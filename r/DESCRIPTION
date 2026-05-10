@@ -1,0 +1,30 @@
+Package: cellAdmixCore
+Type: Package
+Title: Batch-First R Bindings for cellAdmix Core
+Version: 0.0.1
+Authors@R: person("Peter", "Kharchenko", email = "peter.kharchenko@gmail.com", role = c("aut", "cre"))
+Description: Batch-first R bindings for the C++ cellAdmix core, including
+    Xenium project preparation, cell clustering, persisted fit runs, and
+    downstream run inspection helpers.
+License: MIT + file LICENSE
+Encoding: UTF-8
+SystemRequirements: Apache Arrow C++ and Parquet C++ libraries, zlib
+Roxygen: list(markdown = TRUE)
+Imports:
+    Rcpp,
+    Matrix,
+    R6,
+    jsonlite
+LinkingTo:
+    Rcpp
+Suggests:
+    cowplot,
+    ggrepel,
+    ggplot2,
+    knitr,
+    rmarkdown,
+    Seurat,
+    SeuratObject,
+    testthat (>= 3.0.0)
+VignetteBuilder: knitr
+Config/testthat/edition: 3

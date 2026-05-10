@@ -1,0 +1,237 @@
+name: build
+
+on:
+  push:
+  pull_request:
+
+env:
+  VCPKG_GIT_REF: 2026.03.18
+  VCPKG_DISABLE_METRICS: 1
+  HOMEBREW_NO_INSTALL_CLEANUP: 1
+
+jobs:
+  cpp-platforms:
+    name: C++ build (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Ubuntu 24.04
+            os: ubuntu-24.04
+            triplet: x64-linux
+          - name: macOS 14
+            os: macos-14
+            triplet: arm64-osx
+          - name: Windows 2022
+            os: windows-2022
+            triplet: x64-windows
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/.vcpkg
+      VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-bincache,readwrite
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Ubuntu dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y -V \
+            ca-certificates \
+            lsb-release \
+            wget \
+            build-essential \
+            cmake \
+            ninja-build \
+            pkg-config \
+            libeigen3-dev \
+            nlohmann-json3-dev \
+            libopenjp2-7-dev \
+            libtiff-dev \
+            zlib1g-dev
+          wget "https://packages.apache.org/artifactory/arrow/$(lsb_release --id --short | tr 'A-Z' 'a-z')/apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb"
+          sudo apt-get install -y -V "./apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb"
+          sudo apt-get update
+          sudo apt-get install -y -V libarrow-dev libparquet-dev
+
+      - name: Install macOS dependencies
+        if: runner.os == 'macOS'
+        run: brew install cmake ninja pkg-config eigen nlohmann-json apache-arrow openjpeg libtiff zlib
+
+      - name: Checkout vcpkg
+        if: runner.os == 'Windows'
+        uses: actions/checkout@v4
+        with:
+          repository: microsoft/vcpkg
+          ref: ${{ env.VCPKG_GIT_REF }}
+          path: .vcpkg
+
+      - name: Restore vcpkg binary cache
+        if: runner.os == 'Windows'
+        uses: actions/cache@v4
+        with:
+          path: .vcpkg-bincache
+          key: ${{ runner.os }}-${{ matrix.triplet }}-vcpkg-${{ env.VCPKG_GIT_REF }}-${{ hashFiles('vcpkg.json') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.triplet }}-vcpkg-${{ env.VCPKG_GIT_REF }}-
+
+      - name: Bootstrap vcpkg
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: .\.vcpkg\bootstrap-vcpkg.bat -disableMetrics
+
+      - name: Install vcpkg dependencies
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          .\.vcpkg\vcpkg.exe install `
+            --x-manifest-root="$env:GITHUB_WORKSPACE" `
+            --triplet "${{ matrix.triplet }}" `
+            --x-install-root="$env:RUNNER_TEMP/vcpkg_installed"
+
+      - name: Configure
+        if: runner.os != 'Windows'
+        run: cmake --preset user
+
+      - name: Configure
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cmake -S . -B build/ci -G "Visual Studio 17 2022" -A x64 `
+            -DCELLADMIX_BUILD_TESTS=OFF `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" `
+            -DVCPKG_TARGET_TRIPLET="${{ matrix.triplet }}" `
+            -DVCPKG_INSTALLED_DIR="$env:RUNNER_TEMP/vcpkg_installed"
+
+      - name: Build
+        if: runner.os != 'Windows'
+        run: cmake --build --preset user --parallel
+
+      - name: Build
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: cmake --build build/ci --config Release --target celladmix_core --parallel
+
+  cpp-tests:
+    name: Ubuntu C++ tests
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Ubuntu dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y -V \
+            ca-certificates \
+            lsb-release \
+            wget \
+            build-essential \
+            cmake \
+            ninja-build \
+            pkg-config \
+            libeigen3-dev \
+            nlohmann-json3-dev \
+            libopenjp2-7-dev \
+            libtiff-dev \
+            zlib1g-dev
+          wget "https://packages.apache.org/artifactory/arrow/$(lsb_release --id --short | tr 'A-Z' 'a-z')/apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb"
+          sudo apt-get install -y -V "./apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb"
+          sudo apt-get update
+          sudo apt-get install -y -V libarrow-dev libparquet-dev
+
+      - name: Configure tests
+        run: cmake --preset tests
+
+      - name: Build tests
+        run: cmake --build --preset tests --parallel
+
+      - name: Run tests
+        run: ctest --preset tests
+
+  r-install:
+    name: Ubuntu R install smoke
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: release
+
+      - name: Install Ubuntu dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y -V \
+            ca-certificates \
+            lsb-release \
+            wget \
+            build-essential \
+            pkg-config \
+            libeigen3-dev \
+            nlohmann-json3-dev \
+            libopenjp2-7-dev \
+            libtiff-dev \
+            zlib1g-dev
+          wget "https://packages.apache.org/artifactory/arrow/$(lsb_release --id --short | tr 'A-Z' 'a-z')/apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb"
+          sudo apt-get install -y -V "./apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb"
+          sudo apt-get update
+          sudo apt-get install -y -V libarrow-dev libparquet-dev
+
+      - name: Install R dependencies
+        run: |
+          Rscript -e 'install.packages(c("Rcpp", "R6", "jsonlite", "Matrix"), repos = "https://cloud.r-project.org")'
+
+      - name: Install R package
+        run: MAKEFLAGS=-j2 R CMD INSTALL r
+
+      - name: Load R package
+        run: Rscript -e 'library(cellAdmixCore); packageVersion("cellAdmixCore")'
+
+  python-install:
+    name: Ubuntu Python install smoke
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Ubuntu dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y -V \
+            ca-certificates \
+            lsb-release \
+            wget \
+            build-essential \
+            cmake \
+            ninja-build \
+            pkg-config \
+            libeigen3-dev \
+            nlohmann-json3-dev \
+            libopenjp2-7-dev \
+            libtiff-dev \
+            zlib1g-dev
+          wget "https://packages.apache.org/artifactory/arrow/$(lsb_release --id --short | tr 'A-Z' 'a-z')/apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb"
+          sudo apt-get install -y -V "./apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb"
+          sudo apt-get update
+          sudo apt-get install -y -V libarrow-dev libparquet-dev
+
+      - name: Install Python package
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install ./python
+
+      - name: Import Python package
+        run: python -c "import celladmix as ca; print(ca.__version__)"

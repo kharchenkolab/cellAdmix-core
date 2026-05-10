@@ -1,0 +1,38 @@
+[build-system]
+requires = ["scikit-build-core>=0.8", "pybind11>=2.11"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "celladmix"
+version = "0.0.1"
+description = "Python bindings for the C++ cellAdmix core"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+dependencies = [
+  "numpy",
+  "pandas",
+  "pyarrow",
+  "scipy",
+]
+
+[project.optional-dependencies]
+anndata = ["anndata"]
+plot = ["matplotlib", "seaborn"]
+spatialdata = [
+  "anndata",
+  "spatialdata; python_version >= '3.11'",
+  "spatialdata-io; python_version >= '3.11'",
+  "spatialdata-plot; python_version >= '3.11'",
+]
+
+[tool.scikit-build]
+cmake.source-dir = ".."
+wheel.packages = ["src/celladmix"]
+cmake.args = [
+  "-DCELLADMIX_BUILD_PYTHON=ON",
+  "-DCELLADMIX_BUILD_TESTS=OFF",
+]
+
+[tool.scikit-build.cmake.define]
+CMAKE_BUILD_TYPE = "Release"

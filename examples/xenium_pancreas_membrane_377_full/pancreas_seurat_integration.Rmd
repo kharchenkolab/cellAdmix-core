@@ -1,0 +1,235 @@
+---
+title: "cellAdmix with a Seurat Xenium Object"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    df_print: paged
+---
+
+```{r setup, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = TRUE, warning = TRUE,
+  fig.width = 8, fig.height = 6, dpi = 120)
+
+library(Seurat)
+library(cellAdmixCore)
+library(ggplot2)
+library(cowplot)
+```
+
+## Overview
+
+This example shows how to use cellAdmix when the cell-level analysis is managed
+in Seurat. Seurat defines the active cells, active genes, cell annotations, and
+downstream object that users keep working with. cellAdmix uses the original
+Xenium bundle as a molecule-complete backing source, fits molecular admixture
+factors, scores likely source/target relationships, removes putative admixture
+molecules, and writes corrected counts back into the Seurat object as a new
+assay.
+
+The core workflow is:
+
+```{r api-overview, eval=FALSE}
+seu <- LoadXenium("data", molecule.coordinates = FALSE)
+seu$cell_type <- ...
+
+ds <- cellAdmix(seu, xenium_dir = "data", output_dir = "out",
+  annotation = "cell_type")
+fit <- ds$fit()
+score <- fit$score_membrane()
+correction <- score$correct()
+
+seu <- celladmix_add_to_seurat(seu, fit = fit, score = score,
+  correction = correction, corrected_assay = "cellAdmix")
+```
+
+We use `molecule.coordinates = FALSE` when loading Seurat because cellAdmix reads
+the complete transcript table directly from the Xenium bundle. This avoids
+duplicating all molecules in R memory and preserves Xenium fields that Seurat's
+molecule object does not keep.
+
+## Input Data
+
+This example uses the 10x Genomics
+[FFPE human pancreas Xenium dataset](https://www.10xgenomics.com/datasets/ffpe-human-pancreas-with-xenium-multimodal-cell-segmentation-1-standard).
+Download and unpack the bundle into a folder named `data` next to this notebook:
+
+```{bash download-data, eval=FALSE}
+curl -O https://cf.10xgenomics.com/samples/xenium/2.0.0/Xenium_V1_human_Pancreas_FFPE/Xenium_V1_human_Pancreas_FFPE_outs.zip
+unzip Xenium_V1_human_Pancreas_FFPE_outs.zip
+mv outs data
+```
+
+The quick cell-type annotations used here are for demonstration only. They were
+derived from a lightweight clustering/marker workflow in the companion pancreas
+annotation notebook and are intentionally not treated as a curated reference.
+In a normal Seurat analysis, these labels would usually come from standard
+Seurat clustering, marker inspection, reference mapping, or another annotation
+workflow. Here we load predetermined labels only to keep the example focused on
+cellAdmix integration. Place `annotation.csv.gz` in an `annotations` folder next
+to this notebook.
+
+```{r paths}
+data_dir <- "data"
+annotation_file <- file.path("annotations", "annotation.csv.gz")
+
+stopifnot(dir.exists(data_dir))
+stopifnot(file.exists(annotation_file))
+```
+
+## Load Xenium into Seurat
+
+We first create a normal Seurat object from the Xenium output. This is where a
+typical Seurat workflow would do QC, subsetting, normalization, clustering, and
+manual or automated annotation. In this tutorial, we keep that part minimal and
+attach the precomputed example annotations.
+
+The annotation file is a gzip-compressed CSV with one row per cell. We use
+`cell_id` to match rows to Seurat cells, and `merged_annotation` as the
+cell-type label that will be stored in `seu$cell_type`.
+
+```{r load-seurat}
+seu <- LoadXenium(data_dir, fov = "fov", assay = "Xenium",
+  molecule.coordinates = FALSE)
+
+annotation <- read.csv(gzfile(annotation_file), stringsAsFactors = FALSE)
+rownames(annotation) <- annotation$cell_id
+seu$cell_type <- annotation[colnames(seu), "merged_annotation"]
+seu <- subset(seu, cells = colnames(seu)[!is.na(seu$cell_type)])
+
+table(seu$cell_type)
+```
+
+The Seurat object now defines the active analysis universe. If the object had
+already been subsetted to particular cells or genes, the cellAdmix adapter would
+pass those active cell and feature IDs as filters to the Xenium-backed store.
+
+```{r seurat-spatial-labels, fig.width=7, fig.height=6}
+ImageDimPlot(seu, fov = "fov", group.by = "cell_type",
+  axes = TRUE, cols = "polychrome", dark.background = FALSE,
+  border.color = "grey30", border.size = 0.03, alpha = 0.9) +
+  ggtitle("Cell annotations")
+```
+
+## Construct cellAdmix Dataset
+
+The constructor below is the main integration point. The first argument is the
+Seurat object, while `xenium_dir` points to the original Xenium bundle. The
+annotation argument names a Seurat metadata field. We do not need to specify
+`assay` or `image` here because the defaults are inferred from the Seurat object.
+The output directory stores the cellAdmix project cache: encoded molecules,
+factorization output, scores, correction results, and any reusable intermediate
+files.
+
+cellAdmix can work with Seurat without loading molecule coordinates into R
+memory, but it still needs a molecule-complete backing source for the core
+fit/score/correct workflow. For Xenium data, that source is the original bundle
+passed as `xenium_dir`; without it, the analysis is limited to Seurat-side
+metadata/visualization or adding previously computed cellAdmix results back to
+the object.
+
+```{r construct-dataset}
+output_dir <- "out_seurat"
+num_threads <- min(10, parallel::detectCores())
+
+ds <- cellAdmix(seu, xenium_dir = data_dir, output_dir = output_dir,
+  annotation = "cell_type", num_threads = num_threads)
+
+ds
+```
+
+## Fit Molecular Factors
+
+`fit()` samples neighborhood composition vectors from molecules inside cells and
+fits NMF factors. The default rank is chosen from the number of annotation
+classes. Multiple random/cluster-initialized NMF runs are run in parallel by
+default, and the lowest-loss solution is retained.
+
+```{r fit}
+fit <- ds$fit(verbose = TRUE)
+fit
+```
+
+Top factor-loading genes help interpret each factor. The stability plot shows
+whether important factors were consistently recovered across NMF restarts.
+
+```{r factor-loadings, fig.width=10, fig.height=7}
+fit$plot_loadings()
+```
+
+```{r factor-stability, fig.width=6, fig.height=5}
+fit$plot_stability()
+```
+
+## Membrane-Based Scoring
+
+This Xenium run includes membrane staining, so we use membrane scoring. The
+score summarizes which factor-cell-type combinations look more consistent with
+external admixture than with native signal.
+
+```{r membrane-score}
+membrane_score <- fit$score_membrane(verbose = TRUE)
+```
+
+The heatmap is a compact factor-by-cell-type summary of putative source and
+admixture labels.
+
+```{r membrane-heatmap, fig.width=8, fig.height=6}
+p_thresh <- 0.1
+membrane_score$plot_heatmap(p_thresh = p_thresh)
+```
+
+The pair plots show, for each factor, which target cell types have significant
+evidence of admixture from each candidate source cell type. The source evidence
+bar above each matrix summarizes which cell types best explain the factor.
+
+```{r membrane-pairs, fig.width=9.6, fig.height=20}
+membrane_score$plot_pairs()
+```
+
+Correction rules are the source-factor-target combinations that pass the
+threshold and will be used to remove molecules from target cells.
+
+```{r membrane-rules}
+membrane_rules <- membrane_score$rules(p_thresh = p_thresh)
+head(membrane_rules[, c("factor", "source_cell_type", "target_cell_type", "p_value")])
+```
+
+## Correct Counts
+
+The correction step removes molecules assigned to significant admixture factors
+in their target cell types. The result is persisted on disk and can be collected
+as a sparse gene-by-cell matrix.
+
+```{r correction}
+membrane_correction <- membrane_score$correct(rules = membrane_rules,
+  name = "membrane_clean")
+
+membrane_correction$summary()
+```
+
+The molecule-removal plot is a basic diagnostic for how much correction was
+applied across cell types. Large removals should be inspected carefully.
+
+```{r molecule-removal, fig.width=8, fig.height=6}
+membrane_correction$plot_removed_molecules()
+```
+
+## Add Results Back to Seurat
+
+Finally, we attach cellAdmix outputs to the Seurat object. Factor fractions and
+correction summaries are added to metadata. Corrected counts are added as a new
+`cellAdmix` assay, leaving the original `Xenium` assay unchanged.
+
+```{r add-to-seurat}
+seu <- celladmix_add_to_seurat(seu, fit = fit, score = membrane_score,
+  correction = membrane_correction, corrected_assay = "cellAdmix")
+
+SeuratObject::Assays(seu)
+grep("^celladmix_", colnames(seu[[]]), value = TRUE)
+dim(seu[["cellAdmix"]])
+```
+
+At this point, downstream Seurat analyses can compare the original `Xenium`
+assay with the corrected `cellAdmix` assay, or use the added cellAdmix metadata
+for factor-aware visualization and diagnostics.

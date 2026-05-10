@@ -1,0 +1,107 @@
+{
+  "version": 2,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 20,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "user",
+      "displayName": "User Build",
+      "description": "Optimized C++ build using dependencies already visible to CMake.",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/user",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/install",
+        "CELLADMIX_BUILD_TESTS": "OFF"
+      }
+    },
+    {
+      "name": "tests",
+      "displayName": "C++ Tests",
+      "description": "Optimized C++ build with unit tests enabled.",
+      "inherits": "user",
+      "binaryDir": "${sourceDir}/build/tests",
+      "cacheVariables": {
+        "CELLADMIX_BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "python",
+      "displayName": "Python Extension",
+      "description": "Build the pybind11 extension through top-level CMake.",
+      "inherits": "user",
+      "binaryDir": "${sourceDir}/build/python",
+      "cacheVariables": {
+        "CELLADMIX_BUILD_PYTHON": "ON",
+        "CELLADMIX_BUILD_TESTS": "OFF"
+      }
+    },
+    {
+      "name": "user-vcpkg",
+      "displayName": "User Build With vcpkg",
+      "description": "Build with dependencies resolved by vcpkg manifest mode.",
+      "inherits": "user",
+      "binaryDir": "${sourceDir}/build/user-vcpkg",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+        "VCPKG_INSTALLED_DIR": "${sourceDir}/vcpkg_installed"
+      }
+    },
+    {
+      "name": "vcpkg-tests",
+      "displayName": "C++ Tests With vcpkg",
+      "description": "Build tests with dependencies resolved by vcpkg.",
+      "inherits": "user-vcpkg",
+      "binaryDir": "${sourceDir}/build/vcpkg-tests",
+      "cacheVariables": {
+        "CELLADMIX_BUILD_TESTS": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "user",
+      "configurePreset": "user",
+      "targets": ["celladmix_core"]
+    },
+    {
+      "name": "tests",
+      "configurePreset": "tests",
+      "targets": ["celladmix_core_tests"]
+    },
+    {
+      "name": "python",
+      "configurePreset": "python",
+      "targets": ["_core"]
+    },
+    {
+      "name": "user-vcpkg",
+      "configurePreset": "user-vcpkg",
+      "targets": ["celladmix_core"]
+    },
+    {
+      "name": "vcpkg-tests",
+      "configurePreset": "vcpkg-tests",
+      "targets": ["celladmix_core_tests"]
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "tests",
+      "configurePreset": "tests",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "vcpkg-tests",
+      "configurePreset": "vcpkg-tests",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}

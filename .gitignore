@@ -1,0 +1,39 @@
+build/
+build-rel/
+.venv-vis/
+.venv-sdata/
+__pycache__/
+*.pyc
+benchmarks/
+
+# Local exploratory scripts and benchmark artifacts.
+misc/
+docs/development/
+
+# Rendered notebooks and generated run caches are reproducible outputs.
+examples/**/*.html
+examples/**/figure/
+examples/**/project*/
+examples/**/output*/
+examples/**/out_*/
+examples/**/out/
+examples/**/data/
+examples/**/annotations/
+examples/**/out
+examples/**/data
+examples/**/annotations
+examples/**/prepared*/
+examples/**/render_logs/
+examples/**/nmf_sensitivity/
+examples/**/tabular_store_parity*/
+examples/**/*.log
+examples/cosmx_nsclc_giotto/celladmix_scoring_cross_test_*.csv
+r/vignettes/**/*.html
+r/vignettes/examples/
+r/vignettes/project*/
+r/vignettes/output*/
+r/vignettes/**/prep.rds
+
+# Large local datasets copied into examples for development renders.
+examples/cosmx_nsclc_giotto/SMI_Giotto_Object.RData
+examples/cosmx_nsclc_giotto/Lung5_Rep1_tx_file.csv

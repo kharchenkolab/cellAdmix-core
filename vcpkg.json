@@ -1,0 +1,29 @@
+{
+  "name": "celladmix-core",
+  "version-string": "0.0.1",
+  "description": "C++ core for cellAdmix spatial transcriptomics admixture detection and correction.",
+  "dependencies": [
+    {
+      "name": "arrow",
+      "default-features": false,
+      "features": [
+        "compute",
+        "csv",
+        "parquet"
+      ]
+    },
+    "eigen3",
+    "nlohmann-json",
+    "openjpeg",
+    "tiff",
+    "zlib"
+  ],
+  "features": {
+    "python": {
+      "description": "Dependencies needed when building the Python extension directly through CMake.",
+      "dependencies": [
+        "pybind11"
+      ]
+    }
+  }
+}

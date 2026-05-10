@@ -1,0 +1,495 @@
+---
+title: "cellAdmix Xenium Example: Pancreas Membrane and Bridge Scoring"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+---
+
+```{r setup, include=FALSE}
+library(cellAdmixCore)
+library(ggplot2)
+library(cowplot)
+
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = TRUE,
+  fig.align = "center", out.width = "100%", dpi = 150)
+par(mar = c(3.5, 3.5, 2.0, 0.5), mgp = c(2, 0.65, 0), cex = 2/3)
+```
+
+## Overview
+
+This notebook illustrates a cellAdmix workflow on a Xenium pancreas dataset
+with membrane staining. The example starts from a Xenium output bundle, a simple
+cell-type annotation, and a coarse regional annotation. The core fit uses
+default cellAdmix settings: inverse-square-root KL NMF, automatic rank from the
+number of annotated cell types, multiple NMF starts, and gene-loading molecule
+scoring.
+
+At a high level, the workflow is:
+
+```{r api-overview, eval=FALSE}
+ds <- cellAdmix(bundle_dir, output_dir = output_dir, annotation = cell_annotation)
+fit <- ds$fit()
+
+membrane_score <- fit$score_membrane()
+membrane_rules <- membrane_score$rules()
+membrane_correction <- membrane_score$correct(rules = membrane_rules)
+
+bridge_score <- fit$score_bridge()
+bridge_rules <- bridge_score$rules()
+bridge_correction <- bridge_score$correct(rules = bridge_rules)
+```
+
+The constructor records the Xenium bundle location, validates the input
+configuration, and stores lightweight cell-level metadata. It does not load all
+molecules into R memory. The computational work starts with `fit()`, followed by
+one or more scoring methods that identify source-target admixture patterns and
+produce correction rules.
+
+## Inputs
+
+Download the Xenium output bundle from the original
+[10x Genomics dataset page](https://www.10xgenomics.com/datasets/ffpe-human-pancreas-with-xenium-multimodal-cell-segmentation-1-standard)
+and expand it into a local folder named `data`. The bundle zip can be
+downloaded directly with:
+
+```{r download-bundle-command, eval=FALSE}
+curl -O https://cf.10xgenomics.com/samples/xenium/2.0.0/Xenium_V1_human_Pancreas_FFPE/Xenium_V1_human_Pancreas_FFPE_outs.zip
+```
+
+Also create a folder named `annotations` and download the example annotation
+files from
+<http://pklab.org/peterk/cellAdmix/examples/pancreas_377/annotations>.
+The two files used below are `annotations/annotation.csv.gz` and
+`annotations/domain_annotation.csv.gz`. Base R can read these gzip-compressed
+CSV files directly.
+
+The supplied cell annotation and regional-domain segmentation files are
+quick-and-dirty labels generated only for this illustration. They are not
+curated biological ground truth, and they are probably wrong in places. In a
+real analysis, use your own cell-type annotations and tissue-region definitions.
+
+The output directory `out` stores reusable cellAdmix caches, fit outputs,
+scores, and corrected runs.
+
+```{r inputs}
+bundle_dir <- "data"
+output_dir <- "out"
+annotation_file <- file.path("annotations", "annotation.csv.gz")
+domain_file <- file.path("annotations", "domain_annotation.csv.gz")
+
+annotation <- read.csv(annotation_file, stringsAsFactors = FALSE)
+domain_annotation <- read.csv(domain_file, stringsAsFactors = FALSE)
+
+table(annotation$merged_annotation)
+table(domain_annotation$domain_label)
+```
+
+The cell-type annotation is passed to `cellAdmix()` as a named vector. The
+regional-domain table is kept in R memory because it is only used later for
+plots and diagnostic DE comparisons, not for factor fitting or scoring.
+
+```{r construct-celladmix}
+cell_annotation <- setNames(annotation$merged_annotation, annotation$cell_id)
+
+ds <- cellAdmix(bundle_dir, output_dir = output_dir, annotation = cell_annotation)
+
+ds
+```
+
+## Fit Factors
+
+`ds$fit()` constructs molecule-centered neighborhood composition vectors, fits
+NMF factors, projects/smooths molecule factor assignments, and summarizes the
+result at cell level. The rank is automatically derived from the number of cell
+types in the active annotation.
+
+```{r fit-default}
+fit <- ds$fit(verbose = TRUE)
+
+fit
+```
+
+Top gene loadings are the first-pass interpretation of each factor.
+
+```{r factor-loadings, fig.width=8.5, fig.height=5.0}
+fit$plot_loadings()
+```
+
+The stability plot shows whether high-importance factors are reproducible
+across NMF starts.
+
+```{r factor-stability, fig.width=6.2, fig.height=4.2}
+fit$plot_stability()
+```
+
+## Factor Source Prior
+
+Top loadings are useful, but source calls should emphasize genes that actually
+distinguish annotated cell types. `score_factor_sources()` builds pseudobulk
+cell-type profiles from the original counts, estimates one-versus-rest
+cell-type marker weights, and compares each NMF factor against those weighted
+marker signatures. This is a diagnostic source prior only; the membrane and
+bridge scores below are still run independently.
+
+```{r factor-source-score}
+original_counts <- fit$counts()
+factor_source_score <- fit$score_factor_sources(counts = original_counts)
+
+factor_source_score$annotation()
+```
+
+In this table, `score` is the marker-weighted similarity between a factor and
+the best matching cell type. `margin` is the best score minus the second-best
+score for that factor; larger margins indicate more specific source evidence.
+`called` indicates whether the best cell type passed both the score and margin
+thresholds used for source-prior annotation.
+
+The heatmap shows marker-weighted gene-content evidence for each factor and
+cell type. The `S` marker identifies the best gene-content source call for each
+factor.
+
+```{r factor-source-heatmap, fig.width=8.5, fig.height=5.0}
+factor_source_score$plot_heatmap()
+```
+
+The next plot shows the cell-type marker genes that most strongly support each
+factor's best source call.
+
+```{r factor-source-top-genes, fig.width=9.0, fig.height=5.8}
+factor_source_score$plot_top_genes()
+```
+
+## Tissue Context
+
+The cell-type and domain plots below are side visualizations. To prepare them,
+we merge the cellAdmix cell-level factor summaries with the supplied cell-type
+and regional-domain annotations.
+
+```{r cell-spatial-data}
+cell_factors <- fit$cell_factors()
+cell_spatial <- merge(cell_factors,
+  annotation[, c("cell_id", "merged_annotation", "cluster_label")],
+  by = "cell_id", all.x = FALSE, sort = FALSE)
+cell_spatial <- merge(cell_spatial,
+  domain_annotation[, c("cell_id", "domain_label", "domain_fine_label")],
+  by = "cell_id", all.x = FALSE, sort = FALSE)
+cell_spatial$domain_label <- factor(cell_spatial$domain_label,
+  levels = c("adjacent_normal", "transition", "tumor"))
+```
+
+```{r spatial-celltypes, fig.width=6.0, fig.height=4.8}
+celladmix_plot_spatial(cell_spatial, color_by = "merged_annotation") +
+  ggtitle("Cell type annotation")
+```
+
+```{r spatial-domains-factors, fig.width=11.0, fig.height=4.8}
+cowplot::plot_grid(plotlist = list(
+  celladmix_plot_spatial(cell_spatial, color_by = "domain_label") +
+    ggtitle("Coarse tissue domains"),
+  celladmix_plot_spatial(cell_spatial, color_by = "dominant_factor") +
+    ggtitle("Dominant cellAdmix factor")
+), ncol = 2, align = "hv", axis = "tblr")
+```
+
+## Diagnostic Setup
+
+Scoring and correction below are run for all annotated cell types. To keep the
+diagnostic plots readable, we focus the downstream DE and example-cell panels on
+two illustrative cell types: endothelial and immune cells. These choices are
+only for visualization; they do not restrict the cleanup rules.
+
+The marker genes below are used to highlight likely admixture sources in the
+diagnostic plots: ductal/tumor epithelial cells and endocrine/exocrine
+epithelium.
+
+```{r diagnostic-marker-sets}
+diagnostic_cell_types <- c("Endothelial", "Immune")
+
+ductal_tumor_markers <- c("GPRC5A", "MALL", "FHL2", "EPCAM", "GPX2", "MET",
+  "SERPINB3", "KRT7")
+endocrine_exocrine_markers <- c("AMY2A", "AQP8", "ANPEP", "CFTR", "INS",
+  "GCG", "SST", "CHGA", "SCGN")
+source_marker_sets <- list(
+  "ductal/tumor source" = ductal_tumor_markers,
+  "endocrine/exocrine source" = endocrine_exocrine_markers
+)
+```
+
+We then run a baseline DE comparison between tumor and adjacent-normal domains
+for the two diagnostic cell types using the original counts collected above.
+These DE results are only used for the illustrative before/after cleanup plots
+later in the notebook.
+
+```{r diagnostic-de-original}
+diagnostic_de_original <- celladmix_de_by_group(original_counts, cell_spatial,
+  subset_by = "merged_annotation", subsets = diagnostic_cell_types,
+  group_by = "domain_label", contrast = c("tumor", "adjacent_normal"))
+```
+
+These baseline volcano plots show tumor-domain versus adjacent-normal-domain
+differences before any molecule removal. Positive logFC means higher expression
+in tumor-domain target cells.
+
+```{r baseline-volcano, fig.width=11.0, fig.height=4.8}
+baseline_volcano_plots <- lapply(diagnostic_cell_types, function(target_type) {
+  de <- diagnostic_de_original[[target_type]]
+  celladmix_plot_volcano(de, markers = source_marker_sets,
+    title = paste(target_type, "before cleanup"),
+    subtitle = sprintf("logFC = tumor / adjacent_normal; n = %d / %d",
+      unique(de$n_group_a), unique(de$n_group_b)))
+})
+cowplot::plot_grid(plotlist = baseline_volcano_plots,
+  ncol = length(baseline_volcano_plots), align = "hv", axis = "tblr")
+```
+
+## Membrane Scoring
+
+Membrane scoring asks whether target-cell molecules assigned to a factor are
+enriched along membrane-stain paths facing a candidate source cell type.
+The score summaries are thresholded at `p_thresh`; here we use a permissive
+threshold because this notebook is meant to compare candidate cleanup rules.
+
+```{r score-settings}
+p_thresh <- 0.1
+score_pairs_width <- 9.6
+score_pairs_height <- max(6, ceiling(fit$rank / 2) * 4.9)
+```
+
+First, run the membrane scoring procedure. The returned `membrane_score` object
+stores the raw pair-level and summarized evidence; it does not modify molecules.
+
+```{r membrane-score}
+membrane_score <- fit$score_membrane()
+```
+
+Next, convert score summaries into factor annotations. For each factor, this
+identifies the most plausible source cell type and target cell types with
+significant membrane-supported admixture evidence.
+
+```{r membrane-annotation}
+membrane_annotation <- membrane_score$annotation(p_thresh = p_thresh)
+```
+
+Finally, convert those annotation calls into correction rules. Each row says that
+molecules assigned to a given factor should be removed from a target cell type;
+the source cell type is retained as an interpretation of the likely origin.
+
+```{r membrane-rules}
+membrane_rules <- membrane_score$rules(p_thresh = p_thresh)
+
+head(membrane_rules[, c("factor", "source_cell_type", "target_cell_type", "p_value")])
+```
+
+The heatmap summarizes factor-by-cell-type evidence. Color intensity shows the
+strongest membrane-supported target evidence for each factor and cell type; plot
+symbols mark inferred source and cleanup target calls. With the gene-content
+source prior overlaid, `S` marks the membrane/spatial source, `G` marks the
+gene-content source, `SG` marks agreement, separate `S` and `G` labels in the
+same factor column indicate a source conflict, and `*` marks a cleanup target.
+
+```{r membrane-heatmap, fig.width=8.5, fig.height=5.4}
+membrane_score$plot_heatmap(p_thresh = p_thresh,
+  source_prior = factor_source_score)
+```
+
+The pair plots show the same membrane evidence one factor at a time. Rows are
+factors, columns are candidate target cell types, and the top margin summarizes
+which source cell types best explain each factor. This view is useful for
+checking whether a correction rule has a plausible source and target pattern.
+
+```{r membrane-score-pairs, fig.width=score_pairs_width, fig.height=score_pairs_height}
+membrane_score$plot_pairs()
+```
+
+### Example Cells
+
+Next, we render a few target-cell examples for the diagnostic cell types. The
+cell selection uses the membrane score to find cells with strong rule-supported
+admixture-factor evidence. The molecule colors show post-smoothing factor
+labels: native factors in blue, the top putative admixture factor in red, and
+other non-native factors in orange. Marker-gene molecules are shown with the
+same color coding, but are drawn slightly larger.
+
+For example-cell overlays, `fit$stain()` only resolves stain metadata such as
+the file path, pixel size, and coordinate offsets. Pixel data are read lazily as
+small crops around each selected cell.
+
+```{r membrane-example-overlays, fig.width=10.0, fig.height=10.0}
+dapi_stain <- fit$stain("dapi")
+membrane_stain <- fit$stain("membrane")
+cell_boundaries <- fit$cell_boundaries()
+example_cells <- membrane_score$examples(rules = membrane_rules,
+  score_annotation = membrane_annotation, cell_data = cell_spatial,
+  targets = diagnostic_cell_types, n_per_target = 4)
+
+for (cell_type in diagnostic_cell_types) {
+  type_examples <- example_cells[example_cells$target_cell_type == cell_type, , drop = FALSE]
+  print(membrane_score$plot_examples(type_examples,
+    score_annotation = membrane_annotation, cell_data = cell_spatial,
+    boundaries = cell_boundaries,
+    stains = list(dapi = dapi_stain, membrane = membrane_stain),
+    markers = unique(unlist(source_marker_sets)), ncol = 2))
+}
+```
+
+### Membrane Cleanup Diagnostics
+
+The correction step below applies all membrane-derived rules across all
+annotated cell types. This creates a corrected run and then collects the
+corrected cell-by-gene count matrix that will be used for downstream diagnostics.
+
+```{r membrane-cleanup}
+membrane_correction <- membrane_score$correct(rules = membrane_rules,
+  name = "membrane_clean")
+membrane_counts <- membrane_correction$counts()
+
+membrane_correction$summary()
+```
+
+The next step is illustrative: repeat the same tumor-versus-adjacent-normal DE
+comparison on the corrected counts, limited to the two diagnostic cell types
+defined above. This lets us inspect how membrane-based cleanup changes the
+example DE signal.
+
+```{r membrane-diagnostic-de}
+membrane_de <- celladmix_de_by_group(membrane_counts, cell_spatial,
+  subset_by = "merged_annotation", subsets = diagnostic_cell_types,
+  group_by = "domain_label", contrast = c("tumor", "adjacent_normal"))
+```
+
+This boxplot summarizes the number and fraction of molecules removed per cell.
+It is a coarse sanity check: very large shifts indicate aggressive cleanup, while
+near-zero shifts indicate that few rules applied to the dataset.
+
+```{r membrane-removal, fig.width=6.5, fig.height=5.2}
+membrane_correction$plot_removed_molecules()
+```
+
+The marker-expression plots compare source-marker expression in the original and
+corrected count matrices. Here they are restricted to the two diagnostic target
+cell types, so the plot illustrates cleanup impact rather than defining which
+cell types were corrected.
+
+```{r membrane-marker-expression, fig.width=11.0, fig.height=4.2}
+plots <- lapply(diagnostic_cell_types, function(cell_type) {
+  cells <- cell_spatial$cell_id[cell_spatial$merged_annotation == cell_type]
+  celladmix_plot_marker_expression(original_counts, membrane_counts,
+    cells = cells, markers = source_marker_sets) +
+    ggplot2::ggtitle(cell_type)
+})
+cowplot::plot_grid(plotlist = plots, ncol = length(plots), align = "hv", axis = "tblr")
+```
+
+The volcano plots show the same tumor-versus-adjacent-normal DE comparison
+before and after cleanup. The goal is to check whether highlighted source-marker
+genes become less prominent after removing putative admixture molecules.
+
+```{r membrane-volcano, fig.width=11.0, fig.height=4.8}
+for (target_type in diagnostic_cell_types) {
+  p_before <- celladmix_plot_volcano(diagnostic_de_original[[target_type]],
+    markers = source_marker_sets, title = paste(target_type, "before cleanup")) +
+    ggplot2::theme(legend.position = "none")
+  p_after <- celladmix_plot_volcano(membrane_de[[target_type]],
+    markers = source_marker_sets, title = paste(target_type, "after membrane cleanup"))
+  print(cowplot::plot_grid(plotlist = list(p_before, p_after),
+    ncol = 2, align = "hv", axis = "tblr"))
+}
+```
+
+The scatter plots below compare each gene's adjusted DE significance before and
+after cleanup. Genes below the diagonal are less significant after correction;
+highlighted markers show whether expected source signatures are reduced in the
+diagnostic target cell types.
+
+```{r membrane-pvalue-shift, fig.width=11.0, fig.height=5.0}
+plots <- lapply(diagnostic_cell_types, function(target_type) {
+  celladmix_plot_de_shift(diagnostic_de_original[[target_type]], membrane_de[[target_type]],
+    markers = source_marker_sets, title = paste("Membrane", target_type, "p-value shift"))
+})
+cowplot::plot_grid(plotlist = plots, ncol = length(plots), align = "hv", axis = "tblr")
+```
+
+## Bridge Scoring
+
+Bridge scoring uses molecule adjacency across candidate cell pairs rather than
+the stain image. It is useful when a source cell is visible and physically
+adjacent to target molecules.
+
+```{r bridge-score}
+bridge_score <- fit$score_bridge()
+bridge_annotation <- bridge_score$annotation(p_thresh = p_thresh)
+bridge_rules <- bridge_score$rules(p_thresh = p_thresh)
+
+head(bridge_rules[, c("factor", "source_cell_type", "target_cell_type", "p_value")])
+```
+
+```{r bridge-heatmap, fig.width=8.5, fig.height=5.4}
+bridge_score$plot_heatmap(p_thresh = p_thresh,
+  source_prior = factor_source_score)
+```
+
+```{r bridge-score-pairs, fig.width=score_pairs_width, fig.height=score_pairs_height}
+bridge_score$plot_pairs()
+```
+
+The correction step below applies all bridge-derived rules across all annotated
+cell types. As above, the downstream diagnostic plots focus only on the
+illustrative endothelial and immune target cells.
+
+```{r bridge-cleanup}
+bridge_correction <- bridge_score$correct(rules = bridge_rules,
+  name = "bridge_clean")
+bridge_counts <- bridge_correction$counts()
+bridge_de <- celladmix_de_by_group(bridge_counts, cell_spatial,
+  subset_by = "merged_annotation", subsets = diagnostic_cell_types,
+  group_by = "domain_label", contrast = c("tumor", "adjacent_normal"))
+
+bridge_correction$summary()
+```
+
+```{r bridge-removal, fig.width=6.5, fig.height=5.2}
+bridge_correction$plot_removed_molecules()
+```
+
+```{r bridge-marker-expression, fig.width=11.0, fig.height=4.2}
+plots <- lapply(diagnostic_cell_types, function(cell_type) {
+  cells <- cell_spatial$cell_id[cell_spatial$merged_annotation == cell_type]
+  celladmix_plot_marker_expression(original_counts, bridge_counts,
+    cells = cells, markers = source_marker_sets) +
+    ggplot2::ggtitle(cell_type)
+})
+cowplot::plot_grid(plotlist = plots, ncol = length(plots), align = "hv", axis = "tblr")
+```
+
+```{r bridge-volcano, fig.width=11.0, fig.height=4.8}
+for (target_type in diagnostic_cell_types) {
+  p_before <- celladmix_plot_volcano(diagnostic_de_original[[target_type]],
+    markers = source_marker_sets, title = paste(target_type, "before cleanup")) +
+    ggplot2::theme(legend.position = "none")
+  p_after <- celladmix_plot_volcano(bridge_de[[target_type]],
+    markers = source_marker_sets, title = paste(target_type, "after bridge cleanup"))
+  print(cowplot::plot_grid(plotlist = list(p_before, p_after),
+    ncol = 2, align = "hv", axis = "tblr"))
+}
+```
+
+```{r bridge-pvalue-shift, fig.width=11.0, fig.height=5.0}
+plots <- lapply(diagnostic_cell_types, function(target_type) {
+  celladmix_plot_de_shift(diagnostic_de_original[[target_type]], bridge_de[[target_type]],
+    markers = source_marker_sets, title = paste("Bridge", target_type, "p-value shift"))
+})
+cowplot::plot_grid(plotlist = plots, ncol = length(plots), align = "hv", axis = "tblr")
+```
+
+## Score Comparison
+
+These summaries compare the source-cell annotation and target-cell significance
+calls across membrane and bridge scoring. In each triangle panel, the upper-right
+half of a cell corresponds to the first method named in the subtitle and the
+lower-left half corresponds to the second.
+
+```{r scoring-correspondence-plot, fig.width=10.0, fig.height=5.0}
+celladmix_plot_score_agreement(list(Membrane = membrane_annotation,
+  Bridge = bridge_annotation), p_thresh = p_thresh)
+```

@@ -1,0 +1,40 @@
+.DEFAULT_GOAL := all
+
+CXX_STD = CXX17
+CORE_SOURCES = \
+	../../src/bridge.cpp \
+	../../src/clustering.cpp \
+	../../src/coherence.cpp \
+	../../src/domains.cpp \
+	../../src/graph.cpp \
+	../../src/input_store.cpp \
+	../../src/membrane.cpp \
+	../../src/ncv.cpp \
+	../../src/nmf_euclidean.cpp \
+	../../src/nmf_kl.cpp \
+	../../src/pipeline.cpp \
+	../../src/pipeline_common.cpp \
+	../../src/pipeline_store.cpp \
+	../../src/report_embedding.cpp \
+	../../src/run_store.cpp \
+	../../src/simulation.cpp \
+	../../src/tabular.cpp \
+	../../src/tabular_mask.cpp \
+	../../src/workflow.cpp \
+	../../src/xenium.cpp
+CORE_OBJECTS = $(patsubst ../../src/%.cpp,%.o,$(CORE_SOURCES))
+OBJECTS = bindings.o $(CORE_OBJECTS)
+
+TIFF_CPPFLAGS = $(shell sh -c 'pkg-config --cflags-only-I libtiff-4 2>/dev/null || pkg-config --cflags-only-I tiff-4 2>/dev/null || pkg-config --cflags-only-I tiff 2>/dev/null')
+TIFF_LIBS = $(shell sh -c 'pkg-config --libs libtiff-4 2>/dev/null || pkg-config --libs tiff-4 2>/dev/null || pkg-config --libs tiff 2>/dev/null')
+OPENJPEG_CPPFLAGS = $(shell pkg-config --cflags-only-I libopenjp2 2>/dev/null)
+OPENJPEG_LIBS = $(shell pkg-config --libs libopenjp2 2>/dev/null)
+
+PKG_CPPFLAGS = -I../../include $(shell pkg-config --cflags-only-I arrow parquet eigen3) $(TIFF_CPPFLAGS) $(OPENJPEG_CPPFLAGS)
+PKG_CXXFLAGS = -MMD -MP -std=gnu++2a
+PKG_LIBS = $(shell pkg-config --libs arrow parquet) $(TIFF_LIBS) $(OPENJPEG_LIBS) -lz
+
+-include $(wildcard *.d)
+
+$(CORE_OBJECTS): %.o: ../../src/%.cpp
+	$(CXX) $(ALL_CPPFLAGS) $(ALL_CXXFLAGS) -c $< -o $@
