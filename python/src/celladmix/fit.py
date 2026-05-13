@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from . import _core
@@ -27,6 +28,48 @@ class CellAdmixFit:
             f"n_cells={self.manifest.get('n_cells')})"
         )
 
+    @classmethod
+    def load(
+        cls,
+        run_path,
+        *,
+        source=None,
+        annotation=None,
+        annotation_col=None,
+        cell_id_col: str = "cell_id",
+        num_threads=None,
+    ):
+        """Attach to a persisted run directory without refitting.
+
+        Parameters
+        ----------
+        run_path:
+            Path to a run directory or its ``run.json`` manifest.
+        source:
+            Optional original Xenium bundle. If omitted, the loader uses the
+            source path recorded in the run manifest when available. Methods
+            that need bundle-side files, such as membrane-image discovery, will
+            ask for ``source`` if no usable path is attached.
+        annotation:
+            Optional cell annotation used by scoring/correction methods.
+        """
+        from .dataset import CellAdmix
+
+        run_path = Path(run_path)
+        manifest = _core.read_run_manifest(str(run_path))
+        run_dir = Path(manifest["paths"]["root_dir"])
+        output_dir = _output_dir_from_run_dir(run_dir)
+        source = source or _source_from_run_manifest(manifest)
+        dataset = CellAdmix.attach_existing(
+            output_dir,
+            source=source,
+            annotation=annotation,
+            annotation_col=annotation_col,
+            cell_id_col=cell_id_col,
+            num_threads=num_threads,
+        )
+        return cls(dataset, str(run_dir), manifest)
+
     def cells(self) -> pd.DataFrame:
         """Return per-cell factor fractions and coordinates."""
         return pd.read_parquet(self.manifest["paths"]["cells_parquet"])
@@ -35,10 +78,21 @@ class CellAdmixFit:
         """Alias for ``cells()`` for parity with the R API naming."""
         return self.cells()
 
-    def molecules(self, columns=None) -> pd.DataFrame:
-        """Return per-molecule labels and coordinates."""
-        frame = pd.read_parquet(self.manifest["paths"]["molecules_parquet"], columns=columns)
-        return frame
+    def molecules(self, columns=None, *, raw: bool = False) -> pd.DataFrame:
+        """Return per-molecule labels and coordinates.
+
+        Public Python output uses one-based factors: ``factor`` is an integer
+        in ``1..K`` and ``factor_label`` is ``F1..FK``. The persisted parquet
+        file stores the implementation label as a zero-based integer; pass
+        ``raw=True`` to read those columns without conversion.
+        """
+        if raw:
+            return pd.read_parquet(self.manifest["paths"]["molecules_parquet"], columns=columns)
+
+        requested = _normalize_columns(columns)
+        parquet_columns = _molecule_parquet_columns(requested)
+        frame = pd.read_parquet(self.manifest["paths"]["molecules_parquet"], columns=parquet_columns)
+        return _public_molecule_factors(frame, requested)
 
     def region(self, *, bbox=None, cache: bool = True) -> pd.DataFrame:
         """Return molecule records in a physical-coordinate bbox.
@@ -67,8 +121,7 @@ class CellAdmixFit:
         cells = self._cell_index()
         frame["gene"] = frame["gene_idx"].map(genes)
         frame["cell_id"] = frame["cell_idx"].map(cells)
-        frame["factor_label"] = frame["factor_label"].astype(int) + 1
-        return frame
+        return _public_molecule_factors(frame, requested=None)
 
     def _gene_index(self) -> dict[int, str]:
         path = self.dataset.store_dir / "genes.parquet"
@@ -101,6 +154,83 @@ class CellAdmixFit:
         )
         return matrix.T
 
+    def score_molecules(
+        self,
+        molecules: pd.DataFrame,
+        *,
+        gene_col: str = "gene",
+        cell_col: str = "cell_id",
+        x_col: str = "x",
+        y_col: str = "y",
+        return_scores: bool = False,
+        smooth: bool = False,
+        graph_k: int | None = None,
+        same_label_ratio: float | None = None,
+        max_iterations: int = 20,
+    ) -> pd.DataFrame:
+        """Score new same-fit molecules against the learned factor loadings.
+
+        This is a lightweight same-bundle/synthetic helper. It uses the current
+        gene-loading molecule potential, so no NMF refit is performed. Unknown
+        genes receive a uniform factor score. When ``smooth=True``, ``cell_id``,
+        ``x``, and ``y`` are required and a Python implementation of the same
+        within-cell ICM smoothing used by the core pipeline is applied.
+        """
+        original_index = molecules.index
+        frame = molecules.copy().reset_index(drop=True)
+        if gene_col not in frame.columns:
+            raise ValueError(f"score_molecules() requires a gene column {gene_col!r}")
+
+        loadings = self.factor_loadings()
+        factor_labels = list(loadings.columns.astype(str))
+        n_factors = len(factor_labels)
+        if n_factors == 0:
+            raise ValueError("fit does not contain any factor loadings")
+        h = loadings.to_numpy(dtype=float)
+        h = np.maximum(h, 0.0)
+        gene_to_row = {str(gene): idx for idx, gene in enumerate(loadings.index.astype(str))}
+
+        scores = np.full((len(frame), n_factors), 1.0 / n_factors, dtype=float)
+        genes = frame[gene_col].astype(str).to_numpy()
+        for row, gene in enumerate(genes):
+            idx = gene_to_row.get(gene)
+            if idx is None:
+                continue
+            values = h[idx, :]
+            total = float(np.sum(values))
+            if total > np.finfo(float).eps:
+                scores[row, :] = values / total
+
+        factors = np.argmax(scores, axis=1) + 1
+        if smooth:
+            for required in (cell_col, x_col, y_col):
+                if required not in frame.columns:
+                    raise ValueError(f"smooth=True requires column {required!r}")
+            factors = _smooth_molecule_scores(
+                frame,
+                scores,
+                cell_col=cell_col,
+                x_col=x_col,
+                y_col=y_col,
+                graph_k=graph_k if graph_k is not None else int(self.manifest.get("pipeline_options", {}).get("graph_k", 10)),
+                same_label_ratio=same_label_ratio
+                if same_label_ratio is not None
+                else float(self.manifest.get("pipeline_options", {}).get("same_label_ratio", 5.0)),
+                max_iterations=max_iterations,
+            )
+
+        sorted_scores = np.sort(scores, axis=1)
+        margins = sorted_scores[:, -1] - (sorted_scores[:, -2] if n_factors > 1 else 0.0)
+        out = frame.copy()
+        out["factor"] = factors.astype(int)
+        out["factor_label"] = ["F" + str(int(x)) for x in factors]
+        out["factor_margin"] = margins
+        if return_scores:
+            for idx, label in enumerate(factor_labels):
+                out[label] = scores[:, idx]
+        out.index = original_index
+        return out
+
     def counts(self):
         """Return run counts as a scipy CSC matrix with genes x cells orientation."""
         from scipy import sparse
@@ -126,6 +256,11 @@ class CellAdmixFit:
         if image_path is None or pixel_size is None:
             # Resolve Xenium image metadata lazily so callers can override
             # either the path or pixel size without rebuilding the dataset.
+            if self.dataset.source is None:
+                raise ValueError(
+                    "score_membrane() needs the original Xenium bundle path. "
+                    "Pass source=... to CellAdmix.attach_existing() or CellAdmixFit.load()."
+                )
             discovered = discover_xenium_membrane_image(self.dataset.source)
             image_path = image_path or discovered["image_path"]
             pixel_size = pixel_size or discovered["pixel_size"]
@@ -192,6 +327,11 @@ class CellAdmixFit:
 
     def stain(self, stain: str = "membrane", **kwargs) -> dict:
         """Resolve Xenium stain metadata without loading image pixels."""
+        if self.dataset.source is None:
+            raise ValueError(
+                "stain() needs the original Xenium bundle path. "
+                "Pass source=... to CellAdmix.attach_existing() or CellAdmixFit.load()."
+            )
         return discover_xenium_stain_image(self.dataset.source, stain=stain, **kwargs)
 
     def stain_image(self, stain: str = "membrane", **kwargs) -> dict:
@@ -227,3 +367,118 @@ class CellAdmixFit:
             example = prepare_cell_example(self, example, **kwargs)
             kwargs = {}
         return plot_cell_example(example, **kwargs)
+
+
+def _output_dir_from_run_dir(run_dir: Path) -> Path:
+    run_dir = Path(run_dir)
+    return run_dir.parent.parent if run_dir.parent.name == "runs" else run_dir.parent
+
+
+def _source_from_run_manifest(manifest: dict):
+    source = manifest.get("source") or {}
+    path = source.get("path")
+    return path or None
+
+
+def _molecule_parquet_columns(requested):
+    if requested is None:
+        return None
+    parquet_columns = []
+    for column in requested:
+        source = "factor_label" if column in {"factor", "factor_label"} else column
+        if source not in parquet_columns:
+            parquet_columns.append(source)
+    return parquet_columns
+
+
+def _normalize_columns(columns):
+    if columns is None:
+        return None
+    if isinstance(columns, str):
+        return [columns]
+    return list(columns)
+
+
+def _public_molecule_factors(frame: pd.DataFrame, requested) -> pd.DataFrame:
+    if "factor_label" not in frame.columns:
+        return frame if requested is None else frame[[c for c in requested if c in frame.columns]]
+
+    raw = pd.to_numeric(frame["factor_label"], errors="coerce")
+    factor = raw.astype("Int64") + 1
+    invalid = raw.isna() | (raw < 0)
+    factor = factor.mask(invalid)
+    labels = pd.Series(pd.NA, index=frame.index, dtype="object")
+    valid = factor.notna()
+    labels.loc[valid] = "F" + factor.loc[valid].astype(int).astype(str)
+
+    out = frame.drop(columns=["factor_label"]).copy()
+    out["factor"] = factor
+    out["factor_label"] = labels
+    if requested is None:
+        return out
+    keep = [column for column in requested if column in out.columns]
+    return out.loc[:, keep]
+
+
+def _smooth_molecule_scores(
+    frame: pd.DataFrame,
+    scores: np.ndarray,
+    *,
+    cell_col: str,
+    x_col: str,
+    y_col: str,
+    graph_k: int,
+    same_label_ratio: float,
+    max_iterations: int,
+) -> np.ndarray:
+    from scipy.spatial import cKDTree
+
+    labels = np.argmax(scores, axis=1).astype(int)
+    n_factors = scores.shape[1]
+    smoothness = np.log(max(float(same_label_ratio), 1.0))
+    if graph_k <= 0 or max_iterations <= 0 or smoothness <= 0.0 or len(frame) == 0:
+        return labels + 1
+
+    log_scores = np.log(np.maximum(scores, 1e-12))
+    for _, index in frame.groupby(cell_col, sort=False).groups.items():
+        idx = np.asarray(index, dtype=int)
+        if len(idx) <= 1:
+            continue
+        xy = frame.loc[idx, [x_col, y_col]].to_numpy(dtype=float)
+        finite = np.isfinite(xy).all(axis=1)
+        if finite.sum() <= 1:
+            continue
+        active = idx[finite]
+        coords = xy[finite]
+        k = min(int(graph_k) + 1, len(active))
+        _, neighbors = cKDTree(coords).query(coords, k=k)
+        if k == 1:
+            continue
+        if neighbors.ndim == 1:
+            neighbors = neighbors[:, None]
+        adjacency = [set() for _ in range(len(active))]
+        for local, row_neighbors in enumerate(neighbors):
+            for neighbor in row_neighbors:
+                neighbor = int(neighbor)
+                if neighbor == local:
+                    continue
+                adjacency[local].add(neighbor)
+                adjacency[neighbor].add(local)
+        local_labels = labels[active].copy()
+        local_scores = log_scores[active, :]
+        counts = np.zeros(n_factors, dtype=int)
+        for _ in range(int(max_iterations)):
+            changed = 0
+            for local, neighbor_set in enumerate(adjacency):
+                counts.fill(0)
+                for neighbor in neighbor_set:
+                    counts[local_labels[neighbor]] += 1
+                candidate = local_scores[local, :] + smoothness * counts
+                best = int(np.argmax(candidate))
+                if best != local_labels[local]:
+                    local_labels[local] = best
+                    changed += 1
+            if changed == 0:
+                break
+        labels[active] = local_labels
+    return labels + 1

@@ -21,7 +21,7 @@ class CellAdmix:
 
     def __init__(
         self,
-        source,
+        source=None,
         *,
         output_dir: str | os.PathLike = "out",
         format: str = "xenium",
@@ -35,7 +35,7 @@ class CellAdmix:
         keep_unassigned: bool = False,
         keep_non_gene: bool = False,
     ):
-        self.source = Path(source)
+        self.source = None if source is None else Path(source)
         self.output_dir = Path(output_dir)
         self.format = format
         self.num_threads = int(num_threads or _default_threads())
@@ -56,11 +56,62 @@ class CellAdmix:
 
     def __repr__(self) -> str:
         ann = "none" if self.annotation is None else f"{self.annotation.nunique()} labels"
+        source = None if self.source is None else str(self.source)
         return (
-            f"CellAdmix(format={self.format!r}, source={str(self.source)!r}, "
+            f"CellAdmix(format={self.format!r}, source={source!r}, "
             f"output_dir={str(self.output_dir)!r}, annotation={ann}, "
             f"num_threads={self.num_threads})"
         )
+
+    @classmethod
+    def attach_existing(
+        cls,
+        output_dir: str | os.PathLike,
+        *,
+        source=None,
+        format: Optional[str] = None,
+        annotation=None,
+        annotation_col: Optional[str] = None,
+        cell_id_col: str = "cell_id",
+        num_threads: Optional[int] = None,
+    ):
+        """Attach to an existing cellAdmix output directory.
+
+        This does not build or scan the input store. If ``source`` is omitted,
+        the method uses the source path recorded in ``input_store/store.json``
+        when available. Bundle-dependent methods such as membrane image
+        discovery need a usable source path.
+        """
+        output_dir = Path(output_dir)
+        store_dir = output_dir / "input_store"
+        store_manifest = None
+        if store_dir.exists():
+            try:
+                store_manifest = _core.read_input_store_manifest(str(store_dir))
+            except Exception:
+                store_manifest = None
+        if source is None and store_manifest is not None:
+            source = store_manifest.get("source_path") or None
+        if format is None and store_manifest is not None:
+            format = store_manifest.get("source_type") or "xenium"
+        return cls(
+            source,
+            output_dir=output_dir,
+            format=format or "xenium",
+            annotation=annotation,
+            annotation_col=annotation_col,
+            cell_id_col=cell_id_col,
+            num_threads=num_threads,
+        )
+
+    def load_fit(self, run_id_or_path) -> CellAdmixFit:
+        """Load a persisted fit by run id or path."""
+        run_path = Path(run_id_or_path)
+        if not run_path.exists():
+            run_path = self.runs_dir / str(run_id_or_path)
+        manifest = _core.read_run_manifest(str(run_path))
+        run_dir = Path(manifest["paths"]["root_dir"])
+        return CellAdmixFit(self, str(run_dir), manifest)
 
     def set_annotation(self, annotation, *, annotation_col: Optional[str] = None, cell_id_col: str = "cell_id"):
         """Set or replace the active cell annotation."""
@@ -71,6 +122,11 @@ class CellAdmix:
         """Build or reuse the on-disk input store."""
         if self.format != "xenium":
             raise NotImplementedError("Python v1 currently implements Xenium stores")
+        if self.source is None:
+            raise ValueError(
+                "Cannot build an input store without a source path. "
+                "Pass source=... or attach to an existing completed run."
+            )
         # The C++ store builder owns parsing and parquet materialization; the
         # Python layer only normalizes user options and paths.
         return _core.build_xenium_store(

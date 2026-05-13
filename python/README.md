@@ -22,6 +22,19 @@ correction = score.correct(rules=rules)
 counts, genes, cells = correction.counts()
 ```
 
+Existing output directories can be reattached without refitting:
+
+```python
+fit = ca.CellAdmixFit.load("out/runs/fit_rank8_invsqrt_kl",
+                          source="data",
+                          annotation=labels)
+```
+
+Public factor ids are one-based. Molecule tables returned by
+`fit.molecules()` and `fit.score_molecules()` use `factor` (`1..K`) and
+`factor_label` (`F1..FK`); pass `raw=True` only to inspect internal parquet
+labels.
+
 SpatialData integration is available through `ca.from_spatialdata()`.
 Rendering SpatialData-native figures also uses `spatialdata-plot`; current
 SpatialData packages require Python 3.11 or newer.

@@ -337,9 +337,9 @@ def prepare_cell_example(
     other_name = "other admixture factors"
     molecules["role"] = other_name
     if native:
-        molecules.loc[molecules["factor_label"].isin(native), "role"] = native_name
+        molecules.loc[molecules["factor"].isin(native), "role"] = native_name
     if top_factor:
-        molecules.loc[molecules["factor_label"].astype(int) == top_factor, "role"] = top_name
+        molecules.loc[molecules["factor"].astype("Int64") == top_factor, "role"] = top_name
     marker_set = set(markers or [])
     molecules["is_marker"] = molecules["inside_target"] & molecules["gene"].isin(marker_set)
     return {

@@ -47,6 +47,78 @@ Default behavior mirrors the R API:
   construction. Pass `keep_non_gene=True` only for control-feature diagnostics.
 - NMF restarts: default to the dataset thread count.
 
+### Loading Existing Runs
+
+Persisted runs can be reattached without refitting or manually globbing the
+private run directory layout:
+
+```python
+fit = ca.CellAdmixFit.load("out/runs/fit_rank8_invsqrt_kl",
+                          source="data",
+                          annotation=cell_annotation)
+```
+
+or, when working from an output directory:
+
+```python
+ds = ca.CellAdmix.attach_existing("out", source="data", annotation=cell_annotation)
+fit = ds.load_fit("fit_rank8_invsqrt_kl")
+```
+
+The `source` argument is optional when the input-store manifest records a usable
+source path. It is required for methods that need original bundle-side files,
+such as membrane image discovery or cell-boundary plotting, if the path cannot
+be inferred.
+
+### Factor Indexing
+
+The Python public API uses one-based factors throughout:
+
+- integer factor ids are in `1..K` and are stored in a `factor` column;
+- display labels are strings such as `F1`, `F2`, ... in `factor_label`;
+- cell-level columns remain `factor_1_fraction`, `factor_2_fraction`, ...
+  and `dominant_factor` is one-based.
+
+The on-disk `molecules.parquet` file stores the implementation label as a
+zero-based integer. This is an internal detail. Use `fit.molecules(raw=True)`
+only when debugging the persisted parquet representation directly.
+
+### Scoring Additional Molecules
+
+Small same-fit or synthetic molecule tables can be scored against the learned
+factor loadings without refitting:
+
+```python
+scored = fit.score_molecules(
+    new_molecules,              # columns include at least "gene"
+    return_scores=True,
+)
+```
+
+The returned table includes `factor`, `factor_label`, and `factor_margin`.
+With `return_scores=True`, it also includes pre-smoothing soft scores in
+columns `F1..FK`. These scores are the gene-loading molecule potentials used by
+the default pipeline.
+
+This helper only scores the molecule rows supplied by the caller. Molecules
+removed during input-store construction, for example by a strict QV threshold
+or by excluding unassigned molecules, are not recoverable from a completed run
+unless they are supplied separately or the store was built with permissive
+filters.
+
+To also apply the same within-cell hard smoothing used by the fit pipeline:
+
+```python
+scored = fit.score_molecules(new_molecules, smooth=True)
+```
+
+`smooth=True` requires `cell_id`, `x`, and `y` columns. The smoothing step is
+iterative hard-label ICM, not marginal-probability CRF inference, so the
+`F1..FK` columns, when requested, remain the pre-smoothing soft potentials.
+
+Cell-level `factor_K_fraction` values are fractions of molecules assigned to
+each hard factor label after smoothing. They are not soft cell probabilities.
+
 ## SpatialData API
 
 SpatialData integration keeps SpatialData as the Python-side source of
