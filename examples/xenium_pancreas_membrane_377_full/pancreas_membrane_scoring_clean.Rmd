@@ -275,11 +275,15 @@ membrane_annotation <- membrane_score$annotation(p_thresh = p_thresh)
 Finally, convert those annotation calls into correction rules. Each row says that
 molecules assigned to a given factor should be removed from a target cell type;
 the source cell type is retained as an interpretation of the likely origin.
+A native-factor check runs on each rule by default: rules whose factor
+persists in target cells with no source-type neighbors are flagged
+(`keep = FALSE`) as likely native expression and skipped by correction.
 
 ```{r membrane-rules}
 membrane_rules <- membrane_score$rules(p_thresh = p_thresh)
 
-head(membrane_rules[, c("factor", "source_cell_type", "target_cell_type", "p_value")])
+head(membrane_rules[, c("factor", "source_cell_type", "target_cell_type",
+  "p_value", "keep", "native_check")])
 ```
 
 The heatmap summarizes factor-by-cell-type evidence. Color intensity shows the

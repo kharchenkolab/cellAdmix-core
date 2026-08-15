@@ -180,9 +180,19 @@ factor, its inferred source cell type, and a target cell type where that factor
 is called as potential admixture. We only print the first few columns and rows to
 avoid dumping a large table.
 
+Each rule also passes a native-factor false-positive check: target cells with
+no source-type cells among their nearest neighbors are examined, and rules
+whose factor persists in those source-distant cells are flagged
+(`keep = FALSE`, with the reason in `native_check`) and skipped by
+correction. This guards against removing factors that are genuinely native to
+a related target type — on this dataset, the malignant-cell factor in
+epithelial cells is the canonical case: epithelial cells far from any
+malignant cell still express it, so it should not be removed from them.
+
 ```{r bridge-rules}
 rules <- bridge$rules()
-head(rules[, c("factor", "source_cell_type", "target_cell_type", "p_value")])
+rules[, c("factor", "source_cell_type", "target_cell_type", "p_value",
+  "keep", "native_check", "native_distant_median")]
 ```
 
 The heatmap shows which source cell types are implicated for each factor and
