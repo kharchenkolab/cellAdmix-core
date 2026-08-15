@@ -146,7 +146,7 @@ neighborhood crosses into source cell $b$, $C_{ab}$ is stored as
 The bridge score is:
 
 $$
-s^{\mathrm{bridge}}_{abf} =
+s_{abf}^{\mathrm{bridge}} =
 \left|p_{bf} - p_{af}\right| q_{abf}.
 $$
 
@@ -169,9 +169,9 @@ Groups with fewer than `min_pairs` are skipped. If the group has more than
 The summary mean score is:
 
 $$
-\bar{s}^{\mathrm{bridge}}_{TSf} =
+\bar{s}_{TSf}^{\mathrm{bridge}} =
 \frac{1}{|G_{TSf}|}
-\sum_{(a,b) \in G_{TSf}} s^{\mathrm{bridge}}_{abf}.
+\sum_{(a,b) \in G_{TSf}} s_{abf}^{\mathrm{bridge}}.
 $$
 
 If null computation is enabled, bridge scoring computes matched null scores for
@@ -181,7 +181,7 @@ same local pair structure. The summary p-value is a one-sided paired Wilcoxon
 test:
 
 $$
-H_1: s^{\mathrm{bridge}}_{abf} > s^{\mathrm{bridge,null}}_{abf}.
+H_1: s_{abf}^{\mathrm{bridge}} > s_{abf}^{\mathrm{bridge,null}}.
 $$
 
 The output includes `mean_null_score`, `p_value`, and `neg_log10_p`.
@@ -270,7 +270,7 @@ $$
 The pair/factor score is the mean over scored factor molecules:
 
 $$
-s^{\mathrm{membrane}}_{abf} =
+s_{abf}^{\mathrm{membrane}} =
 \frac{1}{|\{i \in M_a : z_i=f\}|}
 \sum_{\{i \in M_a : z_i=f\}} u_i.
 $$
@@ -278,7 +278,7 @@ $$
 The pair output also reports:
 
 $$
-F^+_{abf} =
+F_{abf}^{+} =
 \frac{|\{i : u_i > 0\}|}{|\{i : u_i \text{ scored}\}|},
 \qquad
 \bar{w}_{abf} = \frac{1}{n}\sum_i w_i.
@@ -294,7 +294,7 @@ For each target/source cell-type pair and factor:
 
 $$
 G_{TSf} =
-\{(a,b) : T(a)=T,\ T(b)=S,\ s^{\mathrm{membrane}}_{abf} \text{ exists}\}.
+\{(a,b) : T(a)=T,\ T(b)=S,\ s_{abf}^{\mathrm{membrane}} \text{ exists}\}.
 $$
 
 The highest-scoring rows are kept up to `max_cells_per_type_pair`; groups with
@@ -303,26 +303,23 @@ fewer than `min_pairs` are skipped.
 The summary reports:
 
 $$
-\bar{s}^{\mathrm{membrane}}_{TSf}
-=
+\bar{s}_{TSf}^{\mathrm{membrane}} =
 \frac{1}{|G_{TSf}|}
-\sum_{(a,b)\in G_{TSf}} s^{\mathrm{membrane}}_{abf},
+\sum_{(a,b)\in G_{TSf}} s_{abf}^{\mathrm{membrane}},
 $$
 
 $$
-q^{0.75,\mathrm{membrane}}_{TSf}
-=
+q_{TSf}^{0.75,\mathrm{membrane}} =
 Q_{0.75}
 \left(
-\{s^{\mathrm{membrane}}_{abf} : (a,b)\in G_{TSf}\}
+\{s_{abf}^{\mathrm{membrane}} : (a,b)\in G_{TSf}\}
 \right),
 $$
 
 $$
-F^+_{TSf}
-=
+F_{TSf}^{+} =
 \frac{
-|\{(a,b)\in G_{TSf}: s^{\mathrm{membrane}}_{abf}>0\}|
+|\{(a,b)\in G_{TSf}: s_{abf}^{\mathrm{membrane}}>0\}|
 }{
 |G_{TSf}|
 }.
@@ -333,7 +330,7 @@ These are stored as `mean_score`, `q75_score`, and
 against zero:
 
 $$
-H_1: s^{\mathrm{membrane}}_{abf} > 0.
+H_1: s_{abf}^{\mathrm{membrane}} > 0.
 $$
 
 Thus membrane scoring asks whether source-facing factor molecules see more
@@ -508,8 +505,7 @@ $$
 The per-cell mean coherence score is:
 
 $$
-s^{\mathrm{mean}}_{aSf}
-=
+s_{aSf}^{\mathrm{mean}} =
 \frac{1}{|Q_{af}|}
 \sum_{i \in Q_{af}} u_i.
 $$
@@ -527,8 +523,7 @@ $$
 $$
 
 $$
-A^{\mathrm{active}}_{aSf}
-=
+A_{aSf}^{\mathrm{active}} =
 \frac{|\{i \in Q_{af}: u_i>\theta\}|}{|Q_{af}|}.
 $$
 
@@ -553,8 +548,7 @@ $$
 The local patch mean is:
 
 $$
-\mu_i^{\mathrm{patch}}
-=
+\mu_i^{\mathrm{patch}} =
 \frac{1}{|P_i|}
 \sum_{j \in P_i} u_j.
 $$
@@ -562,16 +556,14 @@ $$
 The patch size weight is:
 
 $$
-\omega_i^{\mathrm{patch}}
-=
+\omega_i^{\mathrm{patch}} =
 \sqrt{\frac{|P_i|}{\max(|Q_{af}|,1)}}.
 $$
 
 The per-cell patch score is:
 
 $$
-s^{\mathrm{patch}}_{aSf}
-=
+s_{aSf}^{\mathrm{patch}} =
 \max_{i \in Q_{af}}
 \mu_i^{\mathrm{patch}}\omega_i^{\mathrm{patch}}.
 $$
@@ -590,25 +582,21 @@ avoid the observed factor molecules when enough other molecules are available;
 otherwise they sample from all molecules in the target cell.
 
 For each null subset, coherence recomputes the mean and patch scores, producing
-cell-level null expectations $\bar{s}^{\mathrm{mean,null}}_{aSf}$ and
-$\bar{s}^{\mathrm{patch,null}}_{aSf}$.
+cell-level null expectations $\bar{s}_{aSf}^{\mathrm{mean,null}}$ and
+$\bar{s}_{aSf}^{\mathrm{patch,null}}$.
 
 The per-cell deltas are:
 
 $$
-\Delta^{\mathrm{mean}}_{aSf}
-=
-s^{\mathrm{mean}}_{aSf}
--
-\bar{s}^{\mathrm{mean,null}}_{aSf},
+\Delta_{aSf}^{\mathrm{mean}} =
+s_{aSf}^{\mathrm{mean}} -
+\bar{s}_{aSf}^{\mathrm{mean,null}},
 $$
 
 $$
-\Delta^{\mathrm{patch}}_{aSf}
-=
-s^{\mathrm{patch}}_{aSf}
--
-\bar{s}^{\mathrm{patch,null}}_{aSf}.
+\Delta_{aSf}^{\mathrm{patch}} =
+s_{aSf}^{\mathrm{patch}} -
+\bar{s}_{aSf}^{\mathrm{patch,null}}.
 $$
 
 For each target/source cell-type pair and factor:
@@ -626,18 +614,16 @@ The mean p-value tests:
 
 $$
 H_1:
-s^{\mathrm{mean}}_{aSf}
->
-\bar{s}^{\mathrm{mean,null}}_{aSf}.
+s_{aSf}^{\mathrm{mean}} >
+\bar{s}_{aSf}^{\mathrm{mean,null}}.
 $$
 
 The patch p-value tests:
 
 $$
 H_1:
-s^{\mathrm{patch}}_{aSf}
->
-\bar{s}^{\mathrm{patch,null}}_{aSf}.
+s_{aSf}^{\mathrm{patch}} >
+\bar{s}_{aSf}^{\mathrm{patch,null}}.
 $$
 
 The R annotation layer currently uses patch p-values by default when available,
@@ -669,6 +655,47 @@ For bridge and membrane:
 
 This distinction matters: source identity should be interpreted as a factor
 annotation, while cleanup calls are target-specific evidence.
+
+## Native-Factor Check
+
+Correction rules generated from any score pass a false-positive control by
+default (`native_check = TRUE` in `rules()`): a counterfactual test of whether
+the factor is native to the target cell type rather than admixed into it. A
+factor can be genuinely expressed by a target type that is biologically
+related to the inferred source — for example a malignant-cell factor in
+epithelial cells — in which case removal would delete native signal.
+
+For a rule removing factor $f$ from target type $T$ with inferred source type
+$S$, target cells are stratified by source exposure: cell $a$ is
+**source-distant** when none of its $k$ nearest neighbor cells (default
+$k = 15$, cell centroids) are of type $S$, and **source-exposed** otherwise.
+Let $x_{af}$ denote the cell-level fraction of factor $f$ in cell $a$, and let
+$D$ and $E$ denote the source-distant and source-exposed cells of type $T$.
+The rule is flagged as a likely false positive (`keep = FALSE`) when any of
+the following holds:
+
+- **Native persistence:** $\mathrm{median}_{a \in D}(x_{af}) > 0.1$ — the
+  factor persists in target cells with no source contact.
+- **Cross-type outlier:** the fraction of source-distant $T$ cells with
+  $x_{af} > 0.05$ exceeds $Q_3 + 1.5\,\mathrm{IQR}$ of the same rate computed
+  over all other cell types, and exceeds $0.1$ — the target expresses the
+  factor distinctly even in isolation.
+- **No exposure gradient:**
+  $\mathrm{mean}_{a \in E}(x_{af}) - \mathrm{mean}_{a \in D}(x_{af}) < 0$ —
+  source proximity does not explain the signal.
+- **Unverifiable:** the source or target type is absent from the annotation,
+  fewer than two source-distant or source-exposed cells exist, or the factor
+  is not expressed in either group. Rules that cannot be verified are excluded
+  to be safe.
+
+Flagged rules stay in the returned rule table with the reason in the
+`native_check` column and the supporting evidence
+(`native_distant_median`, `native_exposure_gradient`,
+`native_distant_expr_frac`, group sizes); correction skips rules with
+`keep = FALSE`. The source-exposure stratification uses the same
+cell-neighborhood construction as the neighbor-enrichment score: enrichment
+reads the positive direction (exposed target cells carry more of the factor),
+while this check reads the negative control (unexposed cells still carry it).
 
 ## Strengths and Weaknesses
 

@@ -10,7 +10,7 @@ reuse the same store abstraction later.
 From the repository root:
 
 ```bash
-python -m pip install -e python --no-build-isolation
+python -m pip install -e python
 ```
 
 SpatialData integration requires a Python 3.11 or newer environment because
@@ -38,9 +38,25 @@ counts, genes, cells = correction.counts()
 directory. The full molecule table is not loaded into Python memory. Fitting,
 scoring, and correction call the C++ core through pybind11.
 
+Fitted runs are cached on disk by run id and reused only when the requested
+parameters match the cached run: `fit()` compares the requested parameters
+(and the annotation content) against the run manifest, reuses on a match with
+a `Reusing cached run ...` message, and refits automatically when anything
+differs, listing the changes. Omitted auto-resolved values (`ncv_k`,
+`nmf_n_runs`) match whatever the cached run recorded; `overwrite=True` forces
+a refit. Scores and corrections recompute on every call and never go stale.
+
+`score.rules()` applies a native-factor false-positive check by default:
+rules whose factor persists in target cells that have no source-type cells
+among their nearest neighbors are flagged `keep=False` with the reason in the
+`native_check` column, and `correct()` skips them. Pass `native_check=False`
+to disable, or tune `native_median_thresh` and related thresholds. See the
+Native-Factor Check section in
+[docs/scoring_methods.md](scoring_methods.md).
+
 Default behavior mirrors the R API:
 
-- NMF method: `invsqrt_kl`.
+- NMF method: `ls_nmf`.
 - Molecule node potentials: gene-loading based scoring.
 - Rank: `ceil(1.2 * number_of_annotation_labels)`, capped at 30.
 - Xenium control/codeword/non-gene features are excluded during input-store
@@ -53,7 +69,7 @@ Persisted runs can be reattached without refitting or manually globbing the
 private run directory layout:
 
 ```python
-fit = ca.CellAdmixFit.load("out/runs/fit_rank8_invsqrt_kl",
+fit = ca.CellAdmixFit.load("out/runs/fit_rank8_ls_nmf",
                           source="data",
                           annotation=cell_annotation)
 ```
@@ -62,7 +78,7 @@ or, when working from an output directory:
 
 ```python
 ds = ca.CellAdmix.attach_existing("out", source="data", annotation=cell_annotation)
-fit = ds.load_fit("fit_rank8_invsqrt_kl")
+fit = ds.load_fit("fit_rank8_ls_nmf")
 ```
 
 The `source` argument is optional when the input-store manifest records a usable
