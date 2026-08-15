@@ -87,13 +87,24 @@ python -m pip install -U pip
 Install the core Python package:
 
 ```bash
+python -m pip install -e python
+```
+
+The default (isolated) build fetches the Python build requirements
+(`scikit-build-core`, `pybind11`, and CMake/Ninja wheels) automatically; only
+the C++ system dependencies above need to be present. For repeated
+development rebuilds, `--no-build-isolation` is faster but skips that
+automatic step, so install the build tools into the environment first:
+
+```bash
+python -m pip install scikit-build-core pybind11 cmake ninja
 python -m pip install -e python --no-build-isolation
 ```
 
 Install plotting and SpatialData extras when needed:
 
 ```bash
-python -m pip install -e "python[plot,spatialdata]" --no-build-isolation
+python -m pip install -e "python[plot,spatialdata]"
 ```
 
 If C++ dependencies are installed in a non-standard location, pass the prefix to
