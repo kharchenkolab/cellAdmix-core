@@ -75,6 +75,7 @@ add_library(celladmix_core
   src/ncv.cpp
   src/nmf_euclidean.cpp
   src/nmf_kl.cpp
+  src/nmf_stability.cpp
   src/pipeline.cpp
   src/pipeline_common.cpp
   src/pipeline_store.cpp
@@ -118,6 +119,7 @@ if (CELLADMIX_BUILD_TESTS)
     tests/test_membrane.cpp
     tests/test_ncv.cpp
     tests/test_nmf.cpp
+    tests/test_nmf_stability.cpp
     tests/test_run_store.cpp
     tests/test_simulation.cpp
     tests/test_tabular.cpp

@@ -1467,8 +1467,10 @@ StorePipelineResult run_basic_pipeline_store(
               << ", seed=" << result.nmf.selected_seed
               << ", objective_mean=" << std::setprecision(6) << result.nmf.candidate_final_objective_mean
               << ", objective_sd=" << result.nmf.candidate_final_objective_sd
-              << ", mean_best_component_cor=" << std::setprecision(3)
-              << result.nmf.candidate_best_match_correlation_mean << ")";
+              << ", mean_matched_ownership_cor=" << std::setprecision(3)
+              << result.nmf.candidate_best_match_correlation_mean
+              << ", stable_factors=" << result.nmf.stable_factor_count
+              << "/" << result.nmf.h.rows() << ")";
     }
     emit_info(pipeline_start, message.str(), result.timing.nmf_fit_sec);
   }
@@ -1669,16 +1671,7 @@ StorePipelineResult run_basic_pipeline_store(
   result.manifest.analysis_crop = analysis_crop;
   result.manifest.genes = counts.genes;
   result.manifest.nmf_gene_weights = full_transform.gene_weights;
-  result.manifest.nmf_diagnostics.final_objective = result.nmf.final_objective;
-  result.manifest.nmf_diagnostics.selected_seed = result.nmf.selected_seed;
-  result.manifest.nmf_diagnostics.selected_run = result.nmf.selected_run;
-  result.manifest.nmf_diagnostics.candidate_final_objectives = result.nmf.candidate_final_objectives;
-  result.manifest.nmf_diagnostics.candidate_best_match_correlations = result.nmf.candidate_best_match_correlations;
-  result.manifest.nmf_diagnostics.selected_factor_stability = result.nmf.selected_factor_stability;
-  result.manifest.nmf_diagnostics.candidate_final_objective_mean = result.nmf.candidate_final_objective_mean;
-  result.manifest.nmf_diagnostics.candidate_final_objective_sd = result.nmf.candidate_final_objective_sd;
-  result.manifest.nmf_diagnostics.candidate_best_match_correlation_mean =
-      result.nmf.candidate_best_match_correlation_mean;
+  result.manifest.nmf_diagnostics = nmf_diagnostics_from_fit(result.nmf);
   result.manifest.nmf_transform_target_row_sum = full_transform.target_row_sum;
   result.manifest.crop_ids = crop_ids;
   result.manifest.n_transcripts = scope.n_molecules;

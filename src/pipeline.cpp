@@ -609,8 +609,10 @@ BasicPipelineResult run_basic_pipeline(
                   << ", seed=" << result.nmf.selected_seed
                   << ", objective_mean=" << std::setprecision(6) << result.nmf.candidate_final_objective_mean
                   << ", objective_sd=" << result.nmf.candidate_final_objective_sd
-                  << ", mean_best_component_cor=" << std::setprecision(3)
-                  << result.nmf.candidate_best_match_correlation_mean << ")";
+                  << ", mean_matched_ownership_cor=" << std::setprecision(3)
+                  << result.nmf.candidate_best_match_correlation_mean
+                  << ", stable_factors=" << result.nmf.stable_factor_count
+                  << "/" << result.nmf.h.rows() << ")";
     }
     emit_info(pipeline_start, nmf_message.str(), result.timing.nmf_fit_sec);
   }

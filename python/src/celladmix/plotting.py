@@ -30,7 +30,7 @@ def plot_loadings(loadings: pd.DataFrame, *, n_genes: int = 8, ncol: int = 3, ax
     return fig
 
 
-def plot_stability(fit, *, min_stability: float = 0.8, label: bool = True, ax=None):
+def plot_stability(fit, *, min_stability: float = 0.3, label: bool = True, ax=None):
     """Plot NMF restart stability versus factor molecule importance."""
     import matplotlib.pyplot as plt
 
@@ -63,10 +63,10 @@ def plot_stability(fit, *, min_stability: float = 0.8, label: bool = True, ax=No
         return ax
     x = 100 * np.maximum(importance, 0)
     y = np.clip(stability, -1, 1)
-    colors = np.where(y >= 0.9, "#1B9E77", np.where(y >= min_stability, "#7570B3", "#D95F02"))
+    colors = np.where(y >= 0.6, "#1B9E77", np.where(y >= min_stability, "#7570B3", "#D95F02"))
     sizes = 60 + 240 * np.sqrt(np.maximum(importance, 0) / max(np.nanmax(importance), np.finfo(float).eps))
     ax.axhline(min_stability, linestyle="--", color="#8c8c8c", linewidth=0.8)
-    ax.axhline(0.9, linestyle=":", color="#b3b3b3", linewidth=0.8)
+    ax.axhline(0.6, linestyle=":", color="#b3b3b3", linewidth=0.8)
     ax.scatter(x, y, s=sizes, c=colors, alpha=0.9)
     if label:
         for i, (xi, yi) in enumerate(zip(x, y), start=1):
@@ -74,7 +74,7 @@ def plot_stability(fit, *, min_stability: float = 0.8, label: bool = True, ax=No
                 ax.text(xi, yi + 0.015, f"F{i}", fontsize=8, ha="center")
     ax.set_title("NMF factor stability vs. importance")
     ax.set_xlabel(x_label)
-    ax.set_ylabel("Mean best-match correlation across seeds")
+    ax.set_ylabel("Matched ownership correlation across restarts")
     ax.set_ylim(max(-0.1, np.nanmin(y) - 0.05), 1.02)
     ax.figure.tight_layout()
     return ax

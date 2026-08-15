@@ -1,5 +1,7 @@
 #include "celladmix/nmf_euclidean.hpp"
 
+#include "celladmix/nmf_stability.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -364,83 +366,6 @@ void renormalize_factors(DenseMatrix& w, DenseMatrix& h) {
   }
 }
 
-double row_pearson_correlation(
-    const DenseMatrix& lhs,
-    int lhs_row,
-    const DenseMatrix& rhs,
-    int rhs_row) {
-  if (lhs.cols() != rhs.cols() || lhs.cols() == 0) {
-    return 0.0;
-  }
-  double lhs_mean = 0.0;
-  double rhs_mean = 0.0;
-  for (int j = 0; j < lhs.cols(); ++j) {
-    lhs_mean += lhs(lhs_row, j);
-    rhs_mean += rhs(rhs_row, j);
-  }
-  lhs_mean /= static_cast<double>(lhs.cols());
-  rhs_mean /= static_cast<double>(rhs.cols());
-
-  double numerator = 0.0;
-  double lhs_ss = 0.0;
-  double rhs_ss = 0.0;
-  for (int j = 0; j < lhs.cols(); ++j) {
-    const double lhs_delta = lhs(lhs_row, j) - lhs_mean;
-    const double rhs_delta = rhs(rhs_row, j) - rhs_mean;
-    numerator += lhs_delta * rhs_delta;
-    lhs_ss += lhs_delta * lhs_delta;
-    rhs_ss += rhs_delta * rhs_delta;
-  }
-  const double denom = std::sqrt(lhs_ss * rhs_ss);
-  return denom > 1e-30 ? numerator / denom : 0.0;
-}
-
-std::vector<double> best_component_correlations(
-    const DenseMatrix& reference_h,
-    const DenseMatrix& candidate_h) {
-  std::vector<double> out(static_cast<std::size_t>(reference_h.rows()), 0.0);
-  if (reference_h.rows() == 0 || candidate_h.rows() == 0 || reference_h.cols() != candidate_h.cols()) {
-    return out;
-  }
-  for (int ref = 0; ref < reference_h.rows(); ++ref) {
-    double best = -1.0;
-    for (int cand = 0; cand < candidate_h.rows(); ++cand) {
-      best = std::max(best, row_pearson_correlation(reference_h, ref, candidate_h, cand));
-    }
-    out[static_cast<std::size_t>(ref)] = best;
-  }
-  return out;
-}
-
-std::vector<double> selected_factor_stability(
-    const std::vector<WeightedNmfResult>& runs,
-    int selected_run) {
-  if (runs.empty()) {
-    return {};
-  }
-  const DenseMatrix& reference_h = runs[static_cast<std::size_t>(selected_run)].h;
-  std::vector<double> totals(static_cast<std::size_t>(reference_h.rows()), 0.0);
-  int n_compared = 0;
-  for (int run = 0; run < static_cast<int>(runs.size()); ++run) {
-    if (run == selected_run) {
-      continue;
-    }
-    const auto correlations = best_component_correlations(reference_h, runs[static_cast<std::size_t>(run)].h);
-    for (std::size_t factor = 0; factor < totals.size(); ++factor) {
-      totals[factor] += correlations[factor];
-    }
-    ++n_compared;
-  }
-  if (n_compared == 0) {
-    std::fill(totals.begin(), totals.end(), 1.0);
-    return totals;
-  }
-  for (double& value : totals) {
-    value /= static_cast<double>(n_compared);
-  }
-  return totals;
-}
-
 // Apply one guarded multiplicative-update step.
 double multiplicative_update(
     double current,
@@ -618,7 +543,11 @@ WeightedNmfResult weighted_nmf_single(
   result.selected_seed = options.seed;
   result.selected_run = 0;
   result.candidate_final_losses = {result.losses.empty() ? std::numeric_limits<double>::infinity() : result.losses.back()};
+  result.candidate_matched_correlations = {1.0};
   result.selected_factor_stability = std::vector<double>(static_cast<std::size_t>(result.h.rows()), 1.0);
+  result.stability_comparison_runs = 0;
+  result.stable_factor_count = 0;
+  result.stability_threshold = kStableFactorThreshold;
   return result;
 }
 
@@ -693,11 +622,17 @@ WeightedNmfResult weighted_nmf_single(
   result.selected_seed = options.seed;
   result.selected_run = 0;
   result.candidate_final_losses = {result.losses.empty() ? std::numeric_limits<double>::infinity() : result.losses.back()};
+  result.candidate_matched_correlations = {1.0};
   result.selected_factor_stability = std::vector<double>(static_cast<std::size_t>(result.h.rows()), 1.0);
+  result.stability_comparison_runs = 0;
+  result.stable_factor_count = 0;
+  result.stability_threshold = kStableFactorThreshold;
   return result;
 }
 
 // Execute multiple Euclidean NMF restarts and keep the best final loss.
+// Cluster initialization (init_groups) is applied to run 0 only; the other
+// restarts are fully random and form the stability comparison set.
 template<class Runner>
 WeightedNmfResult weighted_nmf_multirun(
     const WeightedNmfOptions& options,
@@ -706,6 +641,9 @@ WeightedNmfResult weighted_nmf_multirun(
   if (n_runs == 1) {
     return run_once(options);
   }
+
+  const bool cluster_run0 = !options.init_groups.empty() &&
+      should_use_group_init(options.init_groups, options.rank);
 
   std::vector<WeightedNmfResult> runs(static_cast<std::size_t>(n_runs));
   std::vector<double> final_losses(static_cast<std::size_t>(n_runs), std::numeric_limits<double>::infinity());
@@ -717,6 +655,9 @@ WeightedNmfResult weighted_nmf_multirun(
       run_options.n_runs = 1;
       run_options.num_threads = 1;
       run_options.seed = options.seed + static_cast<unsigned int>(run);
+      if (run > 0) {
+        run_options.init_groups.clear();
+      }
       auto fit = run_once(run_options);
       fit.selected_seed = run_options.seed;
       fit.selected_run = run;
@@ -744,12 +685,28 @@ WeightedNmfResult weighted_nmf_multirun(
     }
   }
 
-  auto factor_stability = selected_factor_stability(runs, best_run);
+  std::vector<const DenseMatrix*> candidate_h;
+  candidate_h.reserve(static_cast<std::size_t>(n_runs));
+  std::vector<int> comparison_runs;
+  comparison_runs.reserve(static_cast<std::size_t>(n_runs));
+  for (int run = 0; run < n_runs; ++run) {
+    candidate_h.push_back(&runs[static_cast<std::size_t>(run)].h);
+    if (run != best_run && !(cluster_run0 && run == 0)) {
+      comparison_runs.push_back(run);
+    }
+  }
+  const auto stability =
+      matched_ownership_stability(candidate_h, best_run, comparison_runs);
+
   auto best = std::move(runs[static_cast<std::size_t>(best_run)]);
   best.selected_run = best_run;
   best.selected_seed = options.seed + static_cast<unsigned int>(best_run);
   best.candidate_final_losses = std::move(final_losses);
-  best.selected_factor_stability = std::move(factor_stability);
+  best.candidate_matched_correlations = stability.run_matched_means;
+  best.selected_factor_stability = stability.factor_stability;
+  best.stability_comparison_runs = stability.comparison_runs;
+  best.stable_factor_count = stability.stable_factor_count;
+  best.stability_threshold = stability.threshold;
   return best;
 }
 

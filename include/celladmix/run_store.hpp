@@ -46,7 +46,9 @@ struct RunStorageOptions {
   int parquet_row_group_size = 65536;
 };
 
-// Compact NMF restart diagnostics stored with persisted runs.
+// Compact NMF restart diagnostics stored with persisted runs. Stability
+// values are matched gene-ownership correlations (see nmf_stability.hpp);
+// stability_metric records which definition produced them.
 struct NmfRunDiagnostics {
   double final_objective = 0.0;
   unsigned int selected_seed = 1;
@@ -57,7 +59,16 @@ struct NmfRunDiagnostics {
   double candidate_final_objective_mean = 0.0;
   double candidate_final_objective_sd = 0.0;
   double candidate_best_match_correlation_mean = 0.0;
+  std::string stability_metric = "ownership_matched";
+  int stability_comparison_runs = 0;
+  int stable_factor_count = 0;
+  double stability_threshold = 0.0;
 };
+
+struct SparseNmfResult;
+
+// Copy multirun diagnostics from a fit result into manifest form.
+NmfRunDiagnostics nmf_diagnostics_from_fit(const SparseNmfResult& fit);
 
 // Top-level manifest describing one persisted run.
 struct RunManifest {

@@ -1005,8 +1005,11 @@ celladmix_read_run <- function(path) {
 #' Build NMF Restart Stability Diagnostics
 #'
 #' Returns one row per selected factor when a run was fitted with multiple NMF
-#' restarts. Stability is the mean best-match correlation of each selected
-#' factor's gene-loading profile against factors from the other seed runs.
+#' restarts. Stability is the mean Hungarian-matched correlation of each
+#' selected factor's gene-ownership profile (loadings normalized per gene
+#' across factors) against the independent random restarts; unrelated factors
+#' score near zero, and values above ~0.3 indicate a reproducibly re-found
+#' factor.
 #' Importance defaults to the fraction of assigned molecules represented by the
 #' factor, estimated from per-cell factor fractions and molecule counts.
 #'
@@ -1110,7 +1113,7 @@ celladmix_plot_nmf_stability <- function(
     cell_factors = NULL,
     importance = c("molecule_fraction", "cell_mean_fraction", "loading_fraction"),
     label = TRUE,
-    min_stability = 0.8
+    min_stability = 0.3
   ) {
   importance <- match.arg(importance)
   df <- celladmix_nmf_stability_data(run, cell_factors = cell_factors,
@@ -1139,7 +1142,7 @@ celladmix_plot_nmf_stability <- function(
   } else {
     rep(1.2, nrow(df))
   }
-  point_col <- ifelse(y >= 0.9, "#1B9E77", ifelse(y >= min_stability, "#7570B3", "#D95F02"))
+  point_col <- ifelse(y >= 0.6, "#1B9E77", ifelse(y >= min_stability, "#7570B3", "#D95F02"))
   x_label <- switch(unique(df$importance_mode)[[1]],
     molecule_fraction = "Factor importance (% of assigned molecules)",
     cell_mean_fraction = "Factor importance (% mean cell fraction)",
@@ -1155,7 +1158,7 @@ celladmix_plot_nmf_stability <- function(
     plot_df$importance_percent <- x
     plot_df$stability_plot <- y
     plot_df$stability_class <- factor(
-      ifelse(y >= 0.9, "high", ifelse(y >= min_stability, "moderate", "low")),
+      ifelse(y >= 0.6, "high", ifelse(y >= min_stability, "moderate", "low")),
       levels = c("high", "moderate", "low")
     )
     plot_df$point_size <- if (is.finite(max_importance) && max_importance > 0) {
@@ -1172,7 +1175,7 @@ celladmix_plot_nmf_stability <- function(
     )) +
       ggplot2::geom_hline(yintercept = min_stability, linetype = "dashed",
         color = "grey55", linewidth = 0.35) +
-      ggplot2::geom_hline(yintercept = 0.9, linetype = "dotted",
+      ggplot2::geom_hline(yintercept = 0.6, linetype = "dotted",
         color = "grey70", linewidth = 0.35) +
       ggplot2::geom_point(alpha = 0.9) +
       ggplot2::scale_color_manual(values = c(high = "#1B9E77",
@@ -1182,7 +1185,7 @@ celladmix_plot_nmf_stability <- function(
         title = "NMF factor stability vs. importance",
         subtitle = subtitle,
         x = x_label,
-        y = "Mean best-match correlation across other seeds",
+        y = "Matched ownership correlation across restarts",
         color = "Stability"
       ) +
       ggplot2::theme_classic(base_size = 10) +
@@ -1202,11 +1205,11 @@ celladmix_plot_nmf_stability <- function(
 
   graphics::plot(x, y, pch = 19, cex = point_cex, col = point_col,
     xlab = x_label,
-    ylab = "Mean best-match correlation across other seeds",
+    ylab = "Matched ownership correlation across restarts",
     main = "NMF factor stability vs. importance",
     ylim = c(max(-0.1, min(y, na.rm = TRUE) - 0.05), 1.02))
   graphics::abline(h = min_stability, lty = 2, col = "grey55")
-  graphics::abline(h = 0.9, lty = 3, col = "grey70")
+  graphics::abline(h = 0.6, lty = 3, col = "grey70")
   if (label) {
     graphics::text(x, y, labels = df$factor_label, pos = 3, cex = 0.72)
   }

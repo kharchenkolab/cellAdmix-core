@@ -47,6 +47,10 @@ recommended mode for current workflows.
 | `sqrt_kl` | Sparse KL-NMF after square-root transformation of NCV counts. |
 | `ls_nmf` | Legacy weighted least-squares NMF mode, included for comparison with the original cellAdmix formulation. |
 
+Multirun fits report a per-factor restart stability diagnostic used for
+factor trust and rank selection; see
+[docs/nmf_stability.md](docs/nmf_stability.md).
+
 ## Installation
 
 See [docs/install.md](docs/install.md) for system dependencies and R/Python

@@ -116,6 +116,14 @@ fit$plot_stability()
 fit$cell_factors()
 ```
 
+With `nmf_n_runs > 1` (default: one restart per thread), the fit records a
+per-factor restart stability diagnostic. Factors below the stability
+threshold (0.3) are seed artifacts rather than reproducible structure and
+should not drive factor interpretation or correction rules; the number of
+stable factors is also the primary rank signal. See
+[NMF restart stability](nmf_stability.md) for the definition, the restart
+initialization recipe, and interpretation guidance.
+
 ## Scoring
 
 Scoring interprets NMF factors as potential source/target admixture patterns.

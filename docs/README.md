@@ -11,6 +11,9 @@ This folder contains user-facing documentation for `cellAdmix-core`.
 - [Inputs](inputs.md): supported input formats and input-specific options.
 - [Scoring methods](scoring_methods.md): bridge, membrane, and coherence
   scoring definitions.
+- [NMF restart stability](nmf_stability.md): the per-factor stability
+  diagnostic, restart recipe, and how to use it for factor trust and rank
+  selection.
 - [Python bindings](python-bindings.md): Python API and SpatialData integration.
 - [Python batch processing](python-batch.md): CLI workflow for Xenium batch
   processing through the Python bindings.

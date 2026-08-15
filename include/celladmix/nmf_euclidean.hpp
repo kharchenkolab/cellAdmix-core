@@ -25,6 +25,7 @@ struct WeightedNmfOptions {
 };
 
 // Result of one weighted-Euclidean NMF solve, possibly selected from multirun.
+// Stability fields hold matched gene-ownership correlations (nmf_stability.hpp).
 struct WeightedNmfResult {
   DenseMatrix w;
   DenseMatrix h;
@@ -32,7 +33,11 @@ struct WeightedNmfResult {
   unsigned int selected_seed = 1;
   int selected_run = 0;
   std::vector<double> candidate_final_losses;
+  std::vector<double> candidate_matched_correlations;
   std::vector<double> selected_factor_stability;
+  int stability_comparison_runs = 0;
+  int stable_factor_count = 0;
+  double stability_threshold = 0.0;
 };
 
 // Compute default inverse column-frequency weights for a dense matrix.

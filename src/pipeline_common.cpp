@@ -66,12 +66,16 @@ SparseNmfResult weighted_to_sparse_nmf_result(const WeightedNmfResult& fit) {
   out.selected_seed = fit.selected_seed;
   out.selected_run = fit.selected_run;
   out.candidate_final_objectives = fit.candidate_final_losses;
+  out.candidate_best_match_correlations = fit.candidate_matched_correlations;
   out.selected_factor_stability = fit.selected_factor_stability;
   const auto [mean, sd] = mean_and_sd(out.candidate_final_objectives);
   out.candidate_final_objective_mean = mean;
   out.candidate_final_objective_sd = sd;
   out.candidate_best_match_correlation_mean =
-      mean_and_sd(out.selected_factor_stability).first;
+      mean_and_sd(out.candidate_best_match_correlations).first;
+  out.stability_comparison_runs = fit.stability_comparison_runs;
+  out.stable_factor_count = fit.stable_factor_count;
+  out.stability_threshold = fit.stability_threshold;
   return out;
 }
 

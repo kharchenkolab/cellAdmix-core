@@ -89,6 +89,10 @@ py::dict nmf_diagnostics_to_dict(const celladmix::NmfRunDiagnostics& diagnostics
   out["candidate_final_objective_sd"] = diagnostics.candidate_final_objective_sd;
   out["candidate_best_match_correlation_mean"] =
       diagnostics.candidate_best_match_correlation_mean;
+  out["stability_metric"] = diagnostics.stability_metric;
+  out["stability_comparison_runs"] = diagnostics.stability_comparison_runs;
+  out["stable_factor_count"] = diagnostics.stable_factor_count;
+  out["stability_threshold"] = diagnostics.stability_threshold;
   return out;
 }
 

@@ -12,6 +12,7 @@ CORE_SOURCES = \
 	../../src/ncv.cpp \
 	../../src/nmf_euclidean.cpp \
 	../../src/nmf_kl.cpp \
+	../../src/nmf_stability.cpp \
 	../../src/pipeline.cpp \
 	../../src/pipeline_common.cpp \
 	../../src/pipeline_store.cpp \

@@ -1850,7 +1850,11 @@ List run_manifest_to_r(const celladmix::RunManifest& manifest) {
       _["candidate_final_objective_sd"] =
           manifest.nmf_diagnostics.candidate_final_objective_sd,
       _["candidate_best_match_correlation_mean"] =
-          manifest.nmf_diagnostics.candidate_best_match_correlation_mean);
+          manifest.nmf_diagnostics.candidate_best_match_correlation_mean,
+      _["stability_metric"] = manifest.nmf_diagnostics.stability_metric,
+      _["stability_comparison_runs"] = manifest.nmf_diagnostics.stability_comparison_runs,
+      _["stable_factor_count"] = manifest.nmf_diagnostics.stable_factor_count,
+      _["stability_threshold"] = manifest.nmf_diagnostics.stability_threshold);
 
   return List::create(
       _["path"] = manifest.paths.root_dir,
@@ -1874,6 +1878,10 @@ List run_manifest_to_r(const celladmix::RunManifest& manifest) {
           manifest.nmf_diagnostics.candidate_final_objective_sd,
       _["nmf_candidate_best_match_correlation_mean"] =
           manifest.nmf_diagnostics.candidate_best_match_correlation_mean,
+      _["nmf_stability_metric"] = manifest.nmf_diagnostics.stability_metric,
+      _["nmf_stability_comparison_runs"] = manifest.nmf_diagnostics.stability_comparison_runs,
+      _["nmf_stable_factor_count"] = manifest.nmf_diagnostics.stable_factor_count,
+      _["nmf_stability_threshold"] = manifest.nmf_diagnostics.stability_threshold,
       _["analysis_crop"] = manifest.analysis_crop.has_value() ? wrap(*manifest.analysis_crop) : R_NilValue,
       _["parent_run"] = manifest.parent_run.has_value() ? wrap(*manifest.parent_run) : R_NilValue,
       _["genes"] = manifest.genes,
@@ -3902,6 +3910,9 @@ extern "C" SEXP _cellAdmixCore_celladmix_fit_store_run(
     out["nmf_candidate_final_objective_mean"] = fit.nmf.candidate_final_objective_mean;
     out["nmf_candidate_final_objective_sd"] = fit.nmf.candidate_final_objective_sd;
     out["nmf_candidate_best_match_correlation_mean"] = fit.nmf.candidate_best_match_correlation_mean;
+    out["nmf_stability_comparison_runs"] = fit.nmf.stability_comparison_runs;
+    out["nmf_stable_factor_count"] = fit.nmf.stable_factor_count;
+    out["nmf_stability_threshold"] = fit.nmf.stability_threshold;
     return out;
   } catch (std::exception& ex) {
     forward_exception_to_r(ex);

@@ -31,6 +31,7 @@ TEST_CASE("Run store writes and reloads a basic fit run") {
   options.rank = 2;
   options.graph_k = 4;
   options.nmf_iterations = 40;
+  options.nmf_n_runs = 3;
   options.nmf_train_max_rows = 40;
   options.return_ncv = false;
   options.seed = 13U;
@@ -64,6 +65,26 @@ TEST_CASE("Run store writes and reloads a basic fit run") {
   REQUIRE_EQ(loaded_manifest.n_transcripts, manifest.n_transcripts);
   REQUIRE_EQ(loaded_manifest.n_factors, manifest.n_factors);
   REQUIRE_EQ(loaded_manifest.n_training_rows, manifest.n_training_rows);
+
+  // Multirun stability diagnostics round-trip through the manifest JSON.
+  REQUIRE_EQ(manifest.nmf_diagnostics.stability_comparison_runs, 2);
+  REQUIRE_EQ(loaded_manifest.nmf_diagnostics.stability_metric, std::string{"ownership_matched"});
+  REQUIRE_EQ(
+      loaded_manifest.nmf_diagnostics.stability_comparison_runs,
+      manifest.nmf_diagnostics.stability_comparison_runs);
+  REQUIRE_EQ(
+      loaded_manifest.nmf_diagnostics.stable_factor_count,
+      manifest.nmf_diagnostics.stable_factor_count);
+  REQUIRE_NEAR(
+      loaded_manifest.nmf_diagnostics.stability_threshold,
+      manifest.nmf_diagnostics.stability_threshold,
+      1e-12);
+  REQUIRE_EQ(
+      loaded_manifest.nmf_diagnostics.selected_factor_stability.size(),
+      manifest.nmf_diagnostics.selected_factor_stability.size());
+  REQUIRE_EQ(
+      loaded_manifest.nmf_diagnostics.candidate_best_match_correlations.size(),
+      static_cast<std::size_t>(3));
 
   const auto training_obs_ids = load_run_training_obs_ids(dir.string());
   REQUIRE_EQ(training_obs_ids.size(), fit.training_query_indices.size());

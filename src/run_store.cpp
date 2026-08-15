@@ -26,9 +26,27 @@
 #include <utility>
 #include <vector>
 
+#include "celladmix/nmf_kl.hpp"
 #include "celladmix/workflow.hpp"
 
 namespace celladmix {
+
+NmfRunDiagnostics nmf_diagnostics_from_fit(const SparseNmfResult& fit) {
+  NmfRunDiagnostics out;
+  out.final_objective = fit.final_objective;
+  out.selected_seed = fit.selected_seed;
+  out.selected_run = fit.selected_run;
+  out.candidate_final_objectives = fit.candidate_final_objectives;
+  out.candidate_best_match_correlations = fit.candidate_best_match_correlations;
+  out.selected_factor_stability = fit.selected_factor_stability;
+  out.candidate_final_objective_mean = fit.candidate_final_objective_mean;
+  out.candidate_final_objective_sd = fit.candidate_final_objective_sd;
+  out.candidate_best_match_correlation_mean = fit.candidate_best_match_correlation_mean;
+  out.stability_comparison_runs = fit.stability_comparison_runs;
+  out.stable_factor_count = fit.stable_factor_count;
+  out.stability_threshold = fit.stability_threshold;
+  return out;
+}
 
 // Persisted run I/O for molecules, cells, factors, manifests, and cropped reloads.
 
@@ -844,6 +862,10 @@ nlohmann::json manifest_to_json(const RunManifest& manifest) {
            {"candidate_final_objective_mean", manifest.nmf_diagnostics.candidate_final_objective_mean},
            {"candidate_final_objective_sd", manifest.nmf_diagnostics.candidate_final_objective_sd},
            {"candidate_best_match_correlation_mean", manifest.nmf_diagnostics.candidate_best_match_correlation_mean},
+           {"stability_metric", manifest.nmf_diagnostics.stability_metric},
+           {"stability_comparison_runs", manifest.nmf_diagnostics.stability_comparison_runs},
+           {"stable_factor_count", manifest.nmf_diagnostics.stable_factor_count},
+           {"stability_threshold", manifest.nmf_diagnostics.stability_threshold},
        }},
       {"nmf_transform_target_row_sum", manifest.nmf_transform_target_row_sum},
       {"crop_ids", manifest.crop_ids},
@@ -945,6 +967,14 @@ RunManifest manifest_from_json(const nlohmann::json& json, const std::filesystem
         diag.value("candidate_final_objective_sd", 0.0);
     manifest.nmf_diagnostics.candidate_best_match_correlation_mean =
         diag.value("candidate_best_match_correlation_mean", 0.0);
+    manifest.nmf_diagnostics.stability_metric =
+        diag.value("stability_metric", std::string{"best_match_legacy"});
+    manifest.nmf_diagnostics.stability_comparison_runs =
+        diag.value("stability_comparison_runs", 0);
+    manifest.nmf_diagnostics.stable_factor_count =
+        diag.value("stable_factor_count", 0);
+    manifest.nmf_diagnostics.stability_threshold =
+        diag.value("stability_threshold", 0.0);
   }
   manifest.nmf_transform_target_row_sum = json.value("nmf_transform_target_row_sum", 0.0);
   manifest.crop_ids = json.at("crop_ids").get<std::vector<std::string>>();
@@ -1341,15 +1371,7 @@ RunManifest write_basic_run(
   manifest.analysis_crop = analysis_crop;
   manifest.genes = table.genes;
   manifest.nmf_gene_weights = fit.nmf_transform.gene_weights;
-  manifest.nmf_diagnostics.final_objective = fit.nmf.final_objective;
-  manifest.nmf_diagnostics.selected_seed = fit.nmf.selected_seed;
-  manifest.nmf_diagnostics.selected_run = fit.nmf.selected_run;
-  manifest.nmf_diagnostics.candidate_final_objectives = fit.nmf.candidate_final_objectives;
-  manifest.nmf_diagnostics.candidate_best_match_correlations = fit.nmf.candidate_best_match_correlations;
-  manifest.nmf_diagnostics.selected_factor_stability = fit.nmf.selected_factor_stability;
-  manifest.nmf_diagnostics.candidate_final_objective_mean = fit.nmf.candidate_final_objective_mean;
-  manifest.nmf_diagnostics.candidate_final_objective_sd = fit.nmf.candidate_final_objective_sd;
-  manifest.nmf_diagnostics.candidate_best_match_correlation_mean = fit.nmf.candidate_best_match_correlation_mean;
+  manifest.nmf_diagnostics = nmf_diagnostics_from_fit(fit.nmf);
   manifest.nmf_transform_target_row_sum = fit.nmf_transform.target_row_sum;
   manifest.crop_ids = unique_nonempty(crop_names);
   manifest.n_transcripts = table.size();

@@ -27,6 +27,10 @@ struct SparseNmfOptions {
 };
 
 // Result of a sparse NMF solve, including multirun selection metadata.
+// Stability fields hold matched gene-ownership correlations (see
+// nmf_stability.hpp): candidate_best_match_correlations is the per-run mean
+// matched correlation against the selected run, and selected_factor_stability
+// is the per-factor mean over the independent comparison restarts.
 struct SparseNmfResult {
   DenseMatrix w;
   DenseMatrix h;
@@ -40,6 +44,9 @@ struct SparseNmfResult {
   double candidate_final_objective_mean = 0.0;
   double candidate_final_objective_sd = 0.0;
   double candidate_best_match_correlation_mean = 0.0;
+  int stability_comparison_runs = 0;
+  int stable_factor_count = 0;
+  double stability_threshold = 0.0;
 };
 
 // Fit sparse NMF under the requested objective and initialization strategy.
