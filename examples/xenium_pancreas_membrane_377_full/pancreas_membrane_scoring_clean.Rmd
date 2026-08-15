@@ -336,6 +336,16 @@ for (cell_type in diagnostic_cell_types) {
 }
 ```
 
+Specific cells can also be plotted directly by ID with `cells = `, whether or
+not they would have been auto-selected — useful for following up on cells
+noticed in other views.
+
+```{r membrane-example-by-id, fig.width=10.0, fig.height=5.9}
+print(membrane_score$plot_examples(
+  cells = as.character(example_cells$target_cell[1:2]),
+  score_annotation = membrane_annotation, cell_data = cell_spatial, ncol = 2))
+```
+
 ### Membrane Cleanup Diagnostics
 
 The correction step below applies all membrane-derived rules across all
