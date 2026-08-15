@@ -146,8 +146,11 @@ fit$plot_loadings()
 ```
 
 The stability plot summarizes how reproducible factors were across the random
-NMF starts. Stable, high-importance factors are easier to interpret; unstable
-or low-importance factors should be treated more cautiously.
+NMF starts. Stability is the matched correlation of each factor's
+gene-ownership profile against independent restarts: unrelated factors score
+near zero, and values above 0.3 indicate a reproducibly re-found factor.
+Stable, high-importance factors are easier to interpret; factors below the
+threshold are seed artifacts and should not drive correction decisions.
 
 ```{r factor-stability, fig.width=6.2, fig.height=4.2}
 fit$plot_stability()

@@ -117,7 +117,8 @@ fit$plot_loadings()
 ```
 
 The stability plot shows whether high-importance factors are reproducible
-across NMF starts.
+across independent NMF restarts (matched gene-ownership correlation: near
+zero for unrelated factors, above 0.3 for reproducibly re-found ones).
 
 ```{r factor-stability, fig.width=6.2, fig.height=4.2}
 fit$plot_stability()
