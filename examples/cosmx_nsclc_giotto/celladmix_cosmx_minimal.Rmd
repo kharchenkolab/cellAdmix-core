@@ -12,7 +12,7 @@ library(cellAdmixCore)
 example_dir <- getwd()
 
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
-  fig.align = "center", out.width = "100%", dpi = 150)
+  fig.align = "center", out.width = "100%", dpi = 96)
 par(mar = c(3.5, 3.5, 2.0, 0.5), mgp = c(2, 0.65, 0), cex = 2/3)
 ```
 
@@ -125,8 +125,9 @@ ds
 
 The fit call constructs neighborhood composition vectors around molecules,
 factorizes them, and assigns each molecule to a factor. By default, the rank is
-chosen from the number of annotation labels, NMF uses inverse-square-root
-weighted KL, molecule scoring uses gene loadings, and the number of NMF starts
+chosen from the number of annotation labels, the neighborhood size is resolved
+from the panel and cell sizes, NMF uses the weighted least-squares (`ls_nmf`)
+formulation, molecule scoring uses gene loadings, and the number of NMF starts
 matches the dataset thread setting.
 
 ```{r fit-default}
@@ -149,6 +150,7 @@ The stability plot summarizes how reproducible factors were across the random
 NMF starts. Stability is the matched correlation of each factor's
 gene-ownership profile against independent restarts: unrelated factors score
 near zero, and values above 0.3 indicate a reproducibly re-found factor.
+Factor importance (the x-axis, echoed by dot size) is the share of all assigned molecules that carry the factor's label, so large dots mark factors that dominate the tissue-wide signal.
 Stable, high-importance factors are easier to interpret; factors below the
 threshold are seed artifacts and should not drive correction decisions.
 

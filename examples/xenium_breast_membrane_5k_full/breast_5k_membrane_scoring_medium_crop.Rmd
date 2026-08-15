@@ -17,7 +17,7 @@ library(ggplot2)
 library(cowplot)
 
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = TRUE,
-  fig.align = "center", out.width = "100%", dpi = 150)
+  fig.align = "center", out.width = "100%", dpi = 96)
 par(mar = c(3.5, 3.5, 2.0, 0.5), mgp = c(2, 0.65, 0), cex = 2/3)
 ```
 
@@ -88,6 +88,10 @@ fit
 ```{r factor-loadings, fig.width=8.5, fig.height=5.0}
 fit$plot_loadings()
 ```
+
+The stability plot shows the matched gene-ownership correlation of each factor
+across independent NMF restarts (near zero for unrelated factors, above 0.3
+for reproducibly re-found ones). Factor importance (the x-axis, echoed by dot size) is the share of all assigned molecules that carry the factor's label, so large dots mark factors that dominate the tissue-wide signal.
 
 ```{r factor-stability, fig.width=6.2, fig.height=4.2}
 fit$plot_stability()

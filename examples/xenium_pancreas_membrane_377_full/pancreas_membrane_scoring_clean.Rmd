@@ -12,7 +12,7 @@ library(ggplot2)
 library(cowplot)
 
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = TRUE,
-  fig.align = "center", out.width = "100%", dpi = 150)
+  fig.align = "center", out.width = "100%", dpi = 96)
 par(mar = c(3.5, 3.5, 2.0, 0.5), mgp = c(2, 0.65, 0), cex = 2/3)
 ```
 
@@ -21,9 +21,9 @@ par(mar = c(3.5, 3.5, 2.0, 0.5), mgp = c(2, 0.65, 0), cex = 2/3)
 This notebook illustrates a cellAdmix workflow on a Xenium pancreas dataset
 with membrane staining. The example starts from a Xenium output bundle, a simple
 cell-type annotation, and a coarse regional annotation. The core fit uses
-default cellAdmix settings: inverse-square-root KL NMF, automatic rank from the
-number of annotated cell types, multiple NMF starts, and gene-loading molecule
-scoring.
+default cellAdmix settings: weighted least-squares (`ls_nmf`) NMF, automatic
+rank from the number of annotated cell types, an automatically resolved
+neighborhood size, multiple NMF starts, and gene-loading molecule scoring.
 
 At a high level, the workflow is:
 
@@ -119,6 +119,7 @@ fit$plot_loadings()
 The stability plot shows whether high-importance factors are reproducible
 across independent NMF restarts (matched gene-ownership correlation: near
 zero for unrelated factors, above 0.3 for reproducibly re-found ones).
+Factor importance (the x-axis, echoed by dot size) is the share of all assigned molecules that carry the factor's label, so large dots mark factors that dominate the tissue-wide signal.
 
 ```{r factor-stability, fig.width=6.2, fig.height=4.2}
 fit$plot_stability()

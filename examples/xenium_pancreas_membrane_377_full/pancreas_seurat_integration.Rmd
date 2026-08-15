@@ -9,7 +9,7 @@ output:
 
 ```{r setup, message=FALSE}
 knitr::opts_chunk$set(echo = TRUE, message = TRUE, warning = TRUE,
-  fig.width = 8, fig.height = 6, dpi = 120)
+  fig.width = 8, fig.height = 6, dpi = 96)
 
 library(Seurat)
 library(cellAdmixCore)
@@ -152,6 +152,7 @@ fit
 
 Top factor-loading genes help interpret each factor. The stability plot shows
 whether important factors were consistently recovered across NMF restarts.
+Factor importance (the x-axis, echoed by dot size) is the share of all assigned molecules that carry the factor's label, so large dots mark factors that dominate the tissue-wide signal.
 
 ```{r factor-loadings, fig.width=10, fig.height=7}
 fit$plot_loadings()
