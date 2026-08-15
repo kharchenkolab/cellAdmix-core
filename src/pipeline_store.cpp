@@ -1283,13 +1283,14 @@ void write_cells_parquet(
 StorePipelineResult run_basic_pipeline_store(
     const std::string& store_dir,
     const RunSourceInfo& source,
-    const BasicPipelineOptions& options,
+    const BasicPipelineOptions& input_options,
     const RunStorageOptions& storage_options,
     const std::string& out_dir,
     const std::optional<std::string>& analysis_crop,
     bool report_ncv_umap,
     const CellCountMatrix* preloaded_counts,
     bool verbose) {
+  BasicPipelineOptions options = input_options;
   const auto pipeline_start = std::chrono::steady_clock::now();
   auto stage_start = pipeline_start;
 
@@ -1336,6 +1337,37 @@ StorePipelineResult run_basic_pipeline_store(
         pipeline_start,
         message.str(),
         std::chrono::duration<double>(std::chrono::steady_clock::now() - stage_start).count());
+  }
+
+  if (options.ncv_k <= 0) {
+    std::vector<char> gene_present(counts.genes.size(), 0);
+    for (const int gene : counts.indices) {
+      gene_present[static_cast<std::size_t>(gene)] = 1;
+    }
+    const int genes_present = static_cast<int>(
+        std::count(gene_present.begin(), gene_present.end(), 1));
+    std::vector<int> cell_totals;
+    cell_totals.reserve(counts.transcript_counts.size());
+    for (const int total : counts.transcript_counts) {
+      if (total > 0) {
+        cell_totals.push_back(total);
+      }
+    }
+    double median_cell = 0.0;
+    if (!cell_totals.empty()) {
+      const auto mid = cell_totals.begin() +
+          static_cast<std::ptrdiff_t>(cell_totals.size() / 2);
+      std::nth_element(cell_totals.begin(), mid, cell_totals.end());
+      median_cell = static_cast<double>(*mid);
+    }
+    options.ncv_k = resolve_auto_ncv_k(genes_present, median_cell);
+    if (verbose) {
+      std::ostringstream message;
+      message << "Resolved ncv_k=" << options.ncv_k << " automatically ("
+              << genes_present << " genes present, median "
+              << static_cast<long long>(median_cell) << " molecules/cell)";
+      emit_info(pipeline_start, message.str(), 0.0);
+    }
   }
 
   StorePipelineResult result;

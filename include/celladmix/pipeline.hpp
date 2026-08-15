@@ -52,6 +52,8 @@ struct BasicPipelineResult {
   std::vector<int> labels;
   std::vector<int> training_query_indices;
   BasicPipelineTiming timing;
+  // Options actually used, with automatic settings (e.g. ncv_k) resolved.
+  BasicPipelineOptions resolved_options;
 };
 
 // Run the full molecule-level factorization and labeling pipeline.

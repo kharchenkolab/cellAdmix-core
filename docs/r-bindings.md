@@ -99,6 +99,16 @@ factor fractions at cell level.
 The default rank is derived from the active annotation. The default NMF method
 is `invsqrt_kl`, the recommended current mode.
 
+The NCV neighborhood size `ncv_k` is resolved automatically from the data:
+it grows with the square root of the panel size (a ~400-gene panel keeps the
+historical value of 20; a 5,000-gene panel resolves to ~70) and is capped at
+half the median cell's molecule count to preserve sub-cellular locality. The
+resolved value is logged during the fit and recorded in the run manifest.
+Passing an explicit `ncv_k` overrides resolution; a warning is raised when an
+explicit value leaves fewer than one neighborhood draw per 100 panel genes,
+since such neighborhoods carry too little gene co-occurrence signal for
+reproducible factors.
+
 Supported `nmf_variant` values:
 
 | `nmf_variant` | Description |

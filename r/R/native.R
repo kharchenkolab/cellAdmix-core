@@ -241,7 +241,7 @@
 .celladmix_fit_store_run <- function(
     store_dir,
     analysis_crop = NULL,
-    ncv_k = 20L,
+    ncv_k = 0L,
     rank = 2L,
     graph_k = 10L,
     same_label_ratio = 5,

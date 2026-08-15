@@ -489,15 +489,53 @@ std::vector<int> sample_training_queries(
 // Run the full transcript-level factorization, projection, and smoothing pipeline.
 BasicPipelineResult run_basic_pipeline(
     const TranscriptTable& table,
-    const BasicPipelineOptions& options,
+    const BasicPipelineOptions& input_options,
     bool verbose) {
   const auto pipeline_start = std::chrono::steady_clock::now();
+  BasicPipelineOptions options = input_options;
+  if (options.ncv_k <= 0) {
+    std::vector<char> gene_present(table.num_genes(), 0);
+    for (const int gene : table.gene_index) {
+      if (gene >= 0) {
+        gene_present[static_cast<std::size_t>(gene)] = 1;
+      }
+    }
+    const int genes_present = static_cast<int>(
+        std::count(gene_present.begin(), gene_present.end(), 1));
+    std::vector<int> cell_totals(static_cast<std::size_t>(table.num_cells()), 0);
+    for (const int cell : table.cell_index) {
+      if (cell >= 0) {
+        ++cell_totals[static_cast<std::size_t>(cell)];
+      }
+    }
+    cell_totals.erase(
+        std::remove(cell_totals.begin(), cell_totals.end(), 0),
+        cell_totals.end());
+    double median_cell = 0.0;
+    if (!cell_totals.empty()) {
+      const auto mid = cell_totals.begin() +
+          static_cast<std::ptrdiff_t>(cell_totals.size() / 2);
+      std::nth_element(cell_totals.begin(), mid, cell_totals.end());
+      median_cell = static_cast<double>(*mid);
+    }
+    options.ncv_k = resolve_auto_ncv_k(genes_present, median_cell);
+    if (verbose) {
+      emit_info(
+          pipeline_start,
+          "Resolved ncv_k=" + std::to_string(options.ncv_k) + " automatically (" +
+              std::to_string(genes_present) + " genes present, median " +
+              std::to_string(static_cast<long long>(median_cell)) +
+              " molecules/cell)",
+          0.0);
+    }
+  }
   NcvOptions ncv_options;
   ncv_options.k = options.ncv_k + 1;
   ncv_options.include_self = true;
   ncv_options.within_cell = true;
 
   BasicPipelineResult result;
+  result.resolved_options = options;
   auto stage_start = std::chrono::steady_clock::now();
   const int training_min_molecules = std::max(options.nmf_min_molecules, options.ncv_k + 1);
   result.training_query_indices =

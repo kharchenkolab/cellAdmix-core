@@ -317,6 +317,20 @@ CellAdmixDataset <- R6::R6Class(
         ),
         dots
       ))
+      explicit_ncv_k <- dots$ncv_k
+      if (!is.null(explicit_ncv_k) && is.finite(explicit_ncv_k[[1]]) &&
+          explicit_ncv_k[[1]] > 0) {
+        n_genes <- length(run$genes)
+        if (n_genes > 100 * as.integer(explicit_ncv_k[[1]])) {
+          warning(sprintf(paste0(
+            "ncv_k=%d is small for a %d-gene panel: neighborhoods carry ",
+            "almost no gene co-occurrence signal and NMF factors become ",
+            "seed-dependent. Consider the automatic default (omit ncv_k; ",
+            "~%d for this panel, subject to cell size) or gene subsetting."),
+            as.integer(explicit_ncv_k[[1]]), n_genes,
+            as.integer(round(20 * sqrt(n_genes / 400)))), call. = FALSE)
+        }
+      }
       fit <- CellAdmixFit$new(
         dataset = self,
         run = run,

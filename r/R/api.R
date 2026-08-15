@@ -838,7 +838,7 @@ celladmix_cluster_cells <- function(
 .celladmix_fit_prep <- function(
     prep, training_labels = "auto", out_dir = NULL, run_id = NULL, analysis_crop = NULL,
     scope = NULL,
-    ncv_k = 20L, rank = NULL, graph_k = 10L, same_label_ratio = 5, nmf_iterations = 150L,
+    ncv_k = NULL, rank = NULL, graph_k = 10L, same_label_ratio = 5, nmf_iterations = 150L,
     nmf_init = c("auto", "random", "cluster"),
     nmf_variant = c("invsqrt_kl", "kl", "sqrt_kl", "ls_nmf"),
     molecule_scoring = c("gene_loadings", "ncv_projection", "auto"),
@@ -867,7 +867,7 @@ celladmix_cluster_cells <- function(
     .celladmix_fit_store_run(
       store$path,
       analysis_crop = analysis_crop,
-      ncv_k = ncv_k,
+      ncv_k = as.integer(ncv_k %||% 0L),
       rank = rank,
       graph_k = graph_k,
       same_label_ratio = same_label_ratio,
@@ -916,6 +916,9 @@ celladmix_cluster_cells <- function(
 #'   selecting NMF training rows. Factors are still projected to all cells in
 #'   the analysis scope.
 #' @param ncv_k Number of within-cell neighbors used for NCV construction.
+#'   The default `NULL` resolves it automatically from the panel size and the
+#'   median cell molecule count (larger panels get larger neighborhoods,
+#'   capped at half the median cell); pass an integer to override.
 #' @param rank Optional NMF rank. If `NULL`, the fit uses an automatically
 #'   recommended value of about `1.2 * n_clusters` from the clustering result,
 #'   capped as if there were at most `20` clusters, with a warning when clustering exceeds `20`
@@ -966,7 +969,7 @@ celladmix_cluster_cells <- function(
 celladmix_fit <- function(
     prep, training_labels = "auto", out_dir = NULL, run_id = NULL, analysis_crop = NULL,
     scope = NULL,
-    ncv_k = 20L, rank = NULL, graph_k = 10L, same_label_ratio = 5,
+    ncv_k = NULL, rank = NULL, graph_k = 10L, same_label_ratio = 5,
     nmf_iterations = 150L, nmf_init = c("auto", "random", "cluster"),
     nmf_variant = c("invsqrt_kl", "kl", "sqrt_kl", "ls_nmf"),
     molecule_scoring = c("gene_loadings", "ncv_projection", "auto"), nmf_n_runs = NA_integer_,

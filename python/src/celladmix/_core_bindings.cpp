@@ -621,7 +621,7 @@ PYBIND11_MODULE(_core, m) {
       py::arg("store_dir"),
       py::arg("out_dir"),
       py::arg("rank"),
-      py::arg("ncv_k") = 20,
+      py::arg("ncv_k") = 0,
       py::arg("graph_k") = 10,
       py::arg("same_label_ratio") = 5.0,
       py::arg("nmf_iterations") = 150,

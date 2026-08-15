@@ -26,6 +26,21 @@ bool is_weighted_ls_variant(const std::string& mode) {
   return mode == "ls_nmf";
 }
 
+int resolve_auto_ncv_k(int genes_present, double median_cell_molecules) {
+  // Neighborhood co-occurrence information scales with ncv_k^2 while the
+  // panel spreads it over genes_present categories, so the sampling-noise
+  // heuristic grows k with sqrt(genes); the anchor keeps a ~400-gene panel at
+  // the historical default of 20. Larger k trades sub-cellular locality for
+  // counts, so it is capped at half the median cell size (and never drops
+  // below the historical default).
+  const double base = 20.0 * std::sqrt(std::max(genes_present, 1) / 400.0);
+  int k = static_cast<int>(std::lround(base));
+  const int cell_cap = std::max(
+      20, static_cast<int>(std::floor(std::max(median_cell_molecules, 0.0) / 2.0)));
+  k = std::min(k, cell_cap);
+  return std::max(k, 20);
+}
+
 std::string resolve_molecule_scoring(const BasicPipelineOptions& options) {
   if (options.molecule_scoring == "auto") {
     return is_weighted_ls_variant(options.nmf_variant)

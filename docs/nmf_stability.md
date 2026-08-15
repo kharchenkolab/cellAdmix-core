@@ -98,3 +98,10 @@ The verbose fit log summarizes the same information, for example
 between the rank and the stable-factor count is the primary signal that the
 rank is set higher than the data support; factors below the threshold should
 be treated as noise when interpreting factors or building correction rules.
+
+Low stability across the board on a large panel usually indicates
+undersized NCV neighborhoods rather than an intrinsic property of the data:
+spreading few neighborhood draws over thousands of genes leaves almost no
+gene co-occurrence signal per neighborhood. The automatic `ncv_k` default
+scales the neighborhood with the panel size to avoid this; see the fitting
+documentation in [r-bindings.md](r-bindings.md).

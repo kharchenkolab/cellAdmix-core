@@ -9,6 +9,7 @@
 #include "celladmix/matrix.hpp"
 #include "celladmix/nmf_euclidean.hpp"
 #include "celladmix/nmf_kl.hpp"
+
 #include "celladmix/pipeline.hpp"
 
 namespace celladmix {
@@ -21,6 +22,11 @@ DenseMatrix expand_h_to_full_genes(
 
 // Return true for the weighted least-squares NMF compatibility mode.
 bool is_weighted_ls_variant(const std::string& mode);
+
+// Resolve the automatic NCV neighborhood size for a panel and cell-size
+// profile: grows with sqrt(genes_present) from the 400-gene/k=20 anchor,
+// capped at half the median cell's molecule count, floored at 20.
+int resolve_auto_ncv_k(int genes_present, double median_cell_molecules);
 
 // Resolve the molecule node-potential mode requested by pipeline options.
 std::string resolve_molecule_scoring(const BasicPipelineOptions& options);

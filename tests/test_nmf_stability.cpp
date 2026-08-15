@@ -5,6 +5,9 @@
 
 #include "celladmix/nmf_kl.hpp"
 #include "celladmix/nmf_stability.hpp"
+#include "celladmix/pipeline.hpp"
+#include "celladmix/pipeline_common.hpp"
+#include "celladmix/simulation.hpp"
 #include "test_framework.hpp"
 
 using namespace celladmix;
@@ -227,4 +230,44 @@ TEST_CASE("Cluster-initialized multirun keeps run zero out of the comparison set
   for (const double value : result.selected_factor_stability) {
     REQUIRE_GT(value, 0.8);
   }
+}
+
+TEST_CASE("Automatic ncv_k grows with panel size and respects cell caps") {
+  // Anchor: a ~400-gene panel keeps the historical default.
+  REQUIRE_EQ(resolve_auto_ncv_k(400, 1000.0), 20);
+  // Small panels never drop below the default.
+  REQUIRE_EQ(resolve_auto_ncv_k(100, 1000.0), 20);
+  // sqrt growth: 960 genes -> ~31, 5000 genes -> ~71.
+  REQUIRE_EQ(resolve_auto_ncv_k(960, 1000.0), 31);
+  REQUIRE_EQ(resolve_auto_ncv_k(5000, 1000.0), 71);
+  // Median cell size caps the growth at half a median cell.
+  REQUIRE_EQ(resolve_auto_ncv_k(5000, 100.0), 50);
+  // Tiny cells fall back to the historical default rather than below it.
+  REQUIRE_EQ(resolve_auto_ncv_k(5000, 30.0), 20);
+  REQUIRE_EQ(resolve_auto_ncv_k(400, 30.0), 20);
+}
+
+TEST_CASE("Pipeline resolves the automatic ncv_k sentinel into options") {
+  SimulationParams params;
+  params.transcripts_per_cell = 60;
+  params.admixture_per_target_cell = 4;
+  params.seed = 5U;
+  const auto sim = simulate_nsclc_admixture(params);
+
+  BasicPipelineOptions options;
+  options.ncv_k = 0;
+  options.rank = 2;
+  options.graph_k = 4;
+  options.nmf_iterations = 30;
+  options.nmf_train_max_rows = 40;
+  options.return_ncv = false;
+  options.seed = 5U;
+  const auto fit = run_basic_pipeline(sim.transcripts, options);
+  // The simulation panel is tiny, so auto resolution lands on the floor of 20
+  // and the resolved value is recorded on the result.
+  REQUIRE_EQ(fit.resolved_options.ncv_k, 20);
+
+  options.ncv_k = 6;
+  const auto explicit_fit = run_basic_pipeline(sim.transcripts, options);
+  REQUIRE_EQ(explicit_fit.resolved_options.ncv_k, 6);
 }

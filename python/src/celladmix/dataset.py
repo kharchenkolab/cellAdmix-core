@@ -190,6 +190,21 @@ class CellAdmix:
             verbose=verbose,
             **kwargs,
         )
+        explicit_ncv_k = kwargs.get("ncv_k")
+        if explicit_ncv_k and int(explicit_ncv_k) > 0:
+            n_genes = len(result.get("genes", []))
+            if n_genes > 100 * int(explicit_ncv_k):
+                import math
+                import warnings
+
+                warnings.warn(
+                    f"ncv_k={explicit_ncv_k} is small for a {n_genes}-gene panel: "
+                    "neighborhoods carry almost no gene co-occurrence signal and "
+                    "NMF factors become seed-dependent. Consider the automatic "
+                    f"default (omit ncv_k; ~{round(20 * math.sqrt(n_genes / 400))} "
+                    "for this panel, subject to cell size) or gene subsetting.",
+                    stacklevel=2,
+                )
         return CellAdmixFit(self, str(run_dir), result)
 
     def cell_state_umap(
