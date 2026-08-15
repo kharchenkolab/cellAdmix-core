@@ -129,14 +129,19 @@ def discover_xenium_stain_image(
     focus_path = Path(focus)
     image_name = re.sub(r"_(\d{4})(?=\.)", f"_{focus_index:04d}", focus_path.name)
     image_path = bundle / focus_path.parent / image_name
+    channel = None
     if not image_path.exists():
+        # Fall back to the manifest's focus image; when that file holds all
+        # channels in one stack, the focus index selects the channel instead.
         image_path = bundle / focus
+        channel = focus_index
     return {
         "stain": stain,
         "image_path": str(image_path),
         "pixel_size": float(manifest.get("pixel_size", 1.0)),
         "x_offset": 0.0,
         "y_offset": 0.0,
+        "channel": channel,
     }
 
 

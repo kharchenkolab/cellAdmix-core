@@ -76,7 +76,14 @@ def read_cell_boundaries(path, *, cells: Iterable[str] | None = None, bbox=None)
 
 
 def read_stain_crop(image: dict, bbox, *, max_pixels: int = 512) -> dict:
-    """Read a downsampled physical-coordinate crop from a tiled Xenium OME-TIFF."""
+    """Read a downsampled physical-coordinate crop from a tiled Xenium OME-TIFF.
+
+    The file is read with OME interpretation disabled: multimodal Xenium
+    bundles split the focus channels across files whose shared OME-XML makes
+    tifffile aggregate them into one multi-channel series, in which case every
+    file would otherwise yield channel 0 (DAPI) regardless of the requested
+    stain. Reading file-local pages keeps each focus file's own channel.
+    """
     import tifffile
     import zarr
 
@@ -84,25 +91,28 @@ def read_stain_crop(image: dict, bbox, *, max_pixels: int = 512) -> dict:
     pixel_size = float(image.get("pixel_size", 1.0))
     x_offset = float(image.get("x_offset", 0.0))
     y_offset = float(image.get("y_offset", 0.0))
+    channel = image.get("channel")
     image_path = str(image["image_path"])
-    with tifffile.TiffFile(image_path) as tif:
-        store = tif.series[0].aszarr()
+    with tifffile.TiffFile(image_path, is_ome=False) as tif:
+        series = tif.series[0]
+        levels = sorted(series.levels, key=lambda l: l.shape[-1], reverse=True)
+        full_width = levels[0].shape[-1]
+        width_px = max(1.0, (xmax - xmin) / pixel_size)
+        height_px = max(1.0, (ymax - ymin) / pixel_size)
+        level = levels[0]
+        # Use the coarsest pyramid level that still satisfies the requested
+        # pixel budget; this keeps notebook example rendering lightweight.
+        for candidate in levels:
+            scale = full_width / candidate.shape[-1]
+            if max(width_px / scale, height_px / scale) <= max_pixels:
+                level = candidate
+                break
+        scale = full_width / level.shape[-1]
+        store = level.aszarr()
         try:
-            group = zarr.open(store, mode="r")
-            arrays = [group[key] for key in group.keys()]
-            arrays = sorted(arrays, key=lambda a: a.shape[-1], reverse=True)
-            full_height, full_width = arrays[0].shape[-2], arrays[0].shape[-1]
-            width_px = max(1.0, (xmax - xmin) / pixel_size)
-            height_px = max(1.0, (ymax - ymin) / pixel_size)
-            level = arrays[0]
-            # Use the coarsest pyramid level that still satisfies the requested
-            # pixel budget; this keeps notebook example rendering lightweight.
-            for candidate in arrays:
-                scale = full_width / candidate.shape[-1]
-                if max(width_px / scale, height_px / scale) <= max_pixels:
-                    level = candidate
-                    break
-            scale = full_width / level.shape[-1]
+            data = zarr.open(store, mode="r")
+            if isinstance(data, zarr.Group):
+                data = data[next(iter(sorted(data.array_keys())))]
             px0 = int(np.floor((xmin - x_offset) / pixel_size / scale))
             px1 = int(np.ceil((xmax - x_offset) / pixel_size / scale))
             py0 = int(np.floor((ymin - y_offset) / pixel_size / scale))
@@ -112,9 +122,10 @@ def read_stain_crop(image: dict, bbox, *, max_pixels: int = 512) -> dict:
             px1 = max(px0 + 1, min(px1, level.shape[-1]))
             py1 = max(py0 + 1, min(py1, level.shape[-2]))
             if len(level.shape) == 3:
-                values = np.asarray(level[0, py0:py1, px0:px1], dtype=float)
+                values = np.asarray(
+                    data[int(channel or 0), py0:py1, px0:px1], dtype=float)
             else:
-                values = np.asarray(level[py0:py1, px0:px1], dtype=float)
+                values = np.asarray(data[py0:py1, px0:px1], dtype=float)
         finally:
             store.close()
     return {
