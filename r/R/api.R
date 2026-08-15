@@ -2104,6 +2104,29 @@ celladmix_discover_stain_image <- function(
   )
 }
 
+#' Discover All Available Stain Images for a Run
+#'
+#' Quiet counterpart of [celladmix_discover_stain_image()]: resolves each of
+#' the requested stains and silently skips ones the source bundle does not
+#' provide. Returns an empty list for non-Xenium sources, which makes the
+#' result directly usable as a default example-plot background specification.
+#'
+#' @keywords internal
+#' @noRd
+.celladmix_discover_stain_images <- function(run, names = c("dapi", "membrane")) {
+  out <- list()
+  for (name in names) {
+    image <- tryCatch(
+      celladmix_discover_stain_image(run, stain = name),
+      error = function(e) NULL
+    )
+    if (!is.null(image)) {
+      out[[name]] <- image
+    }
+  }
+  out
+}
+
 #' Discover a Xenium Membrane Image for Scoring
 #'
 #' Backward-compatible wrapper around [celladmix_discover_stain_image()] used by

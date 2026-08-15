@@ -87,18 +87,28 @@ CellAdmixScore <- R6::R6Class(
                             score_annotation = NULL, ...) {
       score_annotation <- score_annotation %||% self$annotation(p_thresh = p_thresh,
         adjust_p = adjust_p)
+      if (is.character(example)) {
+        example <- celladmix_select_example_cells(self,
+          score_annotation = score_annotation, p_thresh = p_thresh,
+          adjust_p = adjust_p, cells = example)
+      }
       celladmix_plot_cell_example(example, fit = self$fit,
         score_annotation = score_annotation, ...)
     },
     plot_examples = function(examples = NULL, targets = NULL, n_per_target = 4,
                              p_thresh = 0.1, adjust_p = FALSE, rules = NULL,
                              score_annotation = NULL, cell_data = NULL,
-                             ncol = 2, ...) {
+                             cells = NULL, ncol = 2, ...) {
       score_annotation <- score_annotation %||% self$annotation(p_thresh = p_thresh,
         adjust_p = adjust_p)
+      if (is.character(examples) && is.null(cells)) {
+        cells <- examples
+        examples <- NULL
+      }
       if (is.null(examples)) {
         examples <- self$examples(rules = rules, score_annotation = score_annotation,
           cell_data = cell_data, targets = targets, n_per_target = n_per_target,
+          cells = cells,
           p_thresh = p_thresh, adjust_p = adjust_p)
       }
       if (is.null(examples) || !nrow(examples)) {

@@ -216,12 +216,114 @@ celladmix_read_cell_boundaries <- function(path, cells = NULL, bbox = NULL) {
   grDevices::as.raster(rgb_arr)
 }
 
-.celladmix_collect_example_stain_crops <- function(fit, stains, bbox, max_pixels) {
+.celladmix_resolve_example_stains <- function(fit, stains) {
+  if (is.character(stains) && length(stains) == 1L && identical(stains[[1]], "auto")) {
+    return(fit$stains())
+  }
   if (is.null(stains) || !length(stains)) {
     return(list())
   }
   if (!is.list(stains)) {
     stains <- list(stain = stains)
+  }
+  if (!is.null(stains$path)) {
+    # A single stain descriptor rather than a named list of descriptors.
+    stains <- stats::setNames(list(stains), stains$stain %||% "stain")
+  }
+  stains
+}
+
+.celladmix_example_columns <- c(
+  "target_cell", "target_cell_type", "top_admix_factor", "top_admix_source",
+  "top_admix_score", "top_factor_molecules", "top_factor_fraction",
+  "top_evidence", "n_candidate_factors", "total_factor_molecules",
+  "transcript_count", "dominant_factor")
+
+# Assemble the final example table for explicitly requested cells: keep the
+# score-derived rows that exist, append NA-evidence rows for the remaining
+# requested cells, and preserve the requested order.
+.celladmix_requested_cell_examples <- function(score, cells, examples, cell_data) {
+  have <- if (!is.null(examples) && nrow(examples)) {
+    as.character(examples$target_cell)
+  } else {
+    character()
+  }
+  missing_cells <- setdiff(cells, have)
+  if (length(missing_cells)) {
+    type_map <- tryCatch(
+      score$fit$dataset$annotation(score$fit$annotation_name, as_vector = TRUE),
+      error = function(e) NULL)
+    rows <- data.frame(target_cell = missing_cells, stringsAsFactors = FALSE)
+    rows$target_cell_type <- if (!is.null(type_map)) {
+      unname(type_map[missing_cells])
+    } else {
+      NA_character_
+    }
+    for (column in setdiff(.celladmix_example_columns,
+        c("target_cell", "target_cell_type"))) {
+      rows[[column]] <- NA_real_
+    }
+    if (is.data.frame(cell_data) && "cell_id" %in% names(cell_data)) {
+      idx <- match(missing_cells, as.character(cell_data$cell_id))
+      if ("transcript_count" %in% names(cell_data)) {
+        rows$transcript_count <- cell_data$transcript_count[idx]
+      }
+      if ("dominant_factor" %in% names(cell_data)) {
+        rows$dominant_factor <- cell_data$dominant_factor[idx]
+      }
+    }
+    if (!is.null(examples) && nrow(examples)) {
+      rows <- rows[, names(examples), drop = FALSE]
+      examples <- rbind(examples, rows)
+    } else {
+      examples <- rows
+    }
+  }
+  examples <- examples[match(cells, as.character(examples$target_cell)), , drop = FALSE]
+  examples <- examples[!is.na(examples$target_cell), , drop = FALSE]
+  rownames(examples) <- NULL
+  examples
+}
+
+.celladmix_resolve_example_cell_types <- function(fit, cell_types) {
+  if (is.character(cell_types) && length(cell_types) == 1L &&
+      identical(cell_types[[1]], "auto")) {
+    return(tryCatch(
+      fit$dataset$annotation(fit$annotation_name, as_vector = TRUE),
+      error = function(e) NULL))
+  }
+  if (is.null(cell_types) || !length(cell_types)) {
+    return(NULL)
+  }
+  if (is.data.frame(cell_types)) {
+    type_col <- intersect(c("cell_type", "merged_annotation", "cluster_label"),
+      names(cell_types))
+    if (!("cell_id" %in% names(cell_types)) || !length(type_col)) {
+      stop("cell_types data frame must contain cell_id and cell_type columns")
+    }
+    return(stats::setNames(as.character(cell_types[[type_col[[1]]]]),
+      as.character(cell_types$cell_id)))
+  }
+  cell_types
+}
+
+.celladmix_resolve_example_boundaries <- function(fit, boundaries) {
+  if (is.character(boundaries) && length(boundaries) == 1L &&
+      identical(boundaries[[1]], "auto")) {
+    path <- tryCatch(celladmix_discover_cell_boundaries(fit$run),
+      error = function(e) NA_character_)
+    if (is.na(path)) {
+      return(NULL)
+    }
+    return(path)
+  }
+  boundaries
+}
+
+.celladmix_collect_example_stain_crops <- function(fit, stains, bbox, max_pixels) {
+  stains <- .celladmix_resolve_example_stains(fit, stains)
+  if (!length(stains)) {
+    return(list())
   }
   lapply(stains, function(image) {
     if (is.null(image)) {
@@ -256,6 +358,10 @@ celladmix_read_cell_boundaries <- function(path, cells = NULL, bbox = NULL) {
 #' @param min_molecules Minimum target-cell molecule count.
 #' @param min_factor_molecules Minimum score-table `factor_count` for a
 #'   target-cell/factor candidate.
+#' @param cells Optional explicit target cell IDs. When supplied, selection is
+#'   restricted to these cells, the evidence filters are relaxed so every
+#'   requested cell is returned (with `NA` factor columns when the score table
+#'   has no evidence for it), and the cells come back in the requested order.
 #'
 #' @return Data frame of selected examples.
 #' @export
@@ -270,22 +376,39 @@ celladmix_select_example_cells <- function(
     adjust_p = FALSE,
     use_rules = TRUE,
     min_molecules = 50,
-    min_factor_molecules = 3
+    min_factor_molecules = 3,
+    cells = NULL
   ) {
   if (!inherits(score, "CellAdmixScore")) {
     stop("score must be a CellAdmixScore")
   }
+  if (!is.null(cells)) {
+    cells <- as.character(cells)
+    use_rules <- FALSE
+    min_molecules <- 0
+    min_factor_molecules <- 0
+    targets <- NULL
+  }
   pairs <- score$pairs()
   if (is.null(pairs) || !nrow(pairs)) {
-    return(data.frame())
+    pairs <- data.frame()
+  }
+  if (!is.null(cells) && nrow(pairs)) {
+    pairs <- pairs[as.character(pairs$target_cell) %in% cells, , drop = FALSE]
+  }
+  if (is.null(cell_data)) {
+    cell_data <- score$fit$cell_factors()
+  }
+  if (!nrow(pairs)) {
+    if (is.null(cells)) {
+      return(data.frame())
+    }
+    return(.celladmix_requested_cell_examples(score, cells, NULL, cell_data))
   }
   score_annotation <- score_annotation %||% score$annotation(p_thresh = p_thresh,
     adjust_p = adjust_p)
   if (isTRUE(use_rules) && is.null(rules)) {
     rules <- score$rules(p_thresh = p_thresh, adjust_p = adjust_p, targets = targets)
-  }
-  if (is.null(cell_data)) {
-    cell_data <- score$fit$cell_factors()
   }
 
   required <- c("target_cell", "target_cell_type", "factor", "mean_score")
@@ -296,7 +419,7 @@ celladmix_select_example_cells <- function(
   if (!is.null(targets)) {
     pairs <- pairs[pairs$target_cell_type %in% targets, , drop = FALSE]
   }
-  if ("used_in_summary" %in% names(pairs)) {
+  if ("used_in_summary" %in% names(pairs) && is.null(cells)) {
     pairs <- pairs[pairs$used_in_summary %in% TRUE, , drop = FALSE]
   }
   pairs <- pairs[is.finite(pairs$mean_score), , drop = FALSE]
@@ -309,7 +432,10 @@ celladmix_select_example_cells <- function(
     pairs <- pairs[pairs$factor_count >= min_factor_molecules, , drop = FALSE]
   }
   if (!nrow(pairs)) {
-    return(data.frame())
+    if (is.null(cells)) {
+      return(data.frame())
+    }
+    return(.celladmix_requested_cell_examples(score, cells, NULL, cell_data))
   }
 
   factor_sources <- .celladmix_factor_sources(score_annotation)
@@ -342,10 +468,15 @@ celladmix_select_example_cells <- function(
     per_factor <- per_factor[is.na(per_factor$transcript_count) |
       per_factor$transcript_count >= min_molecules, , drop = FALSE]
   }
-  per_factor <- per_factor[is.finite(per_factor$max_score) & per_factor$max_score > 0,
-    , drop = FALSE]
+  if (is.null(cells)) {
+    per_factor <- per_factor[is.finite(per_factor$max_score) & per_factor$max_score > 0,
+      , drop = FALSE]
+  }
   if (!nrow(per_factor)) {
-    return(data.frame())
+    if (is.null(cells)) {
+      return(data.frame())
+    }
+    return(.celladmix_requested_cell_examples(score, cells, NULL, cell_data))
   }
 
   examples <- do.call(rbind, lapply(split(per_factor, per_factor$target_cell), function(x) {
@@ -381,6 +512,9 @@ celladmix_select_example_cells <- function(
       dominant_factor = if ("dominant_factor" %in% names(x)) x$dominant_factor[[1]] else NA_integer_,
       stringsAsFactors = FALSE)
   }))
+  if (!is.null(cells)) {
+    return(.celladmix_requested_cell_examples(score, cells, examples, cell_data))
+  }
   examples <- examples[order(examples$top_evidence, examples$top_factor_molecules,
     examples$total_factor_molecules, examples$top_admix_score,
     examples$n_candidate_factors, decreasing = TRUE), , drop = FALSE]
@@ -401,8 +535,19 @@ celladmix_select_example_cells <- function(
 #'   factors from source calls.
 #' @param cell_data Optional cell-level data frame with coordinates and factor
 #'   summaries. Defaults to `fit$cell_factors()`.
-#' @param boundaries Optional boundary data frame, boundary path, or `NULL`.
-#' @param stains Optional named list of stain-image descriptors.
+#' @param boundaries Cell boundaries used for contours and cell-type shading.
+#'   The default `"auto"` discovers the standard Xenium boundary file next to
+#'   the source bundle (`NULL` when unavailable). Pass a boundary data frame or
+#'   path to override, or `NULL` to fall back to molecule hulls.
+#' @param stains Stain images to compose as the plot background. The default
+#'   `"auto"` discovers the available Xenium stain images (DAPI and membrane)
+#'   from the fit's bundle and is empty for non-Xenium sources. Use `NULL` to
+#'   disable backgrounds, or pass a named list of stain-image descriptors to
+#'   override.
+#' @param cell_types Cell-type labels used to shade cell polygons. The default
+#'   `"auto"` uses the dataset's active annotation; pass a named vector
+#'   (`cell_id` names, type values), a data frame with `cell_id`/`cell_type`,
+#'   or `NULL` to disable shading.
 #' @param markers Optional marker genes to size-emphasize inside the target cell.
 #' @param padding,min_side Controls the square spatial window around the target
 #'   cell.
@@ -415,8 +560,9 @@ celladmix_prepare_cell_example <- function(
     example,
     score_annotation = NULL,
     cell_data = NULL,
-    boundaries = NULL,
-    stains = NULL,
+    boundaries = "auto",
+    stains = "auto",
+    cell_types = "auto",
     markers = NULL,
     padding = 5,
     min_side = 24,
@@ -442,6 +588,7 @@ celladmix_prepare_cell_example <- function(
     stop("Target cell is not present in cell_data: ", target_cell)
   }
 
+  boundaries <- .celladmix_resolve_example_boundaries(fit, boundaries)
   if (is.character(boundaries) && length(boundaries) == 1L) {
     boundaries <- celladmix_read_cell_boundaries(boundaries)
   }
@@ -505,6 +652,13 @@ celladmix_prepare_cell_example <- function(
   contours <- .celladmix_target_contours(molecules, centers, target_cell, bbox,
     boundaries = boundaries)
 
+  type_map <- .celladmix_resolve_example_cell_types(fit, cell_types)
+  contours$cell_type <- if (!is.null(type_map) && nrow(contours)) {
+    unname(type_map[as.character(contours$cell_id)])
+  } else {
+    NA_character_
+  }
+
   structure(list(example = example, target_cell = target_cell,
     target_cell_type = target_type, bbox = bbox, background = background,
     molecules = molecules,
@@ -517,7 +671,10 @@ celladmix_prepare_cell_example <- function(
 #' @param example Prepared example from [celladmix_prepare_cell_example()], or a
 #'   one-row example table when `fit` is supplied.
 #' @param fit Optional [CellAdmixFit] used to prepare an unprepared example.
-#' @param score_annotation,cell_data,boundaries,stains,markers,padding,min_side,max_pixels
+#' @param shade_cell_types Whether to shade cell polygons by cell type when
+#'   boundaries and cell-type labels are available.
+#' @param cell_type_alpha Fill alpha for cell-type shading.
+#' @param score_annotation,cell_data,boundaries,stains,cell_types,markers,padding,min_side,max_pixels
 #'   Passed to [celladmix_prepare_cell_example()] when `fit` is supplied.
 #' @param outside_size,inside_size Molecule point sizes outside and inside the
 #'   target cell.
@@ -533,8 +690,9 @@ celladmix_plot_cell_example <- function(
     fit = NULL,
     score_annotation = NULL,
     cell_data = NULL,
-    boundaries = NULL,
-    stains = NULL,
+    boundaries = "auto",
+    stains = "auto",
+    cell_types = "auto",
     markers = NULL,
     padding = 5,
     min_side = 24,
@@ -544,6 +702,8 @@ celladmix_plot_cell_example <- function(
     marker_size_multiplier = 1.1,
     non_marker_size_multiplier = 0.9,
     contour_color = "#e85d04",
+    shade_cell_types = TRUE,
+    cell_type_alpha = 0.14,
     title = NULL,
     subtitle = NULL
   ) {
@@ -554,7 +714,8 @@ celladmix_plot_cell_example <- function(
     }
     example <- celladmix_prepare_cell_example(fit, example,
       score_annotation = score_annotation, cell_data = cell_data,
-      boundaries = boundaries, stains = stains, markers = markers,
+      boundaries = boundaries, stains = stains, cell_types = cell_types,
+      markers = markers,
       padding = padding, min_side = min_side, max_pixels = max_pixels)
   }
   bbox <- example$bbox
@@ -565,6 +726,11 @@ celladmix_plot_cell_example <- function(
   contours <- example$contours
   target_contours <- contours[contours$role == "Target cell contour", , drop = FALSE]
   nearby_contours <- contours[contours$role == "Nearby cell contours", , drop = FALSE]
+  shaded <- if (isTRUE(shade_cell_types) && "cell_type" %in% names(contours)) {
+    contours[!is.na(contours$cell_type), , drop = FALSE]
+  } else {
+    contours[0, , drop = FALSE]
+  }
   role_cols <- stats::setNames(c("#2b6cb0", "#c92a2a", "#f08c00"),
     example$role_levels)
   title <- title %||% sprintf("%s: %s", example$target_cell_type, example$target_cell)
@@ -578,6 +744,14 @@ celladmix_plot_cell_example <- function(
   if (!is.null(example$background)) {
     p <- p + ggplot2::annotation_raster(example$background,
       xmin = bbox[[1]], xmax = bbox[[2]], ymin = bbox[[3]], ymax = bbox[[4]])
+  }
+  if (nrow(shaded)) {
+    p <- p + ggplot2::geom_polygon(data = shaded,
+      ggplot2::aes(x, y, group = cell_id, fill = cell_type),
+      alpha = cell_type_alpha, color = NA) +
+      ggplot2::guides(fill = ggplot2::guide_legend(
+        override.aes = list(alpha = 0.55))) +
+      ggplot2::labs(fill = "Cell type")
   }
   p +
     ggplot2::geom_path(data = nearby_contours,
@@ -607,6 +781,10 @@ celladmix_plot_cell_example <- function(
     ggplot2::labs(title = title, subtitle = subtitle, color = "Molecule class") +
     ggplot2::theme_void(base_size = 9) +
     ggplot2::theme(legend.position = "bottom",
+      legend.box = "vertical",
+      legend.margin = ggplot2::margin(0, 0, 0, 0),
+      legend.spacing.y = ggplot2::unit(1, "pt"),
+      legend.text = ggplot2::element_text(size = 7),
       plot.title = ggplot2::element_text(face = "bold"),
       plot.subtitle = ggplot2::element_text(size = 8))
 }

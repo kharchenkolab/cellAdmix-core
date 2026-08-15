@@ -848,3 +848,77 @@ test_that("persisted runs support read, collect, bridge scoring, and correction"
   corrected_counts <- celladmix_collect_counts(corrected)
   expect_true(sum(corrected_counts) <= sum(counts))
 })
+
+test_that("example stain auto-discovery resolves quietly", {
+  fake_run <- structure(list(source = list(type = "tabular", path = "")),
+    class = "celladmix_run")
+  expect_identical(cellAdmixCore:::.celladmix_discover_stain_images(fake_run), list())
+
+  fit_stub <- list(stains = function(...) list())
+  resolve <- cellAdmixCore:::.celladmix_resolve_example_stains
+  expect_identical(resolve(fit_stub, "auto"), list())
+  expect_identical(resolve(fit_stub, NULL), list())
+
+  descriptor <- list(path = "x.tif", pixel_size = 0.5, stain = "membrane")
+  expect_identical(resolve(fit_stub, descriptor), list(membrane = descriptor))
+  named <- list(dapi = descriptor)
+  expect_identical(resolve(fit_stub, named), named)
+
+  fit_with_stains <- list(stains = function(...) list(dapi = descriptor))
+  expect_identical(resolve(fit_with_stains, "auto"), list(dapi = descriptor))
+})
+
+test_that("explicit cell selection returns requested cells with relaxed filters", {
+  pairs <- data.frame(
+    target_cell = c("c1", "c1", "c2"),
+    target_cell_type = c("T", "T", "B"),
+    factor = c(1, 2, 1),
+    mean_score = c(0.5, 0.2, -0.1),
+    factor_count = c(2, 1, 1),
+    used_in_summary = c(TRUE, FALSE, FALSE),
+    stringsAsFactors = FALSE
+  )
+  cell_factors <- data.frame(
+    cell_id = c("c1", "c2", "c3"),
+    transcript_count = c(10, 20, 30),
+    dominant_factor = c(3, 3, 3),
+    stringsAsFactors = FALSE
+  )
+  stub_score <- structure(list(
+    pairs = function() pairs,
+    annotation = function(...) list(source_calls = list()),
+    rules = function(...) data.frame(),
+    fit = list(
+      cell_factors = function() cell_factors,
+      annotation_name = "manual",
+      dataset = list(annotation = function(...) c(c1 = "T", c2 = "B", c3 = "NK"))
+    )
+  ), class = "CellAdmixScore")
+
+  out <- celladmix_select_example_cells(stub_score, cells = c("c3", "c1"))
+  expect_equal(as.character(out$target_cell), c("c3", "c1"))
+  expect_equal(as.character(out$target_cell_type[[1]]), "NK")
+  expect_true(is.na(out$top_admix_factor[[1]]))
+  expect_equal(out$transcript_count[[1]], 30)
+  expect_equal(as.integer(out$top_admix_factor[[2]]), 1L)
+
+  neg <- celladmix_select_example_cells(stub_score, cells = "c2")
+  expect_equal(nrow(neg), 1L)
+  expect_equal(neg$top_admix_score[[1]], -0.1)
+
+  auto <- celladmix_select_example_cells(stub_score,
+    min_molecules = 0, min_factor_molecules = 0)
+  expect_equal(as.character(auto$target_cell), "c1")
+})
+
+test_that("example cell-type resolution handles auto, NULL, and frames", {
+  resolve <- cellAdmixCore:::.celladmix_resolve_example_cell_types
+  fit_stub <- list(
+    annotation_name = "manual",
+    dataset = list(annotation = function(...) c(c1 = "T"))
+  )
+  expect_identical(resolve(fit_stub, "auto"), c(c1 = "T"))
+  expect_null(resolve(fit_stub, NULL))
+  frame <- data.frame(cell_id = "c1", cell_type = "T", stringsAsFactors = FALSE)
+  expect_identical(resolve(fit_stub, frame), c(c1 = "T"))
+})

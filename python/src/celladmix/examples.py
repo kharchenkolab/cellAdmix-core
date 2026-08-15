@@ -159,6 +159,54 @@ def compose_stain_background(crops: dict[str, dict] | None) -> np.ndarray | None
     return np.clip(rgb, 0, 1)
 
 
+_EXAMPLE_COLUMNS = [
+    "target_cell", "target_cell_type", "top_admix_factor", "top_admix_source",
+    "top_admix_score", "top_factor_molecules", "top_factor_fraction",
+    "top_evidence", "n_candidate_factors", "total_factor_molecules",
+    "transcript_count", "dominant_factor",
+]
+
+
+def _normalize_cells(cells) -> list[str]:
+    if isinstance(cells, str):
+        return [cells]
+    return [str(c) for c in cells]
+
+
+def _requested_cell_examples(score, cells, examples, cell_data) -> pd.DataFrame:
+    """Assemble the example table for explicitly requested cells.
+
+    Score-derived rows are kept; requested cells without score evidence come
+    back as NA-evidence rows, and the requested order is preserved.
+    """
+    have = set() if examples is None or examples.empty else set(examples["target_cell"].astype(str))
+    missing = [c for c in cells if c not in have]
+    if missing:
+        try:
+            annotation = score.fit.dataset.annotation
+        except AttributeError:
+            annotation = None
+        rows = pd.DataFrame({"target_cell": missing})
+        rows["target_cell_type"] = (
+            [annotation.get(c, np.nan) for c in missing] if annotation is not None else np.nan
+        )
+        for column in _EXAMPLE_COLUMNS[2:]:
+            rows[column] = np.nan
+        if cell_data is not None and not cell_data.empty and "cell_id" in cell_data.columns:
+            lookup = cell_data.set_index(cell_data["cell_id"].astype(str))
+            for column in ("transcript_count", "dominant_factor"):
+                if column in lookup.columns:
+                    rows[column] = [
+                        lookup[column].get(c, np.nan) for c in missing
+                    ]
+        if examples is not None and not examples.empty:
+            examples = pd.concat([examples, rows[examples.columns]], ignore_index=True)
+        else:
+            examples = rows
+    examples = examples.set_index(examples["target_cell"].astype(str)).reindex(cells)
+    return examples.dropna(subset=["target_cell"]).reset_index(drop=True)
+
+
 def select_example_cells(
     score,
     *,
@@ -172,20 +220,37 @@ def select_example_cells(
     use_rules: bool = True,
     min_molecules: int = 50,
     min_factor_molecules: int = 3,
+    cells=None,
 ) -> pd.DataFrame:
-    """Select target cells with strong non-native factor evidence."""
+    """Select target cells with strong non-native factor evidence.
+
+    When ``cells`` is supplied, selection is restricted to those cell IDs, the
+    evidence filters are relaxed so every requested cell is returned (with NA
+    factor columns when the score has no evidence for it), and the cells come
+    back in the requested order.
+    """
+    if cells is not None:
+        cells = _normalize_cells(cells)
+        use_rules = False
+        min_molecules = 0
+        min_factor_molecules = 0
+        targets = None
     pairs = score.pairs.copy()
+    if cells is not None and not pairs.empty:
+        pairs = pairs[pairs["target_cell"].astype(str).isin(cells)]
+    if cell_data is None:
+        cell_data = score.fit.cell_factors()
     if pairs.empty:
-        return pd.DataFrame()
+        if cells is None:
+            return pd.DataFrame()
+        return _requested_cell_examples(score, cells, None, cell_data)
     score_annotation = score_annotation or score.annotation(p_thresh=p_thresh, adjust_p=adjust_p)
     if use_rules and rules is None:
         rules = score.rules(p_thresh=p_thresh, adjust_p=adjust_p, targets=targets)
-    if cell_data is None:
-        cell_data = score.fit.cell_factors()
     if targets is not None:
         targets = list(map(str, targets))
         pairs = pairs[pairs["target_cell_type"].astype(str).isin(targets)]
-    if "used_in_summary" in pairs.columns:
+    if "used_in_summary" in pairs.columns and cells is None:
         pairs = pairs[pairs["used_in_summary"].astype(bool)]
     pairs = pairs[np.isfinite(pd.to_numeric(pairs["mean_score"], errors="coerce"))]
     if use_rules and rules is not None and not rules.empty:
@@ -199,7 +264,9 @@ def select_example_cells(
     if "factor_count" in pairs.columns:
         pairs = pairs[pairs["factor_count"].astype(float) >= min_factor_molecules]
     if pairs.empty:
-        return pd.DataFrame()
+        if cells is None:
+            return pd.DataFrame()
+        return _requested_cell_examples(score, cells, None, cell_data)
 
     source_calls = score_annotation.get("source_calls", {})
     per_factor = (
@@ -240,9 +307,12 @@ def select_example_cells(
             per_factor["transcript_count"].isna()
             | (per_factor["transcript_count"].astype(float) >= min_molecules)
         ]
-    per_factor = per_factor[np.isfinite(per_factor["max_score"]) & (per_factor["max_score"] > 0)]
+    if cells is None:
+        per_factor = per_factor[np.isfinite(per_factor["max_score"]) & (per_factor["max_score"] > 0)]
     if per_factor.empty:
-        return pd.DataFrame()
+        if cells is None:
+            return pd.DataFrame()
+        return _requested_cell_examples(score, cells, None, cell_data)
 
     rows = []
     for _, group in per_factor.groupby("target_cell", sort=False):
@@ -274,9 +344,56 @@ def select_example_cells(
         ["top_evidence", "top_factor_molecules", "total_factor_molecules", "top_admix_score"],
         ascending=False,
     )
+    if cells is not None:
+        return _requested_cell_examples(score, cells, out, cell_data)
     order = targets or out["target_cell_type"].drop_duplicates().tolist()
     pieces = [out[out["target_cell_type"].astype(str) == str(t)].head(n_per_target) for t in order]
     return pd.concat(pieces, ignore_index=True) if pieces else pd.DataFrame()
+
+
+def resolve_example_stains(fit, stains) -> dict:
+    """Resolve the stains argument of example plotting into stain descriptors.
+
+    ``"auto"`` (the default everywhere) discovers the available stain images
+    from the fit's Xenium bundle and is empty for non-Xenium sources; ``None``
+    disables backgrounds; a single descriptor or a name-keyed mapping of
+    descriptors is passed through.
+    """
+    if isinstance(stains, str):
+        if stains != "auto":
+            raise ValueError(f"stains must be 'auto', None, or descriptors; got {stains!r}")
+        from .io import discover_xenium_stain_images
+
+        source = getattr(getattr(fit, "dataset", None), "source", None)
+        return discover_xenium_stain_images(source)
+    if not stains:
+        return {}
+    if isinstance(stains, dict) and "image_path" in stains:
+        return {str(stains.get("stain", "stain")): stains}
+    return dict(stains)
+
+
+def resolve_example_cell_types(fit, cell_types):
+    """Resolve the cell_types argument into a cell_id -> label mapping."""
+    if isinstance(cell_types, str):
+        if cell_types != "auto":
+            raise ValueError(f"cell_types must be 'auto', None, or a mapping; got {cell_types!r}")
+        annotation = getattr(getattr(fit, "dataset", None), "annotation", None)
+        return None if annotation is None else annotation
+    if cell_types is None:
+        return None
+    if isinstance(cell_types, pd.DataFrame):
+        type_col = next(
+            (c for c in ("cell_type", "merged_annotation", "cluster_label") if c in cell_types.columns),
+            None,
+        )
+        if type_col is None or "cell_id" not in cell_types.columns:
+            raise ValueError("cell_types data frame must contain cell_id and cell_type columns")
+        return pd.Series(
+            cell_types[type_col].astype(str).to_numpy(),
+            index=cell_types["cell_id"].astype(str),
+        )
+    return cell_types
 
 
 def prepare_cell_example(
@@ -286,13 +403,21 @@ def prepare_cell_example(
     score_annotation: dict | None = None,
     cell_data: pd.DataFrame | None = None,
     boundaries=None,
-    stains: dict | None = None,
+    stains="auto",
+    cell_types="auto",
     markers=None,
     padding: float = 5,
     min_side: float = 24,
     max_pixels: int = 512,
 ) -> dict:
-    """Collect molecules, contours, and optional stain crops for one example."""
+    """Collect molecules, contours, and optional stain crops for one example.
+
+    Stain backgrounds and cell boundaries are discovered automatically for
+    Xenium-backed fits (``stains=None`` disables backgrounds); ``cell_types``
+    labels neighbor polygons for cell-type shading and defaults to the
+    dataset's annotation.
+    """
+    stains = resolve_example_stains(fit, stains)
     if isinstance(example, pd.DataFrame):
         row = example.iloc[0]
     elif isinstance(example, pd.Series):
@@ -306,9 +431,14 @@ def prepare_cell_example(
     if center.empty:
         raise ValueError(f"Target cell is not present in cell_data: {target_cell}")
 
+    boundary_path = None
     if boundaries is None:
-        path = discover_cell_boundaries(fit.dataset.source)
-        boundaries = read_cell_boundaries(path, cells=[target_cell]) if path is not None else pd.DataFrame()
+        boundary_path = discover_cell_boundaries(fit.dataset.source)
+        boundaries = (
+            read_cell_boundaries(boundary_path, cells=[target_cell])
+            if boundary_path is not None
+            else pd.DataFrame()
+        )
     elif isinstance(boundaries, (str, Path)):
         boundaries = read_cell_boundaries(boundaries)
     boundary = boundaries[boundaries["cell_id"].astype(str) == target_cell] if not boundaries.empty else pd.DataFrame()
@@ -316,6 +446,11 @@ def prepare_cell_example(
         bbox = square_bbox((boundary["x"].min(), boundary["x"].max()), (boundary["y"].min(), boundary["y"].max()), padding=padding, min_side=min_side)
     else:
         bbox = square_bbox((float(center["x"].iloc[0]), float(center["x"].iloc[0])), (float(center["y"].iloc[0]), float(center["y"].iloc[0])), padding=padding, min_side=min_side)
+    if boundary_path is not None:
+        # The discovery path read only the target cell above; add the
+        # neighboring cell polygons inside the plotting window.
+        neighbors = read_cell_boundaries(boundary_path, bbox=bbox)
+        boundaries = pd.concat([boundaries, neighbors], ignore_index=True).drop_duplicates()
     if not boundaries.empty:
         boundaries = boundaries[
             boundaries["cell_id"].isin(
@@ -353,12 +488,20 @@ def prepare_cell_example(
         molecules.loc[molecules["factor"].astype("Int64") == top_factor, "role"] = top_name
     marker_set = set(markers or [])
     molecules["is_marker"] = molecules["inside_target"] & molecules["gene"].isin(marker_set)
+    contours = boundaries.copy() if boundaries is not None else pd.DataFrame()
+    type_map = resolve_example_cell_types(fit, cell_types)
+    if not contours.empty:
+        if type_map is not None:
+            contours["cell_type"] = contours["cell_id"].astype(str).map(
+                lambda c: type_map.get(c, np.nan))
+        else:
+            contours["cell_type"] = np.nan
     return {
         "example": row.to_dict(),
         "bbox": bbox,
         "background": background,
         "molecules": molecules,
-        "contours": boundaries.copy() if boundaries is not None else pd.DataFrame(),
+        "contours": contours,
         "target_cell": target_cell,
         "target_cell_type": target_type,
         "role_levels": [native_name, top_name, other_name],
@@ -374,6 +517,8 @@ def plot_cell_example(
     marker_size_multiplier: float = 1.1,
     non_marker_size_multiplier: float = 0.9,
     contour_color: str = "#e85d04",
+    shade_cell_types: bool = True,
+    cell_type_alpha: float = 0.14,
 ):
     """Render one prepared example-cell overlay."""
     import matplotlib.pyplot as plt
@@ -384,7 +529,22 @@ def plot_cell_example(
     if example.get("background") is not None:
         ax.imshow(example["background"], extent=(bbox[0], bbox[1], bbox[3], bbox[2]), origin="upper")
     contours = example.get("contours", pd.DataFrame())
+    type_handles = []
     if not contours.empty:
+        if shade_cell_types and "cell_type" in contours.columns and contours["cell_type"].notna().any():
+            from matplotlib import colormaps
+            from matplotlib.patches import Patch
+
+            shaded = contours[contours["cell_type"].notna()]
+            types = sorted(shaded["cell_type"].astype(str).unique())
+            cmap = colormaps["tab20"]
+            type_colors = {t: cmap(i % 20) for i, t in enumerate(types)}
+            for (_, cell_type), group in shaded.groupby(["cell_id", "cell_type"], sort=False):
+                ax.fill(group["x"], group["y"], color=type_colors[str(cell_type)],
+                        alpha=cell_type_alpha, linewidth=0)
+            type_handles = [
+                Patch(facecolor=type_colors[t], alpha=0.55, label=t) for t in types
+            ]
         nearby = contours[contours["cell_id"].astype(str) != example["target_cell"]]
         target = contours[contours["cell_id"].astype(str) == example["target_cell"]]
         for _, group in nearby.groupby("cell_id", sort=False):
@@ -417,6 +577,13 @@ def plot_cell_example(
     legend.get_frame().set_facecolor("white")
     legend.get_frame().set_alpha(0.55)
     legend.get_frame().set_linewidth(0)
+    if type_handles:
+        type_legend = ax.legend(handles=type_handles, loc="lower right", frameon=True,
+                                fontsize=5.8, title="Cell type", title_fontsize=6.2)
+        type_legend.get_frame().set_facecolor("white")
+        type_legend.get_frame().set_alpha(0.55)
+        type_legend.get_frame().set_linewidth(0)
+        ax.add_artist(legend)
     ax.set_xlim(bbox[0], bbox[1])
     ax.set_ylim(bbox[3], bbox[2])
     ax.set_aspect("equal")
@@ -425,8 +592,12 @@ def plot_cell_example(
     return ax
 
 
-def plot_examples(examples, *, fit, score_annotation=None, cell_data=None, boundaries=None, stains=None, markers=None, ncol: int = 2, **kwargs):
-    """Render a grid of score-selected example cells."""
+def plot_examples(examples, *, fit, score_annotation=None, cell_data=None, boundaries=None, stains="auto", cell_types="auto", markers=None, ncol: int = 2, **kwargs):
+    """Render a grid of score-selected example cells.
+
+    Stain backgrounds are discovered automatically for Xenium-backed fits;
+    pass ``stains=None`` to disable or a mapping of descriptors to override.
+    """
     import matplotlib.pyplot as plt
 
     if examples is None or len(examples) == 0:
@@ -434,6 +605,7 @@ def plot_examples(examples, *, fit, score_annotation=None, cell_data=None, bound
         ax.text(0.5, 0.5, "No example cells selected", ha="center", va="center")
         ax.axis("off")
         return fig
+    stains = resolve_example_stains(fit, stains)
     if isinstance(boundaries, (str, Path)):
         boundaries = read_cell_boundaries(boundaries)
     elif boundaries is None:
@@ -450,6 +622,7 @@ def plot_examples(examples, *, fit, score_annotation=None, cell_data=None, bound
             cell_data=cell_data,
             boundaries=boundaries,
             stains=stains,
+            cell_types=cell_types,
             markers=markers,
         )
         plot_cell_example(prepared, ax=ax, **kwargs)

@@ -78,20 +78,39 @@ class CellAdmixScore:
         return select_example_cells(self, **kwargs)
 
     def plot_example(self, example, *, p_thresh: float = 0.1, adjust_p: bool = False, **kwargs):
-        """Plot one score-selected example cell."""
-        from .examples import plot_cell_example, prepare_cell_example
+        """Plot one score-selected example cell, or a cell given by its ID."""
+        from .examples import plot_cell_example, prepare_cell_example, select_example_cells
 
         score_annotation = kwargs.pop("score_annotation", None)
         score_annotation = score_annotation or self.annotation(p_thresh=p_thresh, adjust_p=adjust_p)
-        prepared = prepare_cell_example(self.fit, example, score_annotation=score_annotation, **kwargs)
-        return plot_cell_example(prepared)
+        if isinstance(example, str):
+            example = select_example_cells(
+                self, score_annotation=score_annotation, p_thresh=p_thresh,
+                adjust_p=adjust_p, cells=example)
+        prepare_keys = {
+            "cell_data", "boundaries", "stains", "cell_types", "markers",
+            "padding", "min_side", "max_pixels",
+        }
+        prepare_kwargs = {k: kwargs.pop(k) for k in list(kwargs) if k in prepare_keys}
+        prepared = prepare_cell_example(
+            self.fit, example, score_annotation=score_annotation, **prepare_kwargs)
+        return plot_cell_example(prepared, **kwargs)
 
-    def plot_examples(self, examples=None, *, p_thresh: float = 0.1, adjust_p: bool = False, **kwargs):
-        """Plot a grid of score-selected example cells."""
+    def plot_examples(self, examples=None, *, p_thresh: float = 0.1, adjust_p: bool = False, cells=None, **kwargs):
+        """Plot a grid of score-selected example cells.
+
+        Pass ``cells`` (or a list of cell IDs as ``examples``) to plot specific
+        cells instead of the automatically selected ones.
+        """
         from .examples import plot_examples
 
         score_annotation = kwargs.pop("score_annotation", None)
         score_annotation = score_annotation or self.annotation(p_thresh=p_thresh, adjust_p=adjust_p)
+        if cells is None and examples is not None and not hasattr(examples, "columns"):
+            cells = examples
+            examples = None
         if examples is None:
-            examples = self.examples(score_annotation=score_annotation, p_thresh=p_thresh, adjust_p=adjust_p)
+            examples = self.examples(
+                score_annotation=score_annotation, p_thresh=p_thresh,
+                adjust_p=adjust_p, cells=cells)
         return plot_examples(examples, fit=self.fit, score_annotation=score_annotation, **kwargs)

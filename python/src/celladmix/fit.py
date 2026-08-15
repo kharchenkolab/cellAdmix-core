@@ -338,6 +338,12 @@ class CellAdmixFit:
         """Alias for ``stain()`` for API parity with R."""
         return self.stain(stain, **kwargs)
 
+    def stains(self, names=("dapi", "membrane")) -> dict:
+        """Resolve all available stain images, empty for non-Xenium sources."""
+        from .io import discover_xenium_stain_images
+
+        return discover_xenium_stain_images(self.dataset.source, names)
+
     def stain_crop(self, image: dict, *, bbox, max_pixels: int = 512) -> dict:
         """Read a small crop from a stain image descriptor."""
         from .examples import read_stain_crop

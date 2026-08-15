@@ -150,6 +150,28 @@ def discover_xenium_membrane_image(bundle_dir: str | os.PathLike) -> dict:
     return discover_xenium_stain_image(bundle_dir, "membrane", focus_index=1)
 
 
+def discover_xenium_stain_images(
+    bundle_dir: str | os.PathLike | None,
+    names: Iterable[str] = ("dapi", "membrane"),
+) -> dict:
+    """Resolve every available stain image, skipping ones the bundle lacks.
+
+    Returns an empty dict for non-Xenium sources, so callers can use the
+    result directly as a default background specification.
+    """
+    out: dict = {}
+    if bundle_dir is None:
+        return out
+    for name in names:
+        try:
+            descriptor = discover_xenium_stain_image(bundle_dir, name)
+        except (OSError, ValueError, KeyError):
+            continue
+        if Path(descriptor["image_path"]).exists():
+            out[name] = descriptor
+    return out
+
+
 def ensure_list(value: Optional[Iterable[str]]) -> list[str]:
     if value is None:
         return []

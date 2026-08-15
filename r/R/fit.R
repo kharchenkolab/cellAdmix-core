@@ -88,6 +88,9 @@ CellAdmixFit <- R6::R6Class(
       celladmix_discover_stain_image(self$run, stain = stain, ...)
     },
     stain_image = function(...) self$stain(...),
+    stains = function(names = c("dapi", "membrane")) {
+      .celladmix_discover_stain_images(self$run, names)
+    },
     stain_crop = function(image, bbox, ...) celladmix_read_stain_crop(image, bbox = bbox, ...),
     cell_boundaries = function(boundary_path = NULL, cells = NULL, bbox = NULL) {
       path <- celladmix_discover_cell_boundaries(self$run, boundary_path = boundary_path)
