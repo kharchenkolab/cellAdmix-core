@@ -559,8 +559,8 @@ rank_arg <- as_chr(opt("rank"), "auto")
 rank <- if (identical(rank_arg, "auto")) "auto" else as_int(rank_arg)
 nmf_runs_arg <- as_chr(opt("nmf_runs"), "auto")
 nmf_n_runs <- if (identical(nmf_runs_arg, "auto")) threads else as_int(nmf_runs_arg)
-nmf_variant <- match.arg(as_chr(opt("nmf_variant"), "invsqrt_kl"),
-  c("invsqrt_kl", "kl", "sqrt_kl", "ls_nmf"))
+nmf_variant <- match.arg(as_chr(opt("nmf_variant"), "ls_nmf"),
+  c("ls_nmf", "invsqrt_kl", "kl", "sqrt_kl"))
 nmf_init <- match.arg(as_chr(opt("nmf_init"), "auto"), c("auto", "random", "cluster"))
 
 fit_args <- list(

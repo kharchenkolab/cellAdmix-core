@@ -247,7 +247,7 @@
     same_label_ratio = 5,
     nmf_iterations = 150L,
     nmf_init = "auto",
-    nmf_variant = "invsqrt_kl",
+    nmf_variant = "ls_nmf",
     molecule_scoring = "gene_loadings",
     nmf_n_runs = 1L,
     nmf_train_max_rows = NA_integer_,

@@ -626,7 +626,7 @@ PYBIND11_MODULE(_core, m) {
       py::arg("same_label_ratio") = 5.0,
       py::arg("nmf_iterations") = 150,
       py::arg("nmf_init") = "auto",
-      py::arg("nmf_variant") = "invsqrt_kl",
+      py::arg("nmf_variant") = "ls_nmf",
       py::arg("molecule_scoring") = "gene_loadings",
       py::arg("nmf_n_runs") = 1,
       py::arg("nmf_train_max_rows") = 10000,

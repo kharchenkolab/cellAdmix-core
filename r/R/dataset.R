@@ -300,7 +300,7 @@ CellAdmixDataset <- R6::R6Class(
       }
       dots <- list(...)
       dots <- .celladmix_dots_with_default_threads(dots, self$num_threads)
-      nmf_variant <- dots$nmf_variant %||% "invsqrt_kl"
+      nmf_variant <- dots$nmf_variant %||% "ls_nmf"
       run_id <- run_id %||% .celladmix_run_id("fit", ann, resolved_rank, nmf_variant)
       run_dir <- file.path(self$prep$paths$runs_dir, run_id)
       if (dir.exists(run_dir) && file.exists(file.path(run_dir, "run.json")) && !isTRUE(overwrite)) {

@@ -20,7 +20,7 @@ struct BasicPipelineOptions {
   int nmf_iterations = 150;
   int nmf_n_runs = 1;
   std::string nmf_init = "auto";
-  std::string nmf_variant = "kl";
+  std::string nmf_variant = "ls_nmf";
   std::string molecule_scoring = "gene_loadings";
   int nmf_train_max_rows = -1;
   int nmf_min_molecules = 10;

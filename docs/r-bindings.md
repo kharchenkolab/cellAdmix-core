@@ -97,7 +97,13 @@ factors, assigns molecules to factors, applies spatial smoothing, and summarizes
 factor fractions at cell level.
 
 The default rank is derived from the active annotation. The default NMF method
-is `invsqrt_kl`, the recommended current mode.
+is `ls_nmf`, the weighted least-squares formulation of the original cellAdmix:
+across datasets it recovers cell-type-native factors far more reproducibly
+than the KL variants (see [nmf_stability.md](nmf_stability.md)), and the
+factor decomposition it aims for — native factors per cell type or state,
+with admixture read from their minor contributions in non-native cells —
+matches the scoring model directly. `invsqrt_kl` remains available for
+marker-driven loadings.
 
 The NCV neighborhood size `ncv_k` is resolved automatically from the data:
 it grows with the square root of the panel size (a ~400-gene panel keeps the
@@ -113,10 +119,10 @@ Supported `nmf_variant` values:
 
 | `nmf_variant` | Description |
 |---|---|
-| `invsqrt_kl` | Default sparse KL-NMF with inverse-square-root gene-prevalence weighting. |
-| `kl` | Sparse KL-NMF without inverse-square-root gene weighting. |
+| `ls_nmf` | Default weighted least-squares NMF (original cellAdmix formulation). |
+| `invsqrt_kl` | Sparse KL-NMF with inverse-square-root gene-prevalence weighting. |
+| `kl` | Sparse KL-NMF without gene weighting. |
 | `sqrt_kl` | Sparse KL-NMF after square-root transformation of NCV counts. |
-| `ls_nmf` | Legacy weighted least-squares NMF mode, included for comparison with the original implementation. |
 
 Useful fit diagnostics:
 

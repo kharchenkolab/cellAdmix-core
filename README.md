@@ -42,10 +42,10 @@ recommended mode for current workflows.
 
 | `nmf_variant` | Description |
 |---|---|
-| `invsqrt_kl` | Default. Sparse KL-NMF with inverse-square-root gene-prevalence weighting. |
-| `kl` | Sparse KL-NMF without inverse-square-root gene weighting. |
+| `ls_nmf` | Default. Weighted least-squares NMF following the original cellAdmix formulation; produces the most reproducible cell-type-native factors across restarts. |
+| `invsqrt_kl` | Sparse KL-NMF with inverse-square-root gene-prevalence weighting; marker-driven loadings at the cost of lower restart stability. |
+| `kl` | Sparse KL-NMF without gene weighting. |
 | `sqrt_kl` | Sparse KL-NMF after square-root transformation of NCV counts. |
-| `ls_nmf` | Legacy weighted least-squares NMF mode, included for comparison with the original cellAdmix formulation. |
 
 Multirun fits report a per-factor restart stability diagnostic used for
 factor trust and rank selection; see

@@ -148,7 +148,7 @@ class CellAdmix:
         rank: Optional[int] = None,
         rank_multiplier: float = 1.2,
         rank_cap: int = 30,
-        nmf_variant: str = "invsqrt_kl",
+        nmf_variant: str = "ls_nmf",
         nmf_init: str = "auto",
         nmf_n_runs: Optional[int] = None,
         molecule_scoring: str = "gene_loadings",

@@ -89,7 +89,7 @@ Notes:
     fit.add_argument("--rank", default="auto", help="auto or integer factor rank")
     fit.add_argument("--rank-multiplier", type=float, default=1.2)
     fit.add_argument("--rank-cap", type=int, default=30)
-    fit.add_argument("--nmf-variant", choices=("invsqrt_kl", "kl", "sqrt_kl", "ls_nmf"), default="invsqrt_kl")
+    fit.add_argument("--nmf-variant", choices=("ls_nmf", "invsqrt_kl", "kl", "sqrt_kl"), default="ls_nmf")
     fit.add_argument("--nmf-init", choices=("auto", "random", "cluster"), default="auto")
     fit.add_argument("--nmf-runs", default="auto", help="auto or integer NMF restarts")
     fit.add_argument("--nmf-iterations", type=int)

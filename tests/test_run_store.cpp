@@ -67,7 +67,10 @@ TEST_CASE("Run store writes and reloads a basic fit run") {
   REQUIRE_EQ(loaded_manifest.n_training_rows, manifest.n_training_rows);
 
   // Multirun stability diagnostics round-trip through the manifest JSON.
-  REQUIRE_EQ(manifest.nmf_diagnostics.stability_comparison_runs, 2);
+  // With 3 restarts, the selected run is always excluded and the
+  // cluster-initialized run 0 is excluded when it is not selected.
+  REQUIRE_GE(manifest.nmf_diagnostics.stability_comparison_runs, 1);
+  REQUIRE_LE(manifest.nmf_diagnostics.stability_comparison_runs, 2);
   REQUIRE_EQ(loaded_manifest.nmf_diagnostics.stability_metric, std::string{"ownership_matched"});
   REQUIRE_EQ(
       loaded_manifest.nmf_diagnostics.stability_comparison_runs,
