@@ -784,9 +784,12 @@ celladmix_plot_cell_example <- function(
       ggplot2::aes(x, y, color = role),
       size = inside_size * marker_size_multiplier, alpha = 0.92) +
     ggplot2::scale_color_manual(values = role_cols, drop = FALSE) +
-    ggplot2::scale_y_reverse(limits = rev(bbox[3:4]), expand = c(0, 0)) +
-    ggplot2::scale_x_continuous(limits = bbox[1:2], expand = c(0, 0)) +
-    ggplot2::coord_equal() +
+    ggplot2::scale_y_reverse(expand = c(0, 0)) +
+    ggplot2::scale_x_continuous(expand = c(0, 0)) +
+    # Window the plot with coord limits, not scale limits: scale limits drop
+    # out-of-range vertices, which redraws clipped cell contours as chords
+    # across the cell.
+    ggplot2::coord_fixed(xlim = bbox[1:2], ylim = bbox[3:4], expand = FALSE) +
     ggplot2::guides(color = ggplot2::guide_legend(
       override.aes = list(size = 3.4, alpha = 1))) +
     ggplot2::labs(title = title, subtitle = subtitle, color = "Molecule class") +

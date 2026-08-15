@@ -450,7 +450,10 @@ def prepare_cell_example(
         # The discovery path read only the target cell above; add the
         # neighboring cell polygons inside the plotting window.
         neighbors = read_cell_boundaries(boundary_path, bbox=bbox)
-        boundaries = pd.concat([boundaries, neighbors], ignore_index=True).drop_duplicates()
+        # Deduplicate whole cells, not rows: each ring's closing vertex repeats
+        # its first vertex, and row-level deduplication would unclose the ring.
+        neighbors = neighbors[~neighbors["cell_id"].isin(set(boundaries["cell_id"]))]
+        boundaries = pd.concat([boundaries, neighbors], ignore_index=True)
     if not boundaries.empty:
         boundaries = boundaries[
             boundaries["cell_id"].isin(
