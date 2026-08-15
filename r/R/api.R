@@ -845,7 +845,7 @@ celladmix_cluster_cells <- function(
     nmf_n_runs = NA_integer_, nmf_train_max_rows = 10000L,
     nmf_min_molecules = 10L, num_threads = 1L,
     tile_size = 100, parquet_row_group_size = 65536L, report_ncv_umap = FALSE,
-    seed = 1L, verbose = FALSE) {
+    seed = 1L, verbose = FALSE, annotation_hash = NULL) {
   if (!inherits(prep, "celladmix_prep")) {
     stop(".celladmix_fit_prep() expects a celladmix_prep object")
   }
@@ -880,6 +880,7 @@ celladmix_cluster_cells <- function(
       nmf_min_molecules = nmf_min_molecules,
       num_threads = num_threads,
       training_labels_path = training$path,
+      annotation_hash = annotation_hash,
       use_cell_type_training = training$use_cell_type_training,
       training_scope_cell_types = scope,
       seed = seed,
@@ -975,7 +976,7 @@ celladmix_fit <- function(
     molecule_scoring = c("gene_loadings", "ncv_projection", "auto"), nmf_n_runs = NA_integer_,
     nmf_train_max_rows = 10000L, nmf_min_molecules = 10L, num_threads = 1L,
     tile_size = 100, parquet_row_group_size = 65536L, report_ncv_umap = FALSE, seed = 1L,
-    verbose = FALSE) {
+    verbose = FALSE, annotation_hash = NULL) {
   nmf_init <- match.arg(nmf_init)
   nmf_variant <- match.arg(nmf_variant)
   molecule_scoring <- match.arg(molecule_scoring)
@@ -988,6 +989,7 @@ celladmix_fit <- function(
     nmf_n_runs = nmf_n_runs, nmf_train_max_rows = nmf_train_max_rows, nmf_min_molecules = nmf_min_molecules,
     num_threads = num_threads, tile_size = tile_size,
     parquet_row_group_size = parquet_row_group_size, report_ncv_umap = report_ncv_umap,
+    annotation_hash = annotation_hash,
     seed = seed, verbose = verbose)
 }
 
@@ -3211,4 +3213,49 @@ plot.celladmix_clusters <- function(x, color_by = c("cluster", "analysis_crop"),
   )
   do.call(graphics::plot, plot_args)
   invisible(x)
+}
+
+#' Compare requested fit parameters against a cached run manifest
+#'
+#' Only parameters the caller specified (plus the always-resolved rank,
+#' variant, init, and molecule scoring) participate; automatically resolved
+#' values such as an omitted `ncv_k` match whatever the cached run recorded.
+#'
+#' @return Character vector describing the differing parameters, empty when
+#'   the cached run matches the request.
+#' @keywords internal
+#' @noRd
+.celladmix_fit_param_diff <- function(manifest, requested, rank, annotation_hash = NULL) {
+  options <- manifest$pipeline_options %||% list()
+  normalize <- function(value) paste(sort(as.character(value)), collapse = ",")
+  effective <- list(
+    rank = rank,
+    nmf_variant = requested$nmf_variant %||% "ls_nmf",
+    nmf_init = requested$nmf_init %||% "auto",
+    molecule_scoring = requested$molecule_scoring %||% "gene_loadings"
+  )
+  for (name in c("ncv_k", "graph_k", "same_label_ratio", "nmf_iterations",
+      "nmf_n_runs", "nmf_train_max_rows", "nmf_min_molecules", "seed",
+      "training_scope_cell_types")) {
+    if (!is.null(requested[[name]])) {
+      effective[[name]] <- requested[[name]]
+    }
+  }
+  diff <- character()
+  for (name in names(effective)) {
+    recorded <- options[[name]]
+    if (is.null(recorded)) {
+      next
+    }
+    if (!identical(normalize(recorded), normalize(effective[[name]]))) {
+      diff <- c(diff, sprintf("%s: %s -> %s", name,
+        normalize(recorded), normalize(effective[[name]])))
+    }
+  }
+  recorded_hash <- manifest$annotation_hash %||% ""
+  if (nzchar(recorded_hash) && !is.null(annotation_hash) &&
+      !identical(recorded_hash, as.character(annotation_hash))) {
+    diff <- c(diff, "annotation content")
+  }
+  diff
 }

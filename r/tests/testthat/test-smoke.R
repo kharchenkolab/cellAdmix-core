@@ -961,3 +961,62 @@ test_that("native-factor check vetoes persistent factors and keeps true admixtur
   expect_true("keep" %in% names(empty))
   expect_equal(nrow(empty), 0L)
 })
+
+test_that("fit parameter diff compares only requested parameters", {
+  manifest <- list(
+    pipeline_options = list(rank = 8L, nmf_variant = "ls_nmf", nmf_init = "auto",
+      molecule_scoring = "gene_loadings", ncv_k = 71L, nmf_iterations = 150L,
+      seed = 1L),
+    annotation_hash = "abc",
+    package_version = "0.0.1"
+  )
+  diff_fn <- cellAdmixCore:::.celladmix_fit_param_diff
+  # matching request, auto ncv_k matches whatever was resolved
+  expect_length(diff_fn(manifest, requested = list(), rank = 8L,
+    annotation_hash = "abc"), 0L)
+  # explicit differing ncv_k is a diff
+  expect_match(diff_fn(manifest, requested = list(ncv_k = 20L), rank = 8L,
+    annotation_hash = "abc"), "ncv_k: 71 -> 20")
+  # rank and annotation content changes are diffs
+  expect_match(diff_fn(manifest, requested = list(), rank = 9L,
+    annotation_hash = "abc"), "rank")
+  expect_match(diff_fn(manifest, requested = list(), rank = 8L,
+    annotation_hash = "zzz"), "annotation content")
+  # old manifests without a recorded hash never trigger annotation diffs
+  manifest$annotation_hash <- ""
+  expect_length(diff_fn(manifest, requested = list(), rank = 8L,
+    annotation_hash = "zzz"), 0L)
+})
+
+test_that("dataset fit reuses matching runs and refits on parameter changes", {
+  sim <- celladmix_simulate_nsclc(
+    transcripts_per_cell = 30L,
+    admixture_per_target_cell = 6L,
+    seed = 11L
+  )
+  td <- tempfile("celladmix_cache_bundle_")
+  write_mock_xenium_bundle(td, sim, include_cell_type = FALSE)
+  ds <- cellAdmix(td, output_dir = tempfile("celladmix_cache_out_"),
+    annotation = setNames(sim$cells$cell_type, sim$cells$cell_id),
+    num_threads = 1L)
+
+  fit1 <- ds$fit(rank = 2L, ncv_k = 6L, nmf_iterations = 30L,
+    nmf_train_max_rows = 40L)
+  run_json <- file.path(fit1$run_dir, "run.json")
+  mtime1 <- file.info(run_json)$mtime
+
+  expect_message(
+    fit2 <- ds$fit(rank = 2L, ncv_k = 6L, nmf_iterations = 30L,
+      nmf_train_max_rows = 40L),
+    "Reusing cached run")
+  expect_identical(file.info(run_json)$mtime, mtime1)
+  expect_true(isTRUE(fit2$params$reused_existing))
+
+  expect_message(
+    fit3 <- ds$fit(rank = 2L, ncv_k = 6L, nmf_iterations = 40L,
+      nmf_train_max_rows = 40L),
+    "nmf_iterations: 30 -> 40")
+  expect_equal(fit3$run$pipeline_options$nmf_iterations, 40L)
+  expect_false(isTRUE(fit3$params$reused_existing))
+  expect_identical(fit3$run$package_version, celladmix_core_version())
+})

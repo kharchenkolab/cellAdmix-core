@@ -100,6 +100,8 @@ py::dict nmf_diagnostics_to_dict(const celladmix::NmfRunDiagnostics& diagnostics
 py::dict manifest_to_dict(const celladmix::RunManifest& manifest) {
   py::dict out;
   out["format_version"] = manifest.format_version;
+  out["package_version"] = manifest.package_version;
+  out["annotation_hash"] = manifest.annotation_hash;
   out["run_type"] = manifest.run_type;
   out["source"] = source_to_dict(manifest.source);
   out["paths"] = paths_to_dict(manifest.paths);
@@ -574,6 +576,7 @@ PYBIND11_MODULE(_core, m) {
          unsigned int seed,
          const std::vector<std::string>& training_cell_strata,
          const std::vector<std::string>& training_scope_cell_types,
+         const std::string& annotation_hash,
          bool report_ncv_umap,
          bool verbose) {
         celladmix::BasicPipelineOptions pipeline_options;
@@ -593,6 +596,7 @@ PYBIND11_MODULE(_core, m) {
         pipeline_options.return_ncv = false;
         pipeline_options.training_cell_strata = training_cell_strata;
         pipeline_options.training_scope_cell_types = training_scope_cell_types;
+        pipeline_options.annotation_hash = annotation_hash;
 
         celladmix::RunStorageOptions storage_options;
         const auto store_manifest = celladmix::read_input_store_manifest(store_dir);
@@ -636,6 +640,7 @@ PYBIND11_MODULE(_core, m) {
       py::arg("seed") = 1U,
       py::arg("training_cell_strata") = std::vector<std::string>{},
       py::arg("training_scope_cell_types") = std::vector<std::string>{},
+      py::arg("annotation_hash") = "",
       py::arg("report_ncv_umap") = false,
       py::arg("verbose") = false);
 
@@ -645,6 +650,8 @@ PYBIND11_MODULE(_core, m) {
         return manifest_to_dict(celladmix::read_run_manifest(path));
       },
       py::arg("path"));
+
+  m.def("core_version", [] { return std::string(celladmix::kCelladmixVersion); });
 
   m.def(
       "load_run_cells_path",

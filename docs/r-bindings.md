@@ -124,6 +124,19 @@ Supported `nmf_variant` values:
 | `kl` | Sparse KL-NMF without gene weighting. |
 | `sqrt_kl` | Sparse KL-NMF after square-root transformation of NCV counts. |
 
+Fitted runs are cached on disk by run id and reused **only when the requested
+parameters match the cached run**: on each `fit()` call the requested
+parameters (and the annotation content) are compared against the values
+recorded in the run manifest. A match reuses the run with a
+`Reusing cached run ...` message; any difference triggers an automatic refit
+with the changed parameters spelled out
+(`Parameters changed for run ... (ncv_k: 20 -> 71); refitting`).
+Automatically resolved values (an omitted `ncv_k` or `nmf_n_runs`) match
+whatever the cached run recorded. `overwrite = TRUE` forces a refit even when
+parameters match — useful after package upgrades, which are reported in the
+reuse message but do not trigger refits on their own. Scores and corrections
+are recomputed on every call and never go stale.
+
 Useful fit diagnostics:
 
 ```r

@@ -28,6 +28,8 @@ struct BasicPipelineOptions {
   bool return_ncv = true;
   unsigned int seed = 1;
   std::vector<std::string> training_cell_strata;
+  // Provenance of the annotation the strata came from (binding-provided).
+  std::string annotation_hash;
   // Optional cell types used only to select NMF training rows. Projection and
   // downstream labeling still run over the full analysis scope.
   std::vector<std::string> training_scope_cell_types;

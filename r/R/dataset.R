@@ -304,16 +304,35 @@ CellAdmixDataset <- R6::R6Class(
       run_id <- run_id %||% .celladmix_run_id("fit", ann, resolved_rank, nmf_variant)
       run_dir <- file.path(self$prep$paths$runs_dir, run_id)
       if (dir.exists(run_dir) && file.exists(file.path(run_dir, "run.json")) && !isTRUE(overwrite)) {
-        fit <- self$read_fit(run_dir, annotation = ann, name = run_id)
-        fit$params <- c(fit$params, list(reused_existing = TRUE, requested_rank = resolved_rank))
-        return(fit)
+        existing <- .celladmix_read_run_manifest(run_dir)
+        diff <- .celladmix_fit_param_diff(existing, requested = dots,
+          rank = resolved_rank, annotation_hash = ann$hash)
+        if (!length(diff)) {
+          if (nzchar(existing$package_version %||% "") &&
+              !identical(existing$package_version, celladmix_core_version())) {
+            message("Reusing cached run ", run_id, " (parameters match; fitted with package ",
+              existing$package_version, ", current ", celladmix_core_version(),
+              " - pass overwrite = TRUE to refit)")
+          } else {
+            message("Reusing cached run ", run_id, " (parameters match)")
+          }
+          fit <- self$read_fit(run_dir, annotation = ann, name = run_id)
+          fit$params <- c(fit$params, list(reused_existing = TRUE, requested_rank = resolved_rank))
+          return(fit)
+        }
+        message("Parameters changed for run ", run_id, " (",
+          paste(diff, collapse = ", "), "); refitting")
+        unlink(run_dir, recursive = TRUE)
+      } else if (isTRUE(overwrite) && dir.exists(run_dir)) {
+        unlink(run_dir, recursive = TRUE)
       }
       run <- do.call(celladmix_fit, c(
         list(
           prep = self$prep,
           training_labels = ann,
           rank = resolved_rank,
-          run_id = run_id
+          run_id = run_id,
+          annotation_hash = ann$hash
         ),
         dots
       ))

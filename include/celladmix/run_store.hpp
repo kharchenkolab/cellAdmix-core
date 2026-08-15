@@ -73,6 +73,8 @@ NmfRunDiagnostics nmf_diagnostics_from_fit(const SparseNmfResult& fit);
 // Top-level manifest describing one persisted run.
 struct RunManifest {
   std::string format_version = "0.2";
+  std::string package_version;
+  std::string annotation_hash;
   std::string run_type = "fit";
   RunSourceInfo source;
   RunPaths paths;

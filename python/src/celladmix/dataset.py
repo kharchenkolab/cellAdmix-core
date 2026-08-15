@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
+import shutil
 from pathlib import Path
 from typing import Optional
 
@@ -14,6 +16,52 @@ from .state import clustering_result_to_frame
 
 def _default_threads() -> int:
     return max(1, min(10, os.cpu_count() or 1))
+
+
+def _annotation_hash(annotation) -> str:
+    if annotation is None:
+        return ""
+    digest = hashlib.sha1()
+    for cell, label in sorted(zip(annotation.index.astype(str), annotation.astype(str))):
+        digest.update(cell.encode())
+        digest.update(b"=")
+        digest.update(label.encode())
+        digest.update(b";")
+    return digest.hexdigest()
+
+
+_COMPARABLE_FIT_PARAMS = (
+    "rank", "nmf_variant", "nmf_init", "molecule_scoring", "ncv_k", "graph_k",
+    "same_label_ratio", "nmf_iterations", "nmf_n_runs", "nmf_train_max_rows",
+    "nmf_min_molecules", "seed", "training_scope_cell_types",
+)
+
+
+def _fit_param_diff(manifest: dict, requested: dict, annotation_hash: str) -> list[str]:
+    """Describe requested fit parameters that differ from a cached run.
+
+    Only caller-specified parameters participate; automatically resolved
+    values (e.g. an omitted ncv_k) match whatever the cached run recorded.
+    """
+
+    def normalize(value):
+        if isinstance(value, (list, tuple, set)):
+            return ",".join(sorted(map(str, value)))
+        return str(value)
+
+    recorded_options = manifest.get("pipeline_options", {}) or {}
+    diff = []
+    for name in _COMPARABLE_FIT_PARAMS:
+        if name not in requested or name not in recorded_options:
+            continue
+        recorded = normalize(recorded_options[name])
+        wanted = normalize(requested[name])
+        if recorded != wanted:
+            diff.append(f"{name}: {recorded} -> {wanted}")
+    recorded_hash = manifest.get("annotation_hash") or ""
+    if recorded_hash and annotation_hash and recorded_hash != annotation_hash:
+        diff.append("annotation content")
+    return diff
 
 
 class CellAdmix:
@@ -165,14 +213,38 @@ class CellAdmix:
         """
         self.ensure_store(force=False)
         threads = int(num_threads or self.num_threads)
+        explicit_n_runs = nmf_n_runs
         rank = int(rank or recommended_rank(self.annotation, multiplier=rank_multiplier, cap=rank_cap))
         nmf_n_runs = int(nmf_n_runs or threads)
         run_id = run_id or f"fit_rank{rank}_{nmf_variant}"
         run_dir = self.runs_dir / run_id
-        if (run_dir / "run.json").exists() and not overwrite:
-            # Rehydrate existing native runs instead of refitting by default.
-            manifest = _core.read_run_manifest(str(run_dir))
-            return CellAdmixFit(self, str(run_dir), manifest)
+        annotation_hash = _annotation_hash(self.annotation)
+        if (run_dir / "run.json").exists():
+            if overwrite:
+                shutil.rmtree(run_dir)
+            else:
+                manifest = _core.read_run_manifest(str(run_dir))
+                requested = dict(kwargs)
+                requested.update(
+                    rank=rank, nmf_variant=nmf_variant, nmf_init=nmf_init,
+                    molecule_scoring=molecule_scoring)
+                if explicit_n_runs is not None:
+                    requested["nmf_n_runs"] = nmf_n_runs
+                diff = _fit_param_diff(manifest, requested, annotation_hash)
+                if not diff:
+                    # Cached runs are reused only when the request matches them.
+                    if verbose:
+                        recorded = manifest.get("package_version") or ""
+                        note = (
+                            f"; fitted with package {recorded}, pass overwrite=True to refit"
+                            if recorded and recorded != _core.core_version()
+                            else ""
+                        )
+                        print(f"Reusing cached run {run_id} (parameters match{note})")
+                    return CellAdmixFit(self, str(run_dir), manifest)
+                if verbose:
+                    print(f"Parameters changed for run {run_id} ({', '.join(diff)}); refitting")
+                shutil.rmtree(run_dir)
 
         cell_ids, labels = annotation_vectors(self.annotation)
         # Training strata are aligned to the store cell order inside C++.
@@ -187,6 +259,7 @@ class CellAdmix:
             nmf_n_runs=nmf_n_runs,
             num_threads=threads,
             training_cell_strata=training_strata,
+            annotation_hash=annotation_hash,
             verbose=verbose,
             **kwargs,
         )

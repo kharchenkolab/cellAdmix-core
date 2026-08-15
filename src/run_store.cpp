@@ -806,6 +806,8 @@ nlohmann::json manifest_to_json(const RunManifest& manifest) {
   }
   return nlohmann::json{
       {"format_version", manifest.format_version},
+      {"package_version", manifest.package_version},
+      {"annotation_hash", manifest.annotation_hash},
       {"run_type", manifest.run_type},
       {"source",
        {
@@ -889,6 +891,8 @@ nlohmann::json manifest_to_json(const RunManifest& manifest) {
 RunManifest manifest_from_json(const nlohmann::json& json, const std::filesystem::path& root_dir) {
   RunManifest manifest;
   manifest.format_version = json.at("format_version").get<std::string>();
+  manifest.package_version = json.value("package_version", std::string{});
+  manifest.annotation_hash = json.value("annotation_hash", std::string{});
   manifest.run_type = json.at("run_type").get<std::string>();
   const auto& source = json.at("source");
   manifest.source.type = source.at("type").get<std::string>();
@@ -1371,6 +1375,8 @@ RunManifest write_basic_run(
   manifest.analysis_crop = analysis_crop;
   manifest.genes = table.genes;
   manifest.nmf_gene_weights = fit.nmf_transform.gene_weights;
+  manifest.package_version = kCelladmixVersion;
+  manifest.annotation_hash = pipeline_options.annotation_hash;
   manifest.nmf_diagnostics = nmf_diagnostics_from_fit(fit.nmf);
   manifest.nmf_transform_target_row_sum = fit.nmf_transform.target_row_sum;
   manifest.crop_ids = unique_nonempty(crop_names);

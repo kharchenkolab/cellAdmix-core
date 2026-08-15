@@ -1699,6 +1699,8 @@ StorePipelineResult run_basic_pipeline_store(
 
   result.manifest.source = source;
   result.manifest.pipeline_options = options;
+  result.manifest.package_version = kCelladmixVersion;
+  result.manifest.annotation_hash = options.annotation_hash;
   result.manifest.storage_options = storage_options;
   result.manifest.analysis_crop = analysis_crop;
   result.manifest.genes = counts.genes;

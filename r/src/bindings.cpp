@@ -1859,6 +1859,8 @@ List run_manifest_to_r(const celladmix::RunManifest& manifest) {
   return List::create(
       _["path"] = manifest.paths.root_dir,
       _["run_type"] = manifest.run_type,
+      _["package_version"] = manifest.package_version,
+      _["annotation_hash"] = manifest.annotation_hash,
       _["source"] = source,
       _["paths"] = paths,
       _["pipeline_options"] = pipeline_options,
@@ -2904,7 +2906,7 @@ DataFrame coherence_summary_to_df(const celladmix::CoherenceTestResult& result) 
 }  // namespace
 
 extern "C" SEXP _cellAdmixCore_celladmix_core_version() {
-  return wrap(std::string("0.0.1"));
+  return wrap(std::string(celladmix::kCelladmixVersion));
 }
 
 extern "C" SEXP _cellAdmixCore_celladmix_weighted_nmf_matrix(
@@ -3802,6 +3804,7 @@ extern "C" SEXP _cellAdmixCore_celladmix_fit_store_run(
     SEXP training_labels_path_sexp,
     SEXP use_cell_type_training_sexp,
     SEXP training_scope_cell_types_sexp,
+    SEXP annotation_hash_sexp,
     SEXP seed_sexp,
     SEXP out_dir_sexp,
     SEXP tile_size_sexp,
@@ -3857,6 +3860,8 @@ extern "C" SEXP _cellAdmixCore_celladmix_fit_store_run(
     pipeline_options.seed = optional_seed_sexp(seed_sexp, 1U);
     pipeline_options.training_scope_cell_types =
         optional_string_vector_sexp(training_scope_cell_types_sexp);
+    pipeline_options.annotation_hash =
+        optional_string_sexp(annotation_hash_sexp).value_or("");
 
     celladmix::RunStorageOptions storage_options;
     storage_options.tile_size = as<double>(tile_size_sexp);

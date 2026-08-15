@@ -11,6 +11,9 @@
 
 namespace celladmix {
 
+// Single source of truth for the core package version.
+inline constexpr const char* kCelladmixVersion = "0.0.1";
+
 struct CellTable {
   std::vector<std::string> cell_ids;
   std::vector<std::string> sample_ids;
