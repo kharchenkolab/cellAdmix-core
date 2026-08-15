@@ -1,0 +1,55 @@
+"dataset","pair","source","target","variant","method","seed","excess_molecules","n_exposed","n_e0","power","power_strict","excess_strict","n_strict_genes","removal_depth","safety_native","integrity_native","nnls_before","nnls_after","marker_removed_frac","rule_called","rule_kept","label_frac"
+"nsclc","endothelial -> epithelial","endothelial","epithelial","ls_nmf","bridge",NA,3591,2522,1576,0.215,0.244,841,3,0.17,0.886,0.9992,NA,NA,0.19,FALSE,FALSE,0.598
+"nsclc","endothelial -> fibroblast","endothelial","fibroblast","ls_nmf","bridge",NA,7400,7640,5511,0.027,0.023,892,2,0.055,0.999,0.9999,0.1641,0.1662,0.043,FALSE,FALSE,0.45
+"nsclc","endothelial -> immune other","endothelial","immune other","ls_nmf","bridge",NA,16290,22133,24998,0.44,0.43,3168,2,0.276,0.992,0.9973,NA,NA,0.332,TRUE,FALSE,0.612
+"nsclc","endothelial -> macrophage","endothelial","macrophage","ls_nmf","bridge",NA,1603,2741,4668,0.372,0.413,1093,5,0.073,0.997,1,NA,NA,0.157,TRUE,FALSE,0.424
+"nsclc","endothelial -> malignant","endothelial","malignant","ls_nmf","bridge",NA,1805,2873,15727,0.393,0.474,1384,10,0.079,1,1,0.1437,0.1439,0.151,FALSE,FALSE,0.281
+"nsclc","epithelial -> endothelial","epithelial","endothelial","ls_nmf","bridge",NA,4496,2772,4841,0.719,0.802,2078,4,0.212,0.975,0.9997,0.1683,0.1672,0.458,FALSE,FALSE,0
+"nsclc","epithelial -> fibroblast","epithelial","fibroblast","ls_nmf","bridge",NA,3562,2782,10369,0.747,0.795,1882,5,0.188,0.999,0.9999,0.1545,0.1521,0.427,FALSE,FALSE,0
+"nsclc","epithelial -> immune other","epithelial","immune other","ls_nmf","bridge",NA,13697,10944,36187,0.653,0.691,5736,4,0.358,0.992,0.9973,NA,NA,0.49,FALSE,FALSE,0
+"nsclc","epithelial -> macrophage","epithelial","macrophage","ls_nmf","bridge",NA,1443,2395,5014,0.541,0.604,585,5,0.072,0.997,1,NA,NA,0.177,FALSE,FALSE,0
+"nsclc","epithelial -> malignant","epithelial","malignant","ls_nmf","bridge",NA,4300,2435,16165,0.045,0.02,931,2,0.005,1,1,0.1725,0.1728,0.018,FALSE,FALSE,0
+"nsclc","fibroblast -> endothelial","fibroblast","endothelial","ls_nmf","bridge",NA,15456,6287,1326,-0.011,NA,0,0,0.027,0.974,0.9995,0.1584,0.1615,0.016,TRUE,FALSE,0.836
+"nsclc","fibroblast -> epithelial","fibroblast","epithelial","ls_nmf","bridge",NA,8283,2770,1328,0.953,0.999,4741,6,0.6,0.877,0.9992,NA,NA,0.745,TRUE,TRUE,0.699
+"nsclc","fibroblast -> immune other","fibroblast","immune other","ls_nmf","bridge",NA,176703,31739,15392,0.957,1,26771,2,0.707,0.992,0.9986,NA,NA,0.854,TRUE,TRUE,0.826
+"nsclc","fibroblast -> macrophage","fibroblast","macrophage","ls_nmf","bridge",NA,8703,2874,4535,0.799,0.796,8363,16,0.408,0.995,1,NA,NA,0.671,TRUE,TRUE,0.676
+"nsclc","fibroblast -> malignant","fibroblast","malignant","ls_nmf","bridge",NA,13721,6343,12257,0.803,0.805,13414,18,0.517,1,1,0.1287,0.1264,0.658,TRUE,TRUE,0.65
+"nsclc","immune other -> endothelial","immune other","endothelial","ls_nmf","bridge",NA,22171,7481,132,0.563,0.716,9262,5,0.312,0.958,0.9972,0.1957,0.1979,0.471,TRUE,TRUE,0.453
+"nsclc","immune other -> fibroblast","immune other","fibroblast","ls_nmf","bridge",NA,52200,12683,468,0.598,0.623,15163,4,0.486,0.999,0.9989,0.181,0.1797,0.558,TRUE,TRUE,0.531
+"nsclc","immune other -> malignant","immune other","malignant","ls_nmf","bridge",NA,4635,7022,11578,0.677,0.778,3488,8,0.674,1,1,0.181,0.1807,0.675,TRUE,TRUE,0.673
+"nsclc","macrophage -> endothelial","macrophage","endothelial","ls_nmf","bridge",NA,2173,3101,4512,0.87,0.979,746,6,0.533,0.976,0.9997,0.1726,0.1659,0.59,TRUE,TRUE,0.575
+"nsclc","macrophage -> fibroblast","macrophage","fibroblast","ls_nmf","bridge",NA,8018,4521,8630,0.877,0.973,1320,4,0.553,0.999,1,0.1503,0.1416,0.616,TRUE,TRUE,0.605
+"nsclc","macrophage -> immune other","macrophage","immune other","ls_nmf","bridge",NA,47041,20598,26533,0.798,NA,0,0,0.771,0.992,0.9974,NA,NA,0.78,TRUE,TRUE,0.741
+"nsclc","macrophage -> malignant","macrophage","malignant","ls_nmf","bridge",NA,2019,1813,16787,0.699,0.81,1672,15,0.739,0.999,1,0.1567,0.1539,0.726,TRUE,TRUE,0.707
+"nsclc","malignant -> endothelial","malignant","endothelial","ls_nmf","bridge",NA,1654,1296,6317,0.891,0.982,919,8,0.676,0.975,0.9997,0.1368,0.1331,0.764,TRUE,TRUE,0.725
+"nsclc","malignant -> epithelial","malignant","epithelial","ls_nmf","bridge",NA,4949,1072,3026,0.001,0.001,1486,3,0.013,0.883,0.9992,NA,NA,0.008,TRUE,FALSE,0.889
+"nsclc","malignant -> fibroblast","malignant","fibroblast","ls_nmf","bridge",NA,9762,3287,9864,0.981,0.99,5646,12,0.712,0.999,0.9999,0.1279,0.1221,0.888,TRUE,TRUE,0.875
+"nsclc","malignant -> immune other","malignant","immune other","ls_nmf","bridge",NA,11695,7396,39735,0.834,0.939,6527,11,0.695,0.992,0.9972,NA,NA,0.765,TRUE,TRUE,0.719
+"nsclc","malignant -> macrophage","malignant","macrophage","ls_nmf","bridge",NA,1742,2019,5390,0.886,0.865,1504,12,0.524,0.996,1,NA,NA,0.622,TRUE,TRUE,0.633
+"nsclc","endothelial -> epithelial","endothelial","epithelial","invsqrt_kl","bridge",NA,3591,2522,1576,0.786,0.982,841,3,0.555,0.964,0.8769,NA,NA,0.656,FALSE,FALSE,0.214
+"nsclc","endothelial -> fibroblast","endothelial","fibroblast","invsqrt_kl","bridge",NA,7400,7640,5511,0.012,0,892,2,0.025,1,0.9189,0.1641,0.1661,0.019,FALSE,FALSE,0.288
+"nsclc","endothelial -> immune other","endothelial","immune other","invsqrt_kl","bridge",NA,16290,22133,24998,0.92,0.99,3168,2,0.576,1,0.7845,NA,NA,0.693,FALSE,FALSE,0.24
+"nsclc","endothelial -> macrophage","endothelial","macrophage","invsqrt_kl","bridge",NA,1603,2741,4668,0.914,0.989,1093,5,0.588,0.996,0.9655,NA,NA,0.681,FALSE,FALSE,0.183
+"nsclc","endothelial -> malignant","endothelial","malignant","invsqrt_kl","bridge",NA,1805,2873,15727,0.831,0.956,1384,10,0.577,1,0.9671,0.1437,0.1433,0.635,FALSE,FALSE,0.114
+"nsclc","epithelial -> endothelial","epithelial","endothelial","invsqrt_kl","bridge",NA,4496,2772,4841,0.725,0.691,2078,4,0.617,1,0.8815,0.1683,0.1662,0.669,FALSE,FALSE,0.188
+"nsclc","epithelial -> fibroblast","epithelial","fibroblast","invsqrt_kl","bridge",NA,3562,2782,10369,0.724,0.601,1882,5,0.611,1,0.917,0.1545,0.1516,0.66,FALSE,FALSE,0.216
+"nsclc","epithelial -> immune other","epithelial","immune other","invsqrt_kl","bridge",NA,13697,10944,36187,0.646,0.48,5736,4,0.632,1,0.7919,NA,NA,0.638,FALSE,FALSE,0.273
+"nsclc","epithelial -> macrophage","epithelial","macrophage","invsqrt_kl","bridge",NA,1443,2395,5014,0.714,0.669,585,5,0.498,0.996,0.963,NA,NA,0.546,FALSE,FALSE,0.097
+"nsclc","epithelial -> malignant","epithelial","malignant","invsqrt_kl","bridge",NA,4300,2435,16165,0.054,0,931,2,0.047,1,0.967,0.1725,0.1728,0.05,FALSE,FALSE,0.173
+"nsclc","fibroblast -> endothelial","fibroblast","endothelial","invsqrt_kl","bridge",NA,15456,6287,1326,-0.006,NA,0,0,0.011,1,0.8958,0.1584,0.1633,0.006,TRUE,FALSE,0.987
+"nsclc","fibroblast -> epithelial","fibroblast","epithelial","invsqrt_kl","bridge",NA,8283,2770,1328,0.991,1,4741,6,0.91,0.963,0.8983,NA,NA,0.945,TRUE,TRUE,0.941
+"nsclc","fibroblast -> immune other","fibroblast","immune other","invsqrt_kl","bridge",NA,176703,31739,15392,1,1,26771,2,0.995,1,0.7836,NA,NA,0.998,TRUE,TRUE,0.996
+"nsclc","fibroblast -> macrophage","fibroblast","macrophage","invsqrt_kl","bridge",NA,8703,2874,4535,0.946,0.944,8363,16,0.833,0.994,0.9667,NA,NA,0.909,TRUE,TRUE,0.918
+"nsclc","fibroblast -> malignant","fibroblast","malignant","invsqrt_kl","bridge",NA,13721,6343,12257,0.997,0.998,13414,18,0.98,1,0.9672,0.1287,0.1256,0.989,TRUE,TRUE,0.98
+"nsclc","immune other -> endothelial","immune other","endothelial","invsqrt_kl","bridge",NA,22171,7481,132,0.029,0.001,9262,5,0.038,0.999,0.7794,0.1957,0.1977,0.033,FALSE,FALSE,0.754
+"nsclc","immune other -> fibroblast","immune other","fibroblast","invsqrt_kl","bridge",NA,52200,12683,468,0.038,-0.002,15163,4,0.062,1,0.913,0.181,0.1809,0.046,FALSE,FALSE,0.738
+"nsclc","immune other -> malignant","immune other","malignant","invsqrt_kl","bridge",NA,4635,7022,11578,0.039,0.004,3488,8,0.048,1,0.9681,0.181,0.1815,0.046,FALSE,FALSE,0.763
+"nsclc","macrophage -> endothelial","macrophage","endothelial","invsqrt_kl","bridge",NA,2173,3101,4512,0.955,0.999,746,6,0.644,0.999,0.879,0.1726,0.1654,0.701,TRUE,TRUE,0.676
+"nsclc","macrophage -> fibroblast","macrophage","fibroblast","invsqrt_kl","bridge",NA,8018,4521,8630,0.91,0.992,1320,4,0.669,1,0.9131,0.1503,0.1416,0.717,TRUE,TRUE,0.718
+"nsclc","macrophage -> immune other","macrophage","immune other","invsqrt_kl","bridge",NA,47041,20598,26533,0.951,NA,0,0,0.923,1,0.8044,NA,NA,0.932,TRUE,TRUE,0.881
+"nsclc","macrophage -> malignant","macrophage","malignant","invsqrt_kl","bridge",NA,2019,1813,16787,0.864,0.896,1672,15,0.911,1,0.9673,0.1567,0.1545,0.896,TRUE,TRUE,0.89
+"nsclc","malignant -> endothelial","malignant","endothelial","invsqrt_kl","bridge",NA,1654,1296,6317,0.986,0.997,919,8,0.943,0.999,0.876,0.1368,0.1324,0.96,TRUE,TRUE,0.953
+"nsclc","malignant -> epithelial","malignant","epithelial","invsqrt_kl","bridge",NA,4949,1072,3026,0,0,1486,3,0.007,0.965,0.8957,NA,NA,0.004,TRUE,FALSE,0.994
+"nsclc","malignant -> fibroblast","malignant","fibroblast","invsqrt_kl","bridge",NA,9762,3287,9864,1,0.999,5646,12,0.941,1,0.9123,0.1279,0.1214,0.98,TRUE,TRUE,0.988
+"nsclc","malignant -> immune other","malignant","immune other","invsqrt_kl","bridge",NA,11695,7396,39735,0.958,1,6527,11,0.823,1,0.7974,NA,NA,0.891,TRUE,TRUE,0.952
+"nsclc","malignant -> macrophage","malignant","macrophage","invsqrt_kl","bridge",NA,1742,2019,5390,0.945,0.954,1504,12,0.892,0.995,0.964,NA,NA,0.907,TRUE,TRUE,0.932

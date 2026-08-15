@@ -1,0 +1,53 @@
+"dataset","pair","source","target","variant","method","seed","excess_molecules","n_exposed","n_e0","power","power_strict","excess_strict","n_strict_genes","removal_depth","safety_native","integrity_native","nnls_before","nnls_after","marker_removed_frac","rule_called","rule_kept","label_frac"
+"breast_crop","B / plasma -> Epithelial","B / plasma","Epithelial","ls_nmf","membrane",NA,1092,4149,10804,0.99,0.99,1092,20,0.971,0.576,0.9675,NA,NA,0.981,TRUE,TRUE,0.795
+"breast_crop","B / plasma -> Myeloid","B / plasma","Myeloid","ls_nmf","membrane",NA,527,1620,1914,0.932,0.932,527,20,0.944,0.986,0.9707,0.1496,0.1428,0.937,TRUE,TRUE,0.906
+"breast_crop","B / plasma -> T / NK","B / plasma","T / NK","ls_nmf","membrane",NA,764,2992,4138,0.962,0.962,764,20,0.954,0.99,0.996,0.1332,0.1273,0.96,TRUE,TRUE,0.892
+"breast_crop","Endothelial -> T / NK","Endothelial","T / NK","ls_nmf","membrane",NA,206,1973,5157,0.099,NA,0,0,0.036,0.991,0.9969,0.1529,0.1543,0.049,FALSE,FALSE,0
+"breast_crop","Epithelial -> B / plasma","Epithelial","B / plasma","ls_nmf","membrane",NA,606,1399,123,0.104,0.104,606,20,0,0.981,0.936,0.143,0.143,0.093,FALSE,FALSE,0
+"breast_crop","Epithelial -> Myeloid","Epithelial","Myeloid","ls_nmf","membrane",NA,1062,3165,369,-0.012,-0.012,1062,20,0.062,0.975,0.9252,0.1478,0.0043,0.006,FALSE,FALSE,0
+"breast_crop","Epithelial -> T / NK","Epithelial","T / NK","ls_nmf","membrane",NA,1931,6451,679,-0.001,-0.001,1931,20,0.019,0.991,0.99,0.1609,0.1644,0.003,FALSE,FALSE,0
+"breast_crop","Myeloid -> B / plasma","Myeloid","B / plasma","ls_nmf","membrane",NA,438,1211,311,0.132,0.117,355,17,0.047,0.986,0.9575,0.1714,0.1713,0.099,TRUE,TRUE,0.826
+"breast_crop","Myeloid -> Epithelial","Myeloid","Epithelial","ls_nmf","membrane",NA,3296,6513,8440,0.974,0.974,3296,20,0.927,0.571,0.9666,NA,NA,0.96,TRUE,TRUE,0.797
+"breast_crop","Myeloid -> T / NK","Myeloid","T / NK","ls_nmf","membrane",NA,1042,5622,1508,0.778,0.853,825,14,0.821,0.993,0.9943,0.1548,0.1485,0.795,TRUE,TRUE,0.754
+"breast_crop","T / NK -> B / plasma","T / NK","B / plasma","ls_nmf","membrane",NA,843,1413,109,0.73,0.73,843,20,0.917,0.985,0.9574,0.1533,0.1484,0.757,TRUE,TRUE,0.765
+"breast_crop","T / NK -> Epithelial","T / NK","Epithelial","ls_nmf","membrane",NA,8854,10464,4489,0.892,0.892,8854,20,0.871,0.587,0.9646,NA,NA,0.886,TRUE,TRUE,0.863
+"breast_crop","T / NK -> Myeloid","T / NK","Myeloid","ls_nmf","membrane",NA,1687,3326,208,0.698,0.672,1267,15,0.375,0.982,0.9563,0.154,0,0.678,TRUE,TRUE,0.682
+"breast_crop","B / plasma -> Epithelial","B / plasma","Epithelial","invsqrt_kl","membrane",NA,1092,4149,10804,0.994,0.994,1092,20,0.968,0.998,0.9736,NA,NA,0.983,TRUE,TRUE,0.736
+"breast_crop","B / plasma -> Myeloid","B / plasma","Myeloid","invsqrt_kl","membrane",NA,527,1620,1914,0.935,0.935,527,20,0.916,0.998,0.8602,0.1496,0,0.928,TRUE,TRUE,0.883
+"breast_crop","B / plasma -> T / NK","B / plasma","T / NK","invsqrt_kl","membrane",NA,764,2992,4138,0.963,0.963,764,20,0.97,0.999,0.9685,0.1332,0.1267,0.965,TRUE,TRUE,0.847
+"breast_crop","Endothelial -> T / NK","Endothelial","T / NK","invsqrt_kl","membrane",NA,206,1973,5157,0.053,NA,0,0,0.029,0.997,0.9669,0.1529,0.1544,0.034,FALSE,FALSE,0.003
+"breast_crop","Epithelial -> B / plasma","Epithelial","B / plasma","invsqrt_kl","membrane",NA,606,1399,123,0.003,0.003,606,20,0,0.994,0.9232,0.143,0.1446,0.003,TRUE,FALSE,0.972
+"breast_crop","Epithelial -> Myeloid","Epithelial","Myeloid","invsqrt_kl","membrane",NA,1062,3165,369,-0.017,-0.017,1062,20,0.094,0.995,0.8532,0.1478,0,0.01,TRUE,FALSE,0.976
+"breast_crop","Epithelial -> T / NK","Epithelial","T / NK","invsqrt_kl","membrane",NA,1931,6451,679,-0.002,-0.002,1931,20,0.038,0.998,0.9703,0.1609,0.1641,0.006,FALSE,FALSE,0.974
+"breast_crop","Myeloid -> B / plasma","Myeloid","B / plasma","invsqrt_kl","membrane",NA,438,1211,311,0.12,0.103,355,17,0.024,0.996,0.9085,0.1714,0.1719,0.082,TRUE,FALSE,0.86
+"breast_crop","Myeloid -> Epithelial","Myeloid","Epithelial","invsqrt_kl","membrane",NA,3296,6513,8440,0.992,0.992,3296,20,0.966,0.998,0.9735,NA,NA,0.984,TRUE,TRUE,0.911
+"breast_crop","Myeloid -> T / NK","Myeloid","T / NK","invsqrt_kl","membrane",NA,1042,5622,1508,0.982,0.991,825,14,0.961,0.998,0.9544,0.1548,0.1486,0.973,TRUE,TRUE,0.957
+"breast_crop","T / NK -> B / plasma","T / NK","B / plasma","invsqrt_kl","membrane",NA,843,1413,109,0.969,0.969,843,20,1,0.997,0.9408,0.1533,0.1478,0.974,TRUE,TRUE,0.977
+"breast_crop","T / NK -> Epithelial","T / NK","Epithelial","invsqrt_kl","membrane",NA,8854,10464,4489,0.996,0.996,8854,20,0.984,0.999,0.9741,NA,NA,0.993,TRUE,TRUE,0.982
+"breast_crop","T / NK -> Myeloid","T / NK","Myeloid","invsqrt_kl","membrane",NA,1687,3326,208,0.924,0.914,1267,15,1,0.997,0.8996,0.154,0,0.928,TRUE,TRUE,0.914
+"breast_crop","B / plasma -> Epithelial","B / plasma","Epithelial","ls_nmf","bridge",NA,1092,4149,10804,0.859,0.859,1092,20,0.904,1,1,NA,NA,0.879,TRUE,TRUE,0.748
+"breast_crop","B / plasma -> Myeloid","B / plasma","Myeloid","ls_nmf","bridge",NA,527,1620,1914,0.932,0.932,527,20,0.944,0.985,0.9671,0.1496,0,0.937,TRUE,TRUE,0.902
+"breast_crop","B / plasma -> T / NK","B / plasma","T / NK","ls_nmf","bridge",NA,764,2992,4138,0.941,0.941,764,20,0.921,0.995,0.9998,0.1332,0.1283,0.935,TRUE,TRUE,0.881
+"breast_crop","Endothelial -> T / NK","Endothelial","T / NK","ls_nmf","bridge",NA,206,1973,5157,0.038,NA,0,0,0.014,0.999,0.9998,0.1529,0.1541,0.019,FALSE,FALSE,0.021
+"breast_crop","Epithelial -> B / plasma","Epithelial","B / plasma","ls_nmf","bridge",NA,606,1399,123,0,0,606,20,0,0.999,0.987,0.143,0.1449,0,FALSE,FALSE,0.892
+"breast_crop","Epithelial -> Myeloid","Epithelial","Myeloid","ls_nmf","bridge",NA,1062,3165,369,-0.011,-0.011,1062,20,0.062,0.974,0.9136,0.1478,0.0033,0.006,FALSE,FALSE,0.909
+"breast_crop","Epithelial -> T / NK","Epithelial","T / NK","ls_nmf","bridge",NA,1931,6451,679,-0.002,-0.002,1931,20,0.019,0.999,0.9973,0.1609,0.1627,0.002,FALSE,FALSE,0.96
+"breast_crop","Myeloid -> B / plasma","Myeloid","B / plasma","ls_nmf","bridge",NA,438,1211,311,0.082,0.069,355,17,0.047,0.999,0.9853,0.1714,0.1713,0.068,TRUE,FALSE,0.826
+"breast_crop","Myeloid -> Epithelial","Myeloid","Epithelial","ls_nmf","bridge",NA,3296,6513,8440,0.837,0.837,3296,20,0.85,1,1,NA,NA,0.841,TRUE,TRUE,0.797
+"breast_crop","Myeloid -> T / NK","Myeloid","T / NK","ls_nmf","bridge",NA,1042,5622,1508,0.737,0.831,825,14,0.797,0.999,0.9994,0.1548,0.1504,0.761,TRUE,TRUE,0.754
+"breast_crop","T / NK -> B / plasma","T / NK","B / plasma","ls_nmf","bridge",NA,843,1413,109,0.704,0.704,843,20,0.917,0.999,0.9872,0.1533,0.149,0.734,TRUE,TRUE,0.934
+"breast_crop","T / NK -> Epithelial","T / NK","Epithelial","ls_nmf","bridge",NA,8854,10464,4489,0.012,0.012,8854,20,0.009,1,1,NA,NA,0.011,FALSE,FALSE,0.959
+"breast_crop","T / NK -> Myeloid","T / NK","Myeloid","ls_nmf","bridge",NA,1687,3326,208,0.845,0.813,1267,15,0.75,0.982,0.9518,0.154,0,0.839,TRUE,TRUE,0.838
+"breast_crop","B / plasma -> Epithelial","B / plasma","Epithelial","invsqrt_kl","bridge",NA,1092,4149,10804,0.994,0.994,1092,20,0.968,0.998,0.9736,NA,NA,0.983,TRUE,TRUE,0.736
+"breast_crop","B / plasma -> Myeloid","B / plasma","Myeloid","invsqrt_kl","bridge",NA,527,1620,1914,0.935,0.935,527,20,0.916,0.998,0.8828,0.1496,0,0.928,TRUE,TRUE,0.883
+"breast_crop","B / plasma -> T / NK","B / plasma","T / NK","invsqrt_kl","bridge",NA,764,2992,4138,0.963,0.963,764,20,0.97,0.999,0.9685,0.1332,0.1267,0.965,TRUE,TRUE,0.847
+"breast_crop","Endothelial -> T / NK","Endothelial","T / NK","invsqrt_kl","bridge",NA,206,1973,5157,0.053,NA,0,0,0.029,0.997,0.9669,0.1529,0.1544,0.034,FALSE,FALSE,0
+"breast_crop","Epithelial -> B / plasma","Epithelial","B / plasma","invsqrt_kl","bridge",NA,606,1399,123,0,0,606,20,0,1,1,0.143,0.143,0,FALSE,FALSE,0.972
+"breast_crop","Epithelial -> Myeloid","Epithelial","Myeloid","invsqrt_kl","bridge",NA,1062,3165,369,-0.016,-0.016,1062,20,0.062,0.997,0.8804,0.1478,0,0.003,FALSE,FALSE,0.976
+"breast_crop","Epithelial -> T / NK","Epithelial","T / NK","invsqrt_kl","bridge",NA,1931,6451,679,-0.002,-0.002,1931,20,0.038,0.998,0.9703,0.1609,0.1641,0.006,TRUE,FALSE,0.974
+"breast_crop","Myeloid -> B / plasma","Myeloid","B / plasma","invsqrt_kl","bridge",NA,438,1211,311,0,0,355,17,0,1,1,0.1714,0.1714,0,TRUE,FALSE,0.86
+"breast_crop","Myeloid -> Epithelial","Myeloid","Epithelial","invsqrt_kl","bridge",NA,3296,6513,8440,0.992,0.992,3296,20,0.966,0.998,0.9735,NA,NA,0.984,TRUE,TRUE,0.911
+"breast_crop","Myeloid -> T / NK","Myeloid","T / NK","invsqrt_kl","bridge",NA,1042,5622,1508,0.982,0.991,825,14,0.961,0.998,0.9544,0.1548,0.1486,0.973,TRUE,TRUE,0.952
+"breast_crop","T / NK -> B / plasma","T / NK","B / plasma","invsqrt_kl","bridge",NA,843,1413,109,0,0,843,20,0,1,1,0.1533,0.1533,0,FALSE,FALSE,0.977
+"breast_crop","T / NK -> Epithelial","T / NK","Epithelial","invsqrt_kl","bridge",NA,8854,10464,4489,0.996,0.996,8854,20,0.984,0.999,0.9741,NA,NA,0.993,TRUE,TRUE,0.982
+"breast_crop","T / NK -> Myeloid","T / NK","Myeloid","invsqrt_kl","bridge",NA,1687,3326,208,0.921,0.912,1267,15,1,0.997,0.9252,0.154,0,0.926,TRUE,TRUE,0.914

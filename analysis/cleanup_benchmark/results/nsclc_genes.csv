@@ -1,0 +1,1081 @@
+"gene","excess_before","power","dataset","pair","variant","method","seed"
+"VWF",149.8,0.152,"nsclc","endothelial -> epithelial","ls_nmf","bridge",NA
+"COL4A1",499.2,0.248,"nsclc","endothelial -> epithelial","ls_nmf","bridge",NA
+"SPARCL1",191.5,0.304,"nsclc","endothelial -> epithelial","ls_nmf","bridge",NA
+"PECAM1",102.9,0.178,"nsclc","endothelial -> epithelial","ls_nmf","bridge",NA
+"CDH5",40.8,0.074,"nsclc","endothelial -> epithelial","ls_nmf","bridge",NA
+"COL4A2",778.2,0.342,"nsclc","endothelial -> epithelial","ls_nmf","bridge",NA
+"RGS5",100.6,0.353,"nsclc","endothelial -> epithelial","ls_nmf","bridge",NA
+"RAMP2",96.9,0.07,"nsclc","endothelial -> epithelial","ls_nmf","bridge",NA
+"CLEC14A",86.9,0.087,"nsclc","endothelial -> epithelial","ls_nmf","bridge",NA
+"ACKR1",21.8,0.116,"nsclc","endothelial -> epithelial","ls_nmf","bridge",NA
+"ITGA5",69.9,-0.096,"nsclc","endothelial -> epithelial","ls_nmf","bridge",NA
+"CD34",97.9,0.022,"nsclc","endothelial -> epithelial","ls_nmf","bridge",NA
+"FLT1",63.4,0.264,"nsclc","endothelial -> epithelial","ls_nmf","bridge",NA
+"GPX3",244,0.476,"nsclc","endothelial -> epithelial","ls_nmf","bridge",NA
+"TEK",31.3,0.126,"nsclc","endothelial -> epithelial","ls_nmf","bridge",NA
+"RAMP3",17.9,0.294,"nsclc","endothelial -> epithelial","ls_nmf","bridge",NA
+"FZD4",83.9,0.136,"nsclc","endothelial -> epithelial","ls_nmf","bridge",NA
+"ADGRL4",20.4,0.528,"nsclc","endothelial -> epithelial","ls_nmf","bridge",NA
+"ENG",30.1,0.418,"nsclc","endothelial -> epithelial","ls_nmf","bridge",NA
+"RGCC",863.3,0.064,"nsclc","endothelial -> epithelial","ls_nmf","bridge",NA
+"VWF",432.6,0.038,"nsclc","endothelial -> fibroblast","ls_nmf","bridge",NA
+"PECAM1",459.2,0.01,"nsclc","endothelial -> fibroblast","ls_nmf","bridge",NA
+"ACKR1",128.8,0.096,"nsclc","endothelial -> fibroblast","ls_nmf","bridge",NA
+"CDH5",237.6,0.038,"nsclc","endothelial -> fibroblast","ls_nmf","bridge",NA
+"RAMP2",215,0.077,"nsclc","endothelial -> fibroblast","ls_nmf","bridge",NA
+"CLEC14A",222.1,-0.007,"nsclc","endothelial -> fibroblast","ls_nmf","bridge",NA
+"ESAM",503.6,0.022,"nsclc","endothelial -> fibroblast","ls_nmf","bridge",NA
+"RAMP3",149.1,0.053,"nsclc","endothelial -> fibroblast","ls_nmf","bridge",NA
+"ADGRL4",141.2,0.02,"nsclc","endothelial -> fibroblast","ls_nmf","bridge",NA
+"INSR",403.3,0.013,"nsclc","endothelial -> fibroblast","ls_nmf","bridge",NA
+"KDR",170.5,0.094,"nsclc","endothelial -> fibroblast","ls_nmf","bridge",NA
+"TEK",52.1,-0.082,"nsclc","endothelial -> fibroblast","ls_nmf","bridge",NA
+"GPX3",2497.1,0.026,"nsclc","endothelial -> fibroblast","ls_nmf","bridge",NA
+"TIE1",77,-0.003,"nsclc","endothelial -> fibroblast","ls_nmf","bridge",NA
+"RGS5",1051.7,0.029,"nsclc","endothelial -> fibroblast","ls_nmf","bridge",NA
+"FLT1",236,-0.02,"nsclc","endothelial -> fibroblast","ls_nmf","bridge",NA
+"PDGFB",120.4,-0.046,"nsclc","endothelial -> fibroblast","ls_nmf","bridge",NA
+"IL3RA",64.3,-0.109,"nsclc","endothelial -> fibroblast","ls_nmf","bridge",NA
+"IGF2",56,0.131,"nsclc","endothelial -> fibroblast","ls_nmf","bridge",NA
+"EPHB4",182.3,0.089,"nsclc","endothelial -> fibroblast","ls_nmf","bridge",NA
+"VWF",1031.4,0.149,"nsclc","endothelial -> immune other","ls_nmf","bridge",NA
+"COL4A1",2136.6,0.566,"nsclc","endothelial -> immune other","ls_nmf","bridge",NA
+"COL4A2",3077,0.638,"nsclc","endothelial -> immune other","ls_nmf","bridge",NA
+"CDH5",537.6,0.144,"nsclc","endothelial -> immune other","ls_nmf","bridge",NA
+"SPARCL1",1559.7,0.456,"nsclc","endothelial -> immune other","ls_nmf","bridge",NA
+"ACKR1",369.6,0.259,"nsclc","endothelial -> immune other","ls_nmf","bridge",NA
+"INSR",471,0.114,"nsclc","endothelial -> immune other","ls_nmf","bridge",NA
+"ESAM",446.2,0.285,"nsclc","endothelial -> immune other","ls_nmf","bridge",NA
+"RGS5",962.2,0.482,"nsclc","endothelial -> immune other","ls_nmf","bridge",NA
+"RAMP2",460.3,0.198,"nsclc","endothelial -> immune other","ls_nmf","bridge",NA
+"PECAM1",972.9,0.191,"nsclc","endothelial -> immune other","ls_nmf","bridge",NA
+"GPX3",2252.2,0.559,"nsclc","endothelial -> immune other","ls_nmf","bridge",NA
+"RAMP3",205,0.359,"nsclc","endothelial -> immune other","ls_nmf","bridge",NA
+"CLEC14A",92.5,0.251,"nsclc","endothelial -> immune other","ls_nmf","bridge",NA
+"KDR",262.7,0.227,"nsclc","endothelial -> immune other","ls_nmf","bridge",NA
+"APP",741.3,0.462,"nsclc","endothelial -> immune other","ls_nmf","bridge",NA
+"ADGRL4",89.4,0.581,"nsclc","endothelial -> immune other","ls_nmf","bridge",NA
+"TEK",202.9,0.275,"nsclc","endothelial -> immune other","ls_nmf","bridge",NA
+"FLT1",216.4,0.366,"nsclc","endothelial -> immune other","ls_nmf","bridge",NA
+"FZD4",203.4,0.359,"nsclc","endothelial -> immune other","ls_nmf","bridge",NA
+"COL4A1",89.2,0.535,"nsclc","endothelial -> macrophage","ls_nmf","bridge",NA
+"VWF",58.7,0.217,"nsclc","endothelial -> macrophage","ls_nmf","bridge",NA
+"COL4A2",170.4,0.501,"nsclc","endothelial -> macrophage","ls_nmf","bridge",NA
+"IGFBP7",688.5,0.406,"nsclc","endothelial -> macrophage","ls_nmf","bridge",NA
+"SPARCL1",85.7,0.302,"nsclc","endothelial -> macrophage","ls_nmf","bridge",NA
+"RAMP2",31.4,0.157,"nsclc","endothelial -> macrophage","ls_nmf","bridge",NA
+"INSR",6.8,-0.111,"nsclc","endothelial -> macrophage","ls_nmf","bridge",NA
+"CDH5",0,0.03,"nsclc","endothelial -> macrophage","ls_nmf","bridge",NA
+"RGS5",26.7,0.75,"nsclc","endothelial -> macrophage","ls_nmf","bridge",NA
+"ACKR1",4.5,-0.283,"nsclc","endothelial -> macrophage","ls_nmf","bridge",NA
+"COL18A1",63.6,0.407,"nsclc","endothelial -> macrophage","ls_nmf","bridge",NA
+"ESAM",34.1,0.245,"nsclc","endothelial -> macrophage","ls_nmf","bridge",NA
+"CLEC14A",37.2,0.028,"nsclc","endothelial -> macrophage","ls_nmf","bridge",NA
+"RAMP3",10.6,0.05,"nsclc","endothelial -> macrophage","ls_nmf","bridge",NA
+"RGCC",89.8,0.213,"nsclc","endothelial -> macrophage","ls_nmf","bridge",NA
+"APP",101.7,0.103,"nsclc","endothelial -> macrophage","ls_nmf","bridge",NA
+"ADGRL4",5.6,0.366,"nsclc","endothelial -> macrophage","ls_nmf","bridge",NA
+"KDR",1.3,0.104,"nsclc","endothelial -> macrophage","ls_nmf","bridge",NA
+"ITGA5",21.3,-0.037,"nsclc","endothelial -> macrophage","ls_nmf","bridge",NA
+"CCL19",83.5,0.426,"nsclc","endothelial -> macrophage","ls_nmf","bridge",NA
+"VWF",39.8,0.027,"nsclc","endothelial -> malignant","ls_nmf","bridge",NA
+"COL4A1",189.4,0.434,"nsclc","endothelial -> malignant","ls_nmf","bridge",NA
+"VIM",204.9,0.608,"nsclc","endothelial -> malignant","ls_nmf","bridge",NA
+"COL4A2",266.1,0.505,"nsclc","endothelial -> malignant","ls_nmf","bridge",NA
+"PECAM1",40.8,0.213,"nsclc","endothelial -> malignant","ls_nmf","bridge",NA
+"SPARCL1",86.2,0.517,"nsclc","endothelial -> malignant","ls_nmf","bridge",NA
+"GPX3",46.3,0.097,"nsclc","endothelial -> malignant","ls_nmf","bridge",NA
+"IGFBP7",460.2,0.535,"nsclc","endothelial -> malignant","ls_nmf","bridge",NA
+"ACKR1",14.6,0.171,"nsclc","endothelial -> malignant","ls_nmf","bridge",NA
+"ITGA5",35.4,0.111,"nsclc","endothelial -> malignant","ls_nmf","bridge",NA
+"CDH5",48.4,0.064,"nsclc","endothelial -> malignant","ls_nmf","bridge",NA
+"RGS5",16.1,0.356,"nsclc","endothelial -> malignant","ls_nmf","bridge",NA
+"CLEC14A",9.7,0.018,"nsclc","endothelial -> malignant","ls_nmf","bridge",NA
+"DUSP1",289.3,0.068,"nsclc","endothelial -> malignant","ls_nmf","bridge",NA
+"ENTPD1",21.8,0.351,"nsclc","endothelial -> malignant","ls_nmf","bridge",NA
+"RGCC",18,0.073,"nsclc","endothelial -> malignant","ls_nmf","bridge",NA
+"CCL19",15.1,-0.098,"nsclc","endothelial -> malignant","ls_nmf","bridge",NA
+"ENG",16.3,0.463,"nsclc","endothelial -> malignant","ls_nmf","bridge",NA
+"RAMP2",0,NA,"nsclc","endothelial -> malignant","ls_nmf","bridge",NA
+"KDR",22.2,0.086,"nsclc","endothelial -> malignant","ls_nmf","bridge",NA
+"LTF",683.6,0.722,"nsclc","epithelial -> endothelial","ls_nmf","bridge",NA
+"SERPINA1",895.5,0.958,"nsclc","epithelial -> endothelial","ls_nmf","bridge",NA
+"DMBT1",280.7,0.692,"nsclc","epithelial -> endothelial","ls_nmf","bridge",NA
+"ITGB6",218.1,0.557,"nsclc","epithelial -> endothelial","ls_nmf","bridge",NA
+"KRT7",830.1,0.734,"nsclc","epithelial -> endothelial","ls_nmf","bridge",NA
+"LAMP3",99.3,0.726,"nsclc","epithelial -> endothelial","ls_nmf","bridge",NA
+"SLPI",115.4,0.935,"nsclc","epithelial -> endothelial","ls_nmf","bridge",NA
+"CHI3L1",77.3,0.446,"nsclc","epithelial -> endothelial","ls_nmf","bridge",NA
+"CCL20",0,0.406,"nsclc","epithelial -> endothelial","ls_nmf","bridge",NA
+"SERPINA3",0,1,"nsclc","epithelial -> endothelial","ls_nmf","bridge",NA
+"CXCL17",71.8,0.754,"nsclc","epithelial -> endothelial","ls_nmf","bridge",NA
+"CXCL14",237.3,0.255,"nsclc","epithelial -> endothelial","ls_nmf","bridge",NA
+"AQP3",64.5,0.835,"nsclc","epithelial -> endothelial","ls_nmf","bridge",NA
+"FGG",27.5,0.851,"nsclc","epithelial -> endothelial","ls_nmf","bridge",NA
+"PTGS2",0,NA,"nsclc","epithelial -> endothelial","ls_nmf","bridge",NA
+"CCND1",889.7,0.426,"nsclc","epithelial -> endothelial","ls_nmf","bridge",NA
+"FZD5",22.8,0.337,"nsclc","epithelial -> endothelial","ls_nmf","bridge",NA
+"GDF15",66.5,0.564,"nsclc","epithelial -> endothelial","ls_nmf","bridge",NA
+"PRSS2",29.3,0.381,"nsclc","epithelial -> endothelial","ls_nmf","bridge",NA
+"CXCL1",56.6,0.114,"nsclc","epithelial -> endothelial","ls_nmf","bridge",NA
+"LTF",613.5,0.729,"nsclc","epithelial -> fibroblast","ls_nmf","bridge",NA
+"ITGB6",183.8,0.701,"nsclc","epithelial -> fibroblast","ls_nmf","bridge",NA
+"DMBT1",156.6,0.835,"nsclc","epithelial -> fibroblast","ls_nmf","bridge",NA
+"SERPINA1",799.3,0.883,"nsclc","epithelial -> fibroblast","ls_nmf","bridge",NA
+"LAMP3",128.9,0.645,"nsclc","epithelial -> fibroblast","ls_nmf","bridge",NA
+"KRT7",568.4,0.694,"nsclc","epithelial -> fibroblast","ls_nmf","bridge",NA
+"SLPI",66.9,1,"nsclc","epithelial -> fibroblast","ls_nmf","bridge",NA
+"CXCL2",10.3,1,"nsclc","epithelial -> fibroblast","ls_nmf","bridge",NA
+"CXCL17",50.3,0.886,"nsclc","epithelial -> fibroblast","ls_nmf","bridge",NA
+"CCL20",0,1,"nsclc","epithelial -> fibroblast","ls_nmf","bridge",NA
+"AQP3",80.2,0.523,"nsclc","epithelial -> fibroblast","ls_nmf","bridge",NA
+"EFNA1",110.7,0.514,"nsclc","epithelial -> fibroblast","ls_nmf","bridge",NA
+"SERPINA3",93.1,0.466,"nsclc","epithelial -> fibroblast","ls_nmf","bridge",NA
+"CXCL3",37.5,0.827,"nsclc","epithelial -> fibroblast","ls_nmf","bridge",NA
+"CHI3L1",136.3,0.413,"nsclc","epithelial -> fibroblast","ls_nmf","bridge",NA
+"CXCL1",40.2,0.664,"nsclc","epithelial -> fibroblast","ls_nmf","bridge",NA
+"CCND1",540,0.474,"nsclc","epithelial -> fibroblast","ls_nmf","bridge",NA
+"FGG",43.9,0.53,"nsclc","epithelial -> fibroblast","ls_nmf","bridge",NA
+"PTGS2",0,NA,"nsclc","epithelial -> fibroblast","ls_nmf","bridge",NA
+"FZD5",29.4,0.515,"nsclc","epithelial -> fibroblast","ls_nmf","bridge",NA
+"LTF",3139.5,0.707,"nsclc","epithelial -> immune other","ls_nmf","bridge",NA
+"ITGB6",563.1,0.592,"nsclc","epithelial -> immune other","ls_nmf","bridge",NA
+"DMBT1",666.8,0.722,"nsclc","epithelial -> immune other","ls_nmf","bridge",NA
+"KRT7",1366.8,0.68,"nsclc","epithelial -> immune other","ls_nmf","bridge",NA
+"SERPINA3",449.2,0.575,"nsclc","epithelial -> immune other","ls_nmf","bridge",NA
+"SERPINA1",2452.2,0.884,"nsclc","epithelial -> immune other","ls_nmf","bridge",NA
+"CXCL2",416,0.316,"nsclc","epithelial -> immune other","ls_nmf","bridge",NA
+"SLPI",390.6,0.807,"nsclc","epithelial -> immune other","ls_nmf","bridge",NA
+"LAMP3",314.8,0.855,"nsclc","epithelial -> immune other","ls_nmf","bridge",NA
+"PTGS2",267.2,0.344,"nsclc","epithelial -> immune other","ls_nmf","bridge",NA
+"EFNA1",287.4,0.462,"nsclc","epithelial -> immune other","ls_nmf","bridge",NA
+"CHI3L1",296.8,0.307,"nsclc","epithelial -> immune other","ls_nmf","bridge",NA
+"CCL20",297.8,0.471,"nsclc","epithelial -> immune other","ls_nmf","bridge",NA
+"CXCL3",300.5,0.357,"nsclc","epithelial -> immune other","ls_nmf","bridge",NA
+"ICAM1",328.5,0.332,"nsclc","epithelial -> immune other","ls_nmf","bridge",NA
+"CCND1",996.1,0.589,"nsclc","epithelial -> immune other","ls_nmf","bridge",NA
+"CXCL17",259.2,0.491,"nsclc","epithelial -> immune other","ls_nmf","bridge",NA
+"AQP3",222.6,0.56,"nsclc","epithelial -> immune other","ls_nmf","bridge",NA
+"CXCL14",373.4,0.548,"nsclc","epithelial -> immune other","ls_nmf","bridge",NA
+"CXCL1",307.9,0.303,"nsclc","epithelial -> immune other","ls_nmf","bridge",NA
+"LTF",219.5,0.596,"nsclc","epithelial -> macrophage","ls_nmf","bridge",NA
+"DMBT1",61.5,0.572,"nsclc","epithelial -> macrophage","ls_nmf","bridge",NA
+"ITGB6",84.7,0.461,"nsclc","epithelial -> macrophage","ls_nmf","bridge",NA
+"KRT7",179.3,0.653,"nsclc","epithelial -> macrophage","ls_nmf","bridge",NA
+"SERPINA3",40.2,0.646,"nsclc","epithelial -> macrophage","ls_nmf","bridge",NA
+"CLU",53.9,0.266,"nsclc","epithelial -> macrophage","ls_nmf","bridge",NA
+"LAMP3",48.2,0.46,"nsclc","epithelial -> macrophage","ls_nmf","bridge",NA
+"SLPI",40.6,0.655,"nsclc","epithelial -> macrophage","ls_nmf","bridge",NA
+"EFNA1",46.4,0.643,"nsclc","epithelial -> macrophage","ls_nmf","bridge",NA
+"AQP3",26,0.264,"nsclc","epithelial -> macrophage","ls_nmf","bridge",NA
+"CXCL14",54.1,0.502,"nsclc","epithelial -> macrophage","ls_nmf","bridge",NA
+"CCND1",145.2,0.425,"nsclc","epithelial -> macrophage","ls_nmf","bridge",NA
+"PTGS2",0,0.409,"nsclc","epithelial -> macrophage","ls_nmf","bridge",NA
+"CXCL2",71.7,0.276,"nsclc","epithelial -> macrophage","ls_nmf","bridge",NA
+"CXCL17",11.9,0.361,"nsclc","epithelial -> macrophage","ls_nmf","bridge",NA
+"SERPINA1",301.6,0.595,"nsclc","epithelial -> macrophage","ls_nmf","bridge",NA
+"CCL20",0.7,-0.17,"nsclc","epithelial -> macrophage","ls_nmf","bridge",NA
+"CXCL3",46.5,0.236,"nsclc","epithelial -> macrophage","ls_nmf","bridge",NA
+"CXCL1",19.9,0.009,"nsclc","epithelial -> macrophage","ls_nmf","bridge",NA
+"ADGRF5",0,0.028,"nsclc","epithelial -> macrophage","ls_nmf","bridge",NA
+"LTF",852,0.02,"nsclc","epithelial -> malignant","ls_nmf","bridge",NA
+"LAMP3",79.4,0.022,"nsclc","epithelial -> malignant","ls_nmf","bridge",NA
+"CLU",91.6,0.14,"nsclc","epithelial -> malignant","ls_nmf","bridge",NA
+"CXCL14",50.1,0.263,"nsclc","epithelial -> malignant","ls_nmf","bridge",NA
+"ICAM1",176.3,0.075,"nsclc","epithelial -> malignant","ls_nmf","bridge",NA
+"CHI3L1",92.3,0.155,"nsclc","epithelial -> malignant","ls_nmf","bridge",NA
+"PTGS2",10,0.024,"nsclc","epithelial -> malignant","ls_nmf","bridge",NA
+"SOD2",338.3,0.092,"nsclc","epithelial -> malignant","ls_nmf","bridge",NA
+"AQP3",129.2,0.039,"nsclc","epithelial -> malignant","ls_nmf","bridge",NA
+"CCL20",34.6,-0.004,"nsclc","epithelial -> malignant","ls_nmf","bridge",NA
+"SERPINA1",1312.8,0.052,"nsclc","epithelial -> malignant","ls_nmf","bridge",NA
+"FGG",34.2,0.029,"nsclc","epithelial -> malignant","ls_nmf","bridge",NA
+"CSF2RB",4.3,0.036,"nsclc","epithelial -> malignant","ls_nmf","bridge",NA
+"CSF3R",31.2,0.023,"nsclc","epithelial -> malignant","ls_nmf","bridge",NA
+"MRC2",49.4,-0.005,"nsclc","epithelial -> malignant","ls_nmf","bridge",NA
+"CD36",31.6,0.081,"nsclc","epithelial -> malignant","ls_nmf","bridge",NA
+"ADGRF5",0,-0.081,"nsclc","epithelial -> malignant","ls_nmf","bridge",NA
+"ADGRV1",19,0.096,"nsclc","epithelial -> malignant","ls_nmf","bridge",NA
+"CXCL2",947.6,0.004,"nsclc","epithelial -> malignant","ls_nmf","bridge",NA
+"SCGB3A1",19.2,-0.059,"nsclc","epithelial -> malignant","ls_nmf","bridge",NA
+"COL1A1",4293.5,0.005,"nsclc","fibroblast -> endothelial","ls_nmf","bridge",NA
+"COL3A1",2625.9,0.001,"nsclc","fibroblast -> endothelial","ls_nmf","bridge",NA
+"LUM",378.9,-0.06,"nsclc","fibroblast -> endothelial","ls_nmf","bridge",NA
+"COL1A2",1121.6,0.001,"nsclc","fibroblast -> endothelial","ls_nmf","bridge",NA
+"FN1",3771.6,0.001,"nsclc","fibroblast -> endothelial","ls_nmf","bridge",NA
+"CDH11",204,0.015,"nsclc","fibroblast -> endothelial","ls_nmf","bridge",NA
+"COL6A3",98,0,"nsclc","fibroblast -> endothelial","ls_nmf","bridge",NA
+"COL16A1",20.8,-0.253,"nsclc","fibroblast -> endothelial","ls_nmf","bridge",NA
+"COL5A1",392.7,-0.06,"nsclc","fibroblast -> endothelial","ls_nmf","bridge",NA
+"MEG3",0,-4.106,"nsclc","fibroblast -> endothelial","ls_nmf","bridge",NA
+"INHBA",0,NA,"nsclc","fibroblast -> endothelial","ls_nmf","bridge",NA
+"COL11A1",21.4,-0.247,"nsclc","fibroblast -> endothelial","ls_nmf","bridge",NA
+"PDGFRA",0,-0.003,"nsclc","fibroblast -> endothelial","ls_nmf","bridge",NA
+"COL8A1",0,-0.604,"nsclc","fibroblast -> endothelial","ls_nmf","bridge",NA
+"THBS2",218.2,-0.195,"nsclc","fibroblast -> endothelial","ls_nmf","bridge",NA
+"VCAN",69.7,0.27,"nsclc","fibroblast -> endothelial","ls_nmf","bridge",NA
+"COL5A2",208.8,-0.123,"nsclc","fibroblast -> endothelial","ls_nmf","bridge",NA
+"ACTA2",387.5,0.018,"nsclc","fibroblast -> endothelial","ls_nmf","bridge",NA
+"PTGIS",87.8,-0.094,"nsclc","fibroblast -> endothelial","ls_nmf","bridge",NA
+"TAGLN",1690.1,-0.026,"nsclc","fibroblast -> endothelial","ls_nmf","bridge",NA
+"COL3A1",939.4,1,"nsclc","fibroblast -> epithelial","ls_nmf","bridge",NA
+"COL1A2",467.6,0.996,"nsclc","fibroblast -> epithelial","ls_nmf","bridge",NA
+"COL6A3",221.4,0.982,"nsclc","fibroblast -> epithelial","ls_nmf","bridge",NA
+"COL1A1",1943,0.999,"nsclc","fibroblast -> epithelial","ls_nmf","bridge",NA
+"LUM",302,0.995,"nsclc","fibroblast -> epithelial","ls_nmf","bridge",NA
+"FN1",867.2,0.995,"nsclc","fibroblast -> epithelial","ls_nmf","bridge",NA
+"COL5A2",111.3,0.672,"nsclc","fibroblast -> epithelial","ls_nmf","bridge",NA
+"MMP2",269.7,0.96,"nsclc","fibroblast -> epithelial","ls_nmf","bridge",NA
+"BGN",734,0.879,"nsclc","fibroblast -> epithelial","ls_nmf","bridge",NA
+"ACTA2",64.4,0.95,"nsclc","fibroblast -> epithelial","ls_nmf","bridge",NA
+"IGFBP5",359,0.756,"nsclc","fibroblast -> epithelial","ls_nmf","bridge",NA
+"TIMP1",889.5,0.876,"nsclc","fibroblast -> epithelial","ls_nmf","bridge",NA
+"CALD1",277.8,0.617,"nsclc","fibroblast -> epithelial","ls_nmf","bridge",NA
+"TAGLN",645.1,0.614,"nsclc","fibroblast -> epithelial","ls_nmf","bridge",NA
+"MEG3",31.1,0.535,"nsclc","fibroblast -> epithelial","ls_nmf","bridge",NA
+"INHBA",54.9,1,"nsclc","fibroblast -> epithelial","ls_nmf","bridge",NA
+"COL6A2",0,1,"nsclc","fibroblast -> epithelial","ls_nmf","bridge",NA
+"COL14A1",17.4,0.905,"nsclc","fibroblast -> epithelial","ls_nmf","bridge",NA
+"PDGFRB",77.5,0.399,"nsclc","fibroblast -> epithelial","ls_nmf","bridge",NA
+"COL5A1",31.5,1,"nsclc","fibroblast -> epithelial","ls_nmf","bridge",NA
+"FN1",14447.3,1,"nsclc","fibroblast -> immune other","ls_nmf","bridge",NA
+"COL1A2",12324,1,"nsclc","fibroblast -> immune other","ls_nmf","bridge",NA
+"COL1A1",45007,0.97,"nsclc","fibroblast -> immune other","ls_nmf","bridge",NA
+"COL3A1",28697,0.998,"nsclc","fibroblast -> immune other","ls_nmf","bridge",NA
+"COL6A3",5673.1,0.997,"nsclc","fibroblast -> immune other","ls_nmf","bridge",NA
+"COL5A1",1959.6,0.967,"nsclc","fibroblast -> immune other","ls_nmf","bridge",NA
+"IGFBP5",4448.1,0.901,"nsclc","fibroblast -> immune other","ls_nmf","bridge",NA
+"ACTA2",1555.7,0.931,"nsclc","fibroblast -> immune other","ls_nmf","bridge",NA
+"COL5A2",1698.8,1,"nsclc","fibroblast -> immune other","ls_nmf","bridge",NA
+"CDH11",1385.8,1,"nsclc","fibroblast -> immune other","ls_nmf","bridge",NA
+"COL6A2",4880.6,0.994,"nsclc","fibroblast -> immune other","ls_nmf","bridge",NA
+"COL6A1",3335.9,1,"nsclc","fibroblast -> immune other","ls_nmf","bridge",NA
+"BGN",16314.2,0.843,"nsclc","fibroblast -> immune other","ls_nmf","bridge",NA
+"LUM",5452.3,0.98,"nsclc","fibroblast -> immune other","ls_nmf","bridge",NA
+"CALD1",2734,0.811,"nsclc","fibroblast -> immune other","ls_nmf","bridge",NA
+"MMP2",5626.2,0.988,"nsclc","fibroblast -> immune other","ls_nmf","bridge",NA
+"TAGLN",8722,0.827,"nsclc","fibroblast -> immune other","ls_nmf","bridge",NA
+"COL16A1",629.1,1,"nsclc","fibroblast -> immune other","ls_nmf","bridge",NA
+"COL8A1",826.5,1,"nsclc","fibroblast -> immune other","ls_nmf","bridge",NA
+"MGP",10986,0.811,"nsclc","fibroblast -> immune other","ls_nmf","bridge",NA
+"COL3A1",925.9,0.993,"nsclc","fibroblast -> macrophage","ls_nmf","bridge",NA
+"COL1A1",1633.6,0.996,"nsclc","fibroblast -> macrophage","ls_nmf","bridge",NA
+"COL1A2",454.1,0.995,"nsclc","fibroblast -> macrophage","ls_nmf","bridge",NA
+"COL6A3",201.5,0.984,"nsclc","fibroblast -> macrophage","ls_nmf","bridge",NA
+"FN1",942.5,0.985,"nsclc","fibroblast -> macrophage","ls_nmf","bridge",NA
+"BGN",776.8,0.513,"nsclc","fibroblast -> macrophage","ls_nmf","bridge",NA
+"LUM",199.7,0.901,"nsclc","fibroblast -> macrophage","ls_nmf","bridge",NA
+"COL6A2",247.4,0.782,"nsclc","fibroblast -> macrophage","ls_nmf","bridge",NA
+"MGP",404.4,0.532,"nsclc","fibroblast -> macrophage","ls_nmf","bridge",NA
+"DCN",297.7,0.68,"nsclc","fibroblast -> macrophage","ls_nmf","bridge",NA
+"COL5A1",129.2,0.698,"nsclc","fibroblast -> macrophage","ls_nmf","bridge",NA
+"ACTA2",114.6,0.573,"nsclc","fibroblast -> macrophage","ls_nmf","bridge",NA
+"COL6A1",161.5,0.85,"nsclc","fibroblast -> macrophage","ls_nmf","bridge",NA
+"CALD1",158.7,0.593,"nsclc","fibroblast -> macrophage","ls_nmf","bridge",NA
+"IGFBP5",237.2,0.748,"nsclc","fibroblast -> macrophage","ls_nmf","bridge",NA
+"TIMP1",1477.9,0.519,"nsclc","fibroblast -> macrophage","ls_nmf","bridge",NA
+"COL5A2",57.2,0.806,"nsclc","fibroblast -> macrophage","ls_nmf","bridge",NA
+"CDH11",59.2,1,"nsclc","fibroblast -> macrophage","ls_nmf","bridge",NA
+"MMP2",197.1,0.752,"nsclc","fibroblast -> macrophage","ls_nmf","bridge",NA
+"IGFBP3",26.4,0.801,"nsclc","fibroblast -> macrophage","ls_nmf","bridge",NA
+"COL3A1",1299.1,0.997,"nsclc","fibroblast -> malignant","ls_nmf","bridge",NA
+"COL1A2",848.4,0.997,"nsclc","fibroblast -> malignant","ls_nmf","bridge",NA
+"FN1",1562,0.993,"nsclc","fibroblast -> malignant","ls_nmf","bridge",NA
+"COL6A3",269.8,0.975,"nsclc","fibroblast -> malignant","ls_nmf","bridge",NA
+"BGN",1183.3,0.922,"nsclc","fibroblast -> malignant","ls_nmf","bridge",NA
+"COL1A1",2669.1,0.999,"nsclc","fibroblast -> malignant","ls_nmf","bridge",NA
+"LUM",167.8,0.999,"nsclc","fibroblast -> malignant","ls_nmf","bridge",NA
+"COL6A2",299.8,0.906,"nsclc","fibroblast -> malignant","ls_nmf","bridge",NA
+"DCN",152.5,0.913,"nsclc","fibroblast -> malignant","ls_nmf","bridge",NA
+"MGP",441,0.738,"nsclc","fibroblast -> malignant","ls_nmf","bridge",NA
+"TAGLN",1333.7,0.477,"nsclc","fibroblast -> malignant","ls_nmf","bridge",NA
+"MMP2",55.4,1,"nsclc","fibroblast -> malignant","ls_nmf","bridge",NA
+"IGFBP5",970.8,0.682,"nsclc","fibroblast -> malignant","ls_nmf","bridge",NA
+"COL5A1",108.8,0.982,"nsclc","fibroblast -> malignant","ls_nmf","bridge",NA
+"ACTA2",274,0.729,"nsclc","fibroblast -> malignant","ls_nmf","bridge",NA
+"CDH11",42.4,0.906,"nsclc","fibroblast -> malignant","ls_nmf","bridge",NA
+"CALD1",531.6,0.442,"nsclc","fibroblast -> malignant","ls_nmf","bridge",NA
+"THBS1",1204.4,0.133,"nsclc","fibroblast -> malignant","ls_nmf","bridge",NA
+"IL1R1",151.4,0.654,"nsclc","fibroblast -> malignant","ls_nmf","bridge",NA
+"COL5A2",155.6,0.745,"nsclc","fibroblast -> malignant","ls_nmf","bridge",NA
+"TPSB2",1174.9,0.981,"nsclc","immune other -> endothelial","ls_nmf","bridge",NA
+"JCHAIN",1056.5,1,"nsclc","immune other -> endothelial","ls_nmf","bridge",NA
+"IGHA1",3776.3,0.714,"nsclc","immune other -> endothelial","ls_nmf","bridge",NA
+"IGHG2",2372.9,0.619,"nsclc","immune other -> endothelial","ls_nmf","bridge",NA
+"IGHM",881.6,0.248,"nsclc","immune other -> endothelial","ls_nmf","bridge",NA
+"IGKC",4073.9,0.726,"nsclc","immune other -> endothelial","ls_nmf","bridge",NA
+"MZB1",349.5,0.386,"nsclc","immune other -> endothelial","ls_nmf","bridge",NA
+"IGHG1",2749.6,0.716,"nsclc","immune other -> endothelial","ls_nmf","bridge",NA
+"RGS1",331.1,0.248,"nsclc","immune other -> endothelial","ls_nmf","bridge",NA
+"VPREB3",361.9,0.014,"nsclc","immune other -> endothelial","ls_nmf","bridge",NA
+"CD53",578.9,0.152,"nsclc","immune other -> endothelial","ls_nmf","bridge",NA
+"TPSAB1",514.5,0.928,"nsclc","immune other -> endothelial","ls_nmf","bridge",NA
+"P2RX5",229.8,0.035,"nsclc","immune other -> endothelial","ls_nmf","bridge",NA
+"IL7R",809.1,0,"nsclc","immune other -> endothelial","ls_nmf","bridge",NA
+"CIITA",1054.9,0.047,"nsclc","immune other -> endothelial","ls_nmf","bridge",NA
+"IL1RL1",412.6,0.099,"nsclc","immune other -> endothelial","ls_nmf","bridge",NA
+"TNFSF8",275.8,0.051,"nsclc","immune other -> endothelial","ls_nmf","bridge",NA
+"CD52",413.3,0.082,"nsclc","immune other -> endothelial","ls_nmf","bridge",NA
+"DUSP2",508.4,0.018,"nsclc","immune other -> endothelial","ls_nmf","bridge",NA
+"PTPRC",245.6,-0.05,"nsclc","immune other -> endothelial","ls_nmf","bridge",NA
+"IGHA1",8186.9,0.836,"nsclc","immune other -> fibroblast","ls_nmf","bridge",NA
+"IGHM",3332.1,0.196,"nsclc","immune other -> fibroblast","ls_nmf","bridge",NA
+"JCHAIN",1938.2,1,"nsclc","immune other -> fibroblast","ls_nmf","bridge",NA
+"IL7R",1706.1,0.001,"nsclc","immune other -> fibroblast","ls_nmf","bridge",NA
+"TPSB2",1420.7,0.984,"nsclc","immune other -> fibroblast","ls_nmf","bridge",NA
+"IGHG1",8684.2,0.798,"nsclc","immune other -> fibroblast","ls_nmf","bridge",NA
+"RGS1",1526.2,0.188,"nsclc","immune other -> fibroblast","ls_nmf","bridge",NA
+"MS4A1",717.3,0.017,"nsclc","immune other -> fibroblast","ls_nmf","bridge",NA
+"IGHG2",5582,0.883,"nsclc","immune other -> fibroblast","ls_nmf","bridge",NA
+"IGKC",8408.8,0.69,"nsclc","immune other -> fibroblast","ls_nmf","bridge",NA
+"CD37",1476,0.11,"nsclc","immune other -> fibroblast","ls_nmf","bridge",NA
+"CXCR4",2420.8,0.079,"nsclc","immune other -> fibroblast","ls_nmf","bridge",NA
+"TPSAB1",1092.2,1,"nsclc","immune other -> fibroblast","ls_nmf","bridge",NA
+"CIITA",1122.6,0.076,"nsclc","immune other -> fibroblast","ls_nmf","bridge",NA
+"CD52",915.3,0.073,"nsclc","immune other -> fibroblast","ls_nmf","bridge",NA
+"PTPRC",1219.2,0.031,"nsclc","immune other -> fibroblast","ls_nmf","bridge",NA
+"IL1RL1",268.4,0.433,"nsclc","immune other -> fibroblast","ls_nmf","bridge",NA
+"CD79A",533.1,0.219,"nsclc","immune other -> fibroblast","ls_nmf","bridge",NA
+"CD53",1384,0.15,"nsclc","immune other -> fibroblast","ls_nmf","bridge",NA
+"MZB1",266.2,0.999,"nsclc","immune other -> fibroblast","ls_nmf","bridge",NA
+"JCHAIN",11.3,0.933,"nsclc","immune other -> malignant","ls_nmf","bridge",NA
+"IGHA1",641.8,0.841,"nsclc","immune other -> malignant","ls_nmf","bridge",NA
+"TPSB2",275.9,0.973,"nsclc","immune other -> malignant","ls_nmf","bridge",NA
+"IGHM",159.6,0.347,"nsclc","immune other -> malignant","ls_nmf","bridge",NA
+"IGHG1",864.6,0.779,"nsclc","immune other -> malignant","ls_nmf","bridge",NA
+"IGKC",926.8,0.871,"nsclc","immune other -> malignant","ls_nmf","bridge",NA
+"PTPRC",97,0.037,"nsclc","immune other -> malignant","ls_nmf","bridge",NA
+"IGHG2",511.1,0.69,"nsclc","immune other -> malignant","ls_nmf","bridge",NA
+"CD37",43.5,0.194,"nsclc","immune other -> malignant","ls_nmf","bridge",NA
+"CD53",128.2,0.121,"nsclc","immune other -> malignant","ls_nmf","bridge",NA
+"RGS1",39.8,0.265,"nsclc","immune other -> malignant","ls_nmf","bridge",NA
+"IL7R",18.1,-0.014,"nsclc","immune other -> malignant","ls_nmf","bridge",NA
+"TPSAB1",234.7,0.98,"nsclc","immune other -> malignant","ls_nmf","bridge",NA
+"CPA3",68.5,0.94,"nsclc","immune other -> malignant","ls_nmf","bridge",NA
+"MZB1",26.5,0.529,"nsclc","immune other -> malignant","ls_nmf","bridge",NA
+"IL16",128.7,0.07,"nsclc","immune other -> malignant","ls_nmf","bridge",NA
+"MS4A1",72.2,0.214,"nsclc","immune other -> malignant","ls_nmf","bridge",NA
+"CIITA",270.6,0.09,"nsclc","immune other -> malignant","ls_nmf","bridge",NA
+"CD52",39.4,-0.01,"nsclc","immune other -> malignant","ls_nmf","bridge",NA
+"IL1RL1",76.5,0.232,"nsclc","immune other -> malignant","ls_nmf","bridge",NA
+"GPNMB",61.6,0.931,"nsclc","macrophage -> endothelial","ls_nmf","bridge",NA
+"C1QB",201.2,0.979,"nsclc","macrophage -> endothelial","ls_nmf","bridge",NA
+"CD163",33.8,0.894,"nsclc","macrophage -> endothelial","ls_nmf","bridge",NA
+"C1QA",277.4,0.971,"nsclc","macrophage -> endothelial","ls_nmf","bridge",NA
+"C1QC",148.2,0.984,"nsclc","macrophage -> endothelial","ls_nmf","bridge",NA
+"CCL18",24.2,0.755,"nsclc","macrophage -> endothelial","ls_nmf","bridge",NA
+"CD68",104.7,0.756,"nsclc","macrophage -> endothelial","ls_nmf","bridge",NA
+"CD14",153.5,0.979,"nsclc","macrophage -> endothelial","ls_nmf","bridge",NA
+"MS4A4A",31.5,0.479,"nsclc","macrophage -> endothelial","ls_nmf","bridge",NA
+"PSAP",369.5,1,"nsclc","macrophage -> endothelial","ls_nmf","bridge",NA
+"TYROBP",82.7,0.587,"nsclc","macrophage -> endothelial","ls_nmf","bridge",NA
+"HLA-DQA1",75.2,1,"nsclc","macrophage -> endothelial","ls_nmf","bridge",NA
+"GLUL",134.9,0.597,"nsclc","macrophage -> endothelial","ls_nmf","bridge",NA
+"IL2RA",34.5,0.214,"nsclc","macrophage -> endothelial","ls_nmf","bridge",NA
+"FCER1G",41.8,0.449,"nsclc","macrophage -> endothelial","ls_nmf","bridge",NA
+"ITGAX",25.1,-0.005,"nsclc","macrophage -> endothelial","ls_nmf","bridge",NA
+"MRC1",23.6,0.882,"nsclc","macrophage -> endothelial","ls_nmf","bridge",NA
+"ITGB2",102.7,0.291,"nsclc","macrophage -> endothelial","ls_nmf","bridge",NA
+"CFD",178.7,0.256,"nsclc","macrophage -> endothelial","ls_nmf","bridge",NA
+"FCGR3A",68.4,0.285,"nsclc","macrophage -> endothelial","ls_nmf","bridge",NA
+"C1QB",225.3,0.995,"nsclc","macrophage -> fibroblast","ls_nmf","bridge",NA
+"CCL18",129.9,0.826,"nsclc","macrophage -> fibroblast","ls_nmf","bridge",NA
+"C1QA",527.1,0.995,"nsclc","macrophage -> fibroblast","ls_nmf","bridge",NA
+"GPNMB",438,0.969,"nsclc","macrophage -> fibroblast","ls_nmf","bridge",NA
+"CD163",164.3,0.857,"nsclc","macrophage -> fibroblast","ls_nmf","bridge",NA
+"C1QC",335.8,0.989,"nsclc","macrophage -> fibroblast","ls_nmf","bridge",NA
+"CD68",507.1,0.982,"nsclc","macrophage -> fibroblast","ls_nmf","bridge",NA
+"CD14",186.2,0.967,"nsclc","macrophage -> fibroblast","ls_nmf","bridge",NA
+"MS4A4A",37.3,0.481,"nsclc","macrophage -> fibroblast","ls_nmf","bridge",NA
+"MRC1",118,0.599,"nsclc","macrophage -> fibroblast","ls_nmf","bridge",NA
+"GLUL",559.4,0.468,"nsclc","macrophage -> fibroblast","ls_nmf","bridge",NA
+"PSAP",1465.6,0.748,"nsclc","macrophage -> fibroblast","ls_nmf","bridge",NA
+"HLA-DRB1",663.7,0.928,"nsclc","macrophage -> fibroblast","ls_nmf","bridge",NA
+"TYROBP",159.6,0.696,"nsclc","macrophage -> fibroblast","ls_nmf","bridge",NA
+"HLA-DQA1",199.2,0.833,"nsclc","macrophage -> fibroblast","ls_nmf","bridge",NA
+"HLA-DRA",350.5,0.99,"nsclc","macrophage -> fibroblast","ls_nmf","bridge",NA
+"CD74",1196,0.948,"nsclc","macrophage -> fibroblast","ls_nmf","bridge",NA
+"HLA-DPA1",545.7,0.929,"nsclc","macrophage -> fibroblast","ls_nmf","bridge",NA
+"FCER1G",96.1,0.433,"nsclc","macrophage -> fibroblast","ls_nmf","bridge",NA
+"ITGAX",113.2,0.651,"nsclc","macrophage -> fibroblast","ls_nmf","bridge",NA
+"GPNMB",3106.2,0.998,"nsclc","macrophage -> immune other","ls_nmf","bridge",NA
+"CCL18",1284.8,0.625,"nsclc","macrophage -> immune other","ls_nmf","bridge",NA
+"C1QB",3151.7,0.996,"nsclc","macrophage -> immune other","ls_nmf","bridge",NA
+"C1QA",4310.2,0.992,"nsclc","macrophage -> immune other","ls_nmf","bridge",NA
+"PSAP",11370.9,1,"nsclc","macrophage -> immune other","ls_nmf","bridge",NA
+"C1QC",3257.8,0.976,"nsclc","macrophage -> immune other","ls_nmf","bridge",NA
+"CD68",4058.8,0.853,"nsclc","macrophage -> immune other","ls_nmf","bridge",NA
+"GLUL",7485,0.331,"nsclc","macrophage -> immune other","ls_nmf","bridge",NA
+"CD14",2310.3,0.89,"nsclc","macrophage -> immune other","ls_nmf","bridge",NA
+"CD163",2119.1,0.507,"nsclc","macrophage -> immune other","ls_nmf","bridge",NA
+"MS4A4A",385.4,0.449,"nsclc","macrophage -> immune other","ls_nmf","bridge",NA
+"SPP1",746.1,0.447,"nsclc","macrophage -> immune other","ls_nmf","bridge",NA
+"CFD",922.5,0.617,"nsclc","macrophage -> immune other","ls_nmf","bridge",NA
+"LGALS3",1212.4,0.544,"nsclc","macrophage -> immune other","ls_nmf","bridge",NA
+"SELENOP",132.6,0.942,"nsclc","macrophage -> immune other","ls_nmf","bridge",NA
+"MARCO",234,0.533,"nsclc","macrophage -> immune other","ls_nmf","bridge",NA
+"NR1H3",186.9,0.268,"nsclc","macrophage -> immune other","ls_nmf","bridge",NA
+"MMP12",238,0.497,"nsclc","macrophage -> immune other","ls_nmf","bridge",NA
+"MERTK",217.7,0.527,"nsclc","macrophage -> immune other","ls_nmf","bridge",NA
+"CMKLR1",310.9,0.381,"nsclc","macrophage -> immune other","ls_nmf","bridge",NA
+"GPNMB",81.5,0.943,"nsclc","macrophage -> malignant","ls_nmf","bridge",NA
+"CD163",36.9,0.508,"nsclc","macrophage -> malignant","ls_nmf","bridge",NA
+"C1QB",105.7,1,"nsclc","macrophage -> malignant","ls_nmf","bridge",NA
+"C1QA",156.4,1,"nsclc","macrophage -> malignant","ls_nmf","bridge",NA
+"C1QC",84.5,0.957,"nsclc","macrophage -> malignant","ls_nmf","bridge",NA
+"HLA-DPA1",188.3,0.791,"nsclc","macrophage -> malignant","ls_nmf","bridge",NA
+"CD14",57.9,0.912,"nsclc","macrophage -> malignant","ls_nmf","bridge",NA
+"HLA-DRA",152.4,0.842,"nsclc","macrophage -> malignant","ls_nmf","bridge",NA
+"HLA-DQA1",74.4,0.882,"nsclc","macrophage -> malignant","ls_nmf","bridge",NA
+"CD74",383.2,0.806,"nsclc","macrophage -> malignant","ls_nmf","bridge",NA
+"HLA-DPB1",92,0.721,"nsclc","macrophage -> malignant","ls_nmf","bridge",NA
+"HLA-DRB1",138.8,0.638,"nsclc","macrophage -> malignant","ls_nmf","bridge",NA
+"SRGN",107.5,0.316,"nsclc","macrophage -> malignant","ls_nmf","bridge",NA
+"SELENOP",8.7,0.821,"nsclc","macrophage -> malignant","ls_nmf","bridge",NA
+"MS4A4A",4.1,0.608,"nsclc","macrophage -> malignant","ls_nmf","bridge",NA
+"MRC1",1,0.132,"nsclc","macrophage -> malignant","ls_nmf","bridge",NA
+"FCER1G",39.3,0.574,"nsclc","macrophage -> malignant","ls_nmf","bridge",NA
+"GADD45B",248.4,0.075,"nsclc","macrophage -> malignant","ls_nmf","bridge",NA
+"IL2RA",54,0.439,"nsclc","macrophage -> malignant","ls_nmf","bridge",NA
+"CD68",4,0.81,"nsclc","macrophage -> malignant","ls_nmf","bridge",NA
+"OLFM4",299.7,0.992,"nsclc","malignant -> endothelial","ls_nmf","bridge",NA
+"KRT19",268,0.994,"nsclc","malignant -> endothelial","ls_nmf","bridge",NA
+"CEACAM6",56,0.993,"nsclc","malignant -> endothelial","ls_nmf","bridge",NA
+"MMP1",28.3,0.916,"nsclc","malignant -> endothelial","ls_nmf","bridge",NA
+"KRT17",133,0.966,"nsclc","malignant -> endothelial","ls_nmf","bridge",NA
+"CXCL5",59,0.97,"nsclc","malignant -> endothelial","ls_nmf","bridge",NA
+"AGR2",24.8,1,"nsclc","malignant -> endothelial","ls_nmf","bridge",NA
+"EPCAM",50.3,0.859,"nsclc","malignant -> endothelial","ls_nmf","bridge",NA
+"MMP7",174.6,0.966,"nsclc","malignant -> endothelial","ls_nmf","bridge",NA
+"LYZ",78.1,0.971,"nsclc","malignant -> endothelial","ls_nmf","bridge",NA
+"S100P",56.1,0.655,"nsclc","malignant -> endothelial","ls_nmf","bridge",NA
+"SPINK1",53.1,0.638,"nsclc","malignant -> endothelial","ls_nmf","bridge",NA
+"PIGR",36.3,0.608,"nsclc","malignant -> endothelial","ls_nmf","bridge",NA
+"CDH1",8.9,1,"nsclc","malignant -> endothelial","ls_nmf","bridge",NA
+"SOX9",41.3,0.36,"nsclc","malignant -> endothelial","ls_nmf","bridge",NA
+"KRT8",165,0.765,"nsclc","malignant -> endothelial","ls_nmf","bridge",NA
+"DDR1",38,0.67,"nsclc","malignant -> endothelial","ls_nmf","bridge",NA
+"TACSTD2",12.2,0.928,"nsclc","malignant -> endothelial","ls_nmf","bridge",NA
+"KRT23",38.5,0.354,"nsclc","malignant -> endothelial","ls_nmf","bridge",NA
+"ERBB3",32.8,0.34,"nsclc","malignant -> endothelial","ls_nmf","bridge",NA
+"OLFM4",949,0,"nsclc","malignant -> epithelial","ls_nmf","bridge",NA
+"MMP1",155.8,0.006,"nsclc","malignant -> epithelial","ls_nmf","bridge",NA
+"CXCL5",381.1,0.003,"nsclc","malignant -> epithelial","ls_nmf","bridge",NA
+"CEACAM6",430.7,0,"nsclc","malignant -> epithelial","ls_nmf","bridge",NA
+"COL17A1",43.5,-0.059,"nsclc","malignant -> epithelial","ls_nmf","bridge",NA
+"SPINK1",89,0,"nsclc","malignant -> epithelial","ls_nmf","bridge",NA
+"ITGB4",141.9,-0.007,"nsclc","malignant -> epithelial","ls_nmf","bridge",NA
+"PSCA",32.8,-0.034,"nsclc","malignant -> epithelial","ls_nmf","bridge",NA
+"KRT23",74.7,0.027,"nsclc","malignant -> epithelial","ls_nmf","bridge",NA
+"SOX9",171.1,0.012,"nsclc","malignant -> epithelial","ls_nmf","bridge",NA
+"KRT17",603.8,0.002,"nsclc","malignant -> epithelial","ls_nmf","bridge",NA
+"S100P",174,0,"nsclc","malignant -> epithelial","ls_nmf","bridge",NA
+"SLC2A1",16.4,-0.102,"nsclc","malignant -> epithelial","ls_nmf","bridge",NA
+"EPHA2",146.7,0.005,"nsclc","malignant -> epithelial","ls_nmf","bridge",NA
+"ITGA6",35,0.076,"nsclc","malignant -> epithelial","ls_nmf","bridge",NA
+"TM4SF1",327.7,0.012,"nsclc","malignant -> epithelial","ls_nmf","bridge",NA
+"SERPINB5",33.2,-0.018,"nsclc","malignant -> epithelial","ls_nmf","bridge",NA
+"IER3",238.1,0.017,"nsclc","malignant -> epithelial","ls_nmf","bridge",NA
+"KRT19",836.4,0.001,"nsclc","malignant -> epithelial","ls_nmf","bridge",NA
+"JAG1",67.6,-0.005,"nsclc","malignant -> epithelial","ls_nmf","bridge",NA
+"OLFM4",1151.1,1,"nsclc","malignant -> fibroblast","ls_nmf","bridge",NA
+"KRT19",1543.7,0.994,"nsclc","malignant -> fibroblast","ls_nmf","bridge",NA
+"CEACAM6",316.9,0.998,"nsclc","malignant -> fibroblast","ls_nmf","bridge",NA
+"KRT17",892.5,0.998,"nsclc","malignant -> fibroblast","ls_nmf","bridge",NA
+"AGR2",118.5,0.977,"nsclc","malignant -> fibroblast","ls_nmf","bridge",NA
+"CXCL5",255.5,0.971,"nsclc","malignant -> fibroblast","ls_nmf","bridge",NA
+"ITGB4",170.9,0.976,"nsclc","malignant -> fibroblast","ls_nmf","bridge",NA
+"TM4SF1",282.4,0.989,"nsclc","malignant -> fibroblast","ls_nmf","bridge",NA
+"EPCAM",220,0.973,"nsclc","malignant -> fibroblast","ls_nmf","bridge",NA
+"MMP1",258.9,0.979,"nsclc","malignant -> fibroblast","ls_nmf","bridge",NA
+"TACSTD2",132.1,0.943,"nsclc","malignant -> fibroblast","ls_nmf","bridge",NA
+"S100P",303.4,0.913,"nsclc","malignant -> fibroblast","ls_nmf","bridge",NA
+"MMP7",2716.7,0.98,"nsclc","malignant -> fibroblast","ls_nmf","bridge",NA
+"KRT8",687.2,0.968,"nsclc","malignant -> fibroblast","ls_nmf","bridge",NA
+"SPINK1",144.2,0.92,"nsclc","malignant -> fibroblast","ls_nmf","bridge",NA
+"CDH1",53.2,0.935,"nsclc","malignant -> fibroblast","ls_nmf","bridge",NA
+"PIGR",73.6,1,"nsclc","malignant -> fibroblast","ls_nmf","bridge",NA
+"ITGA3",121,0.698,"nsclc","malignant -> fibroblast","ls_nmf","bridge",NA
+"SOX9",204.8,0.892,"nsclc","malignant -> fibroblast","ls_nmf","bridge",NA
+"EPHA2",115.1,0.798,"nsclc","malignant -> fibroblast","ls_nmf","bridge",NA
+"OLFM4",848.8,0.998,"nsclc","malignant -> immune other","ls_nmf","bridge",NA
+"CEACAM6",537.5,0.964,"nsclc","malignant -> immune other","ls_nmf","bridge",NA
+"KRT19",1574.2,0.978,"nsclc","malignant -> immune other","ls_nmf","bridge",NA
+"TM4SF1",397.6,0.787,"nsclc","malignant -> immune other","ls_nmf","bridge",NA
+"MMP1",236.4,0.99,"nsclc","malignant -> immune other","ls_nmf","bridge",NA
+"KRT17",963.2,0.918,"nsclc","malignant -> immune other","ls_nmf","bridge",NA
+"EPCAM",296.7,0.849,"nsclc","malignant -> immune other","ls_nmf","bridge",NA
+"ITGB4",201.9,0.705,"nsclc","malignant -> immune other","ls_nmf","bridge",NA
+"CXCL5",617.4,0.892,"nsclc","malignant -> immune other","ls_nmf","bridge",NA
+"AGR2",148.1,0.972,"nsclc","malignant -> immune other","ls_nmf","bridge",NA
+"MMP7",705.5,0.989,"nsclc","malignant -> immune other","ls_nmf","bridge",NA
+"TACSTD2",253,0.805,"nsclc","malignant -> immune other","ls_nmf","bridge",NA
+"EPHA2",194.6,0.314,"nsclc","malignant -> immune other","ls_nmf","bridge",NA
+"S100P",498.9,0.635,"nsclc","malignant -> immune other","ls_nmf","bridge",NA
+"SOX9",273.7,0.6,"nsclc","malignant -> immune other","ls_nmf","bridge",NA
+"CDH1",171.1,0.811,"nsclc","malignant -> immune other","ls_nmf","bridge",NA
+"ITGA3",96.9,0.705,"nsclc","malignant -> immune other","ls_nmf","bridge",NA
+"S100A6",2164.1,0.922,"nsclc","malignant -> immune other","ls_nmf","bridge",NA
+"PIGR",105.8,0.743,"nsclc","malignant -> immune other","ls_nmf","bridge",NA
+"KRT8",1409.4,0.423,"nsclc","malignant -> immune other","ls_nmf","bridge",NA
+"OLFM4",134.5,0.974,"nsclc","malignant -> macrophage","ls_nmf","bridge",NA
+"CEACAM6",88.2,0.936,"nsclc","malignant -> macrophage","ls_nmf","bridge",NA
+"KRT19",183.2,0.994,"nsclc","malignant -> macrophage","ls_nmf","bridge",NA
+"TM4SF1",81.6,1,"nsclc","malignant -> macrophage","ls_nmf","bridge",NA
+"MMP1",70.7,0.912,"nsclc","malignant -> macrophage","ls_nmf","bridge",NA
+"KRT17",117.4,0.981,"nsclc","malignant -> macrophage","ls_nmf","bridge",NA
+"ITGB4",14.4,0.928,"nsclc","malignant -> macrophage","ls_nmf","bridge",NA
+"EPCAM",22.6,0.938,"nsclc","malignant -> macrophage","ls_nmf","bridge",NA
+"CXCL5",132.7,0.916,"nsclc","malignant -> macrophage","ls_nmf","bridge",NA
+"AGR2",4.3,0.255,"nsclc","malignant -> macrophage","ls_nmf","bridge",NA
+"S100A6",533.5,0.713,"nsclc","malignant -> macrophage","ls_nmf","bridge",NA
+"MMP7",120.8,0.754,"nsclc","malignant -> macrophage","ls_nmf","bridge",NA
+"EPHA2",17.2,0.747,"nsclc","malignant -> macrophage","ls_nmf","bridge",NA
+"ITGA3",0,0.453,"nsclc","malignant -> macrophage","ls_nmf","bridge",NA
+"S100P",72.6,0.927,"nsclc","malignant -> macrophage","ls_nmf","bridge",NA
+"TACSTD2",17,1,"nsclc","malignant -> macrophage","ls_nmf","bridge",NA
+"KRT8",93.4,0.698,"nsclc","malignant -> macrophage","ls_nmf","bridge",NA
+"SOX9",25.7,0.903,"nsclc","malignant -> macrophage","ls_nmf","bridge",NA
+"CDH1",27.3,0.23,"nsclc","malignant -> macrophage","ls_nmf","bridge",NA
+"DDR1",0,1,"nsclc","malignant -> macrophage","ls_nmf","bridge",NA
+"VWF",149.8,0.898,"nsclc","endothelial -> epithelial","invsqrt_kl","bridge",NA
+"COL4A1",499.2,0.999,"nsclc","endothelial -> epithelial","invsqrt_kl","bridge",NA
+"SPARCL1",191.5,0.992,"nsclc","endothelial -> epithelial","invsqrt_kl","bridge",NA
+"PECAM1",102.9,0.983,"nsclc","endothelial -> epithelial","invsqrt_kl","bridge",NA
+"CDH5",40.8,0.972,"nsclc","endothelial -> epithelial","invsqrt_kl","bridge",NA
+"COL4A2",778.2,0.999,"nsclc","endothelial -> epithelial","invsqrt_kl","bridge",NA
+"RGS5",100.6,0.97,"nsclc","endothelial -> epithelial","invsqrt_kl","bridge",NA
+"RAMP2",96.9,0.648,"nsclc","endothelial -> epithelial","invsqrt_kl","bridge",NA
+"CLEC14A",86.9,0.012,"nsclc","endothelial -> epithelial","invsqrt_kl","bridge",NA
+"ACKR1",21.8,0.933,"nsclc","endothelial -> epithelial","invsqrt_kl","bridge",NA
+"ITGA5",69.9,0.441,"nsclc","endothelial -> epithelial","invsqrt_kl","bridge",NA
+"CD34",97.9,0.01,"nsclc","endothelial -> epithelial","invsqrt_kl","bridge",NA
+"FLT1",63.4,0.016,"nsclc","endothelial -> epithelial","invsqrt_kl","bridge",NA
+"GPX3",244,1,"nsclc","endothelial -> epithelial","invsqrt_kl","bridge",NA
+"TEK",31.3,0.032,"nsclc","endothelial -> epithelial","invsqrt_kl","bridge",NA
+"RAMP3",17.9,1,"nsclc","endothelial -> epithelial","invsqrt_kl","bridge",NA
+"FZD4",83.9,0.77,"nsclc","endothelial -> epithelial","invsqrt_kl","bridge",NA
+"ADGRL4",20.4,0.586,"nsclc","endothelial -> epithelial","invsqrt_kl","bridge",NA
+"ENG",30.1,0.95,"nsclc","endothelial -> epithelial","invsqrt_kl","bridge",NA
+"RGCC",863.3,0.469,"nsclc","endothelial -> epithelial","invsqrt_kl","bridge",NA
+"VWF",432.6,0,"nsclc","endothelial -> fibroblast","invsqrt_kl","bridge",NA
+"PECAM1",459.2,0.001,"nsclc","endothelial -> fibroblast","invsqrt_kl","bridge",NA
+"ACKR1",128.8,0,"nsclc","endothelial -> fibroblast","invsqrt_kl","bridge",NA
+"CDH5",237.6,0.004,"nsclc","endothelial -> fibroblast","invsqrt_kl","bridge",NA
+"RAMP2",215,0,"nsclc","endothelial -> fibroblast","invsqrt_kl","bridge",NA
+"CLEC14A",222.1,0,"nsclc","endothelial -> fibroblast","invsqrt_kl","bridge",NA
+"ESAM",503.6,0,"nsclc","endothelial -> fibroblast","invsqrt_kl","bridge",NA
+"RAMP3",149.1,0.007,"nsclc","endothelial -> fibroblast","invsqrt_kl","bridge",NA
+"ADGRL4",141.2,0,"nsclc","endothelial -> fibroblast","invsqrt_kl","bridge",NA
+"INSR",403.3,0.002,"nsclc","endothelial -> fibroblast","invsqrt_kl","bridge",NA
+"KDR",170.5,0.006,"nsclc","endothelial -> fibroblast","invsqrt_kl","bridge",NA
+"TEK",52.1,-0.016,"nsclc","endothelial -> fibroblast","invsqrt_kl","bridge",NA
+"GPX3",2497.1,0.013,"nsclc","endothelial -> fibroblast","invsqrt_kl","bridge",NA
+"TIE1",77,0,"nsclc","endothelial -> fibroblast","invsqrt_kl","bridge",NA
+"RGS5",1051.7,0.001,"nsclc","endothelial -> fibroblast","invsqrt_kl","bridge",NA
+"FLT1",236,0,"nsclc","endothelial -> fibroblast","invsqrt_kl","bridge",NA
+"PDGFB",120.4,-0.011,"nsclc","endothelial -> fibroblast","invsqrt_kl","bridge",NA
+"IL3RA",64.3,0,"nsclc","endothelial -> fibroblast","invsqrt_kl","bridge",NA
+"IGF2",56,0,"nsclc","endothelial -> fibroblast","invsqrt_kl","bridge",NA
+"EPHB4",182.3,0.284,"nsclc","endothelial -> fibroblast","invsqrt_kl","bridge",NA
+"VWF",1031.4,0.972,"nsclc","endothelial -> immune other","invsqrt_kl","bridge",NA
+"COL4A1",2136.6,0.998,"nsclc","endothelial -> immune other","invsqrt_kl","bridge",NA
+"COL4A2",3077,0.999,"nsclc","endothelial -> immune other","invsqrt_kl","bridge",NA
+"CDH5",537.6,0.903,"nsclc","endothelial -> immune other","invsqrt_kl","bridge",NA
+"SPARCL1",1559.7,0.998,"nsclc","endothelial -> immune other","invsqrt_kl","bridge",NA
+"ACKR1",369.6,0.944,"nsclc","endothelial -> immune other","invsqrt_kl","bridge",NA
+"INSR",471,-0.011,"nsclc","endothelial -> immune other","invsqrt_kl","bridge",NA
+"ESAM",446.2,0.866,"nsclc","endothelial -> immune other","invsqrt_kl","bridge",NA
+"RGS5",962.2,0.998,"nsclc","endothelial -> immune other","invsqrt_kl","bridge",NA
+"RAMP2",460.3,0.876,"nsclc","endothelial -> immune other","invsqrt_kl","bridge",NA
+"PECAM1",972.9,0.774,"nsclc","endothelial -> immune other","invsqrt_kl","bridge",NA
+"GPX3",2252.2,0.998,"nsclc","endothelial -> immune other","invsqrt_kl","bridge",NA
+"RAMP3",205,0.979,"nsclc","endothelial -> immune other","invsqrt_kl","bridge",NA
+"CLEC14A",92.5,0.052,"nsclc","endothelial -> immune other","invsqrt_kl","bridge",NA
+"KDR",262.7,0.828,"nsclc","endothelial -> immune other","invsqrt_kl","bridge",NA
+"APP",741.3,0.982,"nsclc","endothelial -> immune other","invsqrt_kl","bridge",NA
+"ADGRL4",89.4,0.866,"nsclc","endothelial -> immune other","invsqrt_kl","bridge",NA
+"TEK",202.9,0.001,"nsclc","endothelial -> immune other","invsqrt_kl","bridge",NA
+"FLT1",216.4,0.026,"nsclc","endothelial -> immune other","invsqrt_kl","bridge",NA
+"FZD4",203.4,1,"nsclc","endothelial -> immune other","invsqrt_kl","bridge",NA
+"COL4A1",89.2,0.964,"nsclc","endothelial -> macrophage","invsqrt_kl","bridge",NA
+"VWF",58.7,0.928,"nsclc","endothelial -> macrophage","invsqrt_kl","bridge",NA
+"COL4A2",170.4,0.986,"nsclc","endothelial -> macrophage","invsqrt_kl","bridge",NA
+"IGFBP7",688.5,0.993,"nsclc","endothelial -> macrophage","invsqrt_kl","bridge",NA
+"SPARCL1",85.7,0.995,"nsclc","endothelial -> macrophage","invsqrt_kl","bridge",NA
+"RAMP2",31.4,0.71,"nsclc","endothelial -> macrophage","invsqrt_kl","bridge",NA
+"INSR",6.8,0,"nsclc","endothelial -> macrophage","invsqrt_kl","bridge",NA
+"CDH5",0,-0.957,"nsclc","endothelial -> macrophage","invsqrt_kl","bridge",NA
+"RGS5",26.7,0.993,"nsclc","endothelial -> macrophage","invsqrt_kl","bridge",NA
+"ACKR1",4.5,0.263,"nsclc","endothelial -> macrophage","invsqrt_kl","bridge",NA
+"COL18A1",63.6,0.866,"nsclc","endothelial -> macrophage","invsqrt_kl","bridge",NA
+"ESAM",34.1,0.692,"nsclc","endothelial -> macrophage","invsqrt_kl","bridge",NA
+"CLEC14A",37.2,0.027,"nsclc","endothelial -> macrophage","invsqrt_kl","bridge",NA
+"RAMP3",10.6,0.685,"nsclc","endothelial -> macrophage","invsqrt_kl","bridge",NA
+"RGCC",89.8,0.539,"nsclc","endothelial -> macrophage","invsqrt_kl","bridge",NA
+"APP",101.7,0.948,"nsclc","endothelial -> macrophage","invsqrt_kl","bridge",NA
+"ADGRL4",5.6,-0.198,"nsclc","endothelial -> macrophage","invsqrt_kl","bridge",NA
+"KDR",1.3,0.428,"nsclc","endothelial -> macrophage","invsqrt_kl","bridge",NA
+"ITGA5",21.3,-0.005,"nsclc","endothelial -> macrophage","invsqrt_kl","bridge",NA
+"CCL19",83.5,0.961,"nsclc","endothelial -> macrophage","invsqrt_kl","bridge",NA
+"VWF",39.8,0.933,"nsclc","endothelial -> malignant","invsqrt_kl","bridge",NA
+"COL4A1",189.4,1,"nsclc","endothelial -> malignant","invsqrt_kl","bridge",NA
+"VIM",204.9,0.806,"nsclc","endothelial -> malignant","invsqrt_kl","bridge",NA
+"COL4A2",266.1,0.98,"nsclc","endothelial -> malignant","invsqrt_kl","bridge",NA
+"PECAM1",40.8,0.66,"nsclc","endothelial -> malignant","invsqrt_kl","bridge",NA
+"SPARCL1",86.2,1,"nsclc","endothelial -> malignant","invsqrt_kl","bridge",NA
+"GPX3",46.3,0.969,"nsclc","endothelial -> malignant","invsqrt_kl","bridge",NA
+"IGFBP7",460.2,0.992,"nsclc","endothelial -> malignant","invsqrt_kl","bridge",NA
+"ACKR1",14.6,0.409,"nsclc","endothelial -> malignant","invsqrt_kl","bridge",NA
+"ITGA5",35.4,0.808,"nsclc","endothelial -> malignant","invsqrt_kl","bridge",NA
+"CDH5",48.4,0.769,"nsclc","endothelial -> malignant","invsqrt_kl","bridge",NA
+"RGS5",16.1,1,"nsclc","endothelial -> malignant","invsqrt_kl","bridge",NA
+"CLEC14A",9.7,0,"nsclc","endothelial -> malignant","invsqrt_kl","bridge",NA
+"DUSP1",289.3,0.185,"nsclc","endothelial -> malignant","invsqrt_kl","bridge",NA
+"ENTPD1",21.8,0.55,"nsclc","endothelial -> malignant","invsqrt_kl","bridge",NA
+"RGCC",18,0.299,"nsclc","endothelial -> malignant","invsqrt_kl","bridge",NA
+"CCL19",15.1,0.887,"nsclc","endothelial -> malignant","invsqrt_kl","bridge",NA
+"ENG",16.3,0.626,"nsclc","endothelial -> malignant","invsqrt_kl","bridge",NA
+"RAMP2",0,NA,"nsclc","endothelial -> malignant","invsqrt_kl","bridge",NA
+"KDR",22.2,0.183,"nsclc","endothelial -> malignant","invsqrt_kl","bridge",NA
+"LTF",683.6,0.111,"nsclc","epithelial -> endothelial","invsqrt_kl","bridge",NA
+"SERPINA1",895.5,0.959,"nsclc","epithelial -> endothelial","invsqrt_kl","bridge",NA
+"DMBT1",280.7,1,"nsclc","epithelial -> endothelial","invsqrt_kl","bridge",NA
+"ITGB6",218.1,0.997,"nsclc","epithelial -> endothelial","invsqrt_kl","bridge",NA
+"KRT7",830.1,0.999,"nsclc","epithelial -> endothelial","invsqrt_kl","bridge",NA
+"LAMP3",99.3,0,"nsclc","epithelial -> endothelial","invsqrt_kl","bridge",NA
+"SLPI",115.4,0.906,"nsclc","epithelial -> endothelial","invsqrt_kl","bridge",NA
+"CHI3L1",77.3,0.013,"nsclc","epithelial -> endothelial","invsqrt_kl","bridge",NA
+"CCL20",0,0.377,"nsclc","epithelial -> endothelial","invsqrt_kl","bridge",NA
+"SERPINA3",0,-1.034,"nsclc","epithelial -> endothelial","invsqrt_kl","bridge",NA
+"CXCL17",71.8,0.828,"nsclc","epithelial -> endothelial","invsqrt_kl","bridge",NA
+"CXCL14",237.3,0.085,"nsclc","epithelial -> endothelial","invsqrt_kl","bridge",NA
+"AQP3",64.5,0,"nsclc","epithelial -> endothelial","invsqrt_kl","bridge",NA
+"FGG",27.5,0.036,"nsclc","epithelial -> endothelial","invsqrt_kl","bridge",NA
+"PTGS2",0,NA,"nsclc","epithelial -> endothelial","invsqrt_kl","bridge",NA
+"CCND1",889.7,0.931,"nsclc","epithelial -> endothelial","invsqrt_kl","bridge",NA
+"FZD5",22.8,0.736,"nsclc","epithelial -> endothelial","invsqrt_kl","bridge",NA
+"GDF15",66.5,0.578,"nsclc","epithelial -> endothelial","invsqrt_kl","bridge",NA
+"PRSS2",29.3,0.424,"nsclc","epithelial -> endothelial","invsqrt_kl","bridge",NA
+"CXCL1",56.6,1,"nsclc","epithelial -> endothelial","invsqrt_kl","bridge",NA
+"LTF",613.5,0.091,"nsclc","epithelial -> fibroblast","invsqrt_kl","bridge",NA
+"ITGB6",183.8,0.992,"nsclc","epithelial -> fibroblast","invsqrt_kl","bridge",NA
+"DMBT1",156.6,0.998,"nsclc","epithelial -> fibroblast","invsqrt_kl","bridge",NA
+"SERPINA1",799.3,0.918,"nsclc","epithelial -> fibroblast","invsqrt_kl","bridge",NA
+"LAMP3",128.9,-0.009,"nsclc","epithelial -> fibroblast","invsqrt_kl","bridge",NA
+"KRT7",568.4,0.996,"nsclc","epithelial -> fibroblast","invsqrt_kl","bridge",NA
+"SLPI",66.9,0.994,"nsclc","epithelial -> fibroblast","invsqrt_kl","bridge",NA
+"CXCL2",10.3,1,"nsclc","epithelial -> fibroblast","invsqrt_kl","bridge",NA
+"CXCL17",50.3,0.707,"nsclc","epithelial -> fibroblast","invsqrt_kl","bridge",NA
+"CCL20",0,1,"nsclc","epithelial -> fibroblast","invsqrt_kl","bridge",NA
+"AQP3",80.2,0.009,"nsclc","epithelial -> fibroblast","invsqrt_kl","bridge",NA
+"EFNA1",110.7,0.635,"nsclc","epithelial -> fibroblast","invsqrt_kl","bridge",NA
+"SERPINA3",93.1,0.817,"nsclc","epithelial -> fibroblast","invsqrt_kl","bridge",NA
+"CXCL3",37.5,0.954,"nsclc","epithelial -> fibroblast","invsqrt_kl","bridge",NA
+"CHI3L1",136.3,0,"nsclc","epithelial -> fibroblast","invsqrt_kl","bridge",NA
+"CXCL1",40.2,0.97,"nsclc","epithelial -> fibroblast","invsqrt_kl","bridge",NA
+"CCND1",540,0.992,"nsclc","epithelial -> fibroblast","invsqrt_kl","bridge",NA
+"FGG",43.9,-0.006,"nsclc","epithelial -> fibroblast","invsqrt_kl","bridge",NA
+"PTGS2",0,NA,"nsclc","epithelial -> fibroblast","invsqrt_kl","bridge",NA
+"FZD5",29.4,0.91,"nsclc","epithelial -> fibroblast","invsqrt_kl","bridge",NA
+"LTF",3139.5,0.05,"nsclc","epithelial -> immune other","invsqrt_kl","bridge",NA
+"ITGB6",563.1,1,"nsclc","epithelial -> immune other","invsqrt_kl","bridge",NA
+"DMBT1",666.8,0.995,"nsclc","epithelial -> immune other","invsqrt_kl","bridge",NA
+"KRT7",1366.8,1,"nsclc","epithelial -> immune other","invsqrt_kl","bridge",NA
+"SERPINA3",449.2,0.804,"nsclc","epithelial -> immune other","invsqrt_kl","bridge",NA
+"SERPINA1",2452.2,0.937,"nsclc","epithelial -> immune other","invsqrt_kl","bridge",NA
+"CXCL2",416,0.94,"nsclc","epithelial -> immune other","invsqrt_kl","bridge",NA
+"SLPI",390.6,0.999,"nsclc","epithelial -> immune other","invsqrt_kl","bridge",NA
+"LAMP3",314.8,0.016,"nsclc","epithelial -> immune other","invsqrt_kl","bridge",NA
+"PTGS2",267.2,0.997,"nsclc","epithelial -> immune other","invsqrt_kl","bridge",NA
+"EFNA1",287.4,0.657,"nsclc","epithelial -> immune other","invsqrt_kl","bridge",NA
+"CHI3L1",296.8,-0.008,"nsclc","epithelial -> immune other","invsqrt_kl","bridge",NA
+"CCL20",297.8,0.186,"nsclc","epithelial -> immune other","invsqrt_kl","bridge",NA
+"CXCL3",300.5,0.994,"nsclc","epithelial -> immune other","invsqrt_kl","bridge",NA
+"ICAM1",328.5,0.012,"nsclc","epithelial -> immune other","invsqrt_kl","bridge",NA
+"CCND1",996.1,0.993,"nsclc","epithelial -> immune other","invsqrt_kl","bridge",NA
+"CXCL17",259.2,0.746,"nsclc","epithelial -> immune other","invsqrt_kl","bridge",NA
+"AQP3",222.6,-0.005,"nsclc","epithelial -> immune other","invsqrt_kl","bridge",NA
+"CXCL14",373.4,1,"nsclc","epithelial -> immune other","invsqrt_kl","bridge",NA
+"CXCL1",307.9,0.86,"nsclc","epithelial -> immune other","invsqrt_kl","bridge",NA
+"LTF",219.5,0.104,"nsclc","epithelial -> macrophage","invsqrt_kl","bridge",NA
+"DMBT1",61.5,0.97,"nsclc","epithelial -> macrophage","invsqrt_kl","bridge",NA
+"ITGB6",84.7,1,"nsclc","epithelial -> macrophage","invsqrt_kl","bridge",NA
+"KRT7",179.3,0.997,"nsclc","epithelial -> macrophage","invsqrt_kl","bridge",NA
+"SERPINA3",40.2,0.977,"nsclc","epithelial -> macrophage","invsqrt_kl","bridge",NA
+"CLU",53.9,0.802,"nsclc","epithelial -> macrophage","invsqrt_kl","bridge",NA
+"LAMP3",48.2,0,"nsclc","epithelial -> macrophage","invsqrt_kl","bridge",NA
+"SLPI",40.6,0.991,"nsclc","epithelial -> macrophage","invsqrt_kl","bridge",NA
+"EFNA1",46.4,0.806,"nsclc","epithelial -> macrophage","invsqrt_kl","bridge",NA
+"AQP3",26,0,"nsclc","epithelial -> macrophage","invsqrt_kl","bridge",NA
+"CXCL14",54.1,0.484,"nsclc","epithelial -> macrophage","invsqrt_kl","bridge",NA
+"CCND1",145.2,0.96,"nsclc","epithelial -> macrophage","invsqrt_kl","bridge",NA
+"PTGS2",0,0.368,"nsclc","epithelial -> macrophage","invsqrt_kl","bridge",NA
+"CXCL2",71.7,0.914,"nsclc","epithelial -> macrophage","invsqrt_kl","bridge",NA
+"CXCL17",11.9,0.795,"nsclc","epithelial -> macrophage","invsqrt_kl","bridge",NA
+"SERPINA1",301.6,0.651,"nsclc","epithelial -> macrophage","invsqrt_kl","bridge",NA
+"CCL20",0.7,-0.255,"nsclc","epithelial -> macrophage","invsqrt_kl","bridge",NA
+"CXCL3",46.5,0.912,"nsclc","epithelial -> macrophage","invsqrt_kl","bridge",NA
+"CXCL1",19.9,0.757,"nsclc","epithelial -> macrophage","invsqrt_kl","bridge",NA
+"ADGRF5",0,0,"nsclc","epithelial -> macrophage","invsqrt_kl","bridge",NA
+"LTF",852,0,"nsclc","epithelial -> malignant","invsqrt_kl","bridge",NA
+"LAMP3",79.4,0,"nsclc","epithelial -> malignant","invsqrt_kl","bridge",NA
+"CLU",91.6,0.064,"nsclc","epithelial -> malignant","invsqrt_kl","bridge",NA
+"CXCL14",50.1,0.995,"nsclc","epithelial -> malignant","invsqrt_kl","bridge",NA
+"ICAM1",176.3,0,"nsclc","epithelial -> malignant","invsqrt_kl","bridge",NA
+"CHI3L1",92.3,0,"nsclc","epithelial -> malignant","invsqrt_kl","bridge",NA
+"PTGS2",10,0,"nsclc","epithelial -> malignant","invsqrt_kl","bridge",NA
+"SOD2",338.3,0.125,"nsclc","epithelial -> malignant","invsqrt_kl","bridge",NA
+"AQP3",129.2,0,"nsclc","epithelial -> malignant","invsqrt_kl","bridge",NA
+"CCL20",34.6,0,"nsclc","epithelial -> malignant","invsqrt_kl","bridge",NA
+"SERPINA1",1312.8,0.051,"nsclc","epithelial -> malignant","invsqrt_kl","bridge",NA
+"FGG",34.2,0,"nsclc","epithelial -> malignant","invsqrt_kl","bridge",NA
+"CSF2RB",4.3,0,"nsclc","epithelial -> malignant","invsqrt_kl","bridge",NA
+"CSF3R",31.2,0,"nsclc","epithelial -> malignant","invsqrt_kl","bridge",NA
+"MRC2",49.4,0.998,"nsclc","epithelial -> malignant","invsqrt_kl","bridge",NA
+"CD36",31.6,0.34,"nsclc","epithelial -> malignant","invsqrt_kl","bridge",NA
+"ADGRF5",0,0,"nsclc","epithelial -> malignant","invsqrt_kl","bridge",NA
+"ADGRV1",19,0,"nsclc","epithelial -> malignant","invsqrt_kl","bridge",NA
+"CXCL2",947.6,0.001,"nsclc","epithelial -> malignant","invsqrt_kl","bridge",NA
+"SCGB3A1",19.2,0,"nsclc","epithelial -> malignant","invsqrt_kl","bridge",NA
+"COL1A1",4293.5,0,"nsclc","fibroblast -> endothelial","invsqrt_kl","bridge",NA
+"COL3A1",2625.9,0,"nsclc","fibroblast -> endothelial","invsqrt_kl","bridge",NA
+"LUM",378.9,0,"nsclc","fibroblast -> endothelial","invsqrt_kl","bridge",NA
+"COL1A2",1121.6,0.001,"nsclc","fibroblast -> endothelial","invsqrt_kl","bridge",NA
+"FN1",3771.6,0,"nsclc","fibroblast -> endothelial","invsqrt_kl","bridge",NA
+"CDH11",204,0,"nsclc","fibroblast -> endothelial","invsqrt_kl","bridge",NA
+"COL6A3",98,0,"nsclc","fibroblast -> endothelial","invsqrt_kl","bridge",NA
+"COL16A1",20.8,0.01,"nsclc","fibroblast -> endothelial","invsqrt_kl","bridge",NA
+"COL5A1",392.7,0,"nsclc","fibroblast -> endothelial","invsqrt_kl","bridge",NA
+"MEG3",0,0,"nsclc","fibroblast -> endothelial","invsqrt_kl","bridge",NA
+"INHBA",0,NA,"nsclc","fibroblast -> endothelial","invsqrt_kl","bridge",NA
+"COL11A1",21.4,0,"nsclc","fibroblast -> endothelial","invsqrt_kl","bridge",NA
+"PDGFRA",0,0,"nsclc","fibroblast -> endothelial","invsqrt_kl","bridge",NA
+"COL8A1",0,0.087,"nsclc","fibroblast -> endothelial","invsqrt_kl","bridge",NA
+"THBS2",218.2,-0.175,"nsclc","fibroblast -> endothelial","invsqrt_kl","bridge",NA
+"VCAN",69.7,-0.694,"nsclc","fibroblast -> endothelial","invsqrt_kl","bridge",NA
+"COL5A2",208.8,0,"nsclc","fibroblast -> endothelial","invsqrt_kl","bridge",NA
+"ACTA2",387.5,0,"nsclc","fibroblast -> endothelial","invsqrt_kl","bridge",NA
+"PTGIS",87.8,0,"nsclc","fibroblast -> endothelial","invsqrt_kl","bridge",NA
+"TAGLN",1690.1,0.001,"nsclc","fibroblast -> endothelial","invsqrt_kl","bridge",NA
+"COL3A1",939.4,1,"nsclc","fibroblast -> epithelial","invsqrt_kl","bridge",NA
+"COL1A2",467.6,1,"nsclc","fibroblast -> epithelial","invsqrt_kl","bridge",NA
+"COL6A3",221.4,0.995,"nsclc","fibroblast -> epithelial","invsqrt_kl","bridge",NA
+"COL1A1",1943,1,"nsclc","fibroblast -> epithelial","invsqrt_kl","bridge",NA
+"LUM",302,0.997,"nsclc","fibroblast -> epithelial","invsqrt_kl","bridge",NA
+"FN1",867.2,0.998,"nsclc","fibroblast -> epithelial","invsqrt_kl","bridge",NA
+"COL5A2",111.3,0.991,"nsclc","fibroblast -> epithelial","invsqrt_kl","bridge",NA
+"MMP2",269.7,0.989,"nsclc","fibroblast -> epithelial","invsqrt_kl","bridge",NA
+"BGN",734,0.999,"nsclc","fibroblast -> epithelial","invsqrt_kl","bridge",NA
+"ACTA2",64.4,0.986,"nsclc","fibroblast -> epithelial","invsqrt_kl","bridge",NA
+"IGFBP5",359,0.989,"nsclc","fibroblast -> epithelial","invsqrt_kl","bridge",NA
+"TIMP1",889.5,0.937,"nsclc","fibroblast -> epithelial","invsqrt_kl","bridge",NA
+"CALD1",277.8,1,"nsclc","fibroblast -> epithelial","invsqrt_kl","bridge",NA
+"TAGLN",645.1,0.979,"nsclc","fibroblast -> epithelial","invsqrt_kl","bridge",NA
+"MEG3",31.1,0.936,"nsclc","fibroblast -> epithelial","invsqrt_kl","bridge",NA
+"INHBA",54.9,0.982,"nsclc","fibroblast -> epithelial","invsqrt_kl","bridge",NA
+"COL6A2",0,0.9,"nsclc","fibroblast -> epithelial","invsqrt_kl","bridge",NA
+"COL14A1",17.4,0.965,"nsclc","fibroblast -> epithelial","invsqrt_kl","bridge",NA
+"PDGFRB",77.5,0.997,"nsclc","fibroblast -> epithelial","invsqrt_kl","bridge",NA
+"COL5A1",31.5,1,"nsclc","fibroblast -> epithelial","invsqrt_kl","bridge",NA
+"FN1",14447.3,1,"nsclc","fibroblast -> immune other","invsqrt_kl","bridge",NA
+"COL1A2",12324,1,"nsclc","fibroblast -> immune other","invsqrt_kl","bridge",NA
+"COL1A1",45007,1,"nsclc","fibroblast -> immune other","invsqrt_kl","bridge",NA
+"COL3A1",28697,1,"nsclc","fibroblast -> immune other","invsqrt_kl","bridge",NA
+"COL6A3",5673.1,0.999,"nsclc","fibroblast -> immune other","invsqrt_kl","bridge",NA
+"COL5A1",1959.6,1,"nsclc","fibroblast -> immune other","invsqrt_kl","bridge",NA
+"IGFBP5",4448.1,0.996,"nsclc","fibroblast -> immune other","invsqrt_kl","bridge",NA
+"ACTA2",1555.7,0.998,"nsclc","fibroblast -> immune other","invsqrt_kl","bridge",NA
+"COL5A2",1698.8,1,"nsclc","fibroblast -> immune other","invsqrt_kl","bridge",NA
+"CDH11",1385.8,0.998,"nsclc","fibroblast -> immune other","invsqrt_kl","bridge",NA
+"COL6A2",4880.6,1,"nsclc","fibroblast -> immune other","invsqrt_kl","bridge",NA
+"COL6A1",3335.9,0.999,"nsclc","fibroblast -> immune other","invsqrt_kl","bridge",NA
+"BGN",16314.2,0.999,"nsclc","fibroblast -> immune other","invsqrt_kl","bridge",NA
+"LUM",5452.3,1,"nsclc","fibroblast -> immune other","invsqrt_kl","bridge",NA
+"CALD1",2734,1,"nsclc","fibroblast -> immune other","invsqrt_kl","bridge",NA
+"MMP2",5626.2,0.999,"nsclc","fibroblast -> immune other","invsqrt_kl","bridge",NA
+"TAGLN",8722,1,"nsclc","fibroblast -> immune other","invsqrt_kl","bridge",NA
+"COL16A1",629.1,1,"nsclc","fibroblast -> immune other","invsqrt_kl","bridge",NA
+"COL8A1",826.5,1,"nsclc","fibroblast -> immune other","invsqrt_kl","bridge",NA
+"MGP",10986,1,"nsclc","fibroblast -> immune other","invsqrt_kl","bridge",NA
+"COL3A1",925.9,1,"nsclc","fibroblast -> macrophage","invsqrt_kl","bridge",NA
+"COL1A1",1633.6,0.999,"nsclc","fibroblast -> macrophage","invsqrt_kl","bridge",NA
+"COL1A2",454.1,0.993,"nsclc","fibroblast -> macrophage","invsqrt_kl","bridge",NA
+"COL6A3",201.5,0.999,"nsclc","fibroblast -> macrophage","invsqrt_kl","bridge",NA
+"FN1",942.5,0.997,"nsclc","fibroblast -> macrophage","invsqrt_kl","bridge",NA
+"BGN",776.8,0.999,"nsclc","fibroblast -> macrophage","invsqrt_kl","bridge",NA
+"LUM",199.7,0.997,"nsclc","fibroblast -> macrophage","invsqrt_kl","bridge",NA
+"COL6A2",247.4,0.999,"nsclc","fibroblast -> macrophage","invsqrt_kl","bridge",NA
+"MGP",404.4,1,"nsclc","fibroblast -> macrophage","invsqrt_kl","bridge",NA
+"DCN",297.7,0.996,"nsclc","fibroblast -> macrophage","invsqrt_kl","bridge",NA
+"COL5A1",129.2,1,"nsclc","fibroblast -> macrophage","invsqrt_kl","bridge",NA
+"ACTA2",114.6,0.994,"nsclc","fibroblast -> macrophage","invsqrt_kl","bridge",NA
+"COL6A1",161.5,1,"nsclc","fibroblast -> macrophage","invsqrt_kl","bridge",NA
+"CALD1",158.7,0.995,"nsclc","fibroblast -> macrophage","invsqrt_kl","bridge",NA
+"IGFBP5",237.2,1,"nsclc","fibroblast -> macrophage","invsqrt_kl","bridge",NA
+"TIMP1",1477.9,0.671,"nsclc","fibroblast -> macrophage","invsqrt_kl","bridge",NA
+"COL5A2",57.2,1,"nsclc","fibroblast -> macrophage","invsqrt_kl","bridge",NA
+"CDH11",59.2,0.987,"nsclc","fibroblast -> macrophage","invsqrt_kl","bridge",NA
+"MMP2",197.1,0.997,"nsclc","fibroblast -> macrophage","invsqrt_kl","bridge",NA
+"IGFBP3",26.4,0.954,"nsclc","fibroblast -> macrophage","invsqrt_kl","bridge",NA
+"COL3A1",1299.1,0.998,"nsclc","fibroblast -> malignant","invsqrt_kl","bridge",NA
+"COL1A2",848.4,0.999,"nsclc","fibroblast -> malignant","invsqrt_kl","bridge",NA
+"FN1",1562,0.998,"nsclc","fibroblast -> malignant","invsqrt_kl","bridge",NA
+"COL6A3",269.8,0.98,"nsclc","fibroblast -> malignant","invsqrt_kl","bridge",NA
+"BGN",1183.3,0.999,"nsclc","fibroblast -> malignant","invsqrt_kl","bridge",NA
+"COL1A1",2669.1,0.998,"nsclc","fibroblast -> malignant","invsqrt_kl","bridge",NA
+"LUM",167.8,1,"nsclc","fibroblast -> malignant","invsqrt_kl","bridge",NA
+"COL6A2",299.8,1,"nsclc","fibroblast -> malignant","invsqrt_kl","bridge",NA
+"DCN",152.5,1,"nsclc","fibroblast -> malignant","invsqrt_kl","bridge",NA
+"MGP",441,0.998,"nsclc","fibroblast -> malignant","invsqrt_kl","bridge",NA
+"TAGLN",1333.7,0.988,"nsclc","fibroblast -> malignant","invsqrt_kl","bridge",NA
+"MMP2",55.4,0.979,"nsclc","fibroblast -> malignant","invsqrt_kl","bridge",NA
+"IGFBP5",970.8,0.998,"nsclc","fibroblast -> malignant","invsqrt_kl","bridge",NA
+"COL5A1",108.8,0.973,"nsclc","fibroblast -> malignant","invsqrt_kl","bridge",NA
+"ACTA2",274,0.989,"nsclc","fibroblast -> malignant","invsqrt_kl","bridge",NA
+"CDH11",42.4,0.926,"nsclc","fibroblast -> malignant","invsqrt_kl","bridge",NA
+"CALD1",531.6,0.987,"nsclc","fibroblast -> malignant","invsqrt_kl","bridge",NA
+"THBS1",1204.4,0.985,"nsclc","fibroblast -> malignant","invsqrt_kl","bridge",NA
+"IL1R1",151.4,0.955,"nsclc","fibroblast -> malignant","invsqrt_kl","bridge",NA
+"COL5A2",155.6,0.944,"nsclc","fibroblast -> malignant","invsqrt_kl","bridge",NA
+"TPSB2",1174.9,0.001,"nsclc","immune other -> endothelial","invsqrt_kl","bridge",NA
+"JCHAIN",1056.5,0,"nsclc","immune other -> endothelial","invsqrt_kl","bridge",NA
+"IGHA1",3776.3,0.001,"nsclc","immune other -> endothelial","invsqrt_kl","bridge",NA
+"IGHG2",2372.9,0,"nsclc","immune other -> endothelial","invsqrt_kl","bridge",NA
+"IGHM",881.6,0,"nsclc","immune other -> endothelial","invsqrt_kl","bridge",NA
+"IGKC",4073.9,0.001,"nsclc","immune other -> endothelial","invsqrt_kl","bridge",NA
+"MZB1",349.5,0,"nsclc","immune other -> endothelial","invsqrt_kl","bridge",NA
+"IGHG1",2749.6,0,"nsclc","immune other -> endothelial","invsqrt_kl","bridge",NA
+"RGS1",331.1,0.089,"nsclc","immune other -> endothelial","invsqrt_kl","bridge",NA
+"VPREB3",361.9,0.003,"nsclc","immune other -> endothelial","invsqrt_kl","bridge",NA
+"CD53",578.9,0.309,"nsclc","immune other -> endothelial","invsqrt_kl","bridge",NA
+"TPSAB1",514.5,0.006,"nsclc","immune other -> endothelial","invsqrt_kl","bridge",NA
+"P2RX5",229.8,0,"nsclc","immune other -> endothelial","invsqrt_kl","bridge",NA
+"IL7R",809.1,0,"nsclc","immune other -> endothelial","invsqrt_kl","bridge",NA
+"CIITA",1054.9,0.377,"nsclc","immune other -> endothelial","invsqrt_kl","bridge",NA
+"IL1RL1",412.6,0,"nsclc","immune other -> endothelial","invsqrt_kl","bridge",NA
+"TNFSF8",275.8,0,"nsclc","immune other -> endothelial","invsqrt_kl","bridge",NA
+"CD52",413.3,0,"nsclc","immune other -> endothelial","invsqrt_kl","bridge",NA
+"DUSP2",508.4,0,"nsclc","immune other -> endothelial","invsqrt_kl","bridge",NA
+"PTPRC",245.6,0.128,"nsclc","immune other -> endothelial","invsqrt_kl","bridge",NA
+"IGHA1",8186.9,0,"nsclc","immune other -> fibroblast","invsqrt_kl","bridge",NA
+"IGHM",3332.1,0,"nsclc","immune other -> fibroblast","invsqrt_kl","bridge",NA
+"JCHAIN",1938.2,-0.013,"nsclc","immune other -> fibroblast","invsqrt_kl","bridge",NA
+"IL7R",1706.1,0.001,"nsclc","immune other -> fibroblast","invsqrt_kl","bridge",NA
+"TPSB2",1420.7,0,"nsclc","immune other -> fibroblast","invsqrt_kl","bridge",NA
+"IGHG1",8684.2,0,"nsclc","immune other -> fibroblast","invsqrt_kl","bridge",NA
+"RGS1",1526.2,0.421,"nsclc","immune other -> fibroblast","invsqrt_kl","bridge",NA
+"MS4A1",717.3,0.001,"nsclc","immune other -> fibroblast","invsqrt_kl","bridge",NA
+"IGHG2",5582,0,"nsclc","immune other -> fibroblast","invsqrt_kl","bridge",NA
+"IGKC",8408.8,-0.003,"nsclc","immune other -> fibroblast","invsqrt_kl","bridge",NA
+"CD37",1476,0.197,"nsclc","immune other -> fibroblast","invsqrt_kl","bridge",NA
+"CXCR4",2420.8,0.183,"nsclc","immune other -> fibroblast","invsqrt_kl","bridge",NA
+"TPSAB1",1092.2,0,"nsclc","immune other -> fibroblast","invsqrt_kl","bridge",NA
+"CIITA",1122.6,0.44,"nsclc","immune other -> fibroblast","invsqrt_kl","bridge",NA
+"CD52",915.3,-0.027,"nsclc","immune other -> fibroblast","invsqrt_kl","bridge",NA
+"PTPRC",1219.2,0.106,"nsclc","immune other -> fibroblast","invsqrt_kl","bridge",NA
+"IL1RL1",268.4,0.004,"nsclc","immune other -> fibroblast","invsqrt_kl","bridge",NA
+"CD79A",533.1,0,"nsclc","immune other -> fibroblast","invsqrt_kl","bridge",NA
+"CD53",1384,0.035,"nsclc","immune other -> fibroblast","invsqrt_kl","bridge",NA
+"MZB1",266.2,0.004,"nsclc","immune other -> fibroblast","invsqrt_kl","bridge",NA
+"JCHAIN",11.3,0,"nsclc","immune other -> malignant","invsqrt_kl","bridge",NA
+"IGHA1",641.8,0.002,"nsclc","immune other -> malignant","invsqrt_kl","bridge",NA
+"TPSB2",275.9,0,"nsclc","immune other -> malignant","invsqrt_kl","bridge",NA
+"IGHM",159.6,0,"nsclc","immune other -> malignant","invsqrt_kl","bridge",NA
+"IGHG1",864.6,-0.001,"nsclc","immune other -> malignant","invsqrt_kl","bridge",NA
+"IGKC",926.8,0.001,"nsclc","immune other -> malignant","invsqrt_kl","bridge",NA
+"PTPRC",97,0.112,"nsclc","immune other -> malignant","invsqrt_kl","bridge",NA
+"IGHG2",511.1,0,"nsclc","immune other -> malignant","invsqrt_kl","bridge",NA
+"CD37",43.5,0.384,"nsclc","immune other -> malignant","invsqrt_kl","bridge",NA
+"CD53",128.2,0.104,"nsclc","immune other -> malignant","invsqrt_kl","bridge",NA
+"RGS1",39.8,-0.01,"nsclc","immune other -> malignant","invsqrt_kl","bridge",NA
+"IL7R",18.1,0,"nsclc","immune other -> malignant","invsqrt_kl","bridge",NA
+"TPSAB1",234.7,0,"nsclc","immune other -> malignant","invsqrt_kl","bridge",NA
+"CPA3",68.5,0,"nsclc","immune other -> malignant","invsqrt_kl","bridge",NA
+"MZB1",26.5,0,"nsclc","immune other -> malignant","invsqrt_kl","bridge",NA
+"IL16",128.7,0.038,"nsclc","immune other -> malignant","invsqrt_kl","bridge",NA
+"MS4A1",72.2,0,"nsclc","immune other -> malignant","invsqrt_kl","bridge",NA
+"CIITA",270.6,0.538,"nsclc","immune other -> malignant","invsqrt_kl","bridge",NA
+"CD52",39.4,0,"nsclc","immune other -> malignant","invsqrt_kl","bridge",NA
+"IL1RL1",76.5,0.013,"nsclc","immune other -> malignant","invsqrt_kl","bridge",NA
+"GPNMB",61.6,1,"nsclc","macrophage -> endothelial","invsqrt_kl","bridge",NA
+"C1QB",201.2,0.992,"nsclc","macrophage -> endothelial","invsqrt_kl","bridge",NA
+"CD163",33.8,1,"nsclc","macrophage -> endothelial","invsqrt_kl","bridge",NA
+"C1QA",277.4,0.993,"nsclc","macrophage -> endothelial","invsqrt_kl","bridge",NA
+"C1QC",148.2,0.996,"nsclc","macrophage -> endothelial","invsqrt_kl","bridge",NA
+"CCL18",24.2,0.974,"nsclc","macrophage -> endothelial","invsqrt_kl","bridge",NA
+"CD68",104.7,0.988,"nsclc","macrophage -> endothelial","invsqrt_kl","bridge",NA
+"CD14",153.5,0.998,"nsclc","macrophage -> endothelial","invsqrt_kl","bridge",NA
+"MS4A4A",31.5,0.979,"nsclc","macrophage -> endothelial","invsqrt_kl","bridge",NA
+"PSAP",369.5,1,"nsclc","macrophage -> endothelial","invsqrt_kl","bridge",NA
+"TYROBP",82.7,0.926,"nsclc","macrophage -> endothelial","invsqrt_kl","bridge",NA
+"HLA-DQA1",75.2,0.983,"nsclc","macrophage -> endothelial","invsqrt_kl","bridge",NA
+"GLUL",134.9,0.676,"nsclc","macrophage -> endothelial","invsqrt_kl","bridge",NA
+"IL2RA",34.5,0.946,"nsclc","macrophage -> endothelial","invsqrt_kl","bridge",NA
+"FCER1G",41.8,0.976,"nsclc","macrophage -> endothelial","invsqrt_kl","bridge",NA
+"ITGAX",25.1,0.691,"nsclc","macrophage -> endothelial","invsqrt_kl","bridge",NA
+"MRC1",23.6,1,"nsclc","macrophage -> endothelial","invsqrt_kl","bridge",NA
+"ITGB2",102.7,0.478,"nsclc","macrophage -> endothelial","invsqrt_kl","bridge",NA
+"CFD",178.7,0.473,"nsclc","macrophage -> endothelial","invsqrt_kl","bridge",NA
+"FCGR3A",68.4,0.011,"nsclc","macrophage -> endothelial","invsqrt_kl","bridge",NA
+"C1QB",225.3,0.986,"nsclc","macrophage -> fibroblast","invsqrt_kl","bridge",NA
+"CCL18",129.9,0.979,"nsclc","macrophage -> fibroblast","invsqrt_kl","bridge",NA
+"C1QA",527.1,0.998,"nsclc","macrophage -> fibroblast","invsqrt_kl","bridge",NA
+"GPNMB",438,0.992,"nsclc","macrophage -> fibroblast","invsqrt_kl","bridge",NA
+"CD163",164.3,0.984,"nsclc","macrophage -> fibroblast","invsqrt_kl","bridge",NA
+"C1QC",335.8,0.995,"nsclc","macrophage -> fibroblast","invsqrt_kl","bridge",NA
+"CD68",507.1,0.998,"nsclc","macrophage -> fibroblast","invsqrt_kl","bridge",NA
+"CD14",186.2,0.972,"nsclc","macrophage -> fibroblast","invsqrt_kl","bridge",NA
+"MS4A4A",37.3,1,"nsclc","macrophage -> fibroblast","invsqrt_kl","bridge",NA
+"MRC1",118,0.998,"nsclc","macrophage -> fibroblast","invsqrt_kl","bridge",NA
+"GLUL",559.4,0.68,"nsclc","macrophage -> fibroblast","invsqrt_kl","bridge",NA
+"PSAP",1465.6,0.75,"nsclc","macrophage -> fibroblast","invsqrt_kl","bridge",NA
+"HLA-DRB1",663.7,0.961,"nsclc","macrophage -> fibroblast","invsqrt_kl","bridge",NA
+"TYROBP",159.6,0.918,"nsclc","macrophage -> fibroblast","invsqrt_kl","bridge",NA
+"HLA-DQA1",199.2,0.989,"nsclc","macrophage -> fibroblast","invsqrt_kl","bridge",NA
+"HLA-DRA",350.5,0.933,"nsclc","macrophage -> fibroblast","invsqrt_kl","bridge",NA
+"CD74",1196,0.847,"nsclc","macrophage -> fibroblast","invsqrt_kl","bridge",NA
+"HLA-DPA1",545.7,1,"nsclc","macrophage -> fibroblast","invsqrt_kl","bridge",NA
+"FCER1G",96.1,0.978,"nsclc","macrophage -> fibroblast","invsqrt_kl","bridge",NA
+"ITGAX",113.2,0.88,"nsclc","macrophage -> fibroblast","invsqrt_kl","bridge",NA
+"GPNMB",3106.2,1,"nsclc","macrophage -> immune other","invsqrt_kl","bridge",NA
+"CCL18",1284.8,0.999,"nsclc","macrophage -> immune other","invsqrt_kl","bridge",NA
+"C1QB",3151.7,0.999,"nsclc","macrophage -> immune other","invsqrt_kl","bridge",NA
+"C1QA",4310.2,0.999,"nsclc","macrophage -> immune other","invsqrt_kl","bridge",NA
+"PSAP",11370.9,1,"nsclc","macrophage -> immune other","invsqrt_kl","bridge",NA
+"C1QC",3257.8,0.998,"nsclc","macrophage -> immune other","invsqrt_kl","bridge",NA
+"CD68",4058.8,1,"nsclc","macrophage -> immune other","invsqrt_kl","bridge",NA
+"GLUL",7485,0.788,"nsclc","macrophage -> immune other","invsqrt_kl","bridge",NA
+"CD14",2310.3,1,"nsclc","macrophage -> immune other","invsqrt_kl","bridge",NA
+"CD163",2119.1,1,"nsclc","macrophage -> immune other","invsqrt_kl","bridge",NA
+"MS4A4A",385.4,1,"nsclc","macrophage -> immune other","invsqrt_kl","bridge",NA
+"SPP1",746.1,0.019,"nsclc","macrophage -> immune other","invsqrt_kl","bridge",NA
+"CFD",922.5,1,"nsclc","macrophage -> immune other","invsqrt_kl","bridge",NA
+"LGALS3",1212.4,0.833,"nsclc","macrophage -> immune other","invsqrt_kl","bridge",NA
+"SELENOP",132.6,0.989,"nsclc","macrophage -> immune other","invsqrt_kl","bridge",NA
+"MARCO",234,0.067,"nsclc","macrophage -> immune other","invsqrt_kl","bridge",NA
+"NR1H3",186.9,1,"nsclc","macrophage -> immune other","invsqrt_kl","bridge",NA
+"MMP12",238,-0.005,"nsclc","macrophage -> immune other","invsqrt_kl","bridge",NA
+"MERTK",217.7,1,"nsclc","macrophage -> immune other","invsqrt_kl","bridge",NA
+"CMKLR1",310.9,1,"nsclc","macrophage -> immune other","invsqrt_kl","bridge",NA
+"GPNMB",81.5,0.968,"nsclc","macrophage -> malignant","invsqrt_kl","bridge",NA
+"CD163",36.9,0.901,"nsclc","macrophage -> malignant","invsqrt_kl","bridge",NA
+"C1QB",105.7,0.997,"nsclc","macrophage -> malignant","invsqrt_kl","bridge",NA
+"C1QA",156.4,0.996,"nsclc","macrophage -> malignant","invsqrt_kl","bridge",NA
+"C1QC",84.5,0.991,"nsclc","macrophage -> malignant","invsqrt_kl","bridge",NA
+"HLA-DPA1",188.3,0.939,"nsclc","macrophage -> malignant","invsqrt_kl","bridge",NA
+"CD14",57.9,0.99,"nsclc","macrophage -> malignant","invsqrt_kl","bridge",NA
+"HLA-DRA",152.4,0.936,"nsclc","macrophage -> malignant","invsqrt_kl","bridge",NA
+"HLA-DQA1",74.4,1,"nsclc","macrophage -> malignant","invsqrt_kl","bridge",NA
+"CD74",383.2,0.791,"nsclc","macrophage -> malignant","invsqrt_kl","bridge",NA
+"HLA-DPB1",92,0.888,"nsclc","macrophage -> malignant","invsqrt_kl","bridge",NA
+"HLA-DRB1",138.8,0.835,"nsclc","macrophage -> malignant","invsqrt_kl","bridge",NA
+"SRGN",107.5,0.622,"nsclc","macrophage -> malignant","invsqrt_kl","bridge",NA
+"SELENOP",8.7,0.985,"nsclc","macrophage -> malignant","invsqrt_kl","bridge",NA
+"MS4A4A",4.1,0.934,"nsclc","macrophage -> malignant","invsqrt_kl","bridge",NA
+"MRC1",1,0.898,"nsclc","macrophage -> malignant","invsqrt_kl","bridge",NA
+"FCER1G",39.3,1,"nsclc","macrophage -> malignant","invsqrt_kl","bridge",NA
+"GADD45B",248.4,0.587,"nsclc","macrophage -> malignant","invsqrt_kl","bridge",NA
+"IL2RA",54,0.955,"nsclc","macrophage -> malignant","invsqrt_kl","bridge",NA
+"CD68",4,0.995,"nsclc","macrophage -> malignant","invsqrt_kl","bridge",NA
+"OLFM4",299.7,1,"nsclc","malignant -> endothelial","invsqrt_kl","bridge",NA
+"KRT19",268,1,"nsclc","malignant -> endothelial","invsqrt_kl","bridge",NA
+"CEACAM6",56,0.967,"nsclc","malignant -> endothelial","invsqrt_kl","bridge",NA
+"MMP1",28.3,0.976,"nsclc","malignant -> endothelial","invsqrt_kl","bridge",NA
+"KRT17",133,0.987,"nsclc","malignant -> endothelial","invsqrt_kl","bridge",NA
+"CXCL5",59,1,"nsclc","malignant -> endothelial","invsqrt_kl","bridge",NA
+"AGR2",24.8,0.972,"nsclc","malignant -> endothelial","invsqrt_kl","bridge",NA
+"EPCAM",50.3,0.989,"nsclc","malignant -> endothelial","invsqrt_kl","bridge",NA
+"MMP7",174.6,0.975,"nsclc","malignant -> endothelial","invsqrt_kl","bridge",NA
+"LYZ",78.1,1,"nsclc","malignant -> endothelial","invsqrt_kl","bridge",NA
+"S100P",56.1,1,"nsclc","malignant -> endothelial","invsqrt_kl","bridge",NA
+"SPINK1",53.1,0.962,"nsclc","malignant -> endothelial","invsqrt_kl","bridge",NA
+"PIGR",36.3,1,"nsclc","malignant -> endothelial","invsqrt_kl","bridge",NA
+"CDH1",8.9,0.891,"nsclc","malignant -> endothelial","invsqrt_kl","bridge",NA
+"SOX9",41.3,0.978,"nsclc","malignant -> endothelial","invsqrt_kl","bridge",NA
+"KRT8",165,0.866,"nsclc","malignant -> endothelial","invsqrt_kl","bridge",NA
+"DDR1",38,1,"nsclc","malignant -> endothelial","invsqrt_kl","bridge",NA
+"TACSTD2",12.2,1,"nsclc","malignant -> endothelial","invsqrt_kl","bridge",NA
+"KRT23",38.5,0.976,"nsclc","malignant -> endothelial","invsqrt_kl","bridge",NA
+"ERBB3",32.8,1,"nsclc","malignant -> endothelial","invsqrt_kl","bridge",NA
+"OLFM4",949,0,"nsclc","malignant -> epithelial","invsqrt_kl","bridge",NA
+"MMP1",155.8,0,"nsclc","malignant -> epithelial","invsqrt_kl","bridge",NA
+"CXCL5",381.1,0,"nsclc","malignant -> epithelial","invsqrt_kl","bridge",NA
+"CEACAM6",430.7,0,"nsclc","malignant -> epithelial","invsqrt_kl","bridge",NA
+"COL17A1",43.5,0,"nsclc","malignant -> epithelial","invsqrt_kl","bridge",NA
+"SPINK1",89,0,"nsclc","malignant -> epithelial","invsqrt_kl","bridge",NA
+"ITGB4",141.9,0,"nsclc","malignant -> epithelial","invsqrt_kl","bridge",NA
+"PSCA",32.8,-0.008,"nsclc","malignant -> epithelial","invsqrt_kl","bridge",NA
+"KRT23",74.7,0,"nsclc","malignant -> epithelial","invsqrt_kl","bridge",NA
+"SOX9",171.1,0,"nsclc","malignant -> epithelial","invsqrt_kl","bridge",NA
+"KRT17",603.8,0.002,"nsclc","malignant -> epithelial","invsqrt_kl","bridge",NA
+"S100P",174,0,"nsclc","malignant -> epithelial","invsqrt_kl","bridge",NA
+"SLC2A1",16.4,0,"nsclc","malignant -> epithelial","invsqrt_kl","bridge",NA
+"EPHA2",146.7,-0.005,"nsclc","malignant -> epithelial","invsqrt_kl","bridge",NA
+"ITGA6",35,-0.012,"nsclc","malignant -> epithelial","invsqrt_kl","bridge",NA
+"TM4SF1",327.7,-0.001,"nsclc","malignant -> epithelial","invsqrt_kl","bridge",NA
+"SERPINB5",33.2,-0.017,"nsclc","malignant -> epithelial","invsqrt_kl","bridge",NA
+"IER3",238.1,0.012,"nsclc","malignant -> epithelial","invsqrt_kl","bridge",NA
+"KRT19",836.4,0,"nsclc","malignant -> epithelial","invsqrt_kl","bridge",NA
+"JAG1",67.6,0.014,"nsclc","malignant -> epithelial","invsqrt_kl","bridge",NA
+"OLFM4",1151.1,1,"nsclc","malignant -> fibroblast","invsqrt_kl","bridge",NA
+"KRT19",1543.7,0.998,"nsclc","malignant -> fibroblast","invsqrt_kl","bridge",NA
+"CEACAM6",316.9,0.993,"nsclc","malignant -> fibroblast","invsqrt_kl","bridge",NA
+"KRT17",892.5,1,"nsclc","malignant -> fibroblast","invsqrt_kl","bridge",NA
+"AGR2",118.5,0.987,"nsclc","malignant -> fibroblast","invsqrt_kl","bridge",NA
+"CXCL5",255.5,0.998,"nsclc","malignant -> fibroblast","invsqrt_kl","bridge",NA
+"ITGB4",170.9,0.993,"nsclc","malignant -> fibroblast","invsqrt_kl","bridge",NA
+"TM4SF1",282.4,0.998,"nsclc","malignant -> fibroblast","invsqrt_kl","bridge",NA
+"EPCAM",220,0.998,"nsclc","malignant -> fibroblast","invsqrt_kl","bridge",NA
+"MMP1",258.9,0.987,"nsclc","malignant -> fibroblast","invsqrt_kl","bridge",NA
+"TACSTD2",132.1,0.994,"nsclc","malignant -> fibroblast","invsqrt_kl","bridge",NA
+"S100P",303.4,0.99,"nsclc","malignant -> fibroblast","invsqrt_kl","bridge",NA
+"MMP7",2716.7,0.992,"nsclc","malignant -> fibroblast","invsqrt_kl","bridge",NA
+"KRT8",687.2,1,"nsclc","malignant -> fibroblast","invsqrt_kl","bridge",NA
+"SPINK1",144.2,0.997,"nsclc","malignant -> fibroblast","invsqrt_kl","bridge",NA
+"CDH1",53.2,0.979,"nsclc","malignant -> fibroblast","invsqrt_kl","bridge",NA
+"PIGR",73.6,0.988,"nsclc","malignant -> fibroblast","invsqrt_kl","bridge",NA
+"ITGA3",121,0.945,"nsclc","malignant -> fibroblast","invsqrt_kl","bridge",NA
+"SOX9",204.8,0.994,"nsclc","malignant -> fibroblast","invsqrt_kl","bridge",NA
+"EPHA2",115.1,0.973,"nsclc","malignant -> fibroblast","invsqrt_kl","bridge",NA
+"OLFM4",848.8,0.999,"nsclc","malignant -> immune other","invsqrt_kl","bridge",NA
+"CEACAM6",537.5,0.995,"nsclc","malignant -> immune other","invsqrt_kl","bridge",NA
+"KRT19",1574.2,1,"nsclc","malignant -> immune other","invsqrt_kl","bridge",NA
+"TM4SF1",397.6,0.999,"nsclc","malignant -> immune other","invsqrt_kl","bridge",NA
+"MMP1",236.4,0.998,"nsclc","malignant -> immune other","invsqrt_kl","bridge",NA
+"KRT17",963.2,0.999,"nsclc","malignant -> immune other","invsqrt_kl","bridge",NA
+"EPCAM",296.7,0.997,"nsclc","malignant -> immune other","invsqrt_kl","bridge",NA
+"ITGB4",201.9,1,"nsclc","malignant -> immune other","invsqrt_kl","bridge",NA
+"CXCL5",617.4,1,"nsclc","malignant -> immune other","invsqrt_kl","bridge",NA
+"AGR2",148.1,1,"nsclc","malignant -> immune other","invsqrt_kl","bridge",NA
+"MMP7",705.5,1,"nsclc","malignant -> immune other","invsqrt_kl","bridge",NA
+"TACSTD2",253,0.991,"nsclc","malignant -> immune other","invsqrt_kl","bridge",NA
+"EPHA2",194.6,0.992,"nsclc","malignant -> immune other","invsqrt_kl","bridge",NA
+"S100P",498.9,0.998,"nsclc","malignant -> immune other","invsqrt_kl","bridge",NA
+"SOX9",273.7,0.999,"nsclc","malignant -> immune other","invsqrt_kl","bridge",NA
+"CDH1",171.1,0.99,"nsclc","malignant -> immune other","invsqrt_kl","bridge",NA
+"ITGA3",96.9,1,"nsclc","malignant -> immune other","invsqrt_kl","bridge",NA
+"S100A6",2164.1,1,"nsclc","malignant -> immune other","invsqrt_kl","bridge",NA
+"PIGR",105.8,1,"nsclc","malignant -> immune other","invsqrt_kl","bridge",NA
+"KRT8",1409.4,0.588,"nsclc","malignant -> immune other","invsqrt_kl","bridge",NA
+"OLFM4",134.5,0.983,"nsclc","malignant -> macrophage","invsqrt_kl","bridge",NA
+"CEACAM6",88.2,0.984,"nsclc","malignant -> macrophage","invsqrt_kl","bridge",NA
+"KRT19",183.2,0.993,"nsclc","malignant -> macrophage","invsqrt_kl","bridge",NA
+"TM4SF1",81.6,0.977,"nsclc","malignant -> macrophage","invsqrt_kl","bridge",NA
+"MMP1",70.7,0.961,"nsclc","malignant -> macrophage","invsqrt_kl","bridge",NA
+"KRT17",117.4,0.999,"nsclc","malignant -> macrophage","invsqrt_kl","bridge",NA
+"ITGB4",14.4,0.894,"nsclc","malignant -> macrophage","invsqrt_kl","bridge",NA
+"EPCAM",22.6,0.984,"nsclc","malignant -> macrophage","invsqrt_kl","bridge",NA
+"CXCL5",132.7,0.989,"nsclc","malignant -> macrophage","invsqrt_kl","bridge",NA
+"AGR2",4.3,0.797,"nsclc","malignant -> macrophage","invsqrt_kl","bridge",NA
+"S100A6",533.5,0.884,"nsclc","malignant -> macrophage","invsqrt_kl","bridge",NA
+"MMP7",120.8,0.989,"nsclc","malignant -> macrophage","invsqrt_kl","bridge",NA
+"EPHA2",17.2,1,"nsclc","malignant -> macrophage","invsqrt_kl","bridge",NA
+"ITGA3",0,0.79,"nsclc","malignant -> macrophage","invsqrt_kl","bridge",NA
+"S100P",72.6,0.976,"nsclc","malignant -> macrophage","invsqrt_kl","bridge",NA
+"TACSTD2",17,0.909,"nsclc","malignant -> macrophage","invsqrt_kl","bridge",NA
+"KRT8",93.4,0.778,"nsclc","malignant -> macrophage","invsqrt_kl","bridge",NA
+"SOX9",25.7,0.941,"nsclc","malignant -> macrophage","invsqrt_kl","bridge",NA
+"CDH1",27.3,0.958,"nsclc","malignant -> macrophage","invsqrt_kl","bridge",NA
+"DDR1",0,-0.184,"nsclc","malignant -> macrophage","invsqrt_kl","bridge",NA
