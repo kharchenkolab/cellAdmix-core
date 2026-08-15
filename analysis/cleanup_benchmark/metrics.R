@@ -36,32 +36,41 @@ bench_type_profiles <- function(counts, cell_types) {
   out
 }
 
-# Source-specific marker pool for an ordered pair: genes strongly specific to
-# S among all types, with a near-zero native baseline in exposure-0 T cells.
+# Source-specific marker pool for an ordered pair: among genes whose
+# top-expressing type is S, the top n by contrast against the exposure-0
+# target baseline. Rank-based on purpose - an absolute baseline cutoff would
+# be skewed by the very contamination being measured, and the power metric
+# subtracts the baseline anyway.
 bench_marker_pool <- function(profiles, S, T_type, baseline_cpm_T0,
-                              n_pool = 20L, baseline_frac = 0.05,
-                              min_source_cpm = 50) {
-  others <- setdiff(colnames(profiles), S)
-  max_other <- apply(profiles[, others, drop = FALSE], 1, max)
-  spec <- profiles[, S] / pmax(profiles[, S] + max_other, 1e-9)
-  ok <- profiles[, S] >= min_source_cpm &
-    baseline_cpm_T0 < baseline_frac * profiles[, S]
-  cand <- rownames(profiles)[ok]
-  cand[order(spec[cand], profiles[cand, S], decreasing = TRUE)][
+                              n_pool = 20L, min_source_cpm = 50,
+                              baseline_floor = 20) {
+  top_type <- colnames(profiles)[max.col(profiles, ties.method = "first")]
+  cand <- rownames(profiles)[top_type == S & profiles[, S] >= min_source_cpm]
+  contrast <- profiles[cand, S] / pmax(baseline_cpm_T0[cand], baseline_floor)
+  cand[order(contrast, profiles[cand, S], decreasing = TRUE)][
     seq_len(min(n_pool, length(cand)))]
 }
 
 # Abundance-matched control genes: similar overall cpm to the markers but not
-# S-specific. Used to separate admixture removal from microenvironment shifts.
+# clearly owned by ANY cell type, so that leakage from other colocated types
+# does not masquerade as a confound signal. What remains measures
+# microenvironment/density gradients.
 bench_control_genes <- function(profiles, S, markers, n_per_marker = 2L) {
-  others <- setdiff(colnames(profiles), S)
-  max_other <- apply(profiles[, others, drop = FALSE], 1, max)
-  spec <- profiles[, S] / pmax(profiles[, S] + max_other, 1e-9)
+  norm <- t(t(profiles) / pmax(colSums(profiles), 1))
+  ownership <- apply(norm, 1, max) / pmax(rowSums(norm), 1e-12)
   total <- rowMeans(profiles)
-  pool <- setdiff(rownames(profiles)[spec < stats::median(spec, na.rm = TRUE)], markers)
+  pool <- setdiff(rownames(profiles)[ownership < stats::median(ownership, na.rm = TRUE)],
+    markers)
   unique(unlist(lapply(markers, function(g) {
     pool[order(abs(log1p(total[pool]) - log1p(total[[g]])))][seq_len(n_per_marker)]
   })))
+}
+
+# Strict subpool: pool genes with near-zero native baseline in exposure-0
+# target cells. Their excess is unambiguous contamination; the broad pool adds
+# shared genes whose exposure gradient may include real biology.
+bench_pool_strict <- function(pool, profiles, S, baseline_cpm_T0, baseline_frac = 0.05) {
+  pool[baseline_cpm_T0[pool] < baseline_frac * profiles[pool, S]]
 }
 
 # Exposure-binned pooled rates: marker molecules / cell totals per bin.
@@ -104,32 +113,31 @@ bench_power <- function(rates_before, rates_after) {
   1 - sum(excess_a) / sum(excess_b)
 }
 
-# Dose-response power: same idea on a (near-)continuous exposure dose,
-# weighting each dose level's excess by its molecule mass.
-bench_dose_power <- function(marker_before, marker_after, totals, dose, max_dose = 10L) {
-  dose <- pmin(dose, max_dose)
-  rb <- bench_bin_rates(marker_before, totals, factor(dose))
-  ra <- bench_bin_rates(marker_after, totals, factor(dose))
-  names(rb)[1] <- names(ra)[1] <- "bin"
-  r0b <- rb$rate[rb$bin == "0"]
-  r0a <- ra$rate[ra$bin == "0"]
-  keep <- rb$bin != "0"
-  excess_b <- pmax(rb$rate[keep] - r0b, 0) * rb$totals[keep]
-  excess_a <- pmax(ra$rate[keep] - r0a, 0) * rb$totals[keep]
-  if (!length(excess_b) || sum(excess_b) <= 0) {
-    return(NA_real_)
-  }
-  1 - sum(excess_a) / sum(excess_b)
-}
-
-# Safety 1: marker retention in exposure-0 target cells (native floor).
-bench_safety_baseline <- function(rates_before, rates_after) {
+# Removal depth: how much of the exposure-0 marker signal was removed. For
+# highly source-specific markers that signal is mostly ambient/dispersed
+# contamination, so this measures cleanup reach, not damage.
+bench_removal_depth <- function(rates_before, rates_after) {
   r0b <- rates_before$rate[rates_before$bin == "0"]
   r0a <- rates_after$rate[rates_after$bin == "0"]
   if (!length(r0b) || r0b <= 0) {
     return(NA_real_)
   }
-  r0a / r0b
+  1 - r0a / r0b
+}
+
+# Per-gene power: the excess-removal fraction gene by gene, exposing genes
+# that escape cleanup inside an otherwise well-cleaned pool.
+bench_power_per_gene <- function(counts_before, counts_after, pool, cells_T,
+                                 totals, bins) {
+  do.call(rbind, lapply(pool, function(g) {
+    gb <- as.numeric(counts_before[g, cells_T])
+    ga <- as.numeric(counts_after[g, cells_T])
+    rb <- bench_bin_rates(gb, totals, bins)
+    ra <- bench_bin_rates(ga, totals, bins)
+    det <- bench_detect(rb)
+    data.frame(gene = g, excess_before = round(det$excess_molecules, 1),
+      power = round(bench_power(rb, ra), 3))
+  }))
 }
 
 # Safety 2: retention of the target's own markers, worst bin. Catches
@@ -141,11 +149,19 @@ bench_safety_native <- function(native_before, native_after, totals, bins) {
   min(ret, na.rm = TRUE)
 }
 
-# Safety 3: whole-profile integrity of exposure-0 target cells.
-bench_profile_integrity <- function(counts_before, counts_after, cells_e0) {
+# Safety 3: profile integrity of exposure-0 target cells, restricted to the
+# target's own genes (top-expressing type is T). Removal of drifted foreign
+# material should not count against integrity; erosion of native genes does.
+bench_profile_integrity <- function(counts_before, counts_after, cells_e0,
+                                    profiles = NULL, T_type = NULL) {
   pb <- bench_pseudobulk(counts_before, cells_e0)
   pa <- bench_pseudobulk(counts_after, cells_e0)
-  ok <- is.finite(pb) & is.finite(pa)
+  genes <- rownames(counts_before)
+  if (!is.null(profiles) && !is.null(T_type)) {
+    top_type <- colnames(profiles)[max.col(profiles, ties.method = "first")]
+    genes <- rownames(profiles)[top_type == T_type]
+  }
+  ok <- genes[is.finite(pb[genes]) & is.finite(pa[genes])]
   stats::cor(log1p(pb[ok]), log1p(pa[ok]))
 }
 
@@ -176,23 +192,3 @@ bench_nnls_contamination <- function(counts, profiles_e0, cells_exposed, S, T_ty
   unname(w[S] / sum_w)
 }
 
-# Per-cell doublet-axis shift: project target cells on the S-minus-T profile
-# axis; contamination pulls exposed cells toward S. Unlike the rate metrics,
-# this is a compositional measure, so each state uses its own cell totals.
-bench_doublet_shift <- function(counts, cells_T, exposure, profile_S, profile_T,
-                                n_genes = 40L) {
-  spec_S <- profile_S / pmax(profile_S + profile_T, 1e-9)
-  genes <- unique(c(
-    names(sort(spec_S, decreasing = TRUE))[seq_len(n_genes)],
-    names(sort(spec_S, decreasing = FALSE))[seq_len(n_genes)]))
-  genes <- intersect(genes, rownames(counts))
-  axis <- log1p(profile_S[genes]) - log1p(profile_T[genes])
-  axis <- axis / sqrt(sum(axis^2))
-  cells_T <- intersect(cells_T, colnames(counts))
-  totals <- Matrix::colSums(counts[, cells_T, drop = FALSE])
-  cpm <- t(t(as.matrix(counts[genes, cells_T, drop = FALSE])) /
-    pmax(totals, 1)) * 1e6
-  scores <- as.numeric(t(log1p(cpm)) %*% axis)
-  e <- exposure[cells_T]
-  mean(scores[e > 0]) - mean(scores[e == 0])
-}

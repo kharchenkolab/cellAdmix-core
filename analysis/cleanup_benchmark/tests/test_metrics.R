@@ -16,7 +16,7 @@ make_scenario <- function() {
   counts <- Matrix(0, nrow = length(genes), ncol = length(cells), sparse = TRUE,
     dimnames = list(genes, cells))
   # T cells: native tmk high, bg mid, shared mid, smk small native baseline
-  counts[paste0("tmk", 1:4), types == "T"] <- 50
+  counts[paste0("tmk", 1:4), types == "T"] <- c(50, 40, 30, 20)
   counts[paste0("bg", 1:4), types == "T"] <- 20
   counts["shared1", types == "T"] <- 30
   counts[paste0("smk", 1:4), types == "T"] <- 2
@@ -44,10 +44,13 @@ baseline_T0 <- bench_pseudobulk(sc$before, T_cells[sc$exposure[T_cells] == 0])
 
 marker_counts <- function(m, genes, cells) Matrix::colSums(m[genes, cells, drop = FALSE])
 
-test_that("marker pool selects source-specific genes and drops shared ones", {
-  pool <- bench_marker_pool(profiles, "S", "T", baseline_T0)
+test_that("marker pool ranks source-specific genes above shared ones", {
+  pool <- bench_marker_pool(profiles, "S", "T", baseline_T0, n_pool = 4)
   expect_setequal(pool, paste0("smk", 1:4))
-  expect_false("shared1" %in% pool)
+  full <- bench_marker_pool(profiles, "S", "T", baseline_T0, n_pool = 20)
+  # shared1 is top-expressed in S so it may enter a wide pool, but only
+  # after every truly specific gene
+  expect_true(all(match(paste0("smk", 1:4), full) < match("shared1", full)))
 })
 
 test_that("detection fires on the contaminated pair and not on a clean one", {
@@ -82,19 +85,19 @@ test_that("baseline erosion shows in safety, not power", {
   rb <- bench_bin_rates(marker_counts(sc$before, pool, T_cells), totals[T_cells], bins)
   ra <- bench_bin_rates(marker_counts(over, pool, T_cells), totals[T_cells], bins)
   expect_equal(bench_power(rb, ra), 1, tolerance = 0.02)
-  expect_equal(bench_safety_baseline(rb, ra), 1, tolerance = 0.02)
+  expect_equal(bench_removal_depth(rb, ra), 0, tolerance = 0.02)
   ret <- bench_safety_native(
     marker_counts(sc$before, paste0("tmk", 1:4), T_cells),
     marker_counts(over, paste0("tmk", 1:4), T_cells),
     totals[T_cells], bins)
   expect_lt(ret, 0.6)
   # gene guillotine (all marker molecules removed everywhere): full power,
-  # zero baseline safety - aggressive cleanup is credited but priced
+  # full removal depth
   over2 <- sc$before
   over2[paste0("smk", 1:4), T_cells] <- 0
   ra2 <- bench_bin_rates(marker_counts(over2, pool, T_cells), totals[T_cells], bins)
   expect_equal(bench_power(rb, ra2), 1, tolerance = 1e-6)
-  expect_lt(bench_safety_baseline(rb, ra2), 0.01)
+  expect_gt(bench_removal_depth(rb, ra2), 0.99)
   ret_perfect <- bench_safety_native(
     marker_counts(sc$before, paste0("tmk", 1:4), T_cells),
     marker_counts(sc$before - sc$planted, paste0("tmk", 1:4), T_cells),
@@ -102,20 +105,38 @@ test_that("baseline erosion shows in safety, not power", {
   expect_equal(ret_perfect, 1, tolerance = 0.02)
 })
 
-test_that("dose power agrees with binned power", {
-  pool <- paste0("smk", 1:4)
-  half <- sc$before - sc$planted / 2
-  p <- bench_dose_power(
-    marker_counts(sc$before, pool, T_cells),
-    marker_counts(half, pool, T_cells),
-    totals[T_cells], sc$exposure[T_cells])
-  expect_equal(p, 0.5, tolerance = 0.05)
+test_that("strict subpool drops genes with real native baseline", {
+  pool <- c(paste0("smk", 1:4), "shared1")
+  strict <- bench_pool_strict(pool, profiles, "S", baseline_T0)
+  expect_false("shared1" %in% strict)
+  expect_setequal(strict, paste0("smk", 1:4))
 })
 
-test_that("profile integrity is 1 for untouched baseline cells", {
+test_that("per-gene power exposes a single escaping gene", {
+  pool <- paste0("smk", 1:4)
+  partial <- sc$before - sc$planted
+  partial["smk1", ] <- sc$before["smk1", ]  # smk1 escapes cleanup entirely
+  pg <- bench_power_per_gene(sc$before, partial, pool, T_cells,
+    totals[T_cells], bins)
+  expect_equal(pg$power[pg$gene == "smk1"], 0, tolerance = 0.02)
+  expect_true(all(pg$power[pg$gene != "smk1"] > 0.98))
+})
+
+test_that("native-restricted integrity ignores foreign-gene removal", {
   e0 <- T_cells[sc$exposure[T_cells] == 0]
   expect_equal(bench_profile_integrity(sc$before, sc$before - sc$planted, e0), 1,
     tolerance = 1e-6)
+  # deep cleanup that also strips the S-gene baseline from e0 cells:
+  # T-native-restricted integrity stays 1
+  deep <- sc$before - sc$planted
+  deep[paste0("smk", 1:4), e0] <- 0
+  nat <- bench_profile_integrity(sc$before, deep, e0, profiles = profiles, T_type = "T")
+  expect_equal(nat, 1, tolerance = 1e-6)
+  # but eroding a native gene lowers it
+  worse <- deep
+  worse["tmk1", e0] <- worse["tmk1", e0] / 4
+  expect_lt(bench_profile_integrity(sc$before, worse, e0,
+    profiles = profiles, T_type = "T"), 0.995)
 })
 
 test_that("nnls recovers a planted mixture", {
@@ -132,14 +153,6 @@ test_that("nnls contamination index drops after perfect cleanup", {
   after_idx <- bench_nnls_contamination(sc$before - sc$planted, profiles_e0, exposed, "S", "T")
   expect_gt(before_idx, after_idx + 0.02)
   expect_lt(after_idx, 0.05)
-})
-
-test_that("doublet shift is positive before and near zero after cleanup", {
-  pS <- profiles[, "S"]; pT <- bench_type_profiles(sc$base, sc$types)[, "T"]
-  s_before <- bench_doublet_shift(sc$before, T_cells, sc$exposure, pS, pT, n_genes = 4)
-  s_after <- bench_doublet_shift(sc$before - sc$planted, T_cells, sc$exposure, pS, pT, n_genes = 4)
-  expect_gt(s_before, 0.1)
-  expect_lt(abs(s_after), 0.05)
 })
 
 cat("all metric tests defined\n")
