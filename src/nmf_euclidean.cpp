@@ -576,9 +576,46 @@ WeightedNmfResult weighted_nmf_single(
   WeightedNmfResult result;
   double previous_loss = std::numeric_limits<double>::infinity();
 
+  // Constant data term of the weighted squared loss.
+  double x_squared_weighted = 0.0;
+  for (int i = 0; i < x.rows(); ++i) {
+    for (int p = x.indptr()[static_cast<std::size_t>(i)];
+         p < x.indptr()[static_cast<std::size_t>(i + 1)];
+         ++p) {
+      const double value = x.values()[static_cast<std::size_t>(p)];
+      x_squared_weighted +=
+          column_weights[static_cast<std::size_t>(x.indices()[static_cast<std::size_t>(p)])] *
+          value * value;
+    }
+  }
+
   for (int iteration = 0; iteration < options.max_iterations; ++iteration) {
-    const DenseMatrix wh = multiply(w, h);
-    const double loss = weighted_reconstruction_loss(x, wh, column_weights);
+    // Gram-form loss: sum_ij w_j (x - WH)^2 =
+    // tr((W^T W)(H diag(w) H^T)) - 2 sum_nnz w_j x_ij (WH)_ij + sum_nnz w_j x_ij^2,
+    // which avoids materializing the dense reconstruction each iteration.
+    const DenseMatrix gram_w_loss = gram_rows(w);
+    const DenseMatrix gram_h_loss = weighted_gram_rows(h, column_weights);
+    double fit_energy = 0.0;
+    for (int a = 0; a < h.rows(); ++a) {
+      for (int b = 0; b < h.rows(); ++b) {
+        fit_energy += gram_w_loss(a, b) * gram_h_loss(a, b);
+      }
+    }
+    double cross = 0.0;
+    for (int i = 0; i < x.rows(); ++i) {
+      for (int p = x.indptr()[static_cast<std::size_t>(i)];
+           p < x.indptr()[static_cast<std::size_t>(i + 1)];
+           ++p) {
+        const int j = x.indices()[static_cast<std::size_t>(p)];
+        double fitted = 0.0;
+        for (int a = 0; a < h.rows(); ++a) {
+          fitted += w(i, a) * h(a, j);
+        }
+        cross += column_weights[static_cast<std::size_t>(j)] *
+            x.values()[static_cast<std::size_t>(p)] * fitted;
+      }
+    }
+    const double loss = fit_energy - 2.0 * cross + x_squared_weighted;
     result.losses.push_back(loss);
     if (std::abs(previous_loss - loss) / std::max(loss, 1e-8) < options.tolerance) {
       break;
@@ -586,7 +623,7 @@ WeightedNmfResult weighted_nmf_single(
     previous_loss = loss;
 
     const DenseMatrix numerator_h = sparse_numerator_h(x, w, column_weights);
-    const DenseMatrix gram_w = gram_rows(w);
+    const DenseMatrix gram_w = gram_w_loss;
     const DenseMatrix old_h = h;
     for (int a = 0; a < h.rows(); ++a) {
       for (int j = 0; j < h.cols(); ++j) {
