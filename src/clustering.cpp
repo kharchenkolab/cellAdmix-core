@@ -19,6 +19,7 @@
 
 #include "celladmix/hnsw.hpp"
 #include "celladmix/workflow.hpp"
+#include "celladmix/spatial.hpp"
 #include "celladmix/xenium.hpp"
 #include "irlba/irlba.hpp"
 #include "subpar/subpar.hpp"
@@ -1313,6 +1314,76 @@ CellClusteringResult cluster_cells(
       "Built sparse cell-gene counts: " + std::to_string(counts_subset.values.size()) +
       " non-zero entries");
   return cluster_cell_counts(counts_subset, options, "");
+}
+
+
+namespace {
+
+struct CellPointAdaptor {
+  const std::vector<double>* x = nullptr;
+  const std::vector<double>* y = nullptr;
+
+  inline std::size_t kdtree_get_point_count() const { return x->size(); }
+  inline double kdtree_get_pt(const std::size_t idx, const std::size_t dim) const {
+    return dim == 0 ? (*x)[idx] : (*y)[idx];
+  }
+  template <class BBOX>
+  bool kdtree_get_bbox(BBOX&) const { return false; }
+};
+
+using CellKdTree = nanoflann::KDTreeSingleIndexAdaptor<
+    nanoflann::L2_Simple_Adaptor<double, CellPointAdaptor>,
+    CellPointAdaptor,
+    2,
+    int>;
+
+}  // namespace
+
+DenseMatrix cell_neighbor_type_counts(
+    const std::vector<double>& x,
+    const std::vector<double>& y,
+    const std::vector<int>& type_codes,
+    int n_types,
+    int k) {
+  const std::size_t n = x.size();
+  if (y.size() != n || type_codes.size() != n) {
+    throw std::runtime_error("cell_neighbor_type_counts inputs must have equal length");
+  }
+  if (n_types <= 0 || k <= 0) {
+    throw std::runtime_error("cell_neighbor_type_counts requires positive n_types and k");
+  }
+  DenseMatrix counts(static_cast<int>(n), n_types, 0.0);
+  if (n < 2) {
+    return counts;
+  }
+
+  CellPointAdaptor adaptor;
+  adaptor.x = &x;
+  adaptor.y = &y;
+  CellKdTree tree(2, adaptor, nanoflann::KDTreeSingleIndexAdaptorParams(10));
+  tree.buildIndex();
+
+  const std::size_t request = std::min(n, static_cast<std::size_t>(k) + 1);
+  std::vector<int> hit_indices(request);
+  std::vector<double> hit_distances(request);
+  for (std::size_t i = 0; i < n; ++i) {
+    const double query[2] = {x[i], y[i]};
+    const std::size_t found =
+        tree.knnSearch(query, request, hit_indices.data(), hit_distances.data());
+    int used = 0;
+    for (std::size_t h = 0; h < found && used < k; ++h) {
+      const std::size_t neighbor = static_cast<std::size_t>(hit_indices[h]);
+      if (neighbor == i) {
+        continue;
+      }
+      ++used;
+      const int code = type_codes[neighbor];
+      if (code >= 0 && code < n_types) {
+        counts(static_cast<int>(i), code) += 1.0;
+      }
+    }
+  }
+  return counts;
 }
 
 }  // namespace celladmix

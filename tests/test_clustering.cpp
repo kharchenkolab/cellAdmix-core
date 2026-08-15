@@ -126,3 +126,22 @@ TEST_CASE("Cell clustering can subsample the clustering cell set") {
   REQUIRE_EQ(result.umap.rows(), 4);
   REQUIRE_EQ(result.umap.cols(), 2);
 }
+
+TEST_CASE("Cell neighbor type counts respect k and skip unlabeled neighbors") {
+  // Four labeled cells on a line plus one unlabeled cell in the middle.
+  const std::vector<double> x = {0.0, 1.0, 2.0, 3.0, 1.5};
+  const std::vector<double> y = {0.0, 0.0, 0.0, 0.0, 0.0};
+  const std::vector<int> types = {0, 0, 1, 1, -1};
+  const auto counts = cell_neighbor_type_counts(x, y, types, 2, 2);
+  REQUIRE_EQ(counts.rows(), 5);
+  REQUIRE_EQ(counts.cols(), 2);
+  // Cell 0 at x=0: nearest two neighbors are cell 1 (type 0) and the
+  // unlabeled cell at 1.5, which occupies a slot but adds no counts.
+  REQUIRE_EQ(counts(0, 0), 1.0);
+  REQUIRE_EQ(counts(0, 1), 0.0);
+  // Cell 3 at x=3: nearest two are cell 2 (type 1) and unlabeled at 1.5.
+  REQUIRE_EQ(counts(3, 0), 0.0);
+  REQUIRE_EQ(counts(3, 1), 1.0);
+  // The unlabeled middle cell still gets its own neighbor counts.
+  REQUIRE_EQ(counts(4, 0) + counts(4, 1), 2.0);
+}

@@ -158,6 +158,15 @@ score$plot_pairs()
 rules <- score$rules(p_thresh = 0.1)
 ```
 
+Rules pass a native-factor false-positive check by default: each rule is
+tested against target cells that have no source-type cells among their
+nearest neighbors, and rules whose factor persists in those source-distant
+cells are flagged `keep = FALSE` with the reason in the `native_check` column
+(supporting evidence columns included). Correction skips flagged rules; pass
+`native_check = FALSE` to disable, or adjust `native_median_thresh` and
+related thresholds. See the Native-Factor Check section in
+[scoring_methods.md](scoring_methods.md).
+
 Example-cell overlays show molecule-level evidence around selected target
 cells. For Xenium-backed fits, the DAPI/membrane stain background, cell
 boundaries, and cell-type shading are discovered automatically:

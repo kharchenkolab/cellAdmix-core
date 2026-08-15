@@ -788,3 +788,15 @@
     PACKAGE = "cellAdmixCore"
   )
 }
+
+.celladmix_cell_neighbor_type_counts <- function(x, y, type_codes, n_types, k = 15L) {
+  .Call(
+    "_cellAdmixCore_celladmix_cell_neighbor_type_counts",
+    as.numeric(x),
+    as.numeric(y),
+    as.integer(type_codes),
+    as.integer(n_types),
+    as.integer(k),
+    PACKAGE = "cellAdmixCore"
+  )
+}

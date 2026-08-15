@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "celladmix/bridge.hpp"
+#include "celladmix/clustering.hpp"
 #include "celladmix/input_store.hpp"
 #include "celladmix/membrane.hpp"
 #include "celladmix/pipeline_store.hpp"
@@ -651,6 +652,22 @@ PYBIND11_MODULE(_core, m) {
         return celladmix::read_run_manifest(path).paths.cells_parquet;
       },
       py::arg("path"));
+
+  m.def(
+      "cell_neighbor_type_counts",
+      [](const std::vector<double>& x,
+         const std::vector<double>& y,
+         const std::vector<int>& type_codes,
+         int n_types,
+         int k) {
+        return dense_matrix_to_dict(
+            celladmix::cell_neighbor_type_counts(x, y, type_codes, n_types, k));
+      },
+      py::arg("x"),
+      py::arg("y"),
+      py::arg("type_codes"),
+      py::arg("n_types"),
+      py::arg("k") = 15);
 
   m.def(
       "score_membrane",

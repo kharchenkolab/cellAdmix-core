@@ -80,4 +80,16 @@ Eigen::MatrixXd umap_embed(
     int num_threads = 1,
     bool parallel_optimization = false);
 
+
+// Count cell types among each cell's k nearest neighbor cells (2D centroids).
+// type_codes uses -1 for unlabeled cells; unlabeled cells occupy space (they
+// are valid neighbors) but contribute no counts. Returns a dense cells x
+// n_types matrix.
+DenseMatrix cell_neighbor_type_counts(
+    const std::vector<double>& x,
+    const std::vector<double>& y,
+    const std::vector<int>& type_codes,
+    int n_types,
+    int k);
+
 }  // namespace celladmix

@@ -922,3 +922,42 @@ test_that("example cell-type resolution handles auto, NULL, and frames", {
   frame <- data.frame(cell_id = "c1", cell_type = "T", stringsAsFactors = FALSE)
   expect_identical(resolve(fit_stub, frame), c(c1 = "T"))
 })
+
+test_that("native-factor check vetoes persistent factors and keeps true admixture", {
+  set.seed(0)
+  n <- 20L
+  cells <- data.frame(
+    cell_id = c(paste0("S", 1:n), paste0("TE", 1:n), paste0("TD", 1:n)),
+    x = c(runif(n, 0, 10), runif(n, 5, 15), runif(n, 100, 110)),
+    y = runif(3L * n, 0, 10),
+    factor_1_fraction = c(rep(0.05, n), rep(0.30, 2L * n)),
+    factor_2_fraction = c(rep(0, n), rep(0.40, n), rep(0, n)),
+    stringsAsFactors = FALSE
+  )
+  annotation <- setNames(rep(c("Source", "Target"), c(n, 2L * n)), cells$cell_id)
+  fit_stub <- list(
+    cell_factors = function() cells,
+    annotation_name = "manual",
+    dataset = list(annotation = function(...) annotation)
+  )
+  rules <- data.frame(
+    factor = c(1L, 2L, 1L),
+    source_cell_type = c("Source", "Source", "Missing"),
+    target_cell_type = "Target",
+    p_value = 0.01,
+    neg_log10_p = 2,
+    rule_id = c("1_Target", "2_Target", "1_Target"),
+    stringsAsFactors = FALSE
+  )
+
+  out <- cellAdmixCore:::.celladmix_apply_native_check(rules, fit_stub, neighbor_k = 10L)
+  expect_equal(out$native_check[1:2], c("native_median", "pass"))
+  expect_equal(out$keep, c(FALSE, TRUE, FALSE))
+  expect_gt(out$native_distant_median[[1]], 0.1)
+  expect_gt(out$native_exposure_gradient[[2]], 0.2)
+  expect_equal(out$native_check[[3]], "source_not_in_annotation")
+
+  empty <- cellAdmixCore:::.celladmix_apply_native_check(rules[0, ], fit_stub)
+  expect_true("keep" %in% names(empty))
+  expect_equal(nrow(empty), 0L)
+})

@@ -199,6 +199,10 @@ CellAdmixFit <- R6::R6Class(
       if (is.null(rules)) {
         rules <- score_obj$rules(p_thresh = p_thresh, adjust_p = adjust_p, targets = targets)
       }
+      if (!is.null(rules) && "keep" %in% names(rules)) {
+        # Rules flagged by the native-factor check are excluded from correction.
+        rules <- rules[is.na(rules$keep) | rules$keep, , drop = FALSE]
+      }
       name <- .celladmix_clean_name(name %||% paste0(score_obj$name, "_clean"), "correction")
       out_dir <- file.path(self$run$paths$corrected_dir, name)
       corrected <- celladmix_correct(

@@ -34,8 +34,20 @@ class CellAdmixScore:
         adjust_p: bool = False,
         targets=None,
         max_rules: int | None = None,
+        native_check: bool = True,
+        native_median_thresh: float = 0.1,
+        native_expr_thresh: float = 0.05,
+        native_outlier_min_frac: float = 0.1,
+        neighbor_k: int = 15,
     ) -> pd.DataFrame:
-        """Return factor/target correction rules using the strongest source per factor."""
+        """Return factor/target correction rules using the strongest source per factor.
+
+        With ``native_check`` (the default), each rule is tested against
+        target cells that have no source-type cells among their nearest
+        neighbors; rules whose factor persists in those source-distant cells
+        are flagged ``keep=False`` (with the reason in ``native_check``) and
+        skipped by :meth:`correct`.
+        """
         if self.summary.empty:
             return pd.DataFrame(
                 columns=["factor", "source_cell_type", "target_cell_type", "p_value", "neg_log10_p", "rule_id"]
@@ -48,11 +60,27 @@ class CellAdmixScore:
         rules = rules.sort_values(["p_value", "factor", "target_cell_type"])
         if max_rules is not None:
             rules = rules.head(int(max_rules))
+        if native_check and not rules.empty:
+            from ._score_utils import apply_native_check
+
+            rules = apply_native_check(
+                rules,
+                self.fit,
+                median_thresh=native_median_thresh,
+                expr_thresh=native_expr_thresh,
+                outlier_min_frac=native_outlier_min_frac,
+                neighbor_k=neighbor_k,
+            )
         return rules
 
     def correct(self, rules: pd.DataFrame | None = None, *, p_thresh: float = 0.1, name: str | None = None):
-        """Apply score-derived correction rules to the parent fit."""
+        """Apply score-derived correction rules to the parent fit.
+
+        Rules flagged ``keep=False`` by the native-factor check are skipped.
+        """
         rules = self.rules(p_thresh=p_thresh) if rules is None else rules
+        if "keep" in getattr(rules, "columns", ()):
+            rules = rules[rules["keep"].fillna(True).astype(bool)]
         return self.fit.correct(rules, name=name or f"{self.method}_clean")
 
     def plot_heatmap(self, *, p_thresh: float = 0.1, adjust_p: bool = False, **kwargs):

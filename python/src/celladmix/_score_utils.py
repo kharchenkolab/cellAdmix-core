@@ -140,3 +140,135 @@ def _benjamini_hochberg(values: pd.Series) -> np.ndarray:
     ranked = np.minimum.accumulate(ranked[::-1])[::-1]
     out[order] = np.minimum(ranked, 1.0)
     return out
+
+def source_exposure_counts(cells: pd.DataFrame, annotation, *, neighbor_k: int = 15):
+    """Count annotated cell types among each cell's k nearest neighbor cells.
+
+    Returns ``(counts, types)`` where counts is an ``len(cells) x len(types)``
+    array aligned to the rows of ``cells``. Unannotated cells occupy space as
+    neighbors but contribute no counts.
+    """
+    from . import _core
+
+    types = sorted(map(str, pd.Series(annotation).dropna().unique()))
+    type_index = {t: i for i, t in enumerate(types)}
+    codes = [
+        type_index.get(str(annotation.get(str(c), None)), -1)
+        for c in cells["cell_id"].astype(str)
+    ]
+    raw = _core.cell_neighbor_type_counts(
+        cells["x"].astype(float).tolist(),
+        cells["y"].astype(float).tolist(),
+        codes,
+        len(types),
+        int(neighbor_k),
+    )
+    counts = np.asarray(raw["data"], dtype=float).reshape(raw["rows"], raw["cols"])
+    return counts, types
+
+
+def apply_native_check(
+    rules: pd.DataFrame,
+    fit,
+    *,
+    median_thresh: float = 0.1,
+    expr_thresh: float = 0.05,
+    outlier_min_frac: float = 0.1,
+    neighbor_k: int = 15,
+) -> pd.DataFrame:
+    """Flag likely-native factor/target rules using source-distant cells.
+
+    For each rule (factor f, target T, source S), target cells with zero
+    S-type cells among their nearest neighbors form the source-distant group.
+    The rule is flagged ``keep=False`` when the factor persists in that group
+    (median fraction above ``median_thresh``), when the distant expression is
+    a cross-type outlier, when there is no positive exposure gradient, or when
+    the check cannot be evaluated safely.
+    """
+    rules = rules.copy()
+    checks = {
+        "keep": [], "native_check": [], "native_distant_n": [],
+        "native_exposed_n": [], "native_distant_median": [],
+        "native_exposure_gradient": [], "native_distant_expr_frac": [],
+    }
+    if rules.empty:
+        for key, values in checks.items():
+            rules[key] = values
+        return rules
+
+    annotation = getattr(getattr(fit, "dataset", None), "annotation", None)
+    cells = fit.cell_factors()
+    if annotation is None or cells.empty:
+        raise ValueError("native_check requires an annotation and cell factors")
+    counts, types = source_exposure_counts(cells, annotation, neighbor_k=neighbor_k)
+    cell_types = np.array(
+        [str(annotation.get(str(c), None)) for c in cells["cell_id"].astype(str)]
+    )
+
+    def factor_column(f):
+        return cells[f"factor_{int(f)}_fraction"].to_numpy(dtype=float)
+
+    for _, rule in rules.iterrows():
+        target = str(rule["target_cell_type"])
+        source = rule["source_cell_type"]
+        record = dict(keep=True, native_check="pass", native_distant_n=np.nan,
+                      native_exposed_n=np.nan, native_distant_median=np.nan,
+                      native_exposure_gradient=np.nan, native_distant_expr_frac=np.nan)
+
+        def flag(reason):
+            record["keep"] = False
+            record["native_check"] = reason
+
+        if pd.isna(source) or str(source) not in types:
+            flag("source_not_in_annotation")
+        elif target not in types:
+            flag("target_not_in_annotation")
+        else:
+            source_col = types.index(str(source))
+            fractions = factor_column(rule["factor"])
+            distant_mask = counts[:, source_col] == 0
+            in_target = cell_types == target
+            distant = in_target & distant_mask
+            exposed = in_target & ~distant_mask
+            record["native_distant_n"] = int(distant.sum())
+            record["native_exposed_n"] = int(exposed.sum())
+            if distant.sum() <= 1:
+                flag("no_distant_cells")
+            elif exposed.sum() <= 1:
+                flag("no_exposed_cells")
+            else:
+                fr_d = fractions[distant]
+                fr_e = fractions[exposed]
+                record["native_distant_median"] = float(np.median(fr_d))
+                record["native_exposure_gradient"] = float(fr_e.mean() - fr_d.mean())
+                record["native_distant_expr_frac"] = float((fr_d > expr_thresh).mean())
+                if np.all(fr_d == 0) and np.all(fr_e == 0):
+                    flag("no_expression")
+                else:
+                    # Cross-type outlier test on source-distant expression rates.
+                    rates = []
+                    for cell_type in types:
+                        if cell_type == str(source):
+                            continue
+                        members = (cell_types == cell_type) & distant_mask
+                        rates.append(
+                            float((fractions[members] > expr_thresh).mean())
+                            if members.sum() > 1 else 0.0
+                        )
+                    rates = np.asarray(rates)
+                    q3 = np.quantile(rates, 0.75)
+                    upper = q3 + 1.5 * (q3 - np.quantile(rates, 0.25))
+                    target_rate = record["native_distant_expr_frac"]
+                    is_outlier = target_rate > upper and target_rate > outlier_min_frac
+                    if record["native_distant_median"] > median_thresh:
+                        flag("native_median")
+                    elif is_outlier:
+                        flag("native_outlier")
+                    elif record["native_exposure_gradient"] < 0:
+                        flag("no_gradient")
+        for key in checks:
+            checks[key].append(record[key])
+
+    for key, values in checks.items():
+        rules[key] = values
+    return rules
