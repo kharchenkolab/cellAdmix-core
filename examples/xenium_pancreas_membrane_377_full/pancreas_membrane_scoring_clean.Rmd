@@ -312,14 +312,13 @@ labels: native factors in blue, the top putative admixture factor in red, and
 other non-native factors in orange. Marker-gene molecules are shown with the
 same color coding, but are drawn slightly larger.
 
-For example-cell overlays, `fit$stain()` only resolves stain metadata such as
-the file path, pixel size, and coordinate offsets. Pixel data are read lazily as
-small crops around each selected cell.
+The DAPI/membrane stain backgrounds, cell boundaries, and cell-type shading
+are discovered automatically from the Xenium bundle; stain pixel data are read
+lazily as small crops around each selected cell. Pass `stains = NULL` or
+`shade_cell_types = FALSE` to simplify the panels, or plot specific cells with
+`plot_examples(cells = c(...))`.
 
 ```{r membrane-example-overlays, fig.width=10.0, fig.height=10.0}
-dapi_stain <- fit$stain("dapi")
-membrane_stain <- fit$stain("membrane")
-cell_boundaries <- fit$cell_boundaries()
 example_cells <- membrane_score$examples(rules = membrane_rules,
   score_annotation = membrane_annotation, cell_data = cell_spatial,
   targets = diagnostic_cell_types, n_per_target = 4)
@@ -328,8 +327,6 @@ for (cell_type in diagnostic_cell_types) {
   type_examples <- example_cells[example_cells$target_cell_type == cell_type, , drop = FALSE]
   print(membrane_score$plot_examples(type_examples,
     score_annotation = membrane_annotation, cell_data = cell_spatial,
-    boundaries = cell_boundaries,
-    stains = list(dapi = dapi_stain, membrane = membrane_stain),
     markers = unique(unlist(source_marker_sets)), ncol = 2))
 }
 ```

@@ -142,6 +142,19 @@ score$plot_pairs()
 rules <- score$rules(p_thresh = 0.1)
 ```
 
+Example-cell overlays show molecule-level evidence around selected target
+cells. For Xenium-backed fits, the DAPI/membrane stain background, cell
+boundaries, and cell-type shading are discovered automatically:
+
+```r
+score$plot_examples()                              # auto-selected cells
+score$plot_examples(cells = c("cell-1", "cell-2")) # specific cells
+score$plot_example("cell-1", stains = NULL)        # one cell, no background
+```
+
+Pass `shade_cell_types = FALSE` to drop the cell-type shading, or explicit
+`stains` / `boundaries` / `cell_types` arguments to override discovery.
+
 See [scoring_methods.md](scoring_methods.md) for method definitions and tradeoffs.
 
 ## Correction
