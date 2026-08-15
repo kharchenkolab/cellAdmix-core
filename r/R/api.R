@@ -1161,16 +1161,11 @@ celladmix_plot_nmf_stability <- function(
       ifelse(y >= 0.6, "high", ifelse(y >= min_stability, "moderate", "low")),
       levels = c("high", "moderate", "low")
     )
-    plot_df$point_size <- if (is.finite(max_importance) && max_importance > 0) {
-      sqrt(pmax(plot_df$importance, 0) / max_importance)
-    } else {
-      1
-    }
     p <- ggplot2::ggplot(plot_df, ggplot2::aes(
       x = .data$importance_percent,
       y = .data$stability_plot,
       color = .data$stability_class,
-      size = .data$point_size,
+      size = .data$importance_percent,
       label = .data$factor_label
     )) +
       ggplot2::geom_hline(yintercept = min_stability, linetype = "dashed",
@@ -1180,7 +1175,7 @@ celladmix_plot_nmf_stability <- function(
       ggplot2::geom_point(alpha = 0.9) +
       ggplot2::scale_color_manual(values = c(high = "#1B9E77",
         moderate = "#7570B3", low = "#D95F02")) +
-      ggplot2::scale_size_continuous(range = c(1.8, 5.0), guide = "none") +
+      ggplot2::scale_size_area(max_size = 5.0, name = "Importance (%)") +
       ggplot2::labs(
         title = "NMF factor stability vs. importance",
         subtitle = subtitle,
@@ -1210,6 +1205,17 @@ celladmix_plot_nmf_stability <- function(
     ylim = c(max(-0.1, min(y, na.rm = TRUE) - 0.05), 1.02))
   graphics::abline(h = min_stability, lty = 2, col = "grey55")
   graphics::abline(h = 0.6, lty = 3, col = "grey70")
+  if (is.finite(max_importance) && max_importance > 0) {
+    key_importance <- pretty(c(0, 100 * max_importance), n = 3)
+    key_importance <- key_importance[key_importance > 0 &
+      key_importance <= 100 * max_importance]
+    if (length(key_importance)) {
+      key_cex <- 0.8 + 3.0 * sqrt(key_importance / (100 * max_importance))
+      graphics::legend("bottomright", legend = sprintf("%g%%", key_importance),
+        pt.cex = key_cex, pch = 19, col = "grey60", bty = "n",
+        title = "Importance", cex = 0.7)
+    }
+  }
   if (label) {
     graphics::text(x, y, labels = df$factor_label, pos = 3, cex = 0.72)
   }

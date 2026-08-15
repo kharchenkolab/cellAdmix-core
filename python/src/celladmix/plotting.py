@@ -64,10 +64,28 @@ def plot_stability(fit, *, min_stability: float = 0.3, label: bool = True, ax=No
     x = 100 * np.maximum(importance, 0)
     y = np.clip(stability, -1, 1)
     colors = np.where(y >= 0.6, "#1B9E77", np.where(y >= min_stability, "#7570B3", "#D95F02"))
-    sizes = 60 + 240 * np.sqrt(np.maximum(importance, 0) / max(np.nanmax(importance), np.finfo(float).eps))
+    max_importance = max(np.nanmax(importance), np.finfo(float).eps)
+    sizes = 60 + 240 * np.sqrt(np.maximum(importance, 0) / max_importance)
     ax.axhline(min_stability, linestyle="--", color="#8c8c8c", linewidth=0.8)
     ax.axhline(0.6, linestyle=":", color="#b3b3b3", linewidth=0.8)
-    ax.scatter(x, y, s=sizes, c=colors, alpha=0.9)
+    scatter = ax.scatter(x, y, s=sizes, c=colors, alpha=0.9)
+    # Dot size encodes factor importance; invert the size formula for the key.
+    handles, size_labels = scatter.legend_elements(
+        prop="sizes",
+        num=3,
+        func=lambda s: 100 * max_importance * np.square(np.maximum(s - 60, 0) / 240),
+        fmt="{x:.1f}%",
+    )
+    for handle in handles:
+        handle.set_markerfacecolor("#8c8c8c")
+        handle.set_markeredgecolor("none")
+    size_legend = ax.legend(
+        handles, size_labels, loc="lower right", frameon=True,
+        fontsize=6.5, title="Importance", title_fontsize=7,
+        labelspacing=1.1, borderpad=0.9)
+    size_legend.get_frame().set_facecolor("white")
+    size_legend.get_frame().set_alpha(0.55)
+    size_legend.get_frame().set_linewidth(0)
     if label:
         for i, (xi, yi) in enumerate(zip(x, y), start=1):
             if np.isfinite(xi) and np.isfinite(yi):
