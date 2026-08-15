@@ -317,10 +317,11 @@ labels: native factors in blue, the top putative admixture factor in red, and
 other non-native factors in orange. Marker-gene molecules are shown with the
 same color coding, but are drawn slightly larger.
 
-The DAPI/membrane stain backgrounds, cell boundaries, and cell-type shading
+The DAPI/membrane stain backgrounds, cell boundaries, and cell-type contour
+coloring
 are discovered automatically from the Xenium bundle; stain pixel data are read
 lazily as small crops around each selected cell. Pass `stains = NULL` or
-`shade_cell_types = FALSE` to simplify the panels, or plot specific cells with
+`color_cell_types = FALSE` to simplify the panels, or plot specific cells with
 `plot_examples(cells = c(...))`.
 
 ```{r membrane-example-overlays, fig.width=10.0, fig.height=10.0}

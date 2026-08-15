@@ -414,7 +414,7 @@ def prepare_cell_example(
 
     Stain backgrounds and cell boundaries are discovered automatically for
     Xenium-backed fits (``stains=None`` disables backgrounds); ``cell_types``
-    labels neighbor polygons for cell-type shading and defaults to the
+    labels neighbor contours for cell-type coloring and defaults to the
     dataset's annotation.
     """
     stains = resolve_example_stains(fit, stains)
@@ -517,8 +517,8 @@ def plot_cell_example(
     marker_size_multiplier: float = 1.1,
     non_marker_size_multiplier: float = 0.9,
     contour_color: str = "#e85d04",
-    shade_cell_types: bool = True,
-    cell_type_alpha: float = 0.14,
+    color_cell_types: bool = True,
+    cell_type_linewidth: float = 0.9,
 ):
     """Render one prepared example-cell overlay."""
     import matplotlib.pyplot as plt
@@ -531,23 +531,27 @@ def plot_cell_example(
     contours = example.get("contours", pd.DataFrame())
     type_handles = []
     if not contours.empty:
-        if shade_cell_types and "cell_type" in contours.columns and contours["cell_type"].notna().any():
-            from matplotlib import colormaps
-            from matplotlib.patches import Patch
-
-            shaded = contours[contours["cell_type"].notna()]
-            types = sorted(shaded["cell_type"].astype(str).unique())
-            cmap = colormaps["tab20"]
-            type_colors = {t: cmap(i % 20) for i, t in enumerate(types)}
-            for (_, cell_type), group in shaded.groupby(["cell_id", "cell_type"], sort=False):
-                ax.fill(group["x"], group["y"], color=type_colors[str(cell_type)],
-                        alpha=cell_type_alpha, linewidth=0)
-            type_handles = [
-                Patch(facecolor=type_colors[t], alpha=0.55, label=t) for t in types
-            ]
         nearby = contours[contours["cell_id"].astype(str) != example["target_cell"]]
         target = contours[contours["cell_id"].astype(str) == example["target_cell"]]
-        for _, group in nearby.groupby("cell_id", sort=False):
+        typed = nearby.iloc[0:0]
+        if color_cell_types and "cell_type" in contours.columns and contours["cell_type"].notna().any():
+            from matplotlib import colormaps
+            from matplotlib.lines import Line2D
+
+            # Only contours are colored by cell type; filled polygons would
+            # occlude the stain background.
+            typed = nearby[nearby["cell_type"].notna()]
+            types = sorted(typed["cell_type"].astype(str).unique())
+            cmap = colormaps["tab20"]
+            type_colors = {t: cmap(i % 20) for i, t in enumerate(types)}
+            for (cell_id, cell_type), group in typed.groupby(["cell_id", "cell_type"], sort=False):
+                ax.plot(group["x"], group["y"], color=type_colors[str(cell_type)],
+                        linewidth=cell_type_linewidth, alpha=0.95)
+            type_handles = [
+                Line2D([0], [0], color=type_colors[t], linewidth=2, label=t) for t in types
+            ]
+        plain = nearby if typed.empty else nearby[~nearby["cell_id"].isin(typed["cell_id"])]
+        for _, group in plain.groupby("cell_id", sort=False):
             ax.plot(group["x"], group["y"], color="white", linewidth=0.35, alpha=0.35)
         for _, group in target.groupby("cell_id", sort=False):
             ax.plot(group["x"], group["y"], color="white", linewidth=1.2, alpha=0.95)

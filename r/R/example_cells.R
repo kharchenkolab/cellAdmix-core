@@ -535,7 +535,7 @@ celladmix_select_example_cells <- function(
 #'   factors from source calls.
 #' @param cell_data Optional cell-level data frame with coordinates and factor
 #'   summaries. Defaults to `fit$cell_factors()`.
-#' @param boundaries Cell boundaries used for contours and cell-type shading.
+#' @param boundaries Cell boundaries used for contours and cell-type coloring.
 #'   The default `"auto"` discovers the standard Xenium boundary file next to
 #'   the source bundle (`NULL` when unavailable). Pass a boundary data frame or
 #'   path to override, or `NULL` to fall back to molecule hulls.
@@ -671,9 +671,10 @@ celladmix_prepare_cell_example <- function(
 #' @param example Prepared example from [celladmix_prepare_cell_example()], or a
 #'   one-row example table when `fit` is supplied.
 #' @param fit Optional [CellAdmixFit] used to prepare an unprepared example.
-#' @param shade_cell_types Whether to shade cell polygons by cell type when
-#'   boundaries and cell-type labels are available.
-#' @param cell_type_alpha Fill alpha for cell-type shading.
+#' @param color_cell_types Whether to color nearby cell contours by cell type
+#'   when boundaries and cell-type labels are available. Only the contour is
+#'   colored so that stain backgrounds stay visible.
+#' @param cell_type_linewidth Line width of the cell-type contours.
 #' @param score_annotation,cell_data,boundaries,stains,cell_types,markers,padding,min_side,max_pixels
 #'   Passed to [celladmix_prepare_cell_example()] when `fit` is supplied.
 #' @param outside_size,inside_size Molecule point sizes outside and inside the
@@ -702,8 +703,8 @@ celladmix_plot_cell_example <- function(
     marker_size_multiplier = 1.1,
     non_marker_size_multiplier = 0.9,
     contour_color = "#e85d04",
-    shade_cell_types = TRUE,
-    cell_type_alpha = 0.14,
+    color_cell_types = TRUE,
+    cell_type_linewidth = 0.55,
     title = NULL,
     subtitle = NULL
   ) {
@@ -726,10 +727,17 @@ celladmix_plot_cell_example <- function(
   contours <- example$contours
   target_contours <- contours[contours$role == "Target cell contour", , drop = FALSE]
   nearby_contours <- contours[contours$role == "Nearby cell contours", , drop = FALSE]
-  shaded <- if (isTRUE(shade_cell_types) && "cell_type" %in% names(contours)) {
-    contours[!is.na(contours$cell_type), , drop = FALSE]
+  target_cell <- example$target_cell
+  typed <- if (isTRUE(color_cell_types) && "cell_type" %in% names(contours)) {
+    contours[!is.na(contours$cell_type) & contours$cell_id != target_cell, ,
+      drop = FALSE]
   } else {
     contours[0, , drop = FALSE]
+  }
+  plain_nearby <- if (nrow(typed)) {
+    nearby_contours[!(nearby_contours$cell_id %in% typed$cell_id), , drop = FALSE]
+  } else {
+    nearby_contours
   }
   role_cols <- stats::setNames(c("#2b6cb0", "#c92a2a", "#f08c00"),
     example$role_levels)
@@ -745,16 +753,19 @@ celladmix_plot_cell_example <- function(
     p <- p + ggplot2::annotation_raster(example$background,
       xmin = bbox[[1]], xmax = bbox[[2]], ymin = bbox[[3]], ymax = bbox[[4]])
   }
-  if (nrow(shaded)) {
-    p <- p + ggplot2::geom_polygon(data = shaded,
-      ggplot2::aes(x, y, group = cell_id, fill = cell_type),
-      alpha = cell_type_alpha, color = NA) +
+  if (nrow(typed)) {
+    # Only contours are colored by cell type; filled polygons would occlude
+    # the stain background.
+    p <- p + ggplot2::geom_polygon(data = typed,
+      ggplot2::aes(x, y, group = cell_id, fill = cell_type,
+        colour = ggplot2::after_scale(fill)),
+      alpha = 0, linewidth = cell_type_linewidth) +
       ggplot2::guides(fill = ggplot2::guide_legend(
-        override.aes = list(alpha = 0.55))) +
+        override.aes = list(alpha = 1, linewidth = 0))) +
       ggplot2::labs(fill = "Cell type")
   }
   p +
-    ggplot2::geom_path(data = nearby_contours,
+    ggplot2::geom_path(data = plain_nearby,
       ggplot2::aes(x, y, group = cell_id), color = "white",
       linewidth = 0.35, alpha = 0.35) +
     ggplot2::geom_path(data = target_contours,
