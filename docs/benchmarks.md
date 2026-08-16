@@ -21,60 +21,49 @@ sensitivity/specificity dial. The harness lives in
 
 ## The neighbor benchmark
 
-For an ordered pair of cell types — a *source* S and a *target* T — every
-T cell is characterized by its *exposure*: the number of S cells among its
-15 nearest cells — the same adjacency principle that underlies the
-admixture-probability diagnostics of Mitchel et al. (2025) and the
-pipeline's native-factor check. T cells are stratified into exposure bins
-(0, 1, 2, 3+); the zero-exposure bin is the clean reference — whatever those
-cells contain, a T cell contains on its own.
+For an ordered pair of cell types — a *source* S and a *target* T — each
+T cell's *exposure* is the number of S cells among its 15 nearest cells
+(the adjacency principle of Mitchel et al., 2025, and of the pipeline's
+native-factor check). T cells are stratified into exposure bins
+(0, 1, 2, 3+); the zero-exposure bin is the internal reference.
 
-For each pair we select a panel of up to 20 *source markers*: genes whose
-top expresser is S, ranked by the ratio of their expression rate in S to
-their rate in zero-exposure T cells. Selection is rank-based on purpose —
-an absolute baseline cutoff would itself be skewed by the contamination
-being measured. Within the panel, the *strict tier* holds genes essentially
-absent from reference T cells (baseline under 5% of the source level);
-their excess in exposed T cells can only be leaked material.
+For each cell-type pair we select up to 20 *source markers*: genes whose
+top expresser is S, ranked by their expression in S relative to
+zero-exposure T cells — rank-based, since an absolute baseline cutoff
+would itself be skewed by contamination. The *strict tier* of the panel
+holds genes essentially absent from reference T cells (baseline under 5%
+of the source level), whose excess in exposed cells can only be leaked
+material.
 
-Counts are pooled over the panel: the measured unit is the panel's total
-molecule count, not individual markers. For exposure bin $B$, let $m_B$ be
-the number of panel-gene molecules and $M_B$ the total number of molecules
-over all T cells in that bin. The measurement treats
-$m_B \sim \mathrm{Poisson}(\rho_B M_B)$ — a saturated rate model with one
-rate per bin and no assumed functional form for the exposure dependence.
-The reference rate $\hat\rho_0$ is generally nonzero (Figure 1a): it
-contains whatever low native expression the strict-tier filter admitted,
-plus any contamination that reaches even unexposed cells (ambient spread).
-The pair's estimated leakage counts only the exceedance above it,
+Counts are pooled over the panel. With $m_B$ the panel-molecule count and
+$M_B$ the total molecule count of the T cells in bin $B$, we model
+$m_B \sim \mathrm{Poisson}(\rho_B M_B)$ — one free rate per bin, no
+assumed form for the exposure dependence, which is often non-linear
+(Figure 1a). The estimated leakage is the exceedance over the reference
+rate,
 
 $$L = \textstyle\sum_{B>0} \max(\hat\rho_B - \hat\rho_0,\, 0)\, M_B,$$
 
-i.e. the gap between the observed curve and the dotted baseline in
-Figure 1a, converted from rates back to molecules via each bin's total
-$M_B$. Because the baseline itself may contain contamination, $L$ is a
-conservative (lower-bound) estimate of the pair's admixed molecules. Pairs
-enter the benchmark when a one-sided Poisson test of the pooled exposed
-counts against the $\hat\rho_0$ expectation survives Benjamini–Hochberg
-correction across candidate pairs ($q < 0.01$) and $L \geq 200$
-molecules — 39 of 42 candidate cell-type pairs on the pancreas dataset,
-13 on the breast crop, 27 on NSCLC, with no manual curation.
+the gap between the observed curve and the dotted baseline in Figure 1a,
+converted to molecule counts via the bin totals. Note that $\hat\rho_0$
+is generally nonzero — residual native expression plus ambient
+contamination reaching even unexposed cells — so $L$ is a conservative,
+lower-bound estimate. Pairs enter the benchmark when the exposed counts
+exceed the $\hat\rho_0$ expectation by a one-sided Poisson test
+(Benjamini–Hochberg $q < 0.01$) with $L \geq 200$: 39 of 42 candidate
+pairs on pancreas, 13 on the breast crop, 27 on NSCLC, with no manual
+curation.
 
-A correction is scored by recomputing the exceedance on the corrected
-counts — keeping the pre-correction offsets $M_B$, so that removal
-registers as removal rather than being hidden by renormalization — and
-taking the fraction eliminated:
-$\mathrm{sensitivity} = 1 - L_{\mathrm{after}} / L_{\mathrm{before}}$.
-Two design details matter. The corrected exceedance is measured against the
-*corrected* zero-exposure rate, so uniformly deleting a gene everywhere
-earns full credit for that gene's leakage (it does eliminate the exposure
-dependence) but is charged separately by the specificity metrics below.
-And because the exceedance is bin-wise rather than a fitted slope, monotone
-but non-linear exposure responses (Figure 1a) are handled without
-approximation. The profile across all detected cell-type pairs for a standard single-fit cleanup
-(Figure 1b) shows effectiveness to be highly heterogeneous across pairs,
-with the largest pair by leakage mass (exocrine → ductal, over 200,000
-molecules) missed entirely — a coverage failure invisible to aggregate
+A correction is scored by recomputing the exceedance on corrected counts,
+keeping the pre-correction offsets $M_B$ so removal is not hidden by
+renormalization: $\mathrm{sensitivity} = 1 - L_{\mathrm{after}} /
+L_{\mathrm{before}}$ (Figure 1a, blue versus red). The corrected
+exceedance is measured against the *corrected* reference rate, so deleting
+a gene outright earns full credit here — and is charged instead by the
+specificity metrics below. Applied across all detected pairs of a standard
+single-fit cleanup (Figure 1b), the score is highly heterogeneous, and the
+largest pair by leakage mass (exocrine → ductal, over 200,000 molecules)
+is missed entirely — a coverage failure invisible to aggregate
 diagnostics.
 
 ![Figure 1](figures/benchmark_fig1.png)
