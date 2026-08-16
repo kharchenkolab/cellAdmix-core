@@ -118,16 +118,26 @@ for (variant in c("ls_nmf", "invsqrt_kl")) {
         mcount(counts_after, native_markers[[d$T_type]], d$T_cells),
         totals_before[d$T_cells], d$bins)
     }, 0)
+    # pooled FPR estimate: removal rate of native-marker molecules within
+    # their own cell type, pooled over all types (these molecules are
+    # near-surely genuine, so removals are false positives)
+    fp_before <- 0; fp_after <- 0
+    for (t in types) {
+      tc <- names(cell_types)[!is.na(cell_types) & cell_types == t]
+      fp_before <- fp_before + sum(mcount(counts_before, native_markers[[t]], tc))
+      fp_after <- fp_after + sum(mcount(counts_after, native_markers[[t]], tc))
+    }
+    fpr <- 1 - fp_after / max(fp_before, 1)
     ex <- vapply(pair_defs, function(d) d$excess, 0)
     exs <- vapply(pair_defs, function(d) d$excess_strict, 0)
     oks <- !is.na(pow_s)
     message(sprintf(
-      "%s %s %s/%s: overall=%.3f strict=%.3f pairs>=0.9: %d/%d identity med=%.3f min=%.3f",
+      "%s %s %s/%s: sens_strict=%.3f sens_broad=%.3f fpr_native=%.4f spec_worst_pair=%.3f pairs>=0.9: %d/%d",
       toupper(tag), dataset, variant, method,
-      sum(pow * ex) / sum(ex),
       sum(pow_s[oks] * exs[oks]) / sum(exs[oks]),
-      sum(pow >= 0.9, na.rm = TRUE), length(pow),
-      stats::median(saf, na.rm = TRUE), min(saf, na.rm = TRUE)))
+      sum(pow * ex) / sum(ex),
+      fpr, min(saf, na.rm = TRUE),
+      sum(pow >= 0.9, na.rm = TRUE), length(pow)))
    }
   }
 }
