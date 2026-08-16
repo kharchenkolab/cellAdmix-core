@@ -1,63 +1,92 @@
 # Benchmarking admixture cleanup
 
-Molecule-level admixture correction faces a basic evaluation problem: no one
-can say, molecule by molecule, which transcripts truly leaked between
-neighboring cells. This report describes a benchmark that lets the tissue
-itself supply the answer at the population level, applies it to cellAdmix's
-factorization variants and scoring methods across three datasets, quantifies
-the run-to-run stochasticity of the correction pipeline, and evaluates
-ensemble corrections that turn that stochasticity from a liability into a
-calibration dial. The benchmark harness lives in `analysis/cleanup_benchmark/`.
+Molecule-level admixture correction faces a basic evaluation problem: no
+ground truth identifies which individual transcripts leaked between
+neighboring cells. The benchmark described here exploits the defining
+property of segmentation-driven admixture — that it is spatially structured.
+Contamination of a cell by a given source cell type requires physical
+adjacency to cells of that type, so the amount of foreign material scales
+with a cell's exposure to source-type neighbors, while cells with no such
+neighbors constitute an internal negative control. Any annotated dataset
+thereby carries its own population-level ground truth. The same principle
+underlies earlier cellAdmix diagnostics — the Bayesian admixture-probability
+score built on cell-type adjacency, and the false-positive check based on
+source-distant cells (Mitchel et al., 2025) — but those are per-cell or
+per-rule diagnostics; here the principle is developed into a quantitative
+benchmark of correction methods: per-pair estimates of the number of leaked
+molecules, before/after scoring of corrections, and a translation into
+estimated sensitivity and specificity. We apply it to cellAdmix's
+factorization variants and scoring methods across three datasets, quantify
+the run-to-run stochasticity of the correction pipeline, and evaluate
+ensemble corrections that turn that stochasticity into a calibration dial.
+The harness lives in `analysis/cleanup_benchmark/`.
 
 ## The neighbor benchmark
 
-Leakage is a neighborhood phenomenon: a cell can only pick up stray molecules
-from cells physically adjacent to it. For an ordered pair of cell types —
-a *source* S and a *target* T — every T cell is characterized by its
-*exposure*: the number of S cells among its 15 nearest cells. T cells with
-zero exposure form a clean reference; whatever they contain, a T cell contains
-on its own.
+For an ordered pair of cell types — a *source* S and a *target* T — every
+T cell is characterized by its *exposure*: the number of S cells among its
+15 nearest cells (the same neighborhood definition used by the pipeline's
+native-factor check). T cells are stratified into exposure bins
+(0, 1, 2, 3+); the zero-exposure bin is the clean reference — whatever those
+cells contain, a T cell contains on its own.
 
-For each pair we select a panel of *source markers*: genes whose top
-expresser is S, ranked by contrast against the zero-exposure T baseline
-(rank-based selection, since an absolute baseline cutoff would itself be
-skewed by contamination). Within the panel, the *strict tier* holds genes
-essentially absent from reference T cells (baseline under 5% of the source
-level); their excess in exposed T cells can only be leaked material. Before
-correction, the pooled marker rate climbs steadily with exposure
-(Figure 1, red); the climb, converted to molecule counts above the
-zero-exposure baseline, is the pair's estimated leakage. Pairs enter the
-benchmark when this excess is statistically solid (Poisson test,
-Benjamini-Hochberg across pairs) and exceeds 200 molecules — 39 of 42
-candidate pairs on the pancreas dataset, 13 on the breast crop, 27 on NSCLC,
-with no manual curation.
+For each pair we select a panel of up to 20 *source markers*: genes whose
+top expresser is S, ranked by the ratio of their expression rate in S to
+their rate in zero-exposure T cells. Selection is rank-based on purpose —
+an absolute baseline cutoff would itself be skewed by the contamination
+being measured. Within the panel, the *strict tier* holds genes essentially
+absent from reference T cells (baseline under 5% of the source level);
+their excess in exposed T cells can only be leaked material.
 
-A correction is then scored by how much of the excess it eliminated
-(Figure 1, blue): a value of 1 means exposed T cells now look exactly like
-unexposed ones. Because the "after" rate is compared to the corrected
-zero-exposure baseline, indiscriminate deletion cannot masquerade as cleanup
-of the exposure gradient. The bottom panel of Figure 1 shows the
-resulting per-pair profile for a standard single-fit cleanup (ls-NMF,
-membrane scoring): effectiveness is highly heterogeneous across pairs, and
-the largest pair by leakage mass (exocrine → ductal, over 200,000 molecules)
-is missed entirely — a coverage failure invisible to aggregate diagnostics.
+The measurement treats the pooled marker count in each exposure bin as a
+Poisson rate: m_B ∼ Poisson(ρ_B · M_B), where m_B is the number of panel
+molecules and M_B the total number of molecules over all T cells in bin B
+(the offset). This is a saturated rate model over bins — one rate per bin,
+with no assumed functional form for the exposure dependence. The pair's
+estimated leakage is the exceedance over the reference rate,
+
+L = Σ_{B>0} max(ρ̂_B − ρ̂_0, 0) · M_B ,
+
+i.e. the number of panel molecules in exposed cells beyond what the
+zero-exposure rate predicts (Figure 1a, the gap between the red curve and
+the dotted baseline). Pairs enter the benchmark when a one-sided Poisson
+test of the pooled exposed counts against the ρ̂_0 expectation survives
+Benjamini–Hochberg correction across candidate pairs (q < 0.01) and
+L ≥ 200 molecules — 39 of 42 candidate pairs on the pancreas dataset, 13 on
+the breast crop, 27 on NSCLC, with no manual curation.
+
+A correction is scored by recomputing the exceedance on the corrected
+counts — keeping the pre-correction offsets M_B, so that removal registers
+as removal rather than being hidden by renormalization — and taking the
+fraction eliminated: sensitivity = 1 − L_after / L_before. Two design
+details matter. The corrected exceedance is measured against the
+*corrected* zero-exposure rate, so uniformly deleting a gene everywhere
+earns full credit for that gene's leakage (it does eliminate the exposure
+dependence) but is charged separately by the specificity metrics below.
+And because the exceedance is bin-wise rather than a fitted slope, monotone
+but non-linear exposure responses (Figure 1a) are handled without
+approximation. The per-pair profile for a standard single-fit cleanup
+(Figure 1b) shows effectiveness to be highly heterogeneous across pairs,
+with the largest pair by leakage mass (exocrine → ductal, over 200,000
+molecules) missed entirely — a coverage failure invisible to aggregate
+diagnostics.
 
 ![Figure 1](figures/benchmark_fig1.png)
 
-**Figure 1. The neighbor benchmark.** *Top:* pooled strict-tier
+**Figure 1. The neighbor benchmark.** **(a)** Pooled strict-tier
 source-marker rates in target cells, stratified by the number of source-type
 neighbors, before (red, dashed) and after (blue) a standard cleanup (bare
 ls-NMF fit, membrane scoring, pancreas dataset); the dotted line marks the
-zero-exposure baseline. The rise with exposure is contamination made
-visible; cleanup quality is the degree to which the blue curve flattens to
-baseline — compare the near-complete flattening of endocrine → endothelial
-with the untouched fibroblast → immune pair, where the curves coincide.
-*Bottom:* the same score for every detected pair (bars), with each pair's
-estimated leaked-molecule count overlaid (orange, log scale). Take-home:
-cleanup effectiveness is measurable without molecule-level ground truth, and
-a standard single-fit correction is highly uneven across cell-type pairs —
-including a near-zero score on one of the largest leakage pairs
-(exocrine → ductal).
+zero-exposure reference rate ρ̂_0. The rise with exposure is contamination
+made visible; cleanup quality is the degree to which the blue curve
+flattens to the reference — compare the near-complete flattening of
+endocrine → endothelial with the untouched fibroblast → immune pair, where
+the curves coincide. **(b)** Estimated sensitivity for every detected pair
+(bars), with each pair's estimated leaked-molecule count L overlaid
+(orange, log scale). Take-home: cleanup effectiveness is measurable without
+molecule-level ground truth, and a standard single-fit correction is highly
+uneven across cell-type pairs — including a near-zero score on one of the
+largest leakage pairs (exocrine → ductal).
 
 ## From excess removal to sensitivity and specificity
 
@@ -111,12 +140,13 @@ variants fail at different stages rather than one being uniformly better.
 ![Figure 2](figures/benchmark_fig2.png)
 
 **Figure 2. Correction stochasticity across random seeds (pancreas,
-membrane scoring).** *Left:* total molecules removed by ten reruns of the
-identical pipeline. *Middle:* pairwise overlap (Jaccard) of the removal
-sets, invsqrt KL-NMF. *Right:* per-pair estimated sensitivity across seeds.
-Take-home: the single-fit correction is effectively a lottery — comparable
-total removal, but only about half the individual molecules agree between
-runs, and individual pairs flip between fully cleaned and untouched.
+membrane scoring).** **(a)** Total molecules removed by ten reruns of the
+identical pipeline differing only in random seed. **(b)** Pairwise overlap
+(Jaccard index) of the removal sets, invsqrt KL-NMF. **(c)** Per-pair
+estimated sensitivity across seeds. Take-home: the single-fit correction is
+effectively a lottery — comparable total removal, but only about half the
+individual molecules agree between any two runs, and individual pairs flip
+between fully cleaned and untouched.
 
 ## Ensemble corrections by molecule voting
 
@@ -182,3 +212,9 @@ cellAdmix it yields three conclusions:
    stability diagnostic), with the vote threshold defaulting to ~30% of
    restarts and exposed as a user-facing dial; retain the per-fit
    native-factor check within each contributing run. RECOMMEND_DETAIL_PLACEHOLDER
+
+## References
+
+Mitchel J., Gao T., Cole E., Petukhov V., Kharchenko P.V. Impact of
+Segmentation Errors in Analysis of Spatial Transcriptomics Data. bioRxiv
+2025.01.02.631135 (2025).

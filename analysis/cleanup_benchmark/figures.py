@@ -30,6 +30,9 @@ fig = plt.figure(figsize=(11, 6.2))
 gs = fig.add_gridspec(2, 4, height_ratios=[1, 1.5], hspace=0.45)
 for i, pair in enumerate(show_pairs):
     ax = fig.add_subplot(gs[0, i])
+    if i == 0:
+        ax.annotate('a', (-0.32, 1.12), xycoords='axes fraction',
+            fontsize=13, fontweight='bold')
     d = bins[bins['pair'] == pair].set_index('bin').reindex(BIN_ORDER)
     x = np.arange(4)
     ax.plot(x, d['rate_after'] * 1e3, 'o-', color='#2980b9', label='after cleanup')
@@ -44,6 +47,8 @@ for i, pair in enumerate(show_pairs):
         ax.legend(frameon=False, fontsize=8)
 
 ax = fig.add_subplot(gs[1, :])
+ax.annotate('b', (-0.065, 1.05), xycoords='axes fraction',
+    fontsize=13, fontweight='bold')
 b = bare.dropna(subset=['power_strict']).sort_values('power_strict', ascending=False)
 x = np.arange(len(b))
 bars = ax.bar(x, b['power_strict'], color='#34495e', alpha=0.85)
@@ -65,6 +70,7 @@ ov = json.load(open(f'{R}/pancreas_removal_overlap.json'))
 fig, axes = plt.subplots(1, 3, figsize=(11, 3.1),
     gridspec_kw={'width_ratios': [1, 1, 1.4]})
 ax = axes[0]
+ax.annotate('a', (-0.28, 1.06), xycoords='axes fraction', fontsize=13, fontweight='bold')
 x = np.arange(1, 11)
 ax.bar(x - 0.2, np.array(ov['invsqrt_kl']['n_removed']) / 1e6, width=0.4,
     color='#8e44ad', label='invsqrt KL-NMF')
@@ -76,6 +82,7 @@ ax.legend(frameon=False, fontsize=8)
 ax.set_title('total removal by seed')
 
 ax = axes[1]
+ax.annotate('b', (-0.28, 1.06), xycoords='axes fraction', fontsize=13, fontweight='bold')
 J = np.array(ov['invsqrt_kl']['jaccard'])
 im = ax.imshow(J, vmin=0, vmax=1, cmap='viridis')
 ax.set_xticks(range(10), range(1, 11), fontsize=7)
@@ -85,6 +92,7 @@ ax.set_title('removal-set overlap (Jaccard),\ninvsqrt KL-NMF')
 plt.colorbar(im, ax=ax, fraction=0.045)
 
 ax = axes[2]
+ax.annotate('c', (-0.55, 1.06), xycoords='axes fraction', fontsize=13, fontweight='bold')
 pp = pairs_df[(pairs_df['variant'] == 'invsqrt_kl') & (pairs_df['method'] == 'membrane')
               & pairs_df['arm'].str.match(r'invsqrt_kl/membrane/s\d')]
 piv = pp.pivot_table(index='pair', columns='seed', values='power_strict')
