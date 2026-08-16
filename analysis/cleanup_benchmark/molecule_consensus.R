@@ -9,7 +9,6 @@
 .libPaths(c(Sys.getenv("CELLADMIX_R_LIB", "/tmp/celladmix_r_lib"), .libPaths()))
 suppressMessages(library(cellAdmixCore))
 suppressMessages(library(Matrix))
-suppressMessages(library(arrow))
 bench_dir <- normalizePath(Sys.getenv("BENCH_DIR", "analysis/cleanup_benchmark"))
 source(file.path(bench_dir, "metrics.R"))
 
@@ -85,54 +84,23 @@ for (S in types) for (T_type in setdiff(types, S)) {
 }
 message("pairs: ", length(pair_defs))
 
-# molecule -> (gene, cell) map from one fit run (identical across fits)
-run_dir1 <- file.path(cfg$out, "runs", "bench_seed1_ls_nmf")
-mol <- as.data.frame(read_parquet(file.path(run_dir1, "molecules.parquet"),
-  col_select = c("obs_id", "gene_idx", "cell_idx")))
-run_meta <- jsonlite::fromJSON(file.path(run_dir1, "run.json"))
-genes_vec <- run_meta$genes
-cells_tab <- as.data.frame(read_parquet(file.path(run_dir1, "cells.parquet"),
-  col_select = c("cell_idx", "cell_id")))
-cell_id_by_idx <- setNames(as.character(cells_tab$cell_id), cells_tab$cell_idx)
-assigned <- mol$cell_idx >= 0
-max_obs <- max(mol$obs_id) + 1L
-
+# consensus-removal deltas precomputed by consensus_delta.py
 for (variant in c("ls_nmf", "invsqrt_kl")) {
   for (method in cfg$methods) {
-    votes <- integer(max_obs)
-    n_seeds <- 0L
-    for (s in 1:3) {
-      cdir <- file.path(cfg$out, "runs", sprintf("bench_seed%d_%s", s, variant),
-        "corrected", sprintf("cmp_%s_%s_s%d", method, variant, s))
-      if (!dir.exists(cdir)) { message("missing: ", cdir); next }
-      kept <- read_parquet(file.path(cdir, "molecules.parquet"),
-        col_select = "obs_id")$obs_id
-      removed <- rep(TRUE, max_obs)
-      removed[kept + 1L] <- FALSE
-      removed[mol$obs_id[!assigned] + 1L] <- FALSE
-      votes <- votes + as.integer(removed)
-      n_seeds <- n_seeds + 1L
-    }
-    if (n_seeds < 2) next
-    consensus_removed <- votes >= 2L
-    rm_mask <- consensus_removed[mol$obs_id + 1L] & assigned
-    message(sprintf("%s/%s: consensus removes %d molecules (seed removals pooled from %d seeds)",
-      variant, method, sum(rm_mask), n_seeds))
+   for (tag in c("molcons", "moluni")) {
+    delta_csv <- file.path(bench_dir, "results",
+      sprintf("%s_%s_%s_%s.csv.gz", dataset, tag, variant, method))
+    if (!file.exists(delta_csv)) { message("missing: ", delta_csv); next }
+    dd <- read.csv(gzfile(delta_csv), stringsAsFactors = FALSE)
+    dd <- dd[dd$gene %in% rownames(counts_before) &
+             dd$cell_id %in% colnames(counts_before), , drop = FALSE]
     delta <- sparseMatrix(
-      i = mol$gene_idx[rm_mask] + 1L,
-      j = mol$cell_idx[rm_mask] + 1L,
-      x = 1,
-      dims = c(length(genes_vec), nrow(cells_tab)),
-      dimnames = list(genes_vec, {
-        cn <- character(nrow(cells_tab))
-        cn[cells_tab$cell_idx + 1L] <- as.character(cells_tab$cell_id)
-        cn
-      }))
-    counts_after <- counts_before
-    common_g <- intersect(rownames(counts_before), rownames(delta))
-    common_c <- intersect(colnames(counts_before), colnames(delta))
-    counts_after[common_g, common_c] <-
-      pmax(counts_before[common_g, common_c] - delta[common_g, common_c], 0)
+      i = match(dd$gene, rownames(counts_before)),
+      j = match(dd$cell_id, colnames(counts_before)),
+      x = dd$n,
+      dims = dim(counts_before), dimnames = dimnames(counts_before))
+    counts_after <- counts_before - delta
+    counts_after@x <- pmax(counts_after@x, 0)
 
     pow <- vapply(pair_defs, function(d) {
       bench_power(d$rates_before, bench_bin_rates(
@@ -153,12 +121,13 @@ for (variant in c("ls_nmf", "invsqrt_kl")) {
     exs <- vapply(pair_defs, function(d) d$excess_strict, 0)
     oks <- !is.na(pow_s)
     message(sprintf(
-      "MOLCONS %s %s/%s: overall=%.3f strict=%.3f pairs>=0.9: %d/%d identity med=%.3f min=%.3f",
-      dataset, variant, method,
+      "%s %s %s/%s: overall=%.3f strict=%.3f pairs>=0.9: %d/%d identity med=%.3f min=%.3f",
+      toupper(tag), dataset, variant, method,
       sum(pow * ex) / sum(ex),
       sum(pow_s[oks] * exs[oks]) / sum(exs[oks]),
       sum(pow >= 0.9, na.rm = TRUE), length(pow),
       stats::median(saf, na.rm = TRUE), min(saf, na.rm = TRUE)))
+   }
   }
 }
 message("MOLECULE CONSENSUS DONE")
