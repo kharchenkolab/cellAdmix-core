@@ -417,9 +417,10 @@ membrane_correction$plot_removed_molecules()
 The audit provides the direct verification: per-pair cleanup sensitivity
 against the leaked-molecule estimates, the own-marker false-removal rate
 (removal of near-surely-genuine molecules), and a warning for any detected
-pair no removal rule covers.
+pair no removal rule covers — here it flags the largest leakage pair
+(exocrine → ductal), which membrane scoring under this fit does not call.
 
-```{r membrane-audit-eval, fig.width=8.5, fig.height=7.2}
+```{r membrane-audit-eval, warning=TRUE, fig.width=8.5, fig.height=7.2}
 membrane_report <- audit$evaluate(membrane_correction)
 membrane_report$summary()
 membrane_report$plot_cleanup()
