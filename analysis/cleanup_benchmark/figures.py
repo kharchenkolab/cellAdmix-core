@@ -66,47 +66,54 @@ fig.savefig(f'{OUT}/benchmark_fig1.png', bbox_inches='tight')
 print('fig1 done')
 
 # ---------- Figure 2: stochasticity ----------
+fo = pd.read_csv(f'{R}/pancreas_factor_overlap.csv')
 ov = json.load(open(f'{R}/pancreas_removal_overlap.json'))
-fig, axes = plt.subplots(1, 3, figsize=(11, 3.1),
-    gridspec_kw={'width_ratios': [1, 1, 1.4]})
-ax = axes[0]
-ax.annotate('a', (-0.28, 1.06), xycoords='axes fraction', fontsize=13, fontweight='bold')
-x = np.arange(1, 11)
-ax.bar(x - 0.2, np.array(ov['invsqrt_kl']['n_removed']) / 1e6, width=0.4,
-    color='#8e44ad', label='invsqrt KL-NMF')
-ax.bar(x + 0.2, np.array(ov['ls_nmf']['n_removed']) / 1e6, width=0.4,
-    color='#16a085', label='ls-NMF')
-ax.set_xlabel('random seed'); ax.set_ylabel('molecules removed (millions)')
-ax.set_xticks(range(1, 11))
-ax.legend(frameon=False, fontsize=8)
-ax.set_title('total removal by seed')
+dec_path = f'{R}/pancreas_decisions.csv'
+have_dec = os.path.exists(dec_path)
+vcolors = {'ls_nmf': '#16a085', 'invsqrt_kl': '#8e44ad'}
+vnames = {'ls_nmf': 'ls-NMF', 'invsqrt_kl': 'invsqrt\nKL-NMF'}
 
-ax = axes[1]
-ax.annotate('b', (-0.28, 1.06), xycoords='axes fraction', fontsize=13, fontweight='bold')
-J = np.array(ov['invsqrt_kl']['jaccard'])
-im = ax.imshow(J, vmin=0, vmax=1, cmap='viridis')
-ax.set_xticks(range(10), range(1, 11), fontsize=7)
-ax.set_yticks(range(10), range(1, 11), fontsize=7)
-ax.set_xlabel('seed'); ax.set_ylabel('seed')
-ax.set_title('removal-set overlap (Jaccard),\ninvsqrt KL-NMF')
-plt.colorbar(im, ax=ax, fraction=0.045)
+def dot_panel(ax, data, letter, ylab, title):
+    for k, variant in enumerate(['ls_nmf', 'invsqrt_kl']):
+        v = np.asarray(data[variant])
+        x = k + (np.random.default_rng(0).uniform(-0.14, 0.14, len(v)))
+        ax.scatter(x, v, s=9, color=vcolors[variant], alpha=0.6)
+        ax.hlines(np.median(v), k - 0.25, k + 0.25, color='black', lw=1.8)
+    ax.set_xticks([0, 1], [vnames['ls_nmf'], vnames['invsqrt_kl']])
+    ax.set_xlim(-0.6, 1.6)
+    ax.set_ylim(0, 1.02)
+    ax.set_ylabel(ylab)
+    ax.set_title(title, fontsize=9)
+    ax.annotate(letter, (-0.28, 1.05), xycoords='axes fraction',
+        fontsize=13, fontweight='bold')
 
-ax = axes[2]
-ax.annotate('c', (-0.55, 1.06), xycoords='axes fraction', fontsize=13, fontweight='bold')
-pp = pairs_df[(pairs_df['variant'] == 'invsqrt_kl') & (pairs_df['method'] == 'membrane')
-              & pairs_df['arm'].str.match(r'invsqrt_kl/membrane/s\d')]
-piv = pp.pivot_table(index='pair', columns='seed', values='power_strict')
-piv = piv.dropna().sort_values(1)
-im = ax.imshow(piv.values, aspect='auto', cmap='RdYlBu', vmin=0, vmax=1)
-ax.set_xticks(range(piv.shape[1]), [f's{int(c)}' for c in piv.columns])
-ax.set_yticks(range(len(piv)), [short(p) for p in piv.index], fontsize=5)
-ax.set_title('per-pair sensitivity by seed,\ninvsqrt KL-NMF / membrane')
-plt.colorbar(im, ax=ax, fraction=0.03, label='sensitivity')
+fig, axes = plt.subplots(1, 3, figsize=(9.2, 3.0))
+dot_panel(axes[0],
+    {v: fo[fo['variant'] == v]['corr'].values for v in ['ls_nmf', 'invsqrt_kl']},
+    'a', 'gene-ownership correlation\nof matched factors', 'factor variability')
+if have_dec:
+    dec = pd.read_csv(dec_path)
+    dec = dec[dec['method'] == 'membrane']
+    dd = {}
+    for variant in ['ls_nmf', 'invsqrt_kl']:
+        sets = {s_: set(map(tuple, g[['source', 'target']].values))
+                for s_, g in dec[dec['variant'] == variant].groupby('seed')}
+        vals = []
+        seeds = sorted(sets)
+        for i in range(len(seeds)):
+            for j in range(i + 1, len(seeds)):
+                a, b = sets[seeds[i]], sets[seeds[j]]
+                vals.append(len(a & b) / max(len(a | b), 1))
+        dd[variant] = vals
+    dot_panel(axes[1], dd, 'b', 'overlap of removal decisions\n(Jaccard)',
+        'scoring variability')
+J = {v: np.array(ov[v]['jaccard'])[np.triu_indices(10, 1)] for v in ['ls_nmf', 'invsqrt_kl']}
+dot_panel(axes[2], J, 'c', 'overlap of removed molecules\n(Jaccard)', 'net effect')
 fig.tight_layout()
 fig.savefig(f'{OUT}/benchmark_fig2.png', bbox_inches='tight')
 print('fig2 done')
 
-# ---------- Figure 3: vote-threshold ROC ----------
+# ---------- Figure 3: vote-threshold trade-off ----------
 sweep_log = sys.argv[1] if len(sys.argv) > 1 else None
 if sweep_log and os.path.exists(sweep_log):
     rows = []
@@ -119,40 +126,30 @@ if sweep_log and os.path.exists(sweep_log):
                 method=m[5], sens=float(m[6]), fpr=float(m[8]), worst=float(m[9])))
     sw = pd.DataFrame(rows)
     sw.to_csv(f'{R}/vote_sweep_all.csv', index=False)
-    fig, axes = plt.subplots(1, 2, figsize=(9, 3.4))
-    colors = {'pancreas': '#c0392b', 'breast_crop': '#2980b9', 'nsclc': '#27ae60'}
-    styles = {'membrane': '-', 'bridge': '--'}
-    ax = axes[0]
-    for (dsname, variant, method), g in sw[sw['variant'] == 'invsqrt_kl'].groupby(
-            ['dataset', 'variant', 'method']):
-        g = g.sort_values('thr')
-        fx = np.maximum(g['fpr'] * 100, 0.02)
-        ax.plot(fx, g['sens'], styles[method], marker='o', ms=3,
-            color=colors[dsname], label=f'{dsname} {method}')
-        for _, r in g.iterrows():
-            if r['thr'] in (1, 3, 10):
-                ax.annotate(f"≥{int(r['thr'])}", (max(r['fpr'] * 100, 0.02), r['sens']),
-                    fontsize=6, xytext=(3, 2), textcoords='offset points')
-    ax.set_xscale('log')
-    ax.set_xlabel('estimated FPR, native stratum (%)')
-    ax.set_ylabel('estimated sensitivity (strict tier)')
-    ax.set_title('invsqrt KL-NMF: vote-threshold ROC')
-    ax.legend(frameon=False, fontsize=7)
-    ax = axes[1]
-    for (dsname, variant, method), g in sw[sw['variant'] == 'ls_nmf'].groupby(
-            ['dataset', 'variant', 'method']):
-        g = g.sort_values('thr')
-        fx = np.maximum(g['fpr'] * 100, 0.02)
-        ax.plot(fx, g['sens'], styles[method], marker='o', ms=3,
-            color=colors[dsname], label=f'{dsname} {method}')
-        for _, r in g.iterrows():
-            if r['thr'] in (1, 3, 10):
-                ax.annotate(f"≥{int(r['thr'])}", (max(r['fpr'] * 100, 0.02), r['sens']),
-                    fontsize=6, xytext=(3, 2), textcoords='offset points')
-    ax.set_xscale('log')
-    ax.set_xlabel('estimated FPR, native stratum (%)')
-    ax.set_title('ls-NMF: vote-threshold ROC')
-    ax.legend(frameon=False, fontsize=7)
+    combos = [('pancreas', 'invsqrt_kl', 'membrane', '#c0392b', '-', 'pancreas membrane (invsqrt)'),
+              ('breast_crop', 'invsqrt_kl', 'membrane', '#2980b9', '-', 'breast membrane (invsqrt)'),
+              ('pancreas', 'ls_nmf', 'bridge', '#c0392b', '--', 'pancreas bridge (ls)'),
+              ('breast_crop', 'ls_nmf', 'bridge', '#2980b9', '--', 'breast bridge (ls)'),
+              ('nsclc', 'ls_nmf', 'bridge', '#27ae60', '--', 'NSCLC bridge (ls)')]
+    fig, axes = plt.subplots(1, 2, figsize=(8.6, 3.2))
+    for ax in axes:
+        ax.axvline(3, color='grey', lw=0.8, alpha=0.6)
+        ax.set_xticks([1, 2, 3, 5, 7, 10])
+        ax.set_xlabel('votes required (of 10 runs)')
+    for dsname, variant, method, color, style, lab in combos:
+        g = sw[(sw['dataset'] == dsname) & (sw['variant'] == variant) &
+               (sw['method'] == method)].sort_values('thr')
+        axes[0].plot(g['thr'], g['sens'], style, marker='o', ms=3.5, color=color, label=lab)
+        axes[1].plot(g['thr'], np.maximum(g['fpr'] * 100, 0.005), style, marker='o',
+            ms=3.5, color=color, label=lab)
+    axes[0].set_ylabel('estimated sensitivity (strict tier)')
+    axes[0].set_ylim(0, 1)
+    axes[0].annotate('a', (-0.2, 1.04), xycoords='axes fraction', fontsize=13, fontweight='bold')
+    axes[0].legend(frameon=False, fontsize=7)
+    axes[1].set_yscale('log')
+    axes[1].set_yticks([0.01, 0.1, 1, 10], ['0.01', '0.1', '1', '10'])
+    axes[1].set_ylabel('own-marker false-removal rate (%)')
+    axes[1].annotate('b', (-0.22, 1.04), xycoords='axes fraction', fontsize=13, fontweight='bold')
     fig.tight_layout()
     fig.savefig(f'{OUT}/benchmark_fig3.png', bbox_inches='tight')
     print('fig3 done')

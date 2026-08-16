@@ -89,86 +89,84 @@ largest leakage pairs (exocrine → ductal).
 ## From excess removal to sensitivity and specificity
 
 The benchmark's two axes are estimators of the standard classification
-quantities, each computed on a stratum where the truth is nearly known:
+quantities, each computed on a subset of molecules where the truth is nearly known:
 
 - **Estimated sensitivity.** For strict-tier markers, the excess above the
   zero-exposure baseline estimates the number of truly leaked molecules, so
   the fraction of excess removed is an estimate of TP/(TP+FN) on that
-  stratum. Its bias: it samples leakage carried by source-specific genes —
-  the *easiest* leakage to attribute — so it is an optimistic stratum for any
-  marker-driven method.
+  subset. Its bias: it samples leakage carried by source-specific genes —
+  the *easiest* leakage to attribute — so the estimate is optimistic for
+  any marker-driven method.
 - **Estimated false-positive rate.** Molecules of a cell type's own marker
-  genes, inside cells of that type, are almost surely genuine; their removal
-  rate is a direct FPR estimate ($\mathrm{specificity} = 1 - \mathrm{FPR}$). Its bias runs the
-  other way: it samples the molecules easiest to keep. A worst-case
-  companion — the most-affected pair's retention — tracks the shared-gene
-  erasures (e.g. CFTR, genuinely expressed by both exocrine and ductal cells)
-  that pooled numbers hide.
+  genes, inside cells of that type, are almost surely genuine. The fraction
+  of them a correction removes — below, the **own-marker false-removal
+  rate** — therefore estimates the false-positive rate
+  ($\mathrm{specificity} = 1 - \mathrm{FPR}$). Its bias runs the other
+  way: it samples the molecules easiest to keep. A worst-case companion —
+  retention on the most-affected cell-type pair — tracks the shared-gene
+  erasures (e.g. CFTR, genuinely expressed by both exocrine and ductal
+  cells) that pooled numbers hide.
 
-The two strata bracket the unmeasurable middle (shared and non-distinctive
-genes), and all headline results below are reported in these terms.
+The two gene sets bracket the unmeasurable middle (shared and
+non-distinctive genes), and all headline results below are reported in
+these terms.
 
 ## Stochasticity of factorization and scoring
 
-Rerunning the identical pipeline with different random seeds changes the
-correction substantially (Figure 2). On the pancreas dataset, ten seeds of
-the default membrane-scoring pipeline remove between 1.07 and 1.54 million
-molecules (invsqrt KL-NMF; 0.42-0.80 million for ls-NMF), and the removal
-*sets* of any two seeds share only ~57% of molecules (median Jaccard;
-~45% for ls-NMF). At the pair level, sensitivity can swing from 0.9 to
-near 0 across seeds (Figure 2c).
-
-The source of this variability is structural, not numerical. KL-type NMF is
-a mixture (topic) model; with the rank set above the number of well-separated
-expression programs, the surplus factors face many near-equivalent choices —
-duplicate a large program, split one, or form diffuse blends — and
-multiplicative updates lock each restart into a different discrete gene
-partition (81% of invsqrt loadings are zero; matched factors across seeds
-share only ~43% of their owned genes). Restart objectives span ~2% while the
-factor structures differ qualitatively, and the objective does not predict
-cleanup quality — so best-objective selection among restarts cannot resolve
-the ambiguity, and neither can more restarts (tripling the restart pool left the structural variation intact). Scoring inherits this
-variability twice over: a pair's removal *decision* may fall below threshold
-when its evidence is split across factors, and the removal *labels* may be
-absent when no factor owns the leaked molecules. Dense ls-NMF factors are far
-more reproducible (matched ownership correlation 0.90 vs 0.43) but commit
-weakly to molecule labels, trading instability for insensitivity — the two
-variants fail at different stages rather than one being uniformly better.
+Rerunning the identical pipeline with a different random seed changes the
+result at every level (Figure 2). The factorization itself is unstable
+under invsqrt KL-NMF: factors matched across two runs agree only weakly in
+which genes they own (median correlation 0.48, versus 0.92 for the dense
+ls-NMF factors; Figure 2a). The instability originates in surplus rank:
+with more factors than well-separated expression programs, each restart
+commits to a different, near-equivalent split of the surplus, and the
+training objective neither distinguishes these solutions nor predicts
+their cleanup quality — so selecting the best-objective restart does not
+help, and neither do more restarts. The variability propagates through
+scoring: the sets of removal decisions (source → target rules) that
+survive thresholds overlap only partially between seeds (Figure 2b), and
+the final molecule removal sets of two runs share only about half their
+members (median Jaccard 0.57 invsqrt, 0.45 ls-NMF; Figure 2c) despite
+similar totals. The two variants are exposed at different levels: invsqrt
+varies mostly in factor ownership, ls-NMF mostly in which scoring
+decisions clear the threshold.
 
 ![Figure 2](figures/benchmark_fig2.png)
 
-**Figure 2. Correction stochasticity across random seeds (pancreas,
-membrane scoring).** **(a)** Total molecules removed by ten reruns of the
-identical pipeline differing only in random seed. **(b)** Pairwise overlap
-(Jaccard index) of the removal sets, invsqrt KL-NMF. **(c)** Per-pair
-estimated sensitivity across seeds. Take-home: the single-fit correction is
-effectively a lottery — comparable total removal, but only about half the
-individual molecules agree between any two runs, and individual pairs flip
-between fully cleaned and untouched.
+**Figure 2. Stochasticity of factorization and scoring (pancreas,
+membrane scoring, ten random seeds).** Each dot compares two seeds; bars
+mark medians. **(a)** Factor variability: gene-ownership correlation of
+matched factors between two runs. **(b)** Scoring variability: overlap
+(Jaccard index) of the kept removal-decision sets. **(c)** Net effect:
+overlap of the final removed-molecule sets. Take-home: a single-fit
+correction is effectively a lottery — under invsqrt KL-NMF the factors
+themselves differ between runs; under ls-NMF the factors are stable but
+the scoring decisions still vary; either way only about half of the
+individual removed molecules agree between two runs.
 
 ## Ensemble corrections by molecule voting
 
 Since each seed's correction is a per-molecule decision, an ensemble is
 natural: run the pipeline N times, count for each molecule how many runs
 removed it, and remove molecules whose vote count reaches a threshold. The
-threshold is a sensitivity/specificity dial, and sweeping it traces an
-estimated ROC curve (Figure 3).
+threshold is a sensitivity/specificity dial; Figure 3 shows both sides of
+the trade-off as the threshold varies.
 
-Three properties of the resulting curves (Figure 3) are noteworthy. First,
-the operating knee consistently sits at a *minority* vote — around 3 of
-10 — not at majority: because factor ownership is a lottery, the factor
-structure that correctly cleans a given pair arises in only a minority of
-restarts, so demanding majority agreement discards genuine cleanup
-(sensitivity halves between thresholds 3 and 5 on pancreas membrane
-scoring). Second, the threshold is not merely a power dial but a necessary
-safety mechanism: the permissive union (≥1 vote) accumulates every seed's
-idiosyncratic overcorrections, reaching a 31% native-stratum FPR for ls-NMF
-on the breast dataset, which the ≥3 threshold cuts to 1% at nearly the same
-sensitivity. Third, the vote count separates systematic removals from
-idiosyncratic ones: worst-case pair specificity rises toward 1 at unanimity,
-meaning shared-gene erasures are low-vote events contributed by one or two
-seeds, while genuine leakage removal accumulates votes up to its lottery
-ceiling.
+Three properties stand out (Figure 3). First, the best operating point is
+a *minority* vote — around 3 of 10 — not a majority: because factor
+ownership is a lottery, the factor structure that correctly cleans a given
+pair arises in only a minority of restarts, so demanding majority
+agreement discards genuine cleanup (sensitivity halves between thresholds
+3 and 5 on pancreas membrane scoring; Figure 3a). Second, the threshold is
+also a necessary safety mechanism: requiring a single vote (the union of
+all runs' removals) accumulates every run's idiosyncratic overcorrections —
+up to a 31% own-marker false-removal rate in the worst case (ls-NMF,
+breast membrane) — which the ≥3 threshold cuts to about 1% at nearly the
+same sensitivity (Figure 3b). Third, the vote count separates systematic
+removals from idiosyncratic ones: retention on the worst-affected pair
+approaches 1 as the threshold rises, meaning shared-gene erasures are
+low-vote events contributed by one or two runs, while genuine leakage
+removal accumulates votes up to its lottery ceiling.
 
 A lighter-weight alternative — pooling only the removal *decisions* across
 seeds and applying them with each fit's own labels, with imported decisions
@@ -180,15 +178,15 @@ threshold number of runs label the molecules correctly.
 
 ![Figure 3](figures/benchmark_fig3.png)
 
-**Figure 3. Vote-threshold ROC for ensemble corrections (10 seeds).**
-Estimated sensitivity (strict tier) versus estimated native-stratum FPR
-(log scale) as the required vote count varies from 1 (union, right end of
-each curve) to 10 (unanimity, left end); selected thresholds annotated.
-Solid lines: membrane scoring; dashed: bridge. Take-home: a vote fraction
-near 30% (≥3 of 10) retains nearly all of the union's sensitivity at a
-fraction of its false-positive cost — the union can be actively unsafe
-(31% FPR, breast ls-NMF) — while majority and stricter thresholds are
-miscalibrated because correct removals are typically minority events
+**Figure 3. The vote threshold is a sensitivity/false-removal dial
+(10 seeds; the recommended variant for each scoring method).**
+**(a)** Estimated sensitivity (strict tier) versus the number of votes
+required to remove a molecule. **(b)** Own-marker false-removal rate
+(log scale) versus the same threshold. The grey line marks the recommended
+threshold of 3. Take-home: around 3 of 10 votes retains nearly all the
+sensitivity of the most permissive setting while cutting false removals by
+up to an order of magnitude; majority and stricter thresholds discard
+genuine cleanup because correct removals are typically minority events
 across restarts.
 
 ## Benchmarks across datasets and scoring methods
@@ -197,7 +195,7 @@ Figure 4 and Table 1 summarize the strict-tier sensitivity of the main
 correction strategies across all dataset × scoring-method × variant
 combinations. Three regularities emerge. The 3-of-10 molecule vote matches
 or exceeds the *best* individual seed in every combination while removing
-the seed dependence entirely, at native-stratum FPR of 0.03-3.2%. The
+the seed dependence entirely, at own-marker false-removal rates of 0.03-3.2%. The
 rule-level consensus captures much of the same benefit where failures are
 decision-stage (it rescues ls-NMF bridge scoring on breast from 0.34 to
 0.78-0.84) but cannot help when no single fit labels the molecules
@@ -208,7 +206,7 @@ stays below 0.2 at every threshold — an argument for factorization-level
 work (anchor-based recovery reached 0.52-0.67 there) rather than better
 ensembling.
 
-| dataset (scoring) | ls-NMF single fits | ls-NMF vote ≥3/10 (FPR) | invsqrt single fits | invsqrt vote ≥3/10 (FPR) |
+| dataset (scoring) | ls-NMF single fits | ls-NMF vote ≥3/10 (false-removal %) | invsqrt single fits | invsqrt vote ≥3/10 (false-removal %) |
 |---|---|---|---|---|
 | pancreas (membrane) | 0.38 – 0.44 | 0.45 (2.9%) | 0.40 – 0.88 | **0.86** (3.2%) |
 | pancreas (bridge) | 0.14 – 0.53 | **0.55** (3.2%) | 0.15 – 0.17 | 0.19 (2.9%) |
@@ -219,7 +217,7 @@ ensembling.
 **Table 1. Strict-tier estimated sensitivity across the benchmark matrix.**
 Single-fit columns give the min-max range over individually evaluated seed
 refits; vote columns give the 3-of-10 molecule-vote ensemble (votes pooled
-over ten seeds) with its estimated native-stratum FPR in parentheses. Bold marks the strategy reaching the
+over ten seeds) with its own-marker false-removal rate in parentheses. Bold marks the strategy reaching the
 best (or tied) sensitivity in each row.
 
 ![Figure 4](figures/benchmark_fig4.png)
@@ -267,7 +265,7 @@ cellAdmix it yields three conclusions:
    scoring passes, which parallelize trivially). Remove a molecule when at
    least ~30% of restarts remove it, keeping each restart's native-factor
    check as its internal safety vet. On the benchmark this default achieves
-   0.45-0.86 strict-tier sensitivity at 0.03-3.2% native-stratum FPR,
+   0.45-0.86 strict-tier sensitivity at 0.03-3.2% own-marker false removal,
    always at or above the best individual restart, with the threshold
    exposed as the user's sensitivity/specificity dial — calibrable per
    dataset by exactly the sweep shown in Figure 3. Two known limits bound
