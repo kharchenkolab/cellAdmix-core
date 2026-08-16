@@ -193,8 +193,9 @@ this for every ordered cell-type pair:
 audit <- fit$audit_admixture()
 audit$pairs()                      # per-pair leaked-molecule estimates
 audit$plot_map()                   # source x target admixture overview
-audit$plot_gradient()              # cumulative exposure gradient, with 95% bands
-audit$plot_gradient("Exocrine epithelial", "Endothelial", correction = correction)
+audit$plot_exposure()              # cumulative exposure profile, 95% intervals
+audit$plot_exposure("Exocrine epithelial", "Endothelial", correction = correction)
+audit$plot_remaining(list(membrane = correction))  # admixture left per correction
 ```
 
 `audit$evaluate(correction)` verifies a correction against the same

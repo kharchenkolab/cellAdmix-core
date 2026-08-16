@@ -148,14 +148,15 @@ gives the estimated number of leaked molecules.
 audit$plot_map()
 ```
 
-The default gradient view pools all detected pairs into one cumulative
-exposure curve (bands are 95% Poisson intervals); passing a specific pair
-shows its own gradient.
+The default exposure view pools all detected pairs into one cumulative
+curve of source-marker content versus source-neighbor exposure (error bars
+are 95% Poisson intervals, often narrower than the symbols); passing a
+specific pair shows that pair's own profile.
 
-```{r audit-gradient, fig.width=9.6, fig.height=3.8}
+```{r audit-exposure, fig.width=9.6, fig.height=3.8}
 cowplot::plot_grid(
-  audit$plot_gradient(),
-  audit$plot_gradient("Exocrine epithelial", "Ductal/tumor epithelial"),
+  audit$plot_exposure(),
+  audit$plot_exposure("Exocrine epithelial", "Ductal/tumor epithelial"),
   ncol = 2, align = "hv", axis = "tblr")
 ```
 
@@ -426,12 +427,15 @@ membrane_report$summary()
 membrane_report$plot_cleanup()
 ```
 
-Overlaying the corrected counts on a pair's exposure gradient shows the
-cleanup geometrically:
+Overlaying the corrected counts on the exposure profiles shows the cleanup
+geometrically — first pooled over all detected pairs, then for one pair:
 
-```{r membrane-audit-gradient, fig.width=5.2, fig.height=4.2}
-audit$plot_gradient("Exocrine epithelial", "Endothelial",
-  correction = membrane_correction)
+```{r membrane-audit-exposure, fig.width=9.6, fig.height=4.0}
+cowplot::plot_grid(
+  audit$plot_exposure(correction = membrane_correction),
+  audit$plot_exposure("Exocrine epithelial", "Endothelial",
+    correction = membrane_correction),
+  ncol = 2, align = "hv", axis = "tblr")
 ```
 
 The volcano plots show the same tumor-versus-adjacent-normal DE comparison
@@ -511,6 +515,10 @@ bridge_report$summary()
 bridge_report$plot_cleanup()
 ```
 
+```{r bridge-audit-exposure, fig.width=5.2, fig.height=4.2}
+audit$plot_exposure(correction = bridge_correction)
+```
+
 ```{r bridge-volcano, fig.width=11.0, fig.height=4.8}
 for (target_type in diagnostic_cell_types) {
   p_before <- celladmix_plot_volcano(diagnostic_de_original[[target_type]],
@@ -533,8 +541,17 @@ cowplot::plot_grid(plotlist = plots, ncol = length(plots), align = "hv", axis = 
 
 ## Score Comparison
 
-These summaries compare the source-cell annotation and target-cell significance
-calls across membrane and bridge scoring. In each triangle panel, the upper-right
+The bottom-line comparison is how much of the estimated admixture each
+correction removed. The audit sums the leaked-molecule estimates over all
+detected cell-type pairs, before correction and after each method:
+
+```{r scoring-remaining, fig.width=4.6, fig.height=3.6}
+audit$plot_remaining(list(membrane = membrane_correction,
+  bridge = bridge_correction))
+```
+
+The remaining summaries compare the source-cell annotation and target-cell
+significance calls across membrane and bridge scoring. In each triangle panel, the upper-right
 half of a cell corresponds to the first method named in the subtitle and the
 lower-left half corresponds to the second.
 

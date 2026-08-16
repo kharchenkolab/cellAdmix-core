@@ -248,10 +248,12 @@ CellAdmixAudit <- R6::R6Class(
           subtitle = "cell text: estimated leaked molecules (conservative)") +
         ggplot2::theme_minimal(base_size = 10) +
         ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 40, hjust = 1),
-          panel.grid = ggplot2::element_blank())
+          panel.grid = ggplot2::element_blank(),
+          panel.border = ggplot2::element_rect(fill = NA, color = "grey35",
+            linewidth = 0.35))
     },
 
-    plot_gradient = function(source = NULL, target = NULL, correction = NULL,
+    plot_exposure = function(source = NULL, target = NULL, correction = NULL,
                              strict = TRUE) {
       .celladmix_require_ggplot2()
       counts_after <- if (!is.null(correction)) correction$counts() else NULL
@@ -291,14 +293,16 @@ CellAdmixAudit <- R6::R6Class(
       df$bin <- factor(df$bin, levels = c("0", "1", "2", "3+"))
       r0 <- df$rate[df$bin == "0" & df$state == "before"]
       title <- if (is.null(source)) {
-        "Admixture exposure gradient (pooled over detected pairs)"
+        "Admixture exposure profile (pooled over detected pairs)"
       } else {
         sprintf("%s → %s", source, target)
       }
       cols <- c("before" = "#c0392b", "after cleanup" = "#2980b9")
       ggplot2::ggplot(df, ggplot2::aes(x = bin, group = state)) +
         ggplot2::geom_ribbon(ggplot2::aes(ymin = rate_lo * 1e3, ymax = rate_hi * 1e3,
-          fill = state), alpha = 0.2) +
+          fill = state), alpha = 0.25) +
+        ggplot2::geom_errorbar(ggplot2::aes(ymin = rate_lo * 1e3,
+          ymax = rate_hi * 1e3, color = state), width = 0.12, linewidth = 0.4) +
         ggplot2::geom_line(ggplot2::aes(y = rate * 1e3, color = state)) +
         ggplot2::geom_point(ggplot2::aes(y = rate * 1e3, color = state), size = 1.8) +
         ggplot2::geom_hline(yintercept = r0 * 1e3, linetype = "dotted",
@@ -308,9 +312,52 @@ CellAdmixAudit <- R6::R6Class(
         ggplot2::labs(x = "source-type cells among nearest neighbors",
           y = "source-marker rate (per 1,000 molecules)",
           title = title,
-          subtitle = "bands: 95% Poisson intervals; dotted line: unexposed reference") +
+          subtitle = "error bars: 95% Poisson intervals (often narrower than the symbols); dotted line: unexposed reference") +
         ggplot2::theme_classic(base_size = 10) +
         ggplot2::theme(legend.position = if (is.null(counts_after)) "none" else "bottom")
+    },
+
+    plot_remaining = function(corrections = list(), relative = TRUE) {
+      .celladmix_require_ggplot2()
+      if (length(corrections) && is.null(names(corrections))) {
+        stop("corrections must be a named list, e.g. list(membrane = corr)")
+      }
+      state_excess <- function(counts_mat) {
+        tot <- 0; var_tot <- 0
+        for (d in private$.pair_defs) {
+          if (!d$detected) next
+          rates <- .celladmix_audit_bin_rates(
+            .celladmix_audit_mcount(counts_mat, d$pool, d$T_cells),
+            private$.totals[d$T_cells], d$bins)
+          r0 <- rates$rate[rates$bin == "0"]
+          exposed <- rates[rates$bin != "0", , drop = FALSE]
+          m_ref <- rates$markers[rates$bin == "0"]
+          M_ref <- max(rates$totals[rates$bin == "0"], 1)
+          M_exp <- sum(exposed$totals)
+          tot <- tot + sum(pmax(exposed$rate - r0, 0) * exposed$totals)
+          var_tot <- var_tot + sum(exposed$markers) + (M_exp / M_ref)^2 * m_ref
+        }
+        c(excess = tot, sd = sqrt(var_tot))
+      }
+      states <- c(list(before = private$.counts),
+        lapply(corrections, function(x) x$counts()))
+      est <- t(vapply(states, state_excess, c(excess = 0, sd = 0)))
+      df <- data.frame(state = factor(rownames(est), levels = rownames(est)),
+        excess = est[, "excess"], sd = est[, "sd"])
+      denom <- if (relative) df$excess[[1]] else 1
+      df$y <- df$excess / denom
+      df$lo <- pmax(df$excess - 1.96 * df$sd, 0) / denom
+      df$hi <- (df$excess + 1.96 * df$sd) / denom
+      ggplot2::ggplot(df, ggplot2::aes(x = state, y = y)) +
+        ggplot2::geom_col(fill = "#34495e", width = 0.6, alpha = 0.9) +
+        ggplot2::geom_errorbar(ggplot2::aes(ymin = lo, ymax = hi),
+          width = 0.15, linewidth = 0.4) +
+        ggplot2::labs(x = NULL,
+          y = if (relative) "estimated admixture (fraction of uncorrected)"
+              else "estimated admixed molecules",
+          title = "Remaining admixture by correction",
+          subtitle = "summed over detected cell-type pairs; error bars: 95% intervals") +
+        ggplot2::theme_classic(base_size = 10)
     },
 
     evaluate = function(correction, warn_uncovered = TRUE) {
