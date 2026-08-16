@@ -3810,7 +3810,9 @@ extern "C" SEXP _cellAdmixCore_celladmix_fit_store_run(
     SEXP tile_size_sexp,
     SEXP row_group_size_sexp,
     SEXP report_ncv_umap_sexp,
-    SEXP verbose_sexp) {
+    SEXP verbose_sexp,
+    SEXP nmf_fixed_h_sexp,
+    SEXP nmf_fixed_h_genes_sexp) {
   try {
     const auto fit_start = std::chrono::steady_clock::now();
     auto stage_start = fit_start;
@@ -3872,6 +3874,36 @@ extern "C" SEXP _cellAdmixCore_celladmix_fit_store_run(
       throw std::runtime_error("store-backed fit requires an input store with molecule rows and cell offsets");
     }
     const auto counts = celladmix::load_input_store_counts(store_dir);
+    if (nmf_fixed_h_sexp != R_NilValue) {
+      const Rcpp::NumericMatrix h_in(nmf_fixed_h_sexp);
+      const auto h_genes = optional_string_vector_sexp(nmf_fixed_h_genes_sexp);
+      if (static_cast<int>(h_genes.size()) != h_in.ncol()) {
+        throw std::runtime_error("nmf_fixed_h_genes must name every column of nmf_fixed_h");
+      }
+      std::unordered_map<std::string, int> gene_index;
+      for (std::size_t g = 0; g < counts.genes.size(); ++g) {
+        gene_index[counts.genes[g]] = static_cast<int>(g);
+      }
+      const int rank_in = h_in.nrow();
+      pipeline_options.nmf_fixed_h.assign(
+          static_cast<std::size_t>(rank_in) * counts.genes.size(), 0.0);
+      int matched = 0;
+      for (int c = 0; c < h_in.ncol(); ++c) {
+        const auto hit = gene_index.find(h_genes[static_cast<std::size_t>(c)]);
+        if (hit == gene_index.end()) {
+          continue;
+        }
+        ++matched;
+        for (int f = 0; f < rank_in; ++f) {
+          pipeline_options.nmf_fixed_h[
+              static_cast<std::size_t>(f) * counts.genes.size() +
+              static_cast<std::size_t>(hit->second)] = h_in(f, c);
+        }
+      }
+      if (matched < 2) {
+        throw std::runtime_error("nmf_fixed_h genes do not match the input store gene vocabulary");
+      }
+    }
     stage_start = std::chrono::steady_clock::now();
     if (training_labels_path.has_value()) {
       pipeline_options.training_cell_strata =

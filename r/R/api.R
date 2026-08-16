@@ -845,7 +845,7 @@ celladmix_cluster_cells <- function(
     nmf_n_runs = NA_integer_, nmf_train_max_rows = 10000L,
     nmf_min_molecules = 10L, num_threads = 1L,
     tile_size = 100, parquet_row_group_size = 65536L, report_ncv_umap = FALSE,
-    seed = 1L, verbose = FALSE, annotation_hash = NULL) {
+    seed = 1L, verbose = FALSE, annotation_hash = NULL, nmf_fixed_h = NULL) {
   if (!inherits(prep, "celladmix_prep")) {
     stop(".celladmix_fit_prep() expects a celladmix_prep object")
   }
@@ -888,7 +888,9 @@ celladmix_cluster_cells <- function(
       tile_size = tile_size,
       parquet_row_group_size = parquet_row_group_size,
       report_ncv_umap = report_ncv_umap,
-      verbose = verbose
+      verbose = verbose,
+      nmf_fixed_h = nmf_fixed_h,
+      nmf_fixed_h_genes = if (is.null(nmf_fixed_h)) NULL else colnames(nmf_fixed_h)
     ),
     class = "celladmix_run"
   )
@@ -976,7 +978,7 @@ celladmix_fit <- function(
     molecule_scoring = c("gene_loadings", "ncv_projection", "auto"), nmf_n_runs = NA_integer_,
     nmf_train_max_rows = 10000L, nmf_min_molecules = 10L, num_threads = 1L,
     tile_size = 100, parquet_row_group_size = 65536L, report_ncv_umap = FALSE, seed = 1L,
-    verbose = FALSE, annotation_hash = NULL) {
+    verbose = FALSE, annotation_hash = NULL, nmf_fixed_h = NULL) {
   nmf_init <- match.arg(nmf_init)
   nmf_variant <- match.arg(nmf_variant)
   molecule_scoring <- match.arg(molecule_scoring)
@@ -990,7 +992,7 @@ celladmix_fit <- function(
     num_threads = num_threads, tile_size = tile_size,
     parquet_row_group_size = parquet_row_group_size, report_ncv_umap = report_ncv_umap,
     annotation_hash = annotation_hash,
-    seed = seed, verbose = verbose)
+    seed = seed, verbose = verbose, nmf_fixed_h = nmf_fixed_h)
 }
 
 #' Read a Persisted cellAdmix Run

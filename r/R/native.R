@@ -262,7 +262,9 @@
     tile_size = 100,
     parquet_row_group_size = 65536L,
     report_ncv_umap = FALSE,
-    verbose = FALSE
+    verbose = FALSE,
+    nmf_fixed_h = NULL,
+    nmf_fixed_h_genes = NULL
   ) {
   .Call(
     "_cellAdmixCore_celladmix_fit_store_run",
@@ -290,6 +292,8 @@
     as.integer(parquet_row_group_size),
     isTRUE(report_ncv_umap),
     isTRUE(verbose),
+    if (is.null(nmf_fixed_h)) NULL else as.matrix(nmf_fixed_h),
+    if (is.null(nmf_fixed_h_genes)) NULL else as.character(nmf_fixed_h_genes),
     PACKAGE = "cellAdmixCore"
   )
 }
