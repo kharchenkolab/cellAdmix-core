@@ -54,13 +54,15 @@ CellAdmixCorrection <- R6::R6Class(
     score_name = NULL,
     run = NULL,
     params = NULL,
+    rules = NULL,
 
-    initialize = function(name, fit, score, run, params = list()) {
+    initialize = function(name, fit, score, run, params = list(), rules = NULL) {
       self$name <- .celladmix_clean_name(name, "correction")
       self$fit <- fit
       self$score_name <- score$name
       self$run <- run
       self$params <- params
+      self$rules <- rules
     },
 
     save_metadata = function() {

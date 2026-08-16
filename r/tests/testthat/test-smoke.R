@@ -27,13 +27,13 @@ test_that("core version and simulation helpers work", {
   expect_match(celladmix_core_version(), "^0\\.0\\.1$")
   expect_setequal(
     getNamespaceExports("cellAdmixCore"),
-    c("CellAdmixCorrection", "CellAdmixDataset", "CellAdmixFactorSourceScore",
+    c("CellAdmixAudit", "CellAdmixCleanupReport", "CellAdmixCorrection", "CellAdmixDataset", "CellAdmixFactorSourceScore",
       "CellAdmixFit",
       "CellAdmixScore", "cellAdmix", "celladmix_core_version",
       "celladmix_correction_impact", "celladmix_de",
       "celladmix_de_by_group", "celladmix_domain_composition",
       "celladmix_domain_diagnostics", "celladmix_discover_cell_boundaries",
-      "celladmix_discover_stain_image", "celladmix_add_corrected_assay",
+      "celladmix_discover_stain_image", "celladmix_add_corrected_assay", "celladmix_audit_admixture",
       "celladmix_add_factors_to_seurat", "celladmix_add_to_seurat",
       "celladmix_plot_de_shift", "celladmix_plot_cell_example",
       "celladmix_plot_cluster_marker_dotplot",

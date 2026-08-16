@@ -180,6 +180,37 @@ cells are flagged `keep = FALSE` with the reason in the `native_check` column
 related thresholds. See the Native-Factor Check section in
 [scoring_methods.md](scoring_methods.md).
 
+## Auditing Admixture and Verifying Cleanup
+
+Independently of factorization and scoring, the amount of admixture in a
+dataset can be estimated from its spatial structure: source-marker content
+in target cells rises with the number of source-type neighbor cells, while
+unexposed target cells provide an internal negative control (see
+[benchmarks.md](benchmarks.md) for the methodology). The audit measures
+this for every ordered cell-type pair:
+
+```r
+audit <- fit$audit_admixture()
+audit$pairs()                      # per-pair leaked-molecule estimates
+audit$plot_map()                   # source x target admixture overview
+audit$plot_gradient()              # cumulative exposure gradient, with 95% bands
+audit$plot_gradient("Exocrine epithelial", "Endothelial", correction = correction)
+```
+
+`audit$evaluate(correction)` verifies a correction against the same
+measurements: per-pair cleanup sensitivity, the own-marker false-removal
+rate per cell type (removal of near-surely-genuine molecules), and a
+warning for any detected pair that no removal rule covers.
+
+```r
+report <- audit$evaluate(correction)
+report$summary()
+report$plot_cleanup()
+```
+
+Estimates are conservative lower bounds: contamination that reaches even
+unexposed cells raises the reference level and is not counted.
+
 Example-cell overlays show molecule-level evidence around selected target
 cells. For Xenium-backed fits, the DAPI/membrane stain background, cell
 boundaries, and cell-type contour coloring are discovered automatically:

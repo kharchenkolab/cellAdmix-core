@@ -78,6 +78,8 @@ CellAdmixFit <- R6::R6Class(
       )
     },
     loadings = function() self$run$h,
+
+    audit_admixture = function(...) celladmix_audit_admixture(self, ...),
     cell_factors = function() celladmix_collect_cells(self$run),
     counts = function(...) celladmix_collect_counts_sparse(self$run, ...),
     molecules = function(...) celladmix_collect_transcripts(self$run, ...),
@@ -212,7 +214,8 @@ CellAdmixFit <- R6::R6Class(
         annotation = score_obj$annotation_vector()
       )
       correction <- CellAdmixCorrection$new(name, self, score_obj, corrected,
-        params = c(list(p_thresh = p_thresh, adjust_p = adjust_p, targets = targets), list(...)))
+        params = c(list(p_thresh = p_thresh, adjust_p = adjust_p, targets = targets), list(...)),
+        rules = rules)
       self$corrections_registry[[name]] <- correction
       correction$save_metadata()
       correction
