@@ -543,7 +543,9 @@ cowplot::plot_grid(plotlist = plots, ncol = length(plots), align = "hv", axis = 
 
 The bottom-line comparison is how much of the estimated admixture each
 correction removed. The audit sums the leaked-molecule estimates over all
-detected cell-type pairs, before correction and after each method:
+detected cell-type pairs and expresses them as a share of all molecules in
+the dataset — the uncorrected bar is the estimated admixture burden itself
+(a conservative lower bound), and each correction's bar is what remains:
 
 ```{r scoring-remaining, fig.width=4.6, fig.height=3.6}
 audit$plot_remaining(list(membrane = membrane_correction,

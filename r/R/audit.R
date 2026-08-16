@@ -317,7 +317,7 @@ CellAdmixAudit <- R6::R6Class(
         ggplot2::theme(legend.position = if (is.null(counts_after)) "none" else "bottom")
     },
 
-    plot_remaining = function(corrections = list(), relative = TRUE) {
+    plot_remaining = function(corrections = list()) {
       .celladmix_require_ggplot2()
       if (length(corrections) && is.null(names(corrections))) {
         stop("corrections must be a named list, e.g. list(membrane = corr)")
@@ -339,24 +339,24 @@ CellAdmixAudit <- R6::R6Class(
         }
         c(excess = tot, sd = sqrt(var_tot))
       }
-      states <- c(list(before = private$.counts),
+      states <- c(list(uncorrected = private$.counts),
         lapply(corrections, function(x) x$counts()))
       est <- t(vapply(states, state_excess, c(excess = 0, sd = 0)))
+      # fixed denominator: all molecules before correction, so bars read as
+      # the estimated admixed fraction of the dataset's molecules
+      denom <- max(sum(private$.totals), 1)
       df <- data.frame(state = factor(rownames(est), levels = rownames(est)),
-        excess = est[, "excess"], sd = est[, "sd"])
-      denom <- if (relative) df$excess[[1]] else 1
-      df$y <- df$excess / denom
-      df$lo <- pmax(df$excess - 1.96 * df$sd, 0) / denom
-      df$hi <- (df$excess + 1.96 * df$sd) / denom
-      ggplot2::ggplot(df, ggplot2::aes(x = state, y = y)) +
+        y = est[, "excess"] / denom,
+        lo = pmax(est[, "excess"] - 1.96 * est[, "sd"], 0) / denom,
+        hi = (est[, "excess"] + 1.96 * est[, "sd"]) / denom)
+      ggplot2::ggplot(df, ggplot2::aes(x = state, y = 100 * y)) +
         ggplot2::geom_col(fill = "#34495e", width = 0.6, alpha = 0.9) +
-        ggplot2::geom_errorbar(ggplot2::aes(ymin = lo, ymax = hi),
+        ggplot2::geom_errorbar(ggplot2::aes(ymin = 100 * lo, ymax = 100 * hi),
           width = 0.15, linewidth = 0.4) +
         ggplot2::labs(x = NULL,
-          y = if (relative) "estimated admixture (fraction of uncorrected)"
-              else "estimated admixed molecules",
+          y = "estimated admixture (% of all molecules)",
           title = "Remaining admixture by correction",
-          subtitle = "summed over detected cell-type pairs; error bars: 95% intervals") +
+          subtitle = "conservative estimate over detected cell-type pairs; error bars: 95% intervals") +
         ggplot2::theme_classic(base_size = 10)
     },
 
