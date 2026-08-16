@@ -233,8 +233,9 @@ KL-NMF): individual seed fits (grey), rule-level consensus applied per seed
 (orange squares), and the 3-of-10 molecule-vote ensemble (red star).
 Take-home: the molecule vote is the only strategy that is uniformly at or
 above the best single fit while being deterministic given the restart pool;
-which factorization variant wins remains scoring-method- and
-tissue-dependent, but the ensemble removes the risk of drawing a bad seed.
+under the vote, invsqrt KL-NMF is at least as good as ls-NMF for membrane
+scoring in every case measured, and ls-NMF at least as good as invsqrt for
+bridge scoring — the variant choice should follow the scoring method.
 
 ## Conclusions
 
@@ -253,7 +254,14 @@ cellAdmix it yields three conclusions:
    objective does not identify good corrections, but the restarts jointly
    contain them: molecule-level voting across seeds dominates every
    single-fit arm, and its threshold is a transparent, per-dataset-calibrable
-   sensitivity/specificity dial.
+   sensitivity/specificity dial. Under the vote, the factorization choice
+   resolves cleanly by scoring method — invsqrt KL-NMF for membrane-scored
+   corrections, ls-NMF for bridge-scored ones — reflecting complementary
+   failure geometry: sharp invsqrt factors give membrane scoring its
+   cleanest contrast, while the contact-based bridge statistic is blind to
+   diffuse leakage regardless of variant and benefits from ls-NMF's
+   concentrated per-type evidence. Pooling votes across scoring methods as
+   well as restarts is the natural next increment.
 3. **Recommended solution: ensemble correction by molecule vote.** Derive
    the correction from N independent restarts of the full
    fit-score-correct pipeline (the fit already computes such restarts
