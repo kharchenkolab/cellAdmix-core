@@ -28,10 +28,14 @@ ncv_k = int(manifest.get("pipeline_options", {}).get("ncv_k", 20)) or 20
 
 cache_dir = os.path.join(os.path.dirname(os.path.abspath(out_csv)), "cache")
 os.makedirs(cache_dir, exist_ok=True)
-cache = os.path.join(cache_dir, os.path.basename(os.path.normpath(run_dir)) + "_ncv.npz")
+import hashlib
+run_key = hashlib.sha1(os.path.abspath(run_dir).encode()).hexdigest()[:10]
+cache = os.path.join(cache_dir,
+    os.path.basename(os.path.normpath(run_dir)) + "_" + run_key + "_ncv.npz")
 
 if os.path.exists(cache):
     X = load_npz(cache)
+    assert X.shape[1] == G, "cached NCV gene dimension mismatch"
     print(f"NCV loaded from cache: {X.shape}", flush=True)
 else:
     tr = pq.read_table(f"{run_dir}/training_rows.parquet").to_pandas().sort_values("training_rank")
@@ -82,11 +86,35 @@ Q = Xd[:, ok].T @ Xd[:, ok]
 np.fill_diagonal(Q, 0)
 Qn = Q / np.maximum(Q.sum(axis=1, keepdims=True), 1e-12)
 idx = np.flatnonzero(ok)
+# Shrink each gene's conditional row toward the global gene distribution in
+# proportion to its occurrence count: poorly estimated rows of low-count genes
+# are noise-spiky, and SPA would otherwise select spikiness over exclusivity.
+occ = tot[ok]
+p_global = Q.sum(axis=0) / max(Q.sum(), 1e-12)
+tau = 300.0
+lam = (occ / (occ + tau))[:, None]
+Qn = lam * Qn + (1.0 - lam) * p_global[None, :]
+raw = Q / np.maximum(Q.sum(axis=1, keepdims=True), 1e-12)
+raw_sq = (raw ** 2).sum(axis=1)
 R = Qn.copy()
 anchors = []
+excluded = np.zeros(Qn.shape[0], dtype=bool)
 for _ in range(k):
-    j = int(np.argmax((R ** 2).sum(axis=1)))
+    norms = (R ** 2).sum(axis=1).copy()
+    norms[excluded] = -1
+    if norms.max() <= 0:
+        break
+    j = int(np.argmax(norms))
     anchors.append(j)
+    excluded[j] = True
+    # Masked cosine on raw conditional rows: a co-expressed clique member's
+    # similarity to the picked anchor hides in their mutual coordinates, so
+    # mask each pair's own coordinates out of the norms before comparing.
+    dot = raw @ raw[j]
+    norm_i = np.sqrt(np.maximum(raw_sq - raw[:, j] ** 2, 1e-18))
+    norm_j = np.sqrt(np.maximum(raw_sq[j] - raw[j, :] ** 2, 1e-18))
+    sim = dot / (norm_i * norm_j)
+    excluded |= sim > 0.8
     u = R[j] / max(np.linalg.norm(R[j]), 1e-12)
     R = R - np.outer(R @ u, u)
 print("anchors:", ", ".join(genes[idx[a]] for a in anchors), flush=True)
