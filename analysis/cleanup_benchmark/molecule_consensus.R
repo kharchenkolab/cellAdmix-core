@@ -87,7 +87,8 @@ message("pairs: ", length(pair_defs))
 # consensus-removal deltas precomputed by consensus_delta.py
 for (variant in c("ls_nmf", "invsqrt_kl")) {
   for (method in cfg$methods) {
-   for (tag in c("molcons", "moluni")) {
+   tags <- strsplit(Sys.getenv("BENCH_TAGS", "molcons,moluni"), ",")[[1]]
+   for (tag in tags) {
     delta_csv <- file.path(bench_dir, "results",
       sprintf("%s_%s_%s_%s.csv.gz", dataset, tag, variant, method))
     if (!file.exists(delta_csv)) { message("missing: ", delta_csv); next }
