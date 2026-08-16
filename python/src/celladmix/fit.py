@@ -245,6 +245,12 @@ class CellAdmixFit:
         matrix = sparse.csc_matrix((data, indices, indptr), shape=(len(genes), len(cells)))
         return matrix, genes, cells
 
+    def audit_admixture(self, **kwargs):
+        """Estimate per-cell-type-pair admixture from spatial exposure."""
+        from .audit import CellAdmixAudit
+
+        return CellAdmixAudit(self, **kwargs)
+
     def score_factor_sources(self, *, annotation=None, counts=None, **kwargs):
         """Score factor source cell types using marker-weighted gene content."""
         from .factor_sources import score_factor_sources
@@ -296,6 +302,16 @@ class CellAdmixFit:
         )
         return CellAdmixScore(self, "bridge", result)
 
+    def score_neighbor_enrichment(self, **kwargs):
+        """Score admixture by source-cell neighborhood enrichment."""
+        from .neighbor import score_neighbor_enrichment
+
+        return score_neighbor_enrichment(self, **kwargs)
+
+    def score_neighbor_frequency(self, **kwargs):
+        """Alias for :meth:`score_neighbor_enrichment`."""
+        return self.score_neighbor_enrichment(**kwargs)
+
     def correct(self, rules: pd.DataFrame, *, name: str = "clean"):
         """Remove molecules matching factor/target-cell-type correction rules."""
         from .correction import CellAdmixCorrection
@@ -312,7 +328,7 @@ class CellAdmixFit:
             annotation_cell_ids=cell_ids,
             annotation_labels=labels,
         )
-        return CellAdmixCorrection(str(out_dir), result)
+        return CellAdmixCorrection(str(out_dir), result, rules=rules)
 
     def plot_loadings(self, *, n_genes: int = 8, **kwargs):
         from .plotting import plot_loadings

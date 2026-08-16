@@ -135,6 +135,31 @@ iterative hard-label ICM, not marginal-probability CRF inference, so the
 Cell-level `factor_K_fraction` values are fractions of molecules assigned to
 each hard factor label after smoothing. They are not soft cell probabilities.
 
+### Auditing Admixture and Verifying Cleanup
+
+Independently of factorization and scoring, admixture can be estimated
+from the dataset's spatial structure: source-marker content in target
+cells rises with source-type neighbor exposure, while unexposed target
+cells provide an internal negative control (see
+[benchmarks.md](benchmarks.md) for the methodology). The audit measures
+this per ordered cell-type pair and verifies corrections against the same
+measurements:
+
+```python
+audit = fit.audit_admixture()
+audit.pairs()                       # per-pair leaked-molecule estimates
+audit.plot_map()                    # source x target admixture overview
+audit.plot_exposure()               # pooled exposure profile, 95% intervals
+audit.plot_remaining({"membrane": correction})
+
+report = audit.evaluate(correction) # per-pair sensitivity, false removal,
+report.summary()                    # and warnings for uncovered pairs
+report.plot_cleanup()
+```
+
+Estimates are conservative lower bounds: contamination reaching even
+unexposed cells raises the reference level and is not counted.
+
 ## SpatialData API
 
 SpatialData integration keeps SpatialData as the Python-side source of

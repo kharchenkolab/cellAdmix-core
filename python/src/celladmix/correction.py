@@ -14,9 +14,10 @@ from .state import clustering_result_to_frame
 class CellAdmixCorrection:
     """A corrected cellAdmix run."""
 
-    def __init__(self, run_path: str, manifest: dict):
+    def __init__(self, run_path: str, manifest: dict, rules=None):
         self.run_path = Path(run_path)
         self.manifest = manifest
+        self.rules = rules
 
     def __repr__(self) -> str:
         removed = self.manifest.get("n_removed", "unknown")
