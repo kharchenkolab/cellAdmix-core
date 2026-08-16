@@ -7,7 +7,13 @@ import os
 import numpy as np
 import pyarrow.parquet as pq
 
-OUT = 'examples/xenium_pancreas_membrane_377_full/out'
+import sys
+DATASET = sys.argv[1] if len(sys.argv) > 1 else 'pancreas'
+OUT, METHODS = {
+    'pancreas': ('examples/xenium_pancreas_membrane_377_full/out', ['membrane', 'bridge']),
+    'breast_crop': ('examples/xenium_breast_membrane_5k_full/out_medium_crop', ['membrane', 'bridge']),
+    'nsclc': ('examples/cosmx_nsclc_giotto/out', ['bridge']),
+}[DATASET]
 RESULTS = 'analysis/cleanup_benchmark/results'
 SEEDS = list(range(1, 11))
 THRESHOLDS = [1, 2, 3, 5, 7, 10]
@@ -23,7 +29,7 @@ obs = mol['obs_id'].to_numpy()
 max_obs = int(obs.max()) + 1
 
 for variant in ['ls_nmf', 'invsqrt_kl']:
-    for method in ['membrane', 'bridge']:
+    for method in METHODS:
         votes = np.zeros(max_obs, dtype=np.int16)
         n_seeds = 0
         for s in SEEDS:
@@ -45,7 +51,7 @@ for variant in ['ls_nmf', 'invsqrt_kl']:
             rm = votes[obs] >= thr
             sub = mol.loc[rm]
             agg = sub.groupby(['gene_idx', 'cell_idx']).size().reset_index(name='n')
-            path = f'{RESULTS}/pancreas_vote{thr}of{n_seeds}_{variant}_{method}.csv.gz'
+            path = f'{RESULTS}/{DATASET}_vote{thr}of{n_seeds}_{variant}_{method}.csv.gz'
             with gzip.open(path, 'wt') as f:
                 f.write('gene,cell_id,n\n')
                 for gi, ci, n in agg.itertuples(index=False):

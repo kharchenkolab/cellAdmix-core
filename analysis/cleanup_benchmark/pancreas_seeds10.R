@@ -9,8 +9,11 @@ cell_annotation <- setNames(annotation_df$merged_annotation, annotation_df$cell_
 setwd("examples/xenium_pancreas_membrane_377_full")
 ds <- cellAdmix("data", output_dir = "out", annotation = cell_annotation)
 
-for (variant in c("ls_nmf", "invsqrt_kl")) {
-  for (s in 1:10) {
+args <- commandArgs(trailingOnly = TRUE)
+shard_variant <- args[[1]]
+shard_seeds <- eval(parse(text = args[[2]]))
+for (variant in shard_variant) {
+  for (s in shard_seeds) {
     run_id <- sprintf("bench_seed%d_%s", s, variant)
     fit <- ds$fit(nmf_variant = variant, seed = s, verbose = FALSE, run_id = run_id)
     for (method in c("membrane", "bridge")) {
