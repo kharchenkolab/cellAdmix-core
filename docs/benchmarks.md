@@ -1,32 +1,31 @@
 # Benchmarking admixture cleanup
 
-Molecule-level admixture correction faces a basic evaluation problem: no
-ground truth identifies which individual transcripts leaked between
-neighboring cells. The benchmark described here exploits the defining
-property of segmentation-driven admixture — that it is spatially structured.
-Contamination of a cell by a given source cell type requires physical
-adjacency to cells of that type, so the amount of foreign material scales
-with a cell's exposure to source-type neighbors, while cells with no such
-neighbors constitute an internal negative control. Any annotated dataset
-thereby carries its own population-level ground truth. The same principle
-underlies earlier cellAdmix diagnostics — the Bayesian admixture-probability
-score built on cell-type adjacency, and the false-positive check based on
-source-distant cells (Mitchel et al., 2025) — but those are per-cell or
-per-rule diagnostics; here the principle is developed into a quantitative
-benchmark of correction methods: per-pair estimates of the number of leaked
-molecules, before/after scoring of corrections, and a translation into
-estimated sensitivity and specificity. We apply it to cellAdmix's
-factorization variants and scoring methods across three datasets, quantify
-the run-to-run stochasticity of the correction pipeline, and evaluate
-ensemble corrections that turn that stochasticity into a calibration dial.
-The harness lives in `analysis/cleanup_benchmark/`.
+Admixture correction removes individual molecules from cells, yet no ground
+truth marks which molecules actually leaked between cells — so how well a
+correction works is ordinarily a matter of judgment. This report builds an
+evaluation benchmark from the spatial structure of admixture itself: a
+target cell can only be contaminated by a cell type it physically borders,
+so the content of source-specific genes in target cells must rise with the
+number of source-type neighbors, while target cells with no such neighbors
+provide an internal negative control. Comparing exposed cells against that
+control yields, for every ordered cell-type pair (source → target), a
+conservative estimate of the number of admixed molecules; applied before
+and after correction, it scores how much of the admixture a cleanup
+removed, in terms that translate into estimated sensitivity and
+specificity. We use the benchmark to compare cellAdmix's factorization
+variants and scoring methods across three datasets, to expose the strong
+seed-to-seed stochasticity of single-fit corrections, and to derive an
+ensemble correction whose vote threshold acts as a calibrable
+sensitivity/specificity dial. The harness lives in
+`analysis/cleanup_benchmark/`.
 
 ## The neighbor benchmark
 
 For an ordered pair of cell types — a *source* S and a *target* T — every
 T cell is characterized by its *exposure*: the number of S cells among its
-15 nearest cells (the same neighborhood definition used by the pipeline's
-native-factor check). T cells are stratified into exposure bins
+15 nearest cells — the same adjacency principle that underlies the
+admixture-probability diagnostics of Mitchel et al. (2025) and the
+pipeline's native-factor check. T cells are stratified into exposure bins
 (0, 1, 2, 3+); the zero-exposure bin is the clean reference — whatever those
 cells contain, a T cell contains on its own.
 
@@ -38,34 +37,41 @@ being measured. Within the panel, the *strict tier* holds genes essentially
 absent from reference T cells (baseline under 5% of the source level);
 their excess in exposed T cells can only be leaked material.
 
-The measurement treats the pooled marker count in each exposure bin as a
-Poisson rate: m_B ∼ Poisson(ρ_B · M_B), where m_B is the number of panel
-molecules and M_B the total number of molecules over all T cells in bin B
-(the offset). This is a saturated rate model over bins — one rate per bin,
-with no assumed functional form for the exposure dependence. The pair's
-estimated leakage is the exceedance over the reference rate,
+Counts are pooled over the panel: the measured unit is the panel's total
+molecule count, not individual markers. For exposure bin $B$, let $m_B$ be
+the number of panel-gene molecules and $M_B$ the total number of molecules
+over all T cells in that bin. The measurement treats
+$m_B \sim \mathrm{Poisson}(\rho_B M_B)$ — a saturated rate model with one
+rate per bin and no assumed functional form for the exposure dependence.
+The reference rate $\hat\rho_0$ is generally nonzero (Figure 1a): it
+contains whatever low native expression the strict-tier filter admitted,
+plus any contamination that reaches even unexposed cells (ambient spread).
+The pair's estimated leakage counts only the exceedance above it,
 
-L = Σ_{B>0} max(ρ̂_B − ρ̂_0, 0) · M_B ,
+$$L = \textstyle\sum_{B>0} \max(\hat\rho_B - \hat\rho_0,\, 0)\, M_B,$$
 
-i.e. the number of panel molecules in exposed cells beyond what the
-zero-exposure rate predicts (Figure 1a, the gap between the red curve and
-the dotted baseline). Pairs enter the benchmark when a one-sided Poisson
-test of the pooled exposed counts against the ρ̂_0 expectation survives
-Benjamini–Hochberg correction across candidate pairs (q < 0.01) and
-L ≥ 200 molecules — 39 of 42 candidate pairs on the pancreas dataset, 13 on
-the breast crop, 27 on NSCLC, with no manual curation.
+i.e. the gap between the observed curve and the dotted baseline in
+Figure 1a, converted from rates back to molecules via each bin's total
+$M_B$. Because the baseline itself may contain contamination, $L$ is a
+conservative (lower-bound) estimate of the pair's admixed molecules. Pairs
+enter the benchmark when a one-sided Poisson test of the pooled exposed
+counts against the $\hat\rho_0$ expectation survives Benjamini–Hochberg
+correction across candidate pairs ($q < 0.01$) and $L \geq 200$
+molecules — 39 of 42 candidate cell-type pairs on the pancreas dataset,
+13 on the breast crop, 27 on NSCLC, with no manual curation.
 
 A correction is scored by recomputing the exceedance on the corrected
-counts — keeping the pre-correction offsets M_B, so that removal registers
-as removal rather than being hidden by renormalization — and taking the
-fraction eliminated: sensitivity = 1 − L_after / L_before. Two design
-details matter. The corrected exceedance is measured against the
+counts — keeping the pre-correction offsets $M_B$, so that removal
+registers as removal rather than being hidden by renormalization — and
+taking the fraction eliminated:
+$\mathrm{sensitivity} = 1 - L_{\mathrm{after}} / L_{\mathrm{before}}$.
+Two design details matter. The corrected exceedance is measured against the
 *corrected* zero-exposure rate, so uniformly deleting a gene everywhere
 earns full credit for that gene's leakage (it does eliminate the exposure
 dependence) but is charged separately by the specificity metrics below.
 And because the exceedance is bin-wise rather than a fitted slope, monotone
 but non-linear exposure responses (Figure 1a) are handled without
-approximation. The per-pair profile for a standard single-fit cleanup
+approximation. The profile across all detected cell-type pairs for a standard single-fit cleanup
 (Figure 1b) shows effectiveness to be highly heterogeneous across pairs,
 with the largest pair by leakage mass (exocrine → ductal, over 200,000
 molecules) missed entirely — a coverage failure invisible to aggregate
@@ -77,11 +83,14 @@ diagnostics.
 source-marker rates in target cells, stratified by the number of source-type
 neighbors, before (red, dashed) and after (blue) a standard cleanup (bare
 ls-NMF fit, membrane scoring, pancreas dataset); the dotted line marks the
-zero-exposure reference rate ρ̂_0. The rise with exposure is contamination
+zero-exposure reference rate $\hat\rho_0$ — nonzero in general, since it
+includes residual native expression and ambient contamination; only the
+excess above it counts as leakage. The rise with exposure is contamination
 made visible; cleanup quality is the degree to which the blue curve
-flattens to the reference — compare the near-complete flattening of
-endocrine → endothelial with the untouched fibroblast → immune pair, where
-the curves coincide. **(b)** Estimated sensitivity for every detected pair
+flattens to the reference. Compare the near-complete flattening of
+endocrine → endothelial with fibroblast → immune, where the curves
+coincide exactly: the correction issued no removal rule for that pair, so
+its molecules were untouched. **(b)** Estimated sensitivity for every detected pair
 (bars), with each pair's estimated leaked-molecule count L overlaid
 (orange, log scale). Take-home: cleanup effectiveness is measurable without
 molecule-level ground truth, and a standard single-fit correction is highly
@@ -101,7 +110,7 @@ quantities, each computed on a stratum where the truth is nearly known:
   marker-driven method.
 - **Estimated false-positive rate.** Molecules of a cell type's own marker
   genes, inside cells of that type, are almost surely genuine; their removal
-  rate is a direct FPR estimate (specificity = 1 − FPR). Its bias runs the
+  rate is a direct FPR estimate ($\mathrm{specificity} = 1 - \mathrm{FPR}$). Its bias runs the
   other way: it samples the molecules easiest to keep. A worst-case
   companion — the most-affected pair's retention — tracks the shared-gene
   erasures (e.g. CFTR, genuinely expressed by both exocrine and ductal cells)
