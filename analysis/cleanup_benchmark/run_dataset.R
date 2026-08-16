@@ -1,12 +1,23 @@
 # Shared cleanup-benchmark driver. A per-dataset config script builds the
 # dataset object and calls bench_run(); see run_pancreas.R for an example.
+#
+# Arms evaluated:
+#  - variants x methods x seeds (bare methods)
+#  - consensus: per variant x method, the union of native-check-passing
+#    (source, target) decisions across seeds, imported into each seed's fit
+#    subject to that fit's own native check
+#  - extra_fits: pre-built runs (e.g. anchor-based fixed-H fits), by label
 
 suppressMessages(library(Matrix))
+
+`%||%` <- function(a, b) if (is.null(a)) b else a
 
 bench_run <- function(ds, cell_annotation, label,
                       methods = c("membrane", "bridge"),
                       variants = c("ls_nmf", "invsqrt_kl"),
                       seeds = NULL,
+                      consensus = FALSE,
+                      extra_fits = NULL,
                       p_thresh = 0.1,
                       out_dir = NULL) {
   out_dir <- out_dir %||% file.path(Sys.getenv("BENCH_DIR", "analysis/cleanup_benchmark"), "results")
@@ -83,39 +94,18 @@ bench_run <- function(ds, cell_annotation, label,
   message(sprintf("pairs considered: %d, detected: %d", length(pair_defs), length(keep)))
   pair_defs <- pair_defs[keep]
 
-  arms <- expand.grid(variant = variants, method = methods,
-    seed = seeds %||% NA_integer_, stringsAsFactors = FALSE)
   results <- list()
   gene_results <- list()
 
-  for (ai in seq_len(nrow(arms))) {
-    variant <- arms$variant[[ai]]
-    method <- arms$method[[ai]]
-    seed <- arms$seed[[ai]]
-    arm <- paste0(variant, "/", method, if (!is.na(seed)) paste0("/s", seed))
-    message("== ", label, " arm: ", arm)
-    fit <- if (is.na(seed)) {
-      ds$fit(nmf_variant = variant, verbose = FALSE)
-    } else {
-      ds$fit(nmf_variant = variant, seed = seed, verbose = FALSE,
-        run_id = sprintf("bench_seed%d_%s", seed, variant))
-    }
-    score <- if (method == "membrane") fit$score_membrane() else fit$score_bridge()
+  eval_arm <- function(fit, score, rules, counts_after, variant, method, seed, arm) {
     score_annotation <- score$annotation(p_thresh = p_thresh)
-    rules <- score$rules(p_thresh = p_thresh)
-    corr_name <- paste0("cmp_", method, "_", variant,
-      if (!is.na(seed)) paste0("_s", seed))
-    correction <- score$correct(rules = rules, name = corr_name)
-    counts_after <- correction$counts()
-
-    mols <- tryCatch(fit$molecules(sample_n = 3000000L), error = function(e) NULL)
     source_calls <- score_annotation$source_calls
     factors_of_source <- function(S) {
       hits <- names(source_calls)[vapply(source_calls, function(v)
         identical(as.character(v), S), TRUE)]
       as.integer(sub("^f_", "", hits))
     }
-
+    mols <- tryCatch(fit$molecules(sample_n = 3000000L), error = function(e) NULL)
     for (pname in names(pair_defs)) {
       d <- pair_defs[[pname]]
       exposed <- d$T_cells[d$expo > 0]
@@ -134,9 +124,9 @@ bench_run <- function(ds, cell_annotation, label,
       }
       mk_before <- sum(mcount(counts_before, d$pool, exposed))
       mk_after <- sum(mcount(counts_after, d$pool, exposed))
-      results[[length(results) + 1]] <- data.frame(
+      results[[length(results) + 1]] <<- data.frame(
         dataset = label, pair = pname, source = d$S, target = d$T_type,
-        variant = variant, method = method, seed = seed,
+        variant = variant, method = method, seed = seed, arm = arm,
         excess_molecules = round(d$excess),
         n_exposed = length(exposed), n_e0 = length(e0),
         power = round(bench_power(rb, ra), 3),
@@ -164,25 +154,84 @@ bench_run <- function(ds, cell_annotation, label,
       pg <- bench_power_per_gene(counts_before, counts_after, d$pool,
         d$T_cells, totals_before[d$T_cells], d$bins)
       pg$dataset <- label; pg$pair <- pname
-      pg$variant <- variant; pg$method <- method; pg$seed <- seed
-      gene_results[[length(gene_results) + 1]] <- pg
+      pg$variant <- variant; pg$method <- method; pg$seed <- seed; pg$arm <- arm
+      gene_results[[length(gene_results) + 1]] <<- pg
     }
+  }
 
-    # dataset-level control-gene sanity number for this arm
-    ctrl_excess_b <- 0; ctrl_excess_a <- 0
-    for (pname in names(pair_defs)) {
-      d <- pair_defs[[pname]]
-      ctrl <- bench_control_genes(profiles, d$S, d$pool)
-      crb <- bench_bin_rates(mcount(counts_before, ctrl, d$T_cells),
-        totals_before[d$T_cells], d$bins)
-      cra <- bench_bin_rates(mcount(counts_after, ctrl, d$T_cells),
-        totals_before[d$T_cells], d$bins)
-      db <- bench_detect(crb); da <- bench_detect(cra)
-      ctrl_excess_b <- ctrl_excess_b + db$excess_molecules
-      ctrl_excess_a <- ctrl_excess_a + da$excess_molecules
+  # ---- bare arms ----
+  arm_ctx <- list()
+  arms <- expand.grid(variant = variants, method = methods,
+    seed = seeds %||% NA_integer_, stringsAsFactors = FALSE)
+  for (ai in seq_len(nrow(arms))) {
+    variant <- arms$variant[[ai]]; method <- arms$method[[ai]]; seed <- arms$seed[[ai]]
+    arm <- paste0(variant, "/", method, if (!is.na(seed)) paste0("/s", seed))
+    message("== ", label, " arm: ", arm)
+    fit <- if (is.na(seed)) ds$fit(nmf_variant = variant, verbose = FALSE) else
+      ds$fit(nmf_variant = variant, seed = seed, verbose = FALSE,
+        run_id = sprintf("bench_seed%d_%s", seed, variant))
+    score <- if (method == "membrane") fit$score_membrane() else fit$score_bridge()
+    rules <- score$rules(p_thresh = p_thresh)
+    corr_name <- paste0("cmp_", method, "_", variant, if (!is.na(seed)) paste0("_s", seed))
+    correction <- score$correct(rules = rules, name = corr_name)
+    eval_arm(fit, score, rules, correction$counts(), variant, method, seed, arm)
+    arm_ctx[[arm]] <- list(fit = fit, score = score, rules = rules,
+      variant = variant, method = method, seed = seed)
+  }
+
+  # ---- consensus arms ----
+  if (isTRUE(consensus) && !is.null(seeds) && length(seeds) >= 2) {
+    for (variant in variants) for (method in methods) {
+      ctxs <- Filter(function(cx) cx$variant == variant && cx$method == method, arm_ctx)
+      if (length(ctxs) < 2) next
+      kept <- unique(unlist(lapply(ctxs, function(cx)
+        paste(cx$rules$source_cell_type[cx$rules$keep],
+          cx$rules$target_cell_type[cx$rules$keep], sep = "||"))))
+      for (cx in ctxs) {
+        arm <- paste0(variant, "/", method, "/cons_s", cx$seed)
+        message("== ", label, " arm: ", arm)
+        rules <- cx$rules
+        ann <- cx$score$annotation(p_thresh = p_thresh)
+        src <- ann$source_calls
+        have <- unique(paste(rules$source_cell_type[rules$keep],
+          rules$target_cell_type[rules$keep], sep = "||"))
+        add <- list()
+        for (cp in setdiff(kept, have)) {
+          parts <- strsplit(cp, "\\|\\|")[[1]]
+          fs <- as.integer(sub("^f_", "", names(src)[vapply(src, function(v)
+            identical(as.character(v), parts[[1]]), TRUE)]))
+          for (f in fs) {
+            row <- rules[1, , drop = FALSE]
+            row$factor <- f
+            row$source_cell_type <- parts[[1]]
+            row$target_cell_type <- parts[[2]]
+            add[[length(add) + 1]] <- row
+          }
+        }
+        if (length(add)) {
+          imported <- cellAdmixCore:::.celladmix_apply_native_check(
+            do.call(rbind, add), cx$fit)
+          rules <- rbind(rules, imported[imported$keep, , drop = FALSE])
+        }
+        correction <- cx$score$correct(rules = rules,
+          name = paste0("cmp_cons_", method, "_", variant, "_s", cx$seed))
+        eval_arm(cx$fit, cx$score, rules, correction$counts(),
+          variant, method, cx$seed, arm)
+      }
     }
-    message(sprintf("  control-gene excess (should stay near 0): before=%d after=%d",
-      round(ctrl_excess_b), round(ctrl_excess_a)))
+  }
+
+  # ---- extra fits (e.g. anchor-based) ----
+  for (nm in names(extra_fits %||% list())) {
+    fit <- ds$read_fit(file.path(ds$prep$paths$runs_dir, extra_fits[[nm]]))
+    for (method in methods) {
+      arm <- paste0(nm, "/", method)
+      message("== ", label, " arm: ", arm)
+      score <- if (method == "membrane") fit$score_membrane() else fit$score_bridge()
+      rules <- score$rules(p_thresh = p_thresh)
+      correction <- score$correct(rules = rules, name = paste0("cmp_", nm, "_", method))
+      eval_arm(fit, score, rules, correction$counts(), nm, method, NA_integer_, arm)
+    }
   }
 
   res <- do.call(rbind, results)
@@ -191,8 +240,6 @@ bench_run <- function(ds, cell_annotation, label,
   write.csv(genes, file.path(out_dir, paste0(label, "_genes.csv")), row.names = FALSE)
 
   message("\n== ", label, " scorecard ==")
-  res$arm <- paste0(res$variant, "/", res$method,
-    ifelse(is.na(res$seed), "", paste0("/s", res$seed)))
   card <- do.call(rbind, lapply(split(res, res$arm), function(g) {
     data.frame(arm = g$arm[[1]],
       leakage_removed_overall = round(sum(g$power * g$excess_molecules) /
@@ -202,11 +249,8 @@ bench_run <- function(ds, cell_annotation, label,
       pairs_ge_09 = sprintf("%d/%d", sum(g$power >= 0.9, na.rm = TRUE), nrow(g)),
       rules_kept = round(mean(g$rule_kept), 2),
       identity_retention_med = round(stats::median(g$safety_native, na.rm = TRUE), 3),
-      identity_retention_min = round(min(g$safety_native, na.rm = TRUE), 3),
-      integrity_med = round(stats::median(g$integrity_native, na.rm = TRUE), 3))
+      identity_retention_min = round(min(g$safety_native, na.rm = TRUE), 3))
   }))
   print(card, row.names = FALSE)
   invisible(list(pairs = res, genes = genes, scorecard = card))
 }
-
-`%||%` <- function(a, b) if (is.null(a)) b else a
