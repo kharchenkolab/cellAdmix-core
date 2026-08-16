@@ -122,14 +122,17 @@ with more factors than well-separated expression programs, each restart
 commits to a different, near-equivalent split of the surplus, and the
 training objective neither distinguishes these solutions nor predicts
 their cleanup quality — so selecting the best-objective restart does not
-help, and neither do more restarts. The variability propagates through
-scoring: the sets of removal decisions (source → target rules) that
-survive thresholds overlap only partially between seeds (Figure 2b), and
-the final molecule removal sets of two runs share only about half their
-members (median Jaccard 0.57 invsqrt, 0.45 ls-NMF; Figure 2c) despite
-similar totals. The two variants are exposed at different levels: invsqrt
-varies mostly in factor ownership, ls-NMF mostly in which scoring
-decisions clear the threshold.
+help, and neither do more restarts. Downstream, the *lists* of removal
+decisions (source → target rules) that survive scoring are comparatively
+reproducible (Jaccard ≈ 0.83 between runs; Figure 2b) — but the
+disagreements concentrate on a few high-leakage pairs (the exocrine →
+ductal decision flips between runs and carries half the dataset's
+leakage), and the per-molecule labels that decisions act on vary much
+more. The net effect is that the final removed-molecule sets of two runs
+share only about half their members (median Jaccard 0.56 invsqrt,
+0.45 ls-NMF; Figure 2c) despite similar totals — for ls-NMF even though
+its factors are stable, showing that its weakly committed molecule labels
+are the dominant source of variation.
 
 ![Figure 2](figures/benchmark_fig2.png)
 
@@ -138,11 +141,13 @@ membrane scoring, ten random seeds).** Each dot compares two seeds; bars
 mark medians. **(a)** Factor variability: gene-ownership correlation of
 matched factors between two runs. **(b)** Scoring variability: overlap
 (Jaccard index) of the kept removal-decision sets. **(c)** Net effect:
-overlap of the final removed-molecule sets. Take-home: a single-fit
-correction is effectively a lottery — under invsqrt KL-NMF the factors
-themselves differ between runs; under ls-NMF the factors are stable but
-the scoring decisions still vary; either way only about half of the
-individual removed molecules agree between two runs.
+overlap of the final removed-molecule sets. Take-home: single-fit
+corrections are irreproducible at the molecule level — only about half of
+the removed molecules agree between two runs (c) — but the two variants
+get there differently: invsqrt KL-NMF's factors themselves differ between
+runs (a), while ls-NMF's factors and decision lists are largely stable
+(a, b) and the variation enters through its weakly committed per-molecule
+labels.
 
 ## Ensemble corrections by molecule voting
 
