@@ -116,7 +116,7 @@ if sweep_log and os.path.exists(sweep_log):
         m = pat.search(line)
         if m:
             rows.append(dict(thr=int(m[1]), n=int(m[2]), dataset=m[3], variant=m[4],
-                method=m[5], sens=float(m[6]), fpr=float(m[7]), worst=float(m[8])))
+                method=m[5], sens=float(m[6]), fpr=float(m[8]), worst=float(m[9])))
     sw = pd.DataFrame(rows)
     sw.to_csv(f'{R}/vote_sweep_all.csv', index=False)
     fig, axes = plt.subplots(1, 2, figsize=(9, 3.4))
@@ -126,12 +126,14 @@ if sweep_log and os.path.exists(sweep_log):
     for (dsname, variant, method), g in sw[sw['variant'] == 'invsqrt_kl'].groupby(
             ['dataset', 'variant', 'method']):
         g = g.sort_values('thr')
-        ax.plot(g['fpr'] * 100, g['sens'], styles[method], marker='o', ms=3,
+        fx = np.maximum(g['fpr'] * 100, 0.02)
+        ax.plot(fx, g['sens'], styles[method], marker='o', ms=3,
             color=colors[dsname], label=f'{dsname} {method}')
         for _, r in g.iterrows():
-            if r['thr'] in (1, 3, 5, 10):
-                ax.annotate(f"≥{int(r['thr'])}", (r['fpr'] * 100, r['sens']),
+            if r['thr'] in (1, 3, 10):
+                ax.annotate(f"≥{int(r['thr'])}", (max(r['fpr'] * 100, 0.02), r['sens']),
                     fontsize=6, xytext=(3, 2), textcoords='offset points')
+    ax.set_xscale('log')
     ax.set_xlabel('estimated FPR, native stratum (%)')
     ax.set_ylabel('estimated sensitivity (strict tier)')
     ax.set_title('invsqrt KL-NMF: vote-threshold ROC')
@@ -140,8 +142,14 @@ if sweep_log and os.path.exists(sweep_log):
     for (dsname, variant, method), g in sw[sw['variant'] == 'ls_nmf'].groupby(
             ['dataset', 'variant', 'method']):
         g = g.sort_values('thr')
-        ax.plot(g['fpr'] * 100, g['sens'], styles[method], marker='o', ms=3,
+        fx = np.maximum(g['fpr'] * 100, 0.02)
+        ax.plot(fx, g['sens'], styles[method], marker='o', ms=3,
             color=colors[dsname], label=f'{dsname} {method}')
+        for _, r in g.iterrows():
+            if r['thr'] in (1, 3, 10):
+                ax.annotate(f"≥{int(r['thr'])}", (max(r['fpr'] * 100, 0.02), r['sens']),
+                    fontsize=6, xytext=(3, 2), textcoords='offset points')
+    ax.set_xscale('log')
     ax.set_xlabel('estimated FPR, native stratum (%)')
     ax.set_title('ls-NMF: vote-threshold ROC')
     ax.legend(frameon=False, fontsize=7)
