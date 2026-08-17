@@ -43,7 +43,8 @@ short steps.
 - Corrected sparse cell-by-gene count collection and add-back to Seurat.
 - Admixture audit: exposure-gradient estimates of leaked molecules per
   cell-type pair, independent of the factorization, with post-correction
-  verification of cleanup sensitivity and false removal.
+  verification of cleanup sensitivity and false removal
+  ([docs/benchmarks.md](docs/benchmarks.md)).
 - Ensemble correction by default: molecule-level voting across NMF restarts
   stabilizes seed-dependent corrections, with the vote threshold as a
   sensitivity/specificity dial.

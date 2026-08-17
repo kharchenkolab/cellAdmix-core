@@ -33,7 +33,7 @@ The workflow is:
 
 ```{r api-overview, eval=FALSE}
 ds <- cellAdmix(bundle_dir, output_dir = output_dir, annotation = cell_annotation)
-fit <- ds$fit()
+fit <- ds$fit(nmf_variant = "invsqrt_kl")  # membrane scoring pairs with invsqrt_kl
 
 membrane_score <- fit$score_membrane()
 membrane_rules <- membrane_score$rules()
@@ -58,7 +58,7 @@ These thresholds are practical choices for this dataset, not universal defaults.
 ```{r inputs}
 bundle_dir <- "data"
 output_dir <- "out"
-nmf_variant <- Sys.getenv("CELLADMIX_NMF_VARIANT", "ls_nmf")
+nmf_variant <- Sys.getenv("CELLADMIX_NMF_VARIANT", "invsqrt_kl")
 annotation_file <- file.path("annotations", "annotation.csv.gz")
 domain_file <- file.path("annotations", "domain_annotation.csv.gz")
 
@@ -87,10 +87,12 @@ ds
 
 ## Fit Factors
 
-The default fit uses inverse-square-root weighted KL NMF, automatic rank based
-on the number of annotated cell types, multiple NMF starts, and gene-loading
-molecule scoring. To render a direct KL comparison, set
-`CELLADMIX_NMF_VARIANT=kl` before executing the notebook.
+The fit uses the `invsqrt_kl` NMF variant — the recommended pairing for
+membrane scoring on stained data (see
+[docs/benchmarks.md](../../docs/benchmarks.md)) — with automatic rank based
+on the number of annotated cell types, multiple NMF restarts, and
+gene-loading molecule scoring. To render a comparison with another variant,
+set `CELLADMIX_NMF_VARIANT` before executing the notebook.
 
 ```{r fit-default}
 fit <- ds$fit(nmf_variant = nmf_variant, verbose = TRUE)
@@ -114,6 +116,19 @@ for reproducibly re-found ones). Factor importance (the x-axis, echoed by dot si
 
 ```{r factor-stability, fig.width=6.2, fig.height=4.2}
 fit$plot_stability()
+```
+
+## Admixture Audit
+
+Before correcting anything, the audit estimates how many molecules leaked
+between each ordered cell-type pair, using only the spatial exposure
+structure of the data (cell text: estimated leaked molecules, a
+conservative lower bound). It frames what the cleanup below should fix,
+and the same audit object verifies the correction afterwards.
+
+```{r audit-map, fig.width=8.6, fig.height=6.4}
+audit <- fit$audit_admixture()
+audit$plot_map()
 ```
 
 ## Tissue Context
@@ -279,6 +294,21 @@ This boxplot summarizes how many molecules were removed from modified cells.
 
 ```{r membrane-removal, fig.width=6.8, fig.height=5.2}
 membrane_correction$plot_removed_molecules()
+```
+
+The audit verifies the cleanup against the same exposure measurements: the
+report gives per-pair sensitivity and the own-marker false-removal rate,
+and the panels show the estimated admixture remaining and the pooled
+exposure profile before and after cleanup.
+
+```{r audit-verify, warning=TRUE, fig.width=9.6, fig.height=4.0}
+report <- audit$evaluate(membrane_correction)
+report$summary()
+
+cowplot::plot_grid(
+  audit$plot_remaining(list(corrected = membrane_correction)),
+  audit$plot_exposure(correction = membrane_correction),
+  ncol = 2, align = "hv", axis = "tblr")
 ```
 
 Marker-expression plots show how source-marker expression changed after

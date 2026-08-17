@@ -29,13 +29,14 @@ At a high level, the workflow is:
 
 ```{r api-overview, eval=FALSE}
 ds <- cellAdmix(bundle_dir, output_dir = output_dir, annotation = cell_annotation)
-fit <- ds$fit()
+fit <- ds$fit(nmf_variant = "invsqrt_kl")  # membrane scoring pairs with invsqrt_kl
 
 membrane_score <- fit$score_membrane()
 membrane_rules <- membrane_score$rules()
 membrane_correction <- membrane_score$correct(rules = membrane_rules)
 
-bridge_score <- fit$score_bridge()
+fit_ls <- ds$fit()                         # bridge scoring pairs with ls_nmf
+bridge_score <- fit_ls$score_bridge()
 bridge_rules <- bridge_score$rules()
 bridge_correction <- bridge_score$correct(rules = bridge_rules)
 ```
@@ -104,8 +105,17 @@ NMF factors, projects/smooths molecule factor assignments, and summarizes the
 result at cell level. The rank is automatically derived from the number of cell
 types in the active annotation.
 
+The NMF variant is chosen to match the scoring method that will consume the
+factors (see [docs/benchmarks.md](../../docs/benchmarks.md)): on
+membrane-stained data, membrane scoring removes the most admixture when
+paired with the sparse `invsqrt_kl` factorization, whose inverse-square-root
+gene weighting yields sharp, marker-driven loadings. We therefore fit
+`invsqrt_kl` as the primary factorization, and fit the default weighted
+least-squares variant (`ls_nmf`, the original cellAdmix formulation)
+alongside it for comparison and for bridge scoring later in the notebook.
+
 ```{r fit-default}
-fit <- ds$fit(verbose = TRUE)
+fit <- ds$fit(nmf_variant = "invsqrt_kl", verbose = TRUE)
 
 fit
 ```
@@ -116,13 +126,29 @@ Top gene loadings are the first-pass interpretation of each factor.
 fit$plot_loadings()
 ```
 
-The stability plot shows whether high-importance factors are reproducible
+### Variant Comparison: invsqrt KL-NMF vs ls-NMF
+
+```{r fit-ls}
+fit_ls <- ds$fit()
+```
+
+The stability plots show whether high-importance factors are reproducible
 across independent NMF restarts (matched gene-ownership correlation: near
 zero for unrelated factors, above 0.3 for reproducibly re-found ones).
-Factor importance (the x-axis, echoed by dot size) is the share of all assigned molecules that carry the factor's label, so large dots mark factors that dominate the tissue-wide signal.
+Factor importance (the x-axis, echoed by dot size) is the share of all
+assigned molecules that carry the factor's label. The comparison shows the
+two variants' complementary characters: `ls_nmf` recovers
+cell-type-native factors far more reproducibly across restarts, while
+`invsqrt_kl` trades restart stability for the marker-sharp loadings that
+give membrane scoring its cleanest contrast. The instability costs little
+in practice because the default correction is an ensemble that votes
+across the restarts rather than trusting any single one.
 
-```{r factor-stability, fig.width=6.2, fig.height=4.2}
-fit$plot_stability()
+```{r factor-stability, fig.width=11.0, fig.height=4.2}
+cowplot::plot_grid(
+  fit$plot_stability() + ggplot2::ggtitle("invsqrt_kl (primary)"),
+  fit_ls$plot_stability() + ggplot2::ggtitle("ls_nmf"),
+  ncol = 2, align = "hv", axis = "tblr")
 ```
 
 ## Admixture Audit
@@ -283,7 +309,9 @@ cowplot::plot_grid(plotlist = baseline_volcano_plots,
 ## Membrane Scoring
 
 Membrane scoring asks whether target-cell molecules assigned to a factor are
-enriched along membrane-stain paths facing a candidate source cell type.
+enriched along membrane-stain paths facing a candidate source cell type. It
+operates on the primary `invsqrt_kl` factors, whose sharp loadings give the
+stain-path contrast its cleanest separation.
 The score summaries are thresholded at `p_thresh`; here we use a permissive
 threshold because this notebook is meant to compare candidate cleanup rules.
 
@@ -476,19 +504,23 @@ cowplot::plot_grid(plotlist = plots, ncol = length(plots), align = "hv", axis = 
 
 Bridge scoring uses molecule adjacency across candidate cell pairs rather than
 the stain image. It is useful when a source cell is visible and physically
-adjacent to target molecules.
+adjacent to target molecules — and it is the method to reach for on datasets
+without usable stains. Its contact-based statistic pairs best with the
+`ls_nmf` factorization, whose concentrated per-cell-type factors carry the
+bridge test's evidence (see [docs/benchmarks.md](../../docs/benchmarks.md)),
+so the rules below are derived from the `fit_ls` comparison fit.
 
 ```{r bridge-score}
-bridge_score <- fit$score_bridge()
-bridge_annotation <- bridge_score$annotation(p_thresh = p_thresh)
+bridge_score <- fit_ls$score_bridge()
 bridge_rules <- bridge_score$rules(p_thresh = p_thresh)
+factor_source_score_ls <- fit_ls$score_factor_sources(counts = original_counts)
 
 head(bridge_rules[, c("factor", "source_cell_type", "target_cell_type", "p_value")])
 ```
 
 ```{r bridge-heatmap, fig.width=8.5, fig.height=5.4}
 bridge_score$plot_heatmap(p_thresh = p_thresh,
-  source_prior = factor_source_score)
+  source_prior = factor_source_score_ls)
 ```
 
 ```{r bridge-score-pairs, fig.width=score_pairs_width, fig.height=score_pairs_height}
@@ -547,22 +579,15 @@ cowplot::plot_grid(plotlist = plots, ncol = length(plots), align = "hv", axis = 
 ## Score Comparison
 
 The bottom-line comparison is how much of the estimated admixture each
-correction removed. The audit sums the leaked-molecule estimates over all
-detected cell-type pairs and expresses them as a share of all molecules in
-the dataset — the uncorrected bar is the estimated admixture burden itself
-(a conservative lower bound), and each correction's bar is what remains:
+correction removed, with each method running on its recommended
+factorization: membrane on `invsqrt_kl`, bridge on `ls_nmf`. The audit sums
+the leaked-molecule estimates over all detected cell-type pairs and
+expresses them as a share of all molecules in the dataset — the uncorrected
+bar is the estimated admixture burden itself (a conservative lower bound),
+and each correction's bar is what remains:
 
-```{r scoring-remaining, fig.width=4.6, fig.height=3.6}
-audit$plot_remaining(list(membrane = membrane_correction,
-  bridge = bridge_correction))
-```
-
-The remaining summaries compare the source-cell annotation and target-cell
-significance calls across membrane and bridge scoring. In each triangle panel, the upper-right
-half of a cell corresponds to the first method named in the subtitle and the
-lower-left half corresponds to the second.
-
-```{r scoring-correspondence-plot, fig.width=10.0, fig.height=5.0}
-celladmix_plot_score_agreement(list(Membrane = membrane_annotation,
-  Bridge = bridge_annotation), p_thresh = p_thresh)
+```{r scoring-remaining, fig.width=5.4, fig.height=3.6}
+audit$plot_remaining(list(
+  `membrane\n(invsqrt_kl)` = membrane_correction,
+  `bridge\n(ls_nmf)` = bridge_correction))
 ```
