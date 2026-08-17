@@ -35,20 +35,27 @@ holds genes essentially absent from reference T cells (baseline under 5%
 of the source level), whose excess in exposed cells can only be leaked
 material.
 
-Counts are pooled over the panel. With $m_B$ the panel-molecule count and
-$M_B$ the total molecule count of the T cells in bin $B$, we model
-$m_B \sim \mathrm{Poisson}(\rho_B M_B)$ — one free rate per bin, no
-assumed form for the exposure dependence, which is often non-linear
-(Figure 1a). The estimated leakage is the exceedance over the reference
-rate,
+Counts are pooled over the panel. Let $m_B$ be the number of pool-gene
+molecules in the T cells of exposure bin $B$, and $M_B$ the total number
+of molecules (all genes) in those same cells. We model
+$m_B \sim \mathrm{Poisson}(\rho_B M_B)$, so
+$\hat\rho_B = m_B / M_B$ is the bin's pool-marker rate — the fraction of
+those cells' molecules that carry pool genes — with one free rate per bin
+and no assumed form for the exposure dependence, which is often non-linear
+(Figure 1a). The excess rate $\hat\rho_B - \hat\rho_0$ of an exposed bin
+over the unexposed reference is the admixture attributable to exposure;
+multiplying it by the bin's molecule total $M_B$ converts it back into a
+number of molecules. The pair's estimated leakage $L$ — a molecule count,
+not a rate — sums these excess molecules over the exposed bins:
 
-$$L = \textstyle\sum_{B>0} \max(\hat\rho_B - \hat\rho_0,\, 0)\, M_B,$$
+$$L = \sum_{B>0} \max(\hat\rho_B - \hat\rho_0, 0) \cdot M_B$$
 
-the gap between the observed curve and the dotted baseline in Figure 1a,
-converted to molecule counts via the bin totals. Note that $\hat\rho_0$
-is generally nonzero — residual native expression plus ambient
-contamination reaching even unexposed cells — so $L$ is a conservative,
-lower-bound estimate. $L$ counts only molecules directly observed on the
+Graphically, $L$ is the gap between the observed curve and the dotted
+baseline in Figure 1a, weighted by each bin's molecule total; because each
+term is already a count, the sum needs no further normalization. Note that
+$\hat\rho_0$ is generally nonzero — residual native expression plus
+ambient contamination reaching even unexposed cells — so $L$ is a
+conservative, lower-bound estimate. $L$ counts only molecules directly observed on the
 pair's marker pool; no extrapolation to the rest of the source profile is
 applied, and since each gene belongs to the pool of its top-expressing
 type, pools of different sources are disjoint and pair estimates never
