@@ -41,7 +41,8 @@ the full molecule table into R memory. The computational work starts with
 `fit()`, which builds neighborhood composition vectors, fits NMF factors, and
 assigns molecules to factors. Scoring then interprets these factors as possible
 source-target admixture patterns, and correction removes rule-supported
-admixture molecules to produce corrected counts.
+admixture molecules to produce corrected counts, by default through a
+molecule-vote ensemble across the fit's NMF restarts.
 
 ## Data Preparation
 
