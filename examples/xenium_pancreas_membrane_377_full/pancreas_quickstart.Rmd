@@ -8,7 +8,7 @@ output:
 ```{r setup, include=FALSE}
 library(cellAdmixCore)
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = TRUE,
-  fig.align = "center", dpi = 144)
+  fig.align = "center", dpi = 192)
 ```
 
 This is the compact version of the recommended cellAdmix workflow:

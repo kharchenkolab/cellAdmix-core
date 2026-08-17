@@ -312,7 +312,7 @@ CellAdmixAudit <- R6::R6Class(
         ggplot2::labs(x = "source-type cells among nearest neighbors",
           y = "source-marker rate (per 1,000 molecules)",
           title = title,
-          subtitle = "error bars: 95% Poisson intervals (often narrower than the symbols); dotted line: unexposed reference") +
+          subtitle = "error bars: 95% Poisson intervals (often narrower than the symbols);\ndotted line: unexposed reference") +
         ggplot2::theme_classic(base_size = 10) +
         ggplot2::theme(legend.position = if (is.null(counts_after)) "none" else "bottom")
     },
@@ -356,7 +356,7 @@ CellAdmixAudit <- R6::R6Class(
         ggplot2::labs(x = NULL,
           y = "estimated admixture (% of all molecules)",
           title = "Remaining admixture by correction",
-          subtitle = "conservative estimate over detected cell-type pairs; error bars: 95% intervals") +
+          subtitle = "conservative estimate over detected cell-type pairs;\nerror bars: 95% intervals") +
         ggplot2::theme_classic(base_size = 10)
     },
 
