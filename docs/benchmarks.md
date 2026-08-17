@@ -67,12 +67,13 @@ weighted by the bin totals). $L$ is assumption-free and conservative:
 $\hat\rho_0$ is generally nonzero, so leakage diffuse enough to reach
 even unexposed cells subtracts out.
 
-*Step 3 — extrapolate from the pool to all genes.* Leaked material is
-S-cell transcript, and the pool genes account for a measurable share $s$
+*Step 3 — extrapolate from the pool to all genes.* Leaked molecules are
+S-cell transcripts, and the pool genes account for a measurable share $s$
 of the transcripts of S cells (their share of the S pseudobulk). If
 leakage samples the source transcriptome proportionally — the single
-modeling assumption of the construction — the pool witnessed a fraction
-$s$ of the leaked stream, so
+modeling assumption of the construction — then the same share $s$ of all
+leaked molecules falls on pool genes, i.e. $L$ captures a fraction $s$ of
+the total leakage; dividing by $s$ recovers it:
 
 $$\hat A_{S \to T} = \frac{L}{s}, \qquad
 \hat r_{S \to T} = \frac{L}{s \cdot M_T}.$$
