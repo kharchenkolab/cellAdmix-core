@@ -1,0 +1,90 @@
+---
+title: "cellAdmix Quickstart: Admixture Correction on Xenium Pancreas"
+output:
+  html_document:
+    toc: false
+---
+
+```{r setup, include=FALSE}
+library(cellAdmixCore)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = TRUE,
+  fig.align = "center", dpi = 144)
+```
+
+This is the compact version of the recommended cellAdmix workflow:
+estimate how much admixture the dataset carries, correct it, and verify
+the result. Inputs are the Xenium output bundle (`data/`) and a cell-type
+annotation (see the
+[full tutorial](pancreas_membrane_scoring_clean.ipynb) for download
+instructions and a walkthrough of the intermediate diagnostics; see
+[docs/benchmarks.md](../../docs/benchmarks.md) for how the settings below
+were chosen).
+
+```{r construct}
+annotation <- read.csv(file.path("annotations", "annotation.csv.gz"))
+cell_annotation <- setNames(annotation$merged_annotation, annotation$cell_id)
+
+ds <- cellAdmix("data", output_dir = "out", annotation = cell_annotation)
+fit <- ds$fit(nmf_variant = "invsqrt_kl")
+```
+
+For membrane-stained data, membrane scoring with the `invsqrt_kl`
+factorization removes the most admixture in our benchmarks; on data
+without stains, use `fit$score_bridge()` with the default `ls_nmf`
+factorization instead.
+
+## How much admixture is there?
+
+The audit estimates, for every ordered cell-type pair, how many molecules
+leaked from the source type into target cells — using only the spatial
+exposure structure, before any correction:
+
+```{r audit-map, fig.width=6.8, fig.height=5.2}
+audit <- fit$audit_admixture()
+audit$plot_map()
+```
+
+## Correct
+
+One quick check that the factorization is sound — most factors should sit
+above the 0.3 stability threshold:
+
+```{r stability, fig.width=6.2, fig.height=4.2}
+fit$plot_stability()
+```
+
+Scoring turns factors into removal rules (each vetted by a native-factor
+false-positive check), and correction removes the matching molecules:
+
+```{r correct}
+score <- fit$score_membrane()
+correction <- score$correct(rules = score$rules())
+```
+
+## Verify
+
+The audit re-measures the same exposure gradients on the corrected counts.
+The report gives per-pair cleanup sensitivity, the own-marker
+false-removal rate (how much almost-surely-genuine expression was lost),
+and warns about any detected pair the rules did not cover:
+
+```{r verify, warning=TRUE, fig.width=9.6, fig.height=4.0}
+report <- audit$evaluate(correction)
+report$summary()
+
+cowplot::plot_grid(
+  audit$plot_remaining(list(corrected = correction)),
+  audit$plot_exposure(correction = correction),
+  ncol = 2, align = "hv", axis = "tblr")
+```
+
+## Use the corrected counts
+
+```{r export}
+corrected_counts <- correction$counts()
+dim(corrected_counts)
+```
+
+`corrected_counts` is a sparse genes × cells matrix ready for downstream
+analysis; `celladmix_add_to_seurat()` and the SpatialData helpers attach it
+to existing objects.
