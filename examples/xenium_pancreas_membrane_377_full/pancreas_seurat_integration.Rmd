@@ -198,9 +198,11 @@ head(membrane_rules[, c("factor", "source_cell_type", "target_cell_type", "p_val
 
 ## Correct Counts
 
-The correction step removes molecules assigned to significant admixture factors
-in their target cell types. The result is persisted on disk and can be collected
-as a sparse gene-by-cell matrix.
+The correction step removes molecules assigned to significant admixture
+factors in their target cell types, by default as a molecule-vote ensemble
+across the fit's NMF restarts (a molecule is removed when at least 30% of
+the independently scored restarts remove it). The result is persisted on
+disk and can be collected as a sparse gene-by-cell matrix.
 
 ```{r correction}
 membrane_correction <- membrane_score$correct(rules = membrane_rules,

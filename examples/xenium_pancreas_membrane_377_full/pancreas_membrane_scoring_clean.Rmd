@@ -385,8 +385,13 @@ print(membrane_score$plot_examples(
 ### Membrane Cleanup Diagnostics
 
 The correction step below applies all membrane-derived rules across all
-annotated cell types. This creates a corrected run and then collects the
-corrected cell-by-gene count matrix that will be used for downstream diagnostics.
+annotated cell types. By default it is a molecule-vote ensemble: each of the
+fit's NMF restarts is scored and vetted independently, and a molecule is
+removed when at least 30% of the restarts remove it, which stabilizes the
+strong seed-dependence of single-fit corrections (`vote` tunes the
+threshold; `ensemble = 1` reverts to a single-fit correction). This creates
+a corrected run and then collects the corrected cell-by-gene count matrix
+that will be used for downstream diagnostics.
 
 ```{r membrane-cleanup}
 membrane_correction <- membrane_score$correct(rules = membrane_rules,

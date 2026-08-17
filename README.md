@@ -14,8 +14,10 @@ bundles are handled as first-class inputs, with molecule tables streamed into an
 encoded on-disk store so large experiments do not need to be kept fully in R or
 Python memory. As a rough local benchmark, on Xenium 5K data (breast 5K;
 96.6M kept molecules and 694K cells), a 10-thread batch run with
-auto-annotation, rank-30 fit, membrane scoring/correction, and a minimal report
-completed in about 62 minutes with peak RSS about 42 GB.
+auto-annotation, rank-30 fit, membrane scoring, a single-fit correction
+(`--ensemble 1`), and a minimal report completed in about 62 minutes with
+peak RSS about 42 GB; the default ensemble correction repeats the
+molecule-assignment and scoring stages once per ensemble member.
 
 The quickest way to see the workflow end to end is the
 [pancreas quickstart notebook](examples/xenium_pancreas_membrane_377_full/pancreas_quickstart.ipynb):

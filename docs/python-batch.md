@@ -21,7 +21,10 @@ This performs:
 - membrane scoring when a membrane image is discoverable, otherwise bridge
   scoring;
 - score-rule generation at `--p-thresh`;
-- molecule correction unless `--no-correct` is supplied;
+- molecule correction unless `--no-correct` is supplied — by default a
+  molecule-vote ensemble across the fit's NMF restarts (`--ensemble` caps
+  the member count, `--vote` sets the removal threshold, `--ensemble 1`
+  applies a single-fit correction);
 - summary table output and optional HTML report generation.
 
 If no annotation is available, pass `--auto-annotate` to cluster cell-level
@@ -70,9 +73,12 @@ Important options:
 - `--threads N`: default worker count for fit, scoring, and NMF restarts.
 - `--rank auto|N`: factor rank; `auto` uses the annotation-based default.
 - `--nmf-variant invsqrt_kl|kl|sqrt_kl|ls_nmf`: NMF formulation.
-- `--nmf-runs auto|N`: multiseed NMF restarts; `auto` uses `--threads`.
+- `--nmf-runs auto|N`: multiseed NMF restarts; `auto` uses
+  `max(10, --threads)`.
 - `--score auto|membrane|bridge`: scoring method.
 - `--targets A,B,C`: restrict correction rules to selected target cell types.
+- `--ensemble N` / `--vote X`: ensemble correction member cap and vote
+  threshold; `--ensemble 1` applies a single-fit correction.
 - `--auto-annotate`: cluster cells when no annotation is supplied.
 - `--annotation-report`: write an annotation report even without the main
   batch report.
