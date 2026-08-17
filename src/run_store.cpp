@@ -2346,34 +2346,83 @@ int ensure_ensemble_labels(
   const int threads = std::max(1, num_threads);
   const int selected = run.manifest.nmf_diagnostics.selected_run;
 
+  std::vector<int> pending;
   for (int m = 0; m < n_members; ++m) {
-    const auto member_path = ensemble_labels_parquet_path(run_path_or_dir, m);
-    if (std::filesystem::exists(member_path)) {
-      continue;
+    if (m != selected &&
+        !std::filesystem::exists(ensemble_labels_parquet_path(run_path_or_dir, m))) {
+      pending.push_back(m);
     }
-    std::vector<int> labels;
-    if (m == selected) {
-      labels = run.labels;
-    } else {
+  }
+
+  // Members are assigned chunk by chunk: projection scores for the whole run
+  // at once would need n_molecules x rank doubles, which is both too large
+  // and overflows int indexing on 5K-panel datasets. Run rows are written
+  // cell-contiguously and both projection and smoothing operate per cell, so
+  // chunking on cell boundaries reproduces the unchunked labels.
+  const std::size_t n_rows = run.transcripts.size();
+  std::vector<std::pair<std::size_t, std::size_t>> chunks;
+  const std::size_t target_rows = std::size_t(4) * 1024 * 1024;
+  std::size_t chunk_start = 0;
+  while (chunk_start < n_rows) {
+    std::size_t chunk_end = std::min(n_rows, chunk_start + target_rows);
+    while (chunk_end > 0 && chunk_end < n_rows &&
+           run.transcripts.cell_index[chunk_end] ==
+               run.transcripts.cell_index[chunk_end - 1]) {
+      ++chunk_end;
+    }
+    chunks.emplace_back(chunk_start, chunk_end);
+    chunk_start = chunk_end;
+  }
+
+  std::vector<std::vector<int>> computed(pending.size());
+  for (auto& labels : computed) {
+    labels.resize(n_rows);
+  }
+  const bool has_z = run.transcripts.z.size() == n_rows;
+  for (const auto& [row_start, row_end] : chunks) {
+    TranscriptTable local;
+    local.genes = run.transcripts.genes;
+    local.cells = run.transcripts.cells;
+    local.x.assign(run.transcripts.x.begin() + row_start,
+        run.transcripts.x.begin() + row_end);
+    local.y.assign(run.transcripts.y.begin() + row_start,
+        run.transcripts.y.begin() + row_end);
+    if (has_z) {
+      local.z.assign(run.transcripts.z.begin() + row_start,
+          run.transcripts.z.begin() + row_end);
+    }
+    local.gene_index.assign(run.transcripts.gene_index.begin() + row_start,
+        run.transcripts.gene_index.begin() + row_end);
+    local.cell_index.assign(run.transcripts.cell_index.begin() + row_start,
+        run.transcripts.cell_index.begin() + row_end);
+    for (std::size_t p = 0; p < pending.size(); ++p) {
+      const auto& member_h = pool[static_cast<std::size_t>(pending[p])];
       const DenseMatrix scores = molecule_scoring == "gene_loadings"
-          ? project_gene_loadings_to_factors(
-                run.transcripts, pool[static_cast<std::size_t>(m)], ncv_options, threads)
+          ? project_gene_loadings_to_factors(local, member_h, ncv_options, threads)
           : is_weighted_ls_variant(opts.nmf_variant)
-              ? project_ncv_to_factors(
-                    run.transcripts, pool[static_cast<std::size_t>(m)], ncv_options, threads)
+              ? project_ncv_to_factors(local, member_h, ncv_options, threads)
               : project_ncv_to_factors_kl(
-                    run.transcripts, pool[static_cast<std::size_t>(m)], ncv_options, threads,
-                    10, 1e-4, 1e-10, transform);
-      labels = assign_factors_per_cell(
-          run.transcripts, scores, opts.graph_k, opts.same_label_ratio, 20, threads);
+                    local, member_h, ncv_options, threads, 10, 1e-4, 1e-10, transform);
+      const auto labels = assign_factors_per_cell(
+          local, scores, opts.graph_k, opts.same_label_ratio, 20, threads);
+      std::copy(labels.begin(), labels.end(), computed[p].begin() + row_start);
     }
+  }
+
+  const auto write_member = [&](int member, const std::vector<int>& labels) {
     const auto table_out = arrow::Table::Make(
         arrow::schema({arrow::field("label", arrow::int32())}),
         {build_int32_array(labels)});
     write_parquet_table(
         table_out,
-        std::filesystem::path(member_path),
+        std::filesystem::path(ensemble_labels_parquet_path(run_path_or_dir, member)),
         run.manifest.storage_options.parquet_row_group_size);
+  };
+  if (!std::filesystem::exists(ensemble_labels_parquet_path(run_path_or_dir, selected))) {
+    write_member(selected, run.labels);
+  }
+  for (std::size_t p = 0; p < pending.size(); ++p) {
+    write_member(pending[p], computed[p]);
   }
   return n_members;
 }
