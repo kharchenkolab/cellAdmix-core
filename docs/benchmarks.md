@@ -42,7 +42,9 @@ $r_{S \to T}$: the fraction of all molecules in cells of type T that
 leaked in from S. Writing $M_T$ for the total molecule count of the cells
 of T, the corresponding leaked-molecule count is
 $A_{S \to T} = r_{S \to T} \cdot M_T$. The estimator reaches
-$\hat r_{S \to T}$ in three steps.
+$\hat r_{S \to T}$ in three steps. All quantities in the steps refer to
+the one pair under consideration; the pair subscript is written where a
+variable is defined and dropped elsewhere.
 
 *Step 1 — measure the dose-response on the pool.* Let $m_B$ be the number
 of pool-gene molecules in the type-T cells of exposure bin $B$, and $M_B$
@@ -57,30 +59,34 @@ background.
 *Step 2 — count the demonstrated leakage.* The excess
 $\hat\rho_B - \hat\rho_0$ of an exposed bin is the admixture rate visible
 on the pool; multiplying by the bin total $M_B$ converts it into
-molecules, and summing over exposed bins gives
+molecules, and summing over exposed bins gives the pool leakage
+$L_{S \to T}$:
 
 $$L = \sum_{B>0} \max(\hat\rho_B - \hat\rho_0, 0) \cdot M_B$$
 
 — the number of leaked pool-gene molecules the data directly exhibits
 (the gap between the observed curve and the dotted baseline in Figure 1a,
-weighted by the bin totals). $L$ is assumption-free and conservative:
+weighted by the bin totals). $L$ is the pool-visible portion of the
+target count $A_{S \to T}$: what remains of it after restricting to the
+genes we can watch. It is assumption-free and conservative:
 $\hat\rho_0$ is generally nonzero, so leakage diffuse enough to reach
 even unexposed cells subtracts out.
 
 *Step 3 — extrapolate from the pool to all genes.* Leaked molecules are
-S-cell transcripts, and the pool genes account for a measurable share $s$
-of the transcripts of S cells (their share of the S pseudobulk). If
-leakage samples the source transcriptome proportionally — the single
-modeling assumption of the construction — then the same share $s$ of all
-leaked molecules falls on pool genes, i.e. $L$ captures a fraction $s$ of
-the total leakage; dividing by $s$ recovers it:
+S-cell transcripts, and the pool genes account for a measurable share
+$s_{S \to T}$ of the transcripts of S cells (their share of the S
+pseudobulk). If leakage samples the source transcriptome proportionally —
+the single modeling assumption of the construction — then the same share
+$s$ of all leaked molecules falls on pool genes, i.e. $L = s \cdot
+A_{S \to T}$. Solving for the target quantities:
 
 $$\hat A_{S \to T} = \frac{L}{s}, \qquad
 \hat r_{S \to T} = \frac{L}{s \cdot M_T}.$$
 
 On pancreas the pools carry roughly half of their sources' transcript
 output, so the extrapolation raises totals about 1.7× above the
-demonstrable floor $L$.
+demonstrable floor $L$; Figure 1b maps the resulting per-pair rates
+$\hat r_{S \to T}$.
 
 Dataset-wide cumulatives are sums of the per-pair counts over the
 dataset's total molecule count $M$: the demonstrated floor
@@ -89,6 +95,30 @@ report) and the extrapolated burden
 $\sum_{\text{pairs}} \hat A_{S \to T} / M$. Both are clean sums: each
 gene belongs to the pool of its unique top-expressing type and each cell
 to a single target type, so no molecule is counted by two pairs.
+
+![Figure 1](figures/benchmark_fig1.png)
+
+**Figure 1. The neighbor benchmark.** **(a)** Pooled strict-tier
+source-marker rates in target cells, stratified by the number of source-type
+neighbors, before (red, dashed) and after (blue) a standard cleanup (bare
+ls-NMF fit, membrane scoring, pancreas dataset); the dotted line marks the
+zero-exposure reference rate $\hat\rho_0$ — nonzero in general, since it
+includes residual native expression and ambient contamination; only the
+excess above it counts as leakage. The rise with exposure is contamination
+made visible; cleanup quality is the degree to which the blue curve
+flattens to the reference. Compare the near-complete flattening of
+endocrine → endothelial with fibroblast → immune, where the curves
+coincide exactly: the correction issued no removal rule for that pair, so
+its molecules were untouched. **(b)** Estimated per-pair admixture rates
+$\hat r_{S \to T}$ on pancreas (percent of the target type's molecules
+leaked in from the source; blank cells: pair not detected). Over a
+quarter of ductal/tumor-cell molecules are estimated to originate in
+exocrine cells. **(c)** Estimated cleanup sensitivity for every detected
+pair (bars), with each pair's demonstrated leaked-molecule count $L$
+overlaid (orange, log scale). Take-home: cleanup effectiveness is
+measurable without molecule-level ground truth, and a standard single-fit
+correction is highly uneven across cell-type pairs — including a
+near-zero score on one of the largest leakage pairs (exocrine → ductal).
 
 Pairs enter the benchmark when the exposed counts
 exceed the $\hat\rho_0$ expectation by a one-sided Poisson test
@@ -105,7 +135,7 @@ depend on the extrapolation step. The corrected
 exceedance is measured against the *corrected* reference rate, so deleting
 a gene outright earns full credit here — and is charged instead by the
 specificity metrics below. Applied across all detected pairs of a standard
-single-fit cleanup (Figure 1b), the score is highly heterogeneous, and the
+single-fit cleanup (Figure 1c), the score is highly heterogeneous, and the
 largest pair by leakage mass (exocrine → ductal, over 200,000 molecules)
 is missed entirely — a coverage failure invisible to aggregate
 diagnostics.
@@ -121,26 +151,6 @@ The audit is reference-free, demands the spatial dose-response (native
 expression, however unexpected, cancels against the unexposed baseline),
 and cannot be gamed by aggressive removal: its pre-correction offsets are
 frozen and over-removal surfaces in the own-marker false-removal rate.
-
-![Figure 1](figures/benchmark_fig1.png)
-
-**Figure 1. The neighbor benchmark.** **(a)** Pooled strict-tier
-source-marker rates in target cells, stratified by the number of source-type
-neighbors, before (red, dashed) and after (blue) a standard cleanup (bare
-ls-NMF fit, membrane scoring, pancreas dataset); the dotted line marks the
-zero-exposure reference rate $\hat\rho_0$ — nonzero in general, since it
-includes residual native expression and ambient contamination; only the
-excess above it counts as leakage. The rise with exposure is contamination
-made visible; cleanup quality is the degree to which the blue curve
-flattens to the reference. Compare the near-complete flattening of
-endocrine → endothelial with fibroblast → immune, where the curves
-coincide exactly: the correction issued no removal rule for that pair, so
-its molecules were untouched. **(b)** Estimated sensitivity for every detected pair
-(bars), with each pair's estimated leaked-molecule count L overlaid
-(orange, log scale). Take-home: cleanup effectiveness is measurable without
-molecule-level ground truth, and a standard single-fit correction is highly
-uneven across cell-type pairs — including a near-zero score on one of the
-largest leakage pairs (exocrine → ductal).
 
 ## From excess removal to sensitivity and specificity
 

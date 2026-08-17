@@ -26,8 +26,8 @@ bare = pairs_df[pairs_df['arm'] == 'ls_nmf/membrane/s1'].copy()
 
 show_pairs = ['Exocrine epithelial -> Endothelial', 'Ductal/tumor epithelial -> Immune',
               'Endocrine -> Endothelial', 'Fibroblast / CAF -> Immune']
-fig = plt.figure(figsize=(11, 6.2))
-gs = fig.add_gridspec(2, 4, height_ratios=[1, 1.5], hspace=0.45)
+fig = plt.figure(figsize=(11, 11.2))
+gs = fig.add_gridspec(3, 4, height_ratios=[1, 1.6, 1.45], hspace=0.75)
 for i, pair in enumerate(show_pairs):
     ax = fig.add_subplot(gs[0, i])
     if i == 0:
@@ -46,8 +46,33 @@ for i, pair in enumerate(show_pairs):
         ax.set_ylabel('source-marker rate\n(per 1000 molecules)')
         ax.legend(frameon=False, fontsize=8)
 
-ax = fig.add_subplot(gs[1, :])
-ax.annotate('b', (-0.065, 1.05), xycoords='axes fraction',
+# panel b: extrapolated per-pair admixture rates r as a source x target map
+rates = pd.read_csv(f'{R}/pancreas_pair_rates.csv')
+rate_types = sorted(set(rates['source']) | set(rates['target']))
+mat = np.full((len(rate_types), len(rate_types)), np.nan)
+for _, row in rates.iterrows():
+    mat[rate_types.index(row['source']), rate_types.index(row['target'])] = row['rate'] * 100
+ax = fig.add_subplot(gs[1, 1:3])
+ax.annotate('b', (-0.75, 1.05), xycoords='axes fraction',
+    fontsize=13, fontweight='bold')
+masked = np.ma.masked_invalid(mat)
+im = ax.imshow(masked, cmap='Reds', vmin=0)
+for i in range(len(rate_types)):
+    for j in range(len(rate_types)):
+        if not np.isnan(mat[i, j]):
+            im_color = 'white' if mat[i, j] > 0.6 * np.nanmax(mat) else 'black'
+            ax.text(j, i, f'{mat[i, j]:.1f}', ha='center', va='center',
+                fontsize=7.5, color=im_color)
+ax.set_xticks(range(len(rate_types)), [short(t) for t in rate_types],
+    rotation=45, ha='right', fontsize=7.5)
+ax.set_yticks(range(len(rate_types)), [short(t) for t in rate_types], fontsize=7.5)
+ax.set_xlabel('target cell type')
+ax.set_ylabel('source cell type')
+ax.set_title('estimated admixture rate $\\hat{r}_{S \\to T}$\n(% of target-type molecules)', fontsize=9)
+fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+
+ax = fig.add_subplot(gs[2, :])
+ax.annotate('c', (-0.065, 1.05), xycoords='axes fraction',
     fontsize=13, fontweight='bold')
 b = bare.dropna(subset=['power_strict']).sort_values('power_strict', ascending=False)
 x = np.arange(len(b))
