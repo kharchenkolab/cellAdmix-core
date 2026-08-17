@@ -8,8 +8,9 @@ target cell can only be contaminated by a cell type it physically borders,
 so the content of source-specific genes in target cells must rise with the
 number of source-type neighbors, while target cells with no such neighbors
 provide an internal negative control. Comparing exposed cells against that
-control yields, for every ordered cell-type pair (source → target), a
-conservative estimate of the number of admixed molecules; applied before
+control yields, for every ordered cell-type pair (source → target), an
+estimate of the pair's admixture rate and admixed-molecule count, anchored
+in a conservative directly-demonstrated floor; applied before
 and after correction, it scores how much of the admixture a cleanup
 removed, in terms that translate into estimated sensitivity and
 specificity. We use the benchmark to compare cellAdmix's factorization
@@ -36,36 +37,59 @@ holds genes essentially absent from reference cells of T (baseline under
 5% of the source level), whose excess in exposed cells can only be leaked
 material.
 
-Counts are pooled over the panel. Let $m_B$ be the number of pool-gene
-molecules in the type-T cells of exposure bin $B$, and $M_B$ the total
-number of molecules (all genes) in those same cells. We model
-$m_B \sim \mathrm{Poisson}(\rho_B M_B)$, so
-$\hat\rho_B = m_B / M_B$ is the bin's pool-marker rate — the fraction of
-those cells' molecules that carry pool genes — with one free rate per bin
-and no assumed form for the exposure dependence, which is often non-linear
-(Figure 1a). The excess rate $\hat\rho_B - \hat\rho_0$ of an exposed bin
-over the unexposed reference is the admixture attributable to exposure;
-multiplying it by the bin's molecule total $M_B$ converts it back into a
-number of molecules. The pair's estimated leakage $L$ — a molecule count,
-not a rate — sums these excess molecules over the exposed bins:
+The estimation target for each pair is the admixture rate
+$r_{S \to T}$: the fraction of all molecules in cells of type T that
+leaked in from S. Writing $M_T$ for the total molecule count of the cells
+of T, the corresponding leaked-molecule count is
+$A_{S \to T} = r_{S \to T} \cdot M_T$. The estimator reaches
+$\hat r_{S \to T}$ in three steps.
+
+*Step 1 — measure the dose-response on the pool.* Let $m_B$ be the number
+of pool-gene molecules in the type-T cells of exposure bin $B$, and $M_B$
+the total number of molecules (all genes) in those same cells. Each bin
+gets one free rate under $m_B \sim \mathrm{Poisson}(\rho_B M_B)$,
+estimated as $\hat\rho_B = m_B / M_B$ — the share of those cells'
+molecules that come from pool genes; no form is assumed for the exposure
+dependence, which is often non-linear (Figure 1a). The zero-exposure rate
+$\hat\rho_0$ is the internal control: native expression plus ambient
+background.
+
+*Step 2 — count the demonstrated leakage.* The excess
+$\hat\rho_B - \hat\rho_0$ of an exposed bin is the admixture rate visible
+on the pool; multiplying by the bin total $M_B$ converts it into
+molecules, and summing over exposed bins gives
 
 $$L = \sum_{B>0} \max(\hat\rho_B - \hat\rho_0, 0) \cdot M_B$$
 
-Graphically, $L$ is the gap between the observed curve and the dotted
-baseline in Figure 1a, weighted by each bin's molecule total; because each
-term is already a count, the sum needs no further normalization. Note that
-$\hat\rho_0$ is generally nonzero — residual native expression plus
-ambient contamination reaching even unexposed cells — so $L$ is a
-conservative, lower-bound estimate. $L$ counts only molecules directly observed on the
-pair's marker pool; no extrapolation to the rest of the source profile is
-applied, and since each gene belongs to the pool of its top-expressing
-type, pools of different sources are disjoint and pair estimates never
-double-count a molecule. Dataset-level figures (such as the "% of all
-molecules" bars in `plot_remaining`) are simply the summed pair estimates
-over the total molecule count — on pancreas the pools carry roughly half
-of their sources' transcriptomes, so a profile-proportional reading would
-lift the totals by about 1.7×, but the audit deliberately reports the
-directly demonstrable count instead. Pairs enter the benchmark when the exposed counts
+— the number of leaked pool-gene molecules the data directly exhibits
+(the gap between the observed curve and the dotted baseline in Figure 1a,
+weighted by the bin totals). $L$ is assumption-free and conservative:
+$\hat\rho_0$ is generally nonzero, so leakage diffuse enough to reach
+even unexposed cells subtracts out.
+
+*Step 3 — extrapolate from the pool to all genes.* Leaked material is
+S-cell transcript, and the pool genes account for a measurable share $s$
+of the transcripts of S cells (their share of the S pseudobulk). If
+leakage samples the source transcriptome proportionally — the single
+modeling assumption of the construction — the pool witnessed a fraction
+$s$ of the leaked stream, so
+
+$$\hat A_{S \to T} = \frac{L}{s}, \qquad
+\hat r_{S \to T} = \frac{L}{s \cdot M_T}.$$
+
+On pancreas the pools carry roughly half of their sources' transcript
+output, so the extrapolation raises totals about 1.7× above the
+demonstrable floor $L$.
+
+Dataset-wide cumulatives are sums of the per-pair counts over the
+dataset's total molecule count $M$: the demonstrated floor
+$\sum_{\text{pairs}} L / M$ (what the audit's `plot_remaining` bars
+report) and the extrapolated burden
+$\sum_{\text{pairs}} \hat A_{S \to T} / M$. Both are clean sums: each
+gene belongs to the pool of its unique top-expressing type and each cell
+to a single target type, so no molecule is counted by two pairs.
+
+Pairs enter the benchmark when the exposed counts
 exceed the $\hat\rho_0$ expectation by a one-sided Poisson test
 (Benjamini–Hochberg $q < 0.01$) with $L \geq 200$: 39 of 42 candidate
 pairs on pancreas, 13 on the breast crop, 27 on NSCLC, with no manual
@@ -74,7 +98,9 @@ curation.
 A correction is scored by recomputing the exceedance on corrected counts,
 keeping the pre-correction offsets $M_B$ so removal is not hidden by
 renormalization: $\mathrm{sensitivity} = 1 - L_{\mathrm{after}} /
-L_{\mathrm{before}}$ (Figure 1a, blue versus red). The corrected
+L_{\mathrm{before}}$ (Figure 1a, blue versus red). The coverage factor
+$s$ cancels in this ratio, so the benchmark's cleanup scores do not
+depend on the extrapolation step. The corrected
 exceedance is measured against the *corrected* reference rate, so deleting
 a gene outright earns full credit here — and is charged instead by the
 specificity metrics below. Applied across all detected pairs of a standard
