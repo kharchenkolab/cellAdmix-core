@@ -194,8 +194,8 @@ this for every ordered cell-type pair:
 
 ```r
 audit <- fit$audit_admixture()
-audit$pairs()                      # per-pair leaked-molecule estimates
-audit$plot_map()                   # source x target admixture overview
+audit$pairs()                      # per-pair admixture rates and molecule estimates
+audit$plot_map()                   # admixture-rate map (% of target-type molecules)
 audit$plot_exposure()              # cumulative exposure profile, 95% intervals
 audit$plot_exposure("Exocrine epithelial", "Endothelial", correction = correction)
 audit$plot_remaining(list(membrane = correction))  # admixture left per correction
@@ -212,8 +212,11 @@ report$summary()
 report$plot_cleanup()
 ```
 
-Estimates are conservative lower bounds: contamination that reaches even
-unexposed cells raises the reference level and is not counted.
+The audit's directly measured marker excess is a conservative lower bound
+(contamination that reaches even unexposed cells raises the reference
+level and is not counted); the reported rates and molecule counts
+extrapolate it by the markers' share of the source transcriptome, kept as
+the `coverage` column of `audit$pairs()`.
 
 Example-cell overlays show molecule-level evidence around selected target
 cells. For Xenium-backed fits, the DAPI/membrane stain background, cell

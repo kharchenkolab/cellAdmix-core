@@ -158,17 +158,21 @@ dataset carries and between which cell types. The audit exploits the
 spatial structure of segmentation-driven admixture: source-marker content
 in target cells rises with the number of source-type neighbor cells, while
 unexposed target cells provide an internal negative control. It needs only
-the annotation, cell positions, and counts — no factorization — and its
-per-pair leaked-molecule estimates are conservative lower bounds.
+the annotation, cell positions, and counts — no factorization. The
+directly measured marker excess is a conservative lower bound, which the
+audit extrapolates to per-pair admixture rates and molecule counts by the
+markers' share of the source transcriptome (see
+[docs/benchmarks.md](../../docs/benchmarks.md)).
 
 ```{r audit}
 audit <- fit$audit_admixture()
 audit_pairs <- audit$pairs(detected_only = TRUE)
-head(audit_pairs[order(-audit_pairs$excess), ], 8)
+head(audit_pairs[order(-audit_pairs$admixed_molecules), ], 8)
 ```
 
-The admixture map summarizes every detected source → target pair; cell text
-gives the estimated number of leaked molecules.
+The admixture map summarizes every detected source → target pair; each
+cell shows the estimated admixture rate — the percent of the target
+type's molecules that leaked in from the source.
 
 ```{r audit-map, fig.width=6.8, fig.height=5.2}
 audit$plot_map()
@@ -449,7 +453,7 @@ membrane_correction$plot_removed_molecules()
 ```
 
 The audit provides the direct verification: per-pair cleanup sensitivity
-against the leaked-molecule estimates, the own-marker false-removal rate
+against the admixture estimates, the own-marker false-removal rate
 (removal of near-surely-genuine molecules), and a warning for any detected
 pair no removal rule covers — here it flags the largest leakage pair
 (exocrine → ductal), which membrane scoring under this fit does not call.
@@ -581,10 +585,10 @@ cowplot::plot_grid(plotlist = plots, ncol = length(plots), align = "hv", axis = 
 The bottom-line comparison is how much of the estimated admixture each
 correction removed, with each method running on its recommended
 factorization: membrane on `invsqrt_kl`, bridge on `ls_nmf`. The audit sums
-the leaked-molecule estimates over all detected cell-type pairs and
+the admixed-molecule estimates over all detected cell-type pairs and
 expresses them as a share of all molecules in the dataset — the uncorrected
-bar is the estimated admixture burden itself (a conservative lower bound),
-and each correction's bar is what remains:
+bar is the estimated admixture burden itself, and each correction's bar is
+what remains:
 
 ```{r scoring-remaining, fig.width=5.4, fig.height=3.6}
 audit$plot_remaining(list(

@@ -35,9 +35,9 @@ factorization instead.
 
 ## How much admixture is there?
 
-The audit estimates, for every ordered cell-type pair, how many molecules
-leaked from the source type into target cells — using only the spatial
-exposure structure, before any correction:
+The audit estimates, for every ordered cell-type pair, the admixture rate
+— what share of the target type's molecules leaked in from the source —
+using only the spatial exposure structure, before any correction:
 
 ```{r audit-map, fig.width=6.8, fig.height=5.2}
 audit <- fit$audit_admixture()

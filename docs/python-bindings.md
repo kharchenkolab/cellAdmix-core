@@ -162,8 +162,8 @@ measurements:
 
 ```python
 audit = fit.audit_admixture()
-audit.pairs()                       # per-pair leaked-molecule estimates
-audit.plot_map()                    # source x target admixture overview
+audit.pairs()                       # per-pair admixture rates and molecule estimates
+audit.plot_map()                    # admixture-rate map (% of target-type molecules)
 audit.plot_exposure()               # pooled exposure profile, 95% intervals
 audit.plot_remaining({"membrane": correction})
 
@@ -172,8 +172,11 @@ report.summary()                    # and warnings for uncovered pairs
 report.plot_cleanup()
 ```
 
-Estimates are conservative lower bounds: contamination reaching even
-unexposed cells raises the reference level and is not counted.
+The audit's directly measured marker excess is a conservative lower bound
+(contamination reaching even unexposed cells raises the reference level
+and is not counted); the reported rates and molecule counts extrapolate it
+by the markers' share of the source transcriptome, kept as the `coverage`
+column of `audit.pairs()`.
 
 ## SpatialData API
 

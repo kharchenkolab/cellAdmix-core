@@ -89,17 +89,17 @@ demonstrable floor $L$; Figure 1b maps the resulting per-pair rates
 $\hat r_{S \to T}$.
 
 Dataset-wide cumulatives are sums of the per-pair counts over the
-dataset's total molecule count $M$: the demonstrated floor
-$\sum_{\text{pairs}} L / M$ (what the audit's `plot_remaining` bars
-report) and the extrapolated burden
-$\sum_{\text{pairs}} \hat A_{S \to T} / M$. Both are clean sums: each
+dataset's total molecule count $M$: the extrapolated burden
+$\sum_{\text{pairs}} \hat A_{S \to T} / M$ (what the audit's
+`plot_remaining` bars report) and its demonstrated floor
+$\sum_{\text{pairs}} L / M$. Both are clean sums: each
 gene belongs to the pool of its unique top-expressing type and each cell
 to a single target type, so no molecule is counted by two pairs.
 
 ![Figure 1](figures/benchmark_fig1.png)
 
-**Figure 1. The neighbor benchmark.** **(a)** Pooled strict-tier
-source-marker rates in target cells, stratified by the number of source-type
+**Figure 1. The neighbor benchmark.** **(a)** Strict-tier pool-marker
+rates $\hat\rho_B$ in target cells, stratified by the number of source-type
 neighbors, before (red, dashed) and after (blue) a standard cleanup (bare
 ls-NMF fit, membrane scoring, pancreas dataset); the dotted line marks the
 zero-exposure reference rate $\hat\rho_0$ — nonzero in general, since it
@@ -114,8 +114,8 @@ $\hat r_{S \to T}$ on pancreas (percent of the target type's molecules
 leaked in from the source; blank cells: pair not detected). Over a
 quarter of ductal/tumor-cell molecules are estimated to originate in
 exocrine cells. **(c)** Estimated cleanup sensitivity for every detected
-pair (bars), with each pair's demonstrated leaked-molecule count $L$
-overlaid (orange, log scale). Take-home: cleanup effectiveness is
+pair (bars), with each pair's estimated admixed-molecule count
+$\hat A_{S \to T}$ overlaid (orange, log scale). Take-home: cleanup effectiveness is
 measurable without molecule-level ground truth, and a standard single-fit
 correction is highly uneven across cell-type pairs — including a
 near-zero score on one of the largest leakage pairs (exocrine → ductal).
@@ -136,7 +136,8 @@ exceedance is measured against the *corrected* reference rate, so deleting
 a gene outright earns full credit here — and is charged instead by the
 specificity metrics below. Applied across all detected pairs of a standard
 single-fit cleanup (Figure 1c), the score is highly heterogeneous, and the
-largest pair by leakage mass (exocrine → ductal, over 200,000 molecules)
+largest pair by leakage mass (exocrine → ductal, an estimated
+$\hat A \approx 500{,}000$ admixed molecules)
 is missed entirely — a coverage failure invisible to aggregate
 diagnostics.
 

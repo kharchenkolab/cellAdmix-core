@@ -176,8 +176,10 @@ Before correcting anything, the audit measures how much admixture the
 dataset carries and between which cell types, using only the spatial
 exposure structure (source-marker content in target cells rises with
 source-type neighbor exposure; unexposed target cells are the internal
-negative control). Cell text gives the estimated number of leaked
-molecules per detected source → target pair — a conservative lower bound.
+negative control). Each cell of the map shows a detected source → target
+pair's estimated admixture rate: the percent of the target type's
+molecules that leaked in from the source, extrapolated from a directly
+measured (and conservative) marker excess.
 
 ```{r audit-map, fig.width=6.8, fig.height=5.2}
 audit <- fit$audit_admixture()

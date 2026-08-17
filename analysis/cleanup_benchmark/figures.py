@@ -43,7 +43,7 @@ for i, pair in enumerate(show_pairs):
     ax.set_xlabel('source-type neighbors')
     ax.set_title(short(pair), fontsize=8.5)
     if i == 0:
-        ax.set_ylabel('source-marker rate\n(per 1000 molecules)')
+        ax.set_ylabel('pool-marker rate $\\hat{\\rho}_B$\n(per 1000 molecules)')
         ax.legend(frameon=False, fontsize=8)
 
 # panel b: extrapolated per-pair admixture rates r as a source x target map
@@ -75,12 +75,14 @@ ax = fig.add_subplot(gs[2, :])
 ax.annotate('c', (-0.065, 1.05), xycoords='axes fraction',
     fontsize=13, fontweight='bold')
 b = bare.dropna(subset=['power_strict']).sort_values('power_strict', ascending=False)
+admixed = rates.assign(pair=rates['source'] + ' -> ' + rates['target']) \
+    .set_index('pair')['admixed_molecules']
 x = np.arange(len(b))
 bars = ax.bar(x, b['power_strict'], color='#34495e', alpha=0.85)
 ax2 = ax.twinx()
-ax2.plot(x, b['excess_strict'], 'o', color='#e67e22', ms=4, alpha=0.8)
+ax2.plot(x, b['pair'].map(admixed), 'o', color='#e67e22', ms=4, alpha=0.8)
 ax2.set_yscale('log')
-ax2.set_ylabel('estimated leaked molecules', color='#e67e22')
+ax2.set_ylabel('estimated admixed molecules $\\hat{A}_{S \\to T}$', color='#e67e22')
 ax2.tick_params(axis='y', colors='#e67e22')
 ax.set_xticks(x, [short(p) for p in b['pair']], rotation=60, ha='right', fontsize=6.5)
 ax.set_ylabel('estimated sensitivity (strict tier)')

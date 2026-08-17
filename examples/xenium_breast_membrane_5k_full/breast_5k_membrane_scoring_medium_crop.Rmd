@@ -103,10 +103,10 @@ fit$plot_stability()
 
 ## Admixture Audit
 
-Before correcting anything, the audit estimates how many molecules leaked
-between each ordered cell-type pair within the crop, using only the
-spatial exposure structure of the data (cell text: estimated leaked
-molecules, a conservative lower bound).
+Before correcting anything, the audit estimates each ordered cell-type
+pair's admixture rate within the crop — the percent of the target type's
+molecules that leaked in from the source — using only the spatial
+exposure structure of the data.
 
 ```{r audit-map, fig.width=8.6, fig.height=6.4}
 audit <- fit$audit_admixture()

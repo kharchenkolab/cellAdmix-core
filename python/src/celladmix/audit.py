@@ -1,5 +1,6 @@
-"""Admixture audit: exposure-based estimates of leaked molecules per
-cell-type pair, and verification of corrections against them.
+"""Admixture audit: exposure-based estimates of per-cell-type-pair
+admixture rates and admixed-molecule counts, and verification of
+corrections against them.
 
 The measure exploits the spatial structure of segmentation-driven admixture:
 source-marker content in target cells rises with the number of source-type
@@ -149,11 +150,16 @@ class CellAdmixAudit:
                     excess_strict, _ = _excess(rates_strict)
                 else:
                     rates_strict, excess_strict = None, np.nan
+                # marker-pool share of the source transcriptome: the
+                # extrapolation factor from pool leakage to total admixture
+                coverage = float(profiles[pool, s_idx].sum()) / max(
+                    float(profiles[:, s_idx].sum()), 1e-9)
                 self._pairs[(source, target)] = dict(
                     source=source, target=target, cols=cols, bins=bins,
                     pool=pool, strict=strict, rates=rates,
                     rates_strict=rates_strict, excess=excess, p=p,
-                    excess_strict=excess_strict)
+                    excess_strict=excess_strict, coverage=coverage,
+                    target_molecules=float(tot.sum()))
         pvals = np.array([d["p"] for d in self._pairs.values()])
         if len(pvals):
             order = np.argsort(pvals)
@@ -170,9 +176,11 @@ class CellAdmixAudit:
         for d in self._pairs.values():
             exposed = d["cols"][np.asarray(d["bins"]) != "0"]
             rows.append(dict(source=d["source"], target=d["target"],
+                rate=d["excess"] / (d["coverage"] * max(d["target_molecules"], 1)),
+                admixed_molecules=round(d["excess"] / d["coverage"]),
                 excess=round(d["excess"]),
                 excess_strict=None if np.isnan(d["excess_strict"]) else round(d["excess_strict"]),
-                pct_of_exposed=100 * d["excess"] / max(self._totals[exposed].sum(), 1),
+                coverage=d["coverage"],
                 q_value=d["q"], detected=d["detected"],
                 n_exposed=len(exposed), n_reference=int((np.asarray(d["bins"]) == "0").sum()),
                 n_markers=len(d["pool"]), n_strict=len(d["strict"])))
@@ -191,7 +199,7 @@ class CellAdmixAudit:
         return d
 
     # ---- plots ----
-    def plot_map(self, value="percent", detected_only=True, ax=None):
+    def plot_map(self, value="rate", detected_only=True, ax=None):
         import matplotlib.pyplot as plt
 
         df = self.pairs(detected_only=detected_only)
@@ -203,8 +211,14 @@ class CellAdmixAudit:
         text = {}
         for _, r in df.iterrows():
             i, j = sources.index(r["source"]), targets.index(r["target"])
-            grid[i, j] = r["pct_of_exposed"] if value == "percent" else r["excess"]
-            text[(i, j)] = f"{r['excess']/1000:.0f}k" if r["excess"] >= 1000 else f"{int(r['excess'])}"
+            if value == "rate":
+                grid[i, j] = 100 * r["rate"]
+                text[(i, j)] = f"{100 * r['rate']:.1f}"
+            else:
+                grid[i, j] = r["admixed_molecules"]
+                text[(i, j)] = (f"{r['admixed_molecules']/1000:.0f}k"
+                    if r["admixed_molecules"] >= 1000
+                    else f"{int(r['admixed_molecules'])}")
         if ax is None:
             _, ax = plt.subplots(figsize=(6.5, 5))
         im = ax.imshow(grid, cmap="Oranges", aspect="auto")
@@ -215,13 +229,15 @@ class CellAdmixAudit:
         ax.set_xlabel("target cell type")
         ax.set_ylabel("source cell type")
         ax.set_title("Estimated admixture by cell-type pair\n"
-            "cell text: estimated leaked molecules (conservative)", fontsize=10)
+            + ("estimated admixture rate: % of the target type's molecules"
+               if value == "rate" else "cell text: estimated admixed molecules"),
+            fontsize=10)
         for spine in ax.spines.values():
             spine.set_visible(True)
             spine.set_color("grey")
         plt.colorbar(im, ax=ax, fraction=0.04,
-            label="% of exposed target molecules" if value == "percent"
-            else "leaked molecules")
+            label="% of target-type molecules" if value == "rate"
+            else "admixed molecules")
         return ax
 
     def _state_rates(self, matrix, source=None, target=None, strict=True):
@@ -265,7 +281,7 @@ class CellAdmixAudit:
                 ax.axhline(rates["rate"].iloc[0] * 1e3, ls=":", c="grey", lw=0.8)
         ax.set_xticks(range(len(BIN_LABELS)), BIN_LABELS)
         ax.set_xlabel("source-type cells among nearest neighbors")
-        ax.set_ylabel("source-marker rate (per 1,000 molecules)")
+        ax.set_ylabel("pool-marker rate (per 1,000 molecules)")
         title = ("Admixture exposure profile (pooled over detected pairs)"
             if source is None else f"{source} → {target}")
         ax.set_title(title, fontsize=10)
@@ -293,11 +309,14 @@ class CellAdmixAudit:
                 rates = _bin_rates(mk, self._totals[d["cols"]], np.asarray(d["bins"]))
                 r0 = float(rates.loc[rates["bin"] == "0", "rate"].iloc[0])
                 exposed = rates[rates["bin"] != "0"]
-                tot += float((np.maximum(exposed["rate"] - r0, 0) * exposed["totals"]).sum())
+                # extrapolate each pair's pool excess by its marker coverage
+                tot += float((np.maximum(exposed["rate"] - r0, 0) *
+                    exposed["totals"]).sum()) / d["coverage"]
                 M_exp = float(exposed["totals"].sum())
                 M_ref = max(float(rates.loc[rates["bin"] == "0", "totals"].iloc[0]), 1)
-                var += float(exposed["markers"].sum()) + (M_exp / M_ref) ** 2 * \
-                    float(rates.loc[rates["bin"] == "0", "markers"].iloc[0])
+                var += (float(exposed["markers"].sum()) + (M_exp / M_ref) ** 2 *
+                    float(rates.loc[rates["bin"] == "0", "markers"].iloc[0])) / \
+                    d["coverage"] ** 2
             ys.append(100 * tot / denom)
             los.append(100 * max(tot - 1.96 * np.sqrt(var), 0) / denom)
             his.append(100 * (tot + 1.96 * np.sqrt(var)) / denom)
@@ -310,7 +329,7 @@ class CellAdmixAudit:
         ax.set_xticks(x, list(states))
         ax.set_ylabel("estimated admixture (% of all molecules)")
         ax.set_title("Remaining admixture by correction\n"
-            "conservative estimate over detected pairs; 95% intervals", fontsize=9.5)
+            "estimate over detected pairs; 95% intervals", fontsize=9.5)
         return ax
 
     # ---- verification ----
@@ -329,6 +348,7 @@ class CellAdmixAudit:
                 ras = self._state_rates(after, d["source"], d["target"], strict=True)
                 sens_strict = _power(d["rates_strict"], ras)
             rows.append(dict(source=d["source"], target=d["target"],
+                admixed_molecules=round(d["excess"] / d["coverage"]),
                 excess=round(d["excess"]), sensitivity=sens,
                 sensitivity_strict=sens_strict))
         pairs = pd.DataFrame(rows)
@@ -350,7 +370,7 @@ class CellAdmixAudit:
                 if (r["source"], r["target"]) not in covered and \
                         r["excess"] >= self.params["min_excess"] * 5:
                     warnings.warn(
-                        f"Detected ~{r['excess']:,} leaked molecules from "
+                        f"Detected ~{r['admixed_molecules']:,} admixed molecules from "
                         f"{r['source']} into {r['target']}, but no removal rule "
                         f"covers this pair", stacklevel=2)
         return CellAdmixCleanupReport(self, correction, pairs, false_removal)
@@ -388,10 +408,10 @@ class CellAdmixCleanupReport:
 
     def summary(self):
         p, fr = self._pairs, self._false_removal
-        total = p["excess"].sum()
-        removed = (p["excess"] * p["sensitivity"].clip(lower=0)).sum()
+        total = p["admixed_molecules"].sum()
+        removed = (p["admixed_molecules"] * p["sensitivity"].clip(lower=0)).sum()
         return dict(detected_pairs=len(p),
-            estimated_leaked_molecules=int(total),
+            estimated_admixed_molecules=int(total),
             leakage_removed_overall=removed / max(total, 1),
             median_pair_sensitivity=float(p["sensitivity"].median()),
             own_marker_false_removal=float(
@@ -401,12 +421,12 @@ class CellAdmixCleanupReport:
     def plot_cleanup(self, ax=None):
         import matplotlib.pyplot as plt
 
-        p = self._pairs.sort_values("excess")
+        p = self._pairs.sort_values("admixed_molecules")
         if ax is None:
             _, ax = plt.subplots(figsize=(7, 0.22 * len(p) + 1.5))
         y = np.arange(len(p))
         ax.barh(y, p["sensitivity"].clip(lower=0), color="#34495e", alpha=0.9)
-        ax.scatter(np.full(len(p), 1.06), y, s=np.sqrt(p["excess"]) / 3,
+        ax.scatter(np.full(len(p), 1.06), y, s=np.sqrt(p["admixed_molecules"]) / 3,
             color="#e67e22", alpha=0.85)
         ax.set_yticks(y, [f"{s} → {t}" for s, t in zip(p["source"], p["target"])],
             fontsize=7)

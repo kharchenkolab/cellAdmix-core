@@ -167,7 +167,11 @@ celladmix_audit_admixture <- function(fit, annotation = NULL, neighbor_k = 15L,
       pair_defs[[paste(source, target, sep = " -> ")]] <- list(
         source = source, target = target, T_cells = T_cells, bins = bins,
         pool = pool, strict = strict, rates = rates, rates_strict = rates_strict,
-        excess = det$excess, p = det$p, excess_strict = det_strict$excess)
+        excess = det$excess, p = det$p, excess_strict = det_strict$excess,
+        # marker-pool share of the source transcriptome: the extrapolation
+        # factor from pool-demonstrated leakage to total admixture
+        coverage = sum(profiles[pool, source]) / max(sum(profiles[, source]), 1),
+        target_molecules = sum(totals[T_cells]))
     }
   }
   qvals <- stats::p.adjust(vapply(pair_defs, function(d) d$p, 0), "BH")
@@ -184,9 +188,10 @@ celladmix_audit_admixture <- function(fit, annotation = NULL, neighbor_k = 15L,
 #' Admixture Audit Result
 #'
 #' Created by [celladmix_audit_admixture()] (or `fit$audit_admixture()`).
-#' Holds per-cell-type-pair leakage estimates, plotting methods, and the
-#' `evaluate()` method that verifies a correction against the same
-#' measurements.
+#' Holds per-cell-type-pair admixture-rate and admixed-molecule estimates
+#' (extrapolated from a conservative, directly measured marker-pool
+#' excess), plotting methods, and the `evaluate()` method that verifies a
+#' correction against the same measurements.
 #' @export
 CellAdmixAudit <- R6::R6Class(
   "CellAdmixAudit",
@@ -209,9 +214,10 @@ CellAdmixAudit <- R6::R6Class(
       out <- do.call(rbind, lapply(private$.pair_defs, function(d) {
         exposed <- d$T_cells[d$bins != "0"]
         data.frame(source = d$source, target = d$target,
+          rate = d$excess / (d$coverage * max(d$target_molecules, 1)),
+          admixed_molecules = round(d$excess / d$coverage),
           excess = round(d$excess), excess_strict = round(d$excess_strict),
-          pct_of_exposed = 100 * d$excess /
-            max(sum(private$.totals[exposed]), 1),
+          coverage = d$coverage,
           q_value = d$q, detected = d$detected,
           n_exposed = length(exposed), n_reference = sum(d$bins == "0"),
           n_markers = length(d$pool), n_strict = length(d$strict),
@@ -226,7 +232,7 @@ CellAdmixAudit <- R6::R6Class(
       list(pool = d$pool, strict = d$strict)
     },
 
-    plot_map = function(value = c("percent", "molecules"), detected_only = TRUE) {
+    plot_map = function(value = c("rate", "molecules"), detected_only = TRUE) {
       .celladmix_require_ggplot2()
       value <- match.arg(value)
       df <- self$pairs()
@@ -234,18 +240,27 @@ CellAdmixAudit <- R6::R6Class(
       if (!nrow(df)) {
         return(.celladmix_empty_plot("No detected admixture pairs"))
       }
-      df$fill <- if (value == "percent") df$pct_of_exposed else df$excess
-      df$label <- ifelse(df$excess >= 1000,
-        sprintf("%.0fk", df$excess / 1000), sprintf("%d", df$excess))
+      if (value == "rate") {
+        df$fill <- 100 * df$rate
+        df$label <- sprintf("%.1f", 100 * df$rate)
+        legend_name <- "% of target-type\nmolecules"
+        subtitle <- "estimated admixture rate: molecules leaked from source,\nas % of the target type's molecules"
+      } else {
+        df$fill <- df$admixed_molecules
+        df$label <- ifelse(df$admixed_molecules >= 1000,
+          sprintf("%.0fk", df$admixed_molecules / 1000),
+          sprintf("%d", df$admixed_molecules))
+        legend_name <- "admixed\nmolecules"
+        subtitle <- "cell text: estimated admixed molecules"
+      }
       ggplot2::ggplot(df, ggplot2::aes(x = target, y = source, fill = fill)) +
         ggplot2::geom_tile(color = "white", linewidth = 0.4) +
         ggplot2::geom_text(ggplot2::aes(label = label), size = 2.8) +
         ggplot2::scale_fill_gradient(low = "#fff5eb", high = "#d94801",
-          name = if (value == "percent") "% of exposed\ntarget molecules"
-                 else "leaked molecules") +
+          name = legend_name) +
         ggplot2::labs(x = "target cell type", y = "source cell type",
           title = "Estimated admixture by cell-type pair",
-          subtitle = "cell text: estimated leaked molecules (conservative)") +
+          subtitle = subtitle) +
         ggplot2::theme_minimal(base_size = 10) +
         ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 40, hjust = 1),
           panel.grid = ggplot2::element_blank(),
@@ -310,7 +325,7 @@ CellAdmixAudit <- R6::R6Class(
         ggplot2::scale_color_manual(values = cols, name = NULL) +
         ggplot2::scale_fill_manual(values = cols, name = NULL) +
         ggplot2::labs(x = "source-type cells among nearest neighbors",
-          y = "source-marker rate (per 1,000 molecules)",
+          y = "pool-marker rate (per 1,000 molecules)",
           title = title,
           subtitle = "error bars: 95% Poisson intervals (often narrower than the symbols);\ndotted line: unexposed reference") +
         ggplot2::theme_classic(base_size = 10) +
@@ -334,8 +349,11 @@ CellAdmixAudit <- R6::R6Class(
           m_ref <- rates$markers[rates$bin == "0"]
           M_ref <- max(rates$totals[rates$bin == "0"], 1)
           M_exp <- sum(exposed$totals)
-          tot <- tot + sum(pmax(exposed$rate - r0, 0) * exposed$totals)
-          var_tot <- var_tot + sum(exposed$markers) + (M_exp / M_ref)^2 * m_ref
+          # extrapolate each pair's pool excess by its marker coverage
+          tot <- tot +
+            sum(pmax(exposed$rate - r0, 0) * exposed$totals) / d$coverage
+          var_tot <- var_tot +
+            (sum(exposed$markers) + (M_exp / M_ref)^2 * m_ref) / d$coverage^2
         }
         c(excess = tot, sd = sqrt(var_tot))
       }
@@ -356,7 +374,7 @@ CellAdmixAudit <- R6::R6Class(
         ggplot2::labs(x = NULL,
           y = "estimated admixture (% of all molecules)",
           title = "Remaining admixture by correction",
-          subtitle = "conservative estimate over detected cell-type pairs;\nerror bars: 95% intervals") +
+          subtitle = "estimate over detected cell-type pairs;\nerror bars: 95% intervals") +
         ggplot2::theme_classic(base_size = 10)
     },
 
@@ -375,6 +393,7 @@ CellAdmixAudit <- R6::R6Class(
         } else NA_real_
         rows[[length(rows) + 1]] <- data.frame(
           source = d$source, target = d$target,
+          admixed_molecules = round(d$excess / d$coverage),
           excess = round(d$excess), excess_strict = round(d$excess_strict),
           sensitivity = .celladmix_audit_power(d$rates, rates_after),
           sensitivity_strict = sens_strict,
@@ -398,9 +417,9 @@ CellAdmixAudit <- R6::R6Class(
           pairs$excess >= self$params$min_excess * 5, , drop = FALSE]
         for (i in seq_len(nrow(missed))) {
           warning(sprintf(paste0(
-            "Detected ~%s leaked molecules from %s into %s, but no removal ",
+            "Detected ~%s admixed molecules from %s into %s, but no removal ",
             "rule covers this pair"),
-            format(missed$excess[[i]], big.mark = ","),
+            format(missed$admixed_molecules[[i]], big.mark = ","),
             missed$source[[i]], missed$target[[i]]), call. = FALSE)
         }
       }
@@ -447,11 +466,11 @@ CellAdmixCleanupReport <- R6::R6Class(
     summary = function() {
       p <- private$.pairs
       fr <- private$.false_removal
-      total <- sum(p$excess)
-      removed <- sum(p$excess * pmax(p$sensitivity, 0), na.rm = TRUE)
+      total <- sum(p$admixed_molecules)
+      removed <- sum(p$admixed_molecules * pmax(p$sensitivity, 0), na.rm = TRUE)
       list(
         detected_pairs = nrow(p),
-        estimated_leaked_molecules = total,
+        estimated_admixed_molecules = total,
         leakage_removed_overall = removed / max(total, 1),
         median_pair_sensitivity = stats::median(p$sensitivity, na.rm = TRUE),
         own_marker_false_removal = sum(fr$false_removal * fr$own_marker_molecules) /
@@ -463,14 +482,14 @@ CellAdmixCleanupReport <- R6::R6Class(
     plot_cleanup = function() {
       .celladmix_require_ggplot2()
       p <- private$.pairs
-      p$pair <- stats::reorder(paste(p$source, "→", p$target), p$excess)
+      p$pair <- stats::reorder(paste(p$source, "→", p$target), p$admixed_molecules)
       s <- self$summary()
       ggplot2::ggplot(p, ggplot2::aes(y = pair)) +
         ggplot2::geom_col(ggplot2::aes(x = pmax(sensitivity, 0)),
           fill = "#34495e", alpha = 0.9) +
-        ggplot2::geom_point(ggplot2::aes(x = 1.06, size = excess),
+        ggplot2::geom_point(ggplot2::aes(x = 1.06, size = admixed_molecules),
           color = "#e67e22", alpha = 0.85) +
-        ggplot2::scale_size_area(max_size = 5, name = "leaked\nmolecules",
+        ggplot2::scale_size_area(max_size = 5, name = "admixed\nmolecules",
           labels = scales_comma) +
         ggplot2::coord_cartesian(xlim = c(0, 1.12)) +
         ggplot2::labs(x = "estimated cleanup sensitivity", y = NULL,
