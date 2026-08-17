@@ -48,7 +48,16 @@ the gap between the observed curve and the dotted baseline in Figure 1a,
 converted to molecule counts via the bin totals. Note that $\hat\rho_0$
 is generally nonzero — residual native expression plus ambient
 contamination reaching even unexposed cells — so $L$ is a conservative,
-lower-bound estimate. Pairs enter the benchmark when the exposed counts
+lower-bound estimate. $L$ counts only molecules directly observed on the
+pair's marker pool; no extrapolation to the rest of the source profile is
+applied, and since each gene belongs to the pool of its top-expressing
+type, pools of different sources are disjoint and pair estimates never
+double-count a molecule. Dataset-level figures (such as the "% of all
+molecules" bars in `plot_remaining`) are simply the summed pair estimates
+over the total molecule count — on pancreas the pools carry roughly half
+of their sources' transcriptomes, so a profile-proportional reading would
+lift the totals by about 1.7×, but the audit deliberately reports the
+directly demonstrable count instead. Pairs enter the benchmark when the exposed counts
 exceed the $\hat\rho_0$ expectation by a one-sided Poisson test
 (Benjamini–Hochberg $q < 0.01$) with $L \geq 200$: 39 of 42 candidate
 pairs on pancreas, 13 on the breast crop, 27 on NSCLC, with no manual
@@ -65,6 +74,18 @@ single-fit cleanup (Figure 1b), the score is highly heterogeneous, and the
 largest pair by leakage mass (exocrine → ductal, over 200,000 molecules)
 is missed entirely — a coverage failure invisible to aggregate
 diagnostics.
+
+This design differs deliberately from the Bayesian per-molecule
+contamination estimator of Mitchel et al. (2025), which classifies each
+molecule from reference expression profiles with adjacency-derived priors.
+That estimator needs an external scRNA-seq reference and books any
+expression the reference misrepresents as contamination, and — decisive
+for benchmarking — a correction that simply deletes all source-gene
+molecules from target cells drives it to zero, native molecules included.
+The audit is reference-free, demands the spatial dose-response (native
+expression, however unexpected, cancels against the unexposed baseline),
+and cannot be gamed by aggressive removal: its pre-correction offsets are
+frozen and over-removal surfaces in the own-marker false-removal rate.
 
 ![Figure 1](figures/benchmark_fig1.png)
 
