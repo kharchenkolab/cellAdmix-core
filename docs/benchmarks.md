@@ -22,22 +22,23 @@ sensitivity/specificity dial. The harness lives in
 ## The neighbor benchmark
 
 For an ordered pair of cell types — a *source* S and a *target* T — each
-T cell's *exposure* is the number of S cells among its 15 nearest cells
-(the adjacency principle of Mitchel et al., 2025, and of the pipeline's
-native-factor check). T cells are stratified into exposure bins
-(0, 1, 2, 3+); the zero-exposure bin is the internal reference.
+cell of type T has an *exposure*: the number of type-S cells among its 15
+nearest cells (the adjacency principle of Mitchel et al., 2025, and of
+the pipeline's native-factor check). The cells of T are stratified into
+exposure bins (0, 1, 2, 3+); the zero-exposure bin is the internal
+reference.
 
 For each cell-type pair we select up to 20 *source markers*: genes whose
 top expresser is S, ranked by their expression in S relative to
-zero-exposure T cells — rank-based, since an absolute baseline cutoff
+zero-exposure cells of T — rank-based, since an absolute baseline cutoff
 would itself be skewed by contamination. The *strict tier* of the panel
-holds genes essentially absent from reference T cells (baseline under 5%
-of the source level), whose excess in exposed cells can only be leaked
+holds genes essentially absent from reference cells of T (baseline under
+5% of the source level), whose excess in exposed cells can only be leaked
 material.
 
 Counts are pooled over the panel. Let $m_B$ be the number of pool-gene
-molecules in the T cells of exposure bin $B$, and $M_B$ the total number
-of molecules (all genes) in those same cells. We model
+molecules in the type-T cells of exposure bin $B$, and $M_B$ the total
+number of molecules (all genes) in those same cells. We model
 $m_B \sim \mathrm{Poisson}(\rho_B M_B)$, so
 $\hat\rho_B = m_B / M_B$ is the bin's pool-marker rate — the fraction of
 those cells' molecules that carry pool genes — with one free rate per bin
