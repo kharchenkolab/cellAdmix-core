@@ -134,6 +134,17 @@ struct BridgeRunData {
   std::vector<int> labels;
 };
 
+// Minimal run subset for ensemble member labeling: coordinates and integer
+// gene/cell indices only — no per-molecule strings, obs ids, or margins.
+struct LabelingRunData {
+  RunManifest manifest;
+  TranscriptTable transcripts;
+  std::vector<int> labels;
+};
+
+// Load only the columns needed to project and smooth member labels.
+LabelingRunData load_run_labeling_data(const std::string& path_or_dir);
+
 // Minimal run subset needed to rebuild sampled-training NCV report sidecars.
 struct TrainingRunData {
   RunManifest manifest;

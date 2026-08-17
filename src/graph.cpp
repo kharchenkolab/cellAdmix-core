@@ -222,6 +222,87 @@ std::vector<int> smooth_labels_icm(
   return labels;
 }
 
+// Build every cell's smoothing graph once for reuse across score sets.
+CellGraphs build_cell_graphs(
+    const TranscriptTable& table,
+    int k_neighbors,
+    int num_threads) {
+  CellGraphs out;
+  out.by_cell = table.transcripts_by_cell();
+  out.graphs.resize(out.by_cell.size());
+  if (k_neighbors <= 0) {
+    return out;
+  }
+  const int n_cells = static_cast<int>(out.by_cell.size());
+  auto build_range = [&](int start, int length) {
+    for (int cell = start; cell < start + length; ++cell) {
+      const auto& members = out.by_cell[static_cast<std::size_t>(cell)];
+      if (members.size() > 1) {
+        out.graphs[static_cast<std::size_t>(cell)] =
+            build_cell_knn_graph(table, members, k_neighbors);
+      }
+    }
+  };
+  if (num_threads <= 1 || n_cells <= 1) {
+    build_range(0, n_cells);
+  } else {
+    const int workers = effective_threads(num_threads, n_cells);
+    subpar::parallelize_range<true>(workers, n_cells, [&](int, int start, int length) {
+      build_range(start, length);
+    });
+  }
+  return out;
+}
+
+// Assign transcript factors reusing prebuilt per-cell graphs.
+std::vector<int> assign_factors_per_cell(
+    const TranscriptTable& table,
+    const DenseMatrix& node_scores,
+    const CellGraphs& cell_graphs,
+    double same_label_ratio,
+    int max_iterations,
+    int num_threads) {
+  if (node_scores.rows() != static_cast<int>(table.size())) {
+    throw std::runtime_error("node_scores rows must match number of transcripts");
+  }
+  if (cell_graphs.by_cell.size() != cell_graphs.graphs.size()) {
+    throw std::runtime_error("cell_graphs members and graphs must align");
+  }
+
+  std::vector<int> labels(table.size(), 0);
+  const bool smoothing_active = max_iterations > 0 && same_label_ratio > 1.0;
+  const int n_cells = static_cast<int>(cell_graphs.by_cell.size());
+  auto assign_range = [&](int start, int length) {
+    for (int cell = start; cell < start + length; ++cell) {
+      const auto& members = cell_graphs.by_cell[static_cast<std::size_t>(cell)];
+      if (members.empty()) {
+        continue;
+      }
+      const auto& graph = cell_graphs.graphs[static_cast<std::size_t>(cell)];
+      if (members.size() == 1 || !smoothing_active || graph.n_nodes == 0) {
+        for (const int member : members) {
+          labels[static_cast<std::size_t>(member)] = node_scores.row_argmax(member);
+        }
+        continue;
+      }
+      const auto cell_labels = smooth_labels_icm_subset(
+          node_scores, members, graph, same_label_ratio, max_iterations);
+      for (std::size_t local = 0; local < members.size(); ++local) {
+        labels[static_cast<std::size_t>(members[local])] = cell_labels[local];
+      }
+    }
+  };
+  if (num_threads <= 1 || n_cells <= 1) {
+    assign_range(0, n_cells);
+  } else {
+    const int workers = effective_threads(num_threads, n_cells);
+    subpar::parallelize_range<true>(workers, n_cells, [&](int, int start, int length) {
+      assign_range(start, length);
+    });
+  }
+  return labels;
+}
+
 // Assign transcript factors cell-by-cell and optionally smooth them within each cell.
 std::vector<int> assign_factors_per_cell(
     const TranscriptTable& table,

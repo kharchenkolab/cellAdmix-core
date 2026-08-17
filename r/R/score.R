@@ -333,6 +333,19 @@ CellAdmixScore <- R6::R6Class(
   pair_key <- function(df) paste(df$source_cell_type, df$target_cell_type, sep = "\r")
   cache_key <- function(r) paste(r, p_thresh, adjust_p,
     paste(targets %||% "", collapse = ","), sep = "|")
+  # Member scoring dominates ensemble cost, so kept member rules are also
+  # persisted in the run's scores directory, keyed by the member index and
+  # every input that could change them; re-corrections and re-renders then
+  # reuse them instead of re-scoring.
+  disk_key <- function(r) paste(
+    score_obj$method, r, p_thresh, adjust_p,
+    paste(targets %||% "", collapse = ","),
+    score_obj$annotation_hash,
+    paste(deparse(score_obj$params), collapse = ""),
+    sep = "|")
+  disk_path <- function(r) file.path(
+    fit$run$paths$scores_dir,
+    sprintf("ensemble_rules_%s_m%d.rds", score_obj$method, r))
   frames <- list()
   frame_members <- integer(0)
   pair_sets <- list()
@@ -341,7 +354,14 @@ CellAdmixScore <- R6::R6Class(
       primary_rules
     } else {
       cached <- score_obj$member_rules_cache[[cache_key(r)]]
+      if (is.null(cached) && file.exists(disk_path(r))) {
+        stored <- tryCatch(readRDS(disk_path(r)), error = function(e) NULL)
+        if (!is.null(stored) && identical(stored$key, disk_key(r))) {
+          cached <- stored$rules
+        }
+      }
       if (!is.null(cached)) {
+        score_obj$member_rules_cache[[cache_key(r)]] <- cached
         cached
       } else {
         result_r <- .celladmix_score_member(fit, score_obj, r)
@@ -356,6 +376,7 @@ CellAdmixScore <- R6::R6Class(
           cell_factors = .celladmix_member_cell_factors(fit, r))
         rules_r <- rules_r[is.na(rules_r$keep) | rules_r$keep, , drop = FALSE]
         score_obj$member_rules_cache[[cache_key(r)]] <- rules_r
+        saveRDS(list(key = disk_key(r), rules = rules_r), disk_path(r))
         rules_r
       }
     }

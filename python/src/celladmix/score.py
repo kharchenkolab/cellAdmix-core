@@ -181,6 +181,25 @@ class CellAdmixScore:
         def pair_keys(df):
             return set(zip(df["source_cell_type"].astype(str), df["target_cell_type"].astype(str)))
 
+        # Member scoring dominates ensemble cost, so kept member rules are
+        # also persisted in the run's scores directory, keyed by everything
+        # that could change them; re-corrections and re-renders reuse them
+        # instead of re-scoring.
+        cache_dir = self.fit.run_path / "scores"
+        cache_dir.mkdir(exist_ok=True)
+
+        def disk_key(member):
+            from .dataset import _annotation_hash
+
+            return "|".join([
+                self.method, str(member), str(p_thresh),
+                _annotation_hash(self.fit.dataset.annotation),
+                repr(sorted(self.params.items())),
+            ])
+
+        def disk_path(member):
+            return cache_dir / f"ensemble_rules_{self.method}_m{member}.pkl"
+
         frames = []
         frame_members: list[int] = []
         pair_sets: dict[int, set] = {}
@@ -190,6 +209,13 @@ class CellAdmixScore:
             else:
                 cache_key = (member, p_thresh)
                 member_df = self._member_rules_cache.get(cache_key)
+                if member_df is None and disk_path(member).exists():
+                    try:
+                        stored = pd.read_pickle(disk_path(member))
+                    except Exception:
+                        stored = None
+                    if stored is not None and stored.get("key") == disk_key(member):
+                        member_df = stored["rules"]
                 if member_df is None:
                     member_score = self._score_member(member)
                     member_df = member_score.rules(p_thresh=p_thresh, native_check=False)
@@ -208,7 +234,9 @@ class CellAdmixScore:
                         member_df = apply_native_check(member_df, self.fit, cell_factors=merged)
                     if "keep" in member_df.columns:
                         member_df = member_df[member_df["keep"].fillna(True).astype(bool)]
-                    self._member_rules_cache[cache_key] = member_df
+                    pd.to_pickle({"key": disk_key(member), "rules": member_df},
+                        disk_path(member))
+                self._member_rules_cache[cache_key] = member_df
             if restrict_pairs is not None and len(member_df):
                 allowed = pair_keys(restrict_pairs)
                 keys = list(
