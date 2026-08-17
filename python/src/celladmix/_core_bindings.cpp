@@ -6,6 +6,7 @@
 #include <iomanip>
 #include <iostream>
 #include <limits>
+#include <map>
 #include <memory>
 #include <optional>
 #include <sstream>
@@ -696,7 +697,8 @@ PYBIND11_MODULE(_core, m) {
          unsigned int seed,
          const std::vector<std::string>& annotation_cell_ids,
          const std::vector<std::string>& annotation_labels,
-         bool verbose) {
+         bool verbose,
+         int ensemble_member) {
         celladmix::MembraneImageOptions image_options;
         image_options.image_path = image_path;
         image_options.pixel_size = pixel_size;
@@ -717,7 +719,9 @@ PYBIND11_MODULE(_core, m) {
         options.seed = seed;
         options.progress = make_progress_logger(verbose);
 
-        auto run_data = celladmix::load_run_data(run_path);
+        celladmix::RunLoadOptions load_options;
+        load_options.ensemble_member = ensemble_member;
+        auto run_data = celladmix::load_run_data(run_path, load_options);
         apply_annotation_override(run_data, annotation_cell_ids, annotation_labels);
 
         celladmix::MembraneTestResult result;
@@ -753,7 +757,8 @@ PYBIND11_MODULE(_core, m) {
       py::arg("seed") = 1U,
       py::arg("annotation_cell_ids") = std::vector<std::string>{},
       py::arg("annotation_labels") = std::vector<std::string>{},
-      py::arg("verbose") = false);
+      py::arg("verbose") = false,
+      py::arg("ensemble_member") = -1);
 
   m.def(
       "score_bridge",
@@ -778,7 +783,8 @@ PYBIND11_MODULE(_core, m) {
          bool fast_null_crossing,
          const std::vector<std::string>& annotation_cell_ids,
          const std::vector<std::string>& annotation_labels,
-         bool verbose) {
+         bool verbose,
+         int ensemble_member) {
         celladmix::BridgeTestOptions options;
         options.candidate_mode = candidate_mode;
         options.candidate_k = candidate_k;
@@ -800,7 +806,9 @@ PYBIND11_MODULE(_core, m) {
         options.fast_null_crossing = fast_null_crossing;
         options.progress = make_progress_logger(verbose);
 
-        auto run_data = celladmix::load_run_data(run_path);
+        celladmix::RunLoadOptions load_options;
+        load_options.ensemble_member = ensemble_member;
+        auto run_data = celladmix::load_run_data(run_path, load_options);
         apply_annotation_override(run_data, annotation_cell_ids, annotation_labels);
 
         celladmix::BridgeTestResult result;
@@ -837,7 +845,8 @@ PYBIND11_MODULE(_core, m) {
       py::arg("fast_null_crossing") = true,
       py::arg("annotation_cell_ids") = std::vector<std::string>{},
       py::arg("annotation_labels") = std::vector<std::string>{},
-      py::arg("verbose") = false);
+      py::arg("verbose") = false,
+      py::arg("ensemble_member") = -1);
 
   m.def(
       "correct_run",
@@ -846,36 +855,84 @@ PYBIND11_MODULE(_core, m) {
          const std::vector<int>& factors,
          const std::vector<std::string>& target_cell_types,
          const std::vector<std::string>& annotation_cell_ids,
-         const std::vector<std::string>& annotation_labels) {
+         const std::vector<std::string>& annotation_labels,
+         const std::vector<int>& rule_members,
+         int min_votes) {
         if (factors.size() != target_cell_types.size()) {
           throw std::runtime_error("factors and target_cell_types must have the same length");
+        }
+        if (!rule_members.empty() && rule_members.size() != factors.size()) {
+          throw std::runtime_error("rule_members must match the rule count");
         }
         auto run_data = celladmix::load_run_data(run_path);
         apply_annotation_override(run_data, annotation_cell_ids, annotation_labels);
 
-        // Correction rules are Python-facing one-based factors; the core label
-        // vector is zero-based.
-        std::vector<bool> keep_mask(run_data.transcripts.size(), true);
+        // Ensemble voting: each rule belongs to one member labeling (-1 =
+        // the run's own labels); a molecule is removed when at least
+        // min_votes member labelings remove it. Correction rules are
+        // Python-facing one-based factors; the core label vector is
+        // zero-based.
+        min_votes = std::max(1, min_votes);
+        std::map<int, std::vector<std::size_t>> rules_by_member;
         for (std::size_t rule = 0; rule < factors.size(); ++rule) {
+          const int member = rule_members.empty() ? -1 : rule_members[rule];
+          rules_by_member[member].push_back(rule);
+        }
+
+        auto mark_rule_removed = [&](
+            const std::vector<int>& labels,
+            std::size_t rule,
+            std::vector<bool>& removed) {
           const int zero_based_factor = factors[rule] - 1;
-          std::vector<bool> rule_keep(run_data.transcripts.size(), true);
           if (run_data.transcripts.cell_types.size() == run_data.transcripts.size()) {
             for (std::size_t i = 0; i < run_data.transcripts.size(); ++i) {
-              if (run_data.labels[i] == zero_based_factor &&
+              if (labels[i] == zero_based_factor &&
                   run_data.transcripts.cell_types[i] == target_cell_types[rule]) {
-                rule_keep[i] = false;
+                removed[i] = true;
               }
             }
           } else {
-            rule_keep = celladmix::apply_removal_rule(
+            const auto rule_keep = celladmix::apply_removal_rule(
                 run_data.transcripts,
-                run_data.labels,
+                labels,
                 zero_based_factor,
                 target_cell_types[rule]);
+            for (std::size_t i = 0; i < rule_keep.size(); ++i) {
+              if (!rule_keep[i]) {
+                removed[i] = true;
+              }
+            }
           }
-          for (std::size_t i = 0; i < keep_mask.size(); ++i) {
-            keep_mask[i] = keep_mask[i] && rule_keep[i];
+        };
+
+        std::vector<int> votes(run_data.transcripts.size(), 0);
+        for (const auto& [member, rule_ids] : rules_by_member) {
+          std::vector<int> member_label_vec;
+          const std::vector<int>* labels_ptr = &run_data.labels;
+          if (member >= 0) {
+            const auto member_labels =
+                celladmix::load_ensemble_member_labels(run_path, member);
+            member_label_vec.resize(run_data.transcripts.size());
+            for (std::size_t i = 0; i < run_data.transcripts.size(); ++i) {
+              member_label_vec[i] = member_labels.label_for(run_data.obs_ids[i]);
+            }
+            labels_ptr = &member_label_vec;
           }
+          std::vector<bool> removed(run_data.transcripts.size(), false);
+          for (const auto rule : rule_ids) {
+            mark_rule_removed(*labels_ptr, rule, removed);
+          }
+          for (std::size_t i = 0; i < removed.size(); ++i) {
+            if (removed[i]) {
+              votes[i] += 1;
+            }
+          }
+        }
+
+        const int n_members = static_cast<int>(rules_by_member.size());
+        std::vector<bool> keep_mask(run_data.transcripts.size(), true);
+        for (std::size_t i = 0; i < keep_mask.size(); ++i) {
+          keep_mask[i] = votes[i] < min_votes;
         }
 
         celladmix::RunManifest manifest;
@@ -886,8 +943,17 @@ PYBIND11_MODULE(_core, m) {
         }
         int kept = 0;
         for (const bool keep : keep_mask) kept += keep ? 1 : 0;
+        std::vector<int> vote_histogram(static_cast<std::size_t>(std::max(n_members, 0)), 0);
+        for (std::size_t i = 0; i < votes.size(); ++i) {
+          if (votes[i] > 0 && votes[i] <= n_members) {
+            vote_histogram[static_cast<std::size_t>(votes[i] - 1)] += 1;
+          }
+        }
         auto out = manifest_to_dict(manifest);
         out["n_removed"] = static_cast<int>(keep_mask.size()) - kept;
+        out["n_members"] = n_members;
+        out["min_votes"] = min_votes;
+        out["vote_histogram"] = vote_histogram;
         out["correction_summary_parquet"] =
             celladmix::correction_summary_parquet_path(manifest.paths.root_dir);
         return out;
@@ -897,7 +963,37 @@ PYBIND11_MODULE(_core, m) {
       py::arg("factors"),
       py::arg("target_cell_types"),
       py::arg("annotation_cell_ids") = std::vector<std::string>{},
-      py::arg("annotation_labels") = std::vector<std::string>{});
+      py::arg("annotation_labels") = std::vector<std::string>{},
+      py::arg("rule_members") = std::vector<int>{},
+      py::arg("min_votes") = 1);
+
+  m.def(
+      "ensemble_prepare",
+      [](const std::string& run_path, int num_threads) {
+        int count = 0;
+        {
+          // Member label assignment projects and smooths every molecule.
+          py::gil_scoped_release release;
+          count = celladmix::ensure_ensemble_labels(run_path, num_threads);
+        }
+        return count;
+      },
+      py::arg("run_path"),
+      py::arg("num_threads") = 1);
+
+  m.def(
+      "ensemble_member_fractions",
+      [](const std::string& run_path, int member) {
+        const auto fractions =
+            celladmix::ensemble_member_cell_fractions(run_path, member);
+        const auto cells = celladmix::load_run_cells(run_path);
+        py::dict out;
+        out["fractions"] = dense_matrix_to_dict(fractions);
+        out["cell_id"] = cells.cell_ids;
+        return out;
+      },
+      py::arg("run_path"),
+      py::arg("member"));
 
   m.def(
       "collect_counts",

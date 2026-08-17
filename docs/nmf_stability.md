@@ -51,10 +51,10 @@ random restarts only. This keeps the diagnostic meaningful: it reads as "do
 independent random starts re-find the selected solution?", not "do
 identically-seeded runs stay where they were put?".
 
-Stability requires at least two comparison restarts to be informative;
-`nmf_n_runs` of 5–10 is recommended when the diagnostic matters. With
-`nmf_n_runs = 1` the reported stability is a placeholder of 1.0 and
-`stability_comparison_runs` is 0.
+Stability requires at least two comparison restarts to be informative; the
+default of at least 10 restarts serves both the diagnostic and the ensemble
+correction's member pool. With `nmf_n_runs = 1` the reported stability is a
+placeholder of 1.0 and `stability_comparison_runs` is 0.
 
 ## Reported fields
 

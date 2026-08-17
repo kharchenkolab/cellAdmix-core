@@ -622,6 +622,12 @@ BasicPipelineResult run_basic_pipeline(
         result.nmf.h,
         static_cast<int>(table.num_genes()),
         compact_training.kept_cols);
+    for (auto& candidate : result.nmf.candidate_h) {
+      candidate = expand_h_to_full_genes(
+          candidate,
+          static_cast<int>(table.num_genes()),
+          compact_training.kept_cols);
+    }
     result.nmf_transform = expand_ncv_feature_transform(
         compact_transform,
         static_cast<int>(table.num_genes()),

@@ -61,7 +61,7 @@ Fit:
   --nmf-variant invsqrt_kl|kl|sqrt_kl|ls_nmf
                                       NMF variant [invsqrt_kl]
   --nmf-init auto|random|cluster       NMF initialization [auto]
-  --nmf-runs auto|N                    NMF random starts [auto = threads]
+  --nmf-runs auto|N                    NMF random starts [auto = max(10, threads)]
   --nmf-iterations N                   NMF iterations [package default]
   --seed N                             Random seed [1]
   --run-id NAME                        Optional fit run id
@@ -75,6 +75,8 @@ Scoring and correction:
   --targets A,B,C                      Restrict correction rules to target cell types
   --no-correct                         Score only; skip correction
   --correction-name NAME               Correction run name [<score>_clean]
+  --ensemble N                         Ensemble member cap; 1 = single-fit [10]
+  --vote X                             Ensemble vote threshold fraction [0.3]
   --max-cells-per-type-pair N          Pair summary cap for membrane/bridge [400]
   --candidate-pairs-per-type-pair N    Membrane candidate-pair cap [400]
   --min-factor-molecules N             Minimum factor molecules per pair/cell [5]
@@ -453,6 +455,8 @@ seed <- as_int(opt("seed"), 1L)
 p_thresh <- as_num(opt("p_thresh"), 0.1)
 adjust_p <- as_bool(opt("adjust_p"), FALSE)
 correct_enabled <- !as_bool(opt("no_correct"), FALSE)
+ensemble <- as_int(opt("ensemble"), 10L)
+vote <- as_num(opt("vote"), 0.3)
 targets <- as_csv(opt("targets"))
 report_enabled <- as_bool(opt("report"), FALSE)
 
@@ -558,7 +562,11 @@ if (is.null(ds$active_annotation)) {
 rank_arg <- as_chr(opt("rank"), "auto")
 rank <- if (identical(rank_arg, "auto")) "auto" else as_int(rank_arg)
 nmf_runs_arg <- as_chr(opt("nmf_runs"), "auto")
-nmf_n_runs <- if (identical(nmf_runs_arg, "auto")) threads else as_int(nmf_runs_arg)
+nmf_n_runs <- if (identical(nmf_runs_arg, "auto")) {
+  max(10L, threads)
+} else {
+  as_int(nmf_runs_arg)
+}
 nmf_variant <- match.arg(as_chr(opt("nmf_variant"), "ls_nmf"),
   c("ls_nmf", "invsqrt_kl", "kl", "sqrt_kl"))
 nmf_init <- match.arg(as_chr(opt("nmf_init"), "auto"), c("auto", "random", "cluster"))
@@ -624,7 +632,9 @@ if (isTRUE(correct_enabled)) {
       name = as_chr(opt("correction_name"), paste0(score$name, "_clean")),
       p_thresh = p_thresh,
       adjust_p = adjust_p,
-      targets = targets
+      targets = targets,
+      ensemble = ensemble,
+      vote = vote
     )
     print(correction$summary())
   }

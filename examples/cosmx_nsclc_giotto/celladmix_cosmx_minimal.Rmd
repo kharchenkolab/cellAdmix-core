@@ -41,7 +41,8 @@ the full molecule table into R memory. The computational work starts with
 `fit()`, which builds neighborhood composition vectors, fits NMF factors, and
 assigns molecules to factors. Scoring then interprets these factors as possible
 source-target admixture patterns, and correction removes rule-supported
-admixture molecules to produce corrected counts.
+admixture molecules to produce corrected counts, by default through a
+molecule-vote ensemble across the fit's NMF restarts.
 
 ## Data Preparation
 
@@ -127,8 +128,10 @@ The fit call constructs neighborhood composition vectors around molecules,
 factorizes them, and assigns each molecule to a factor. By default, the rank is
 chosen from the number of annotation labels, the neighborhood size is resolved
 from the panel and cell sizes, NMF uses the weighted least-squares (`ls_nmf`)
-formulation, molecule scoring uses gene loadings, and the number of NMF starts
-matches the dataset thread setting.
+formulation, molecule scoring uses gene loadings, and at least 10 NMF restarts
+are run. The default variant is the right choice here: this dataset carries no
+membrane stain, so cleanup will use bridge scoring, which pairs best with
+`ls_nmf` factors (see [docs/benchmarks.md](../../docs/benchmarks.md)).
 
 ```{r fit-default}
 fit <- ds$fit()
@@ -165,6 +168,22 @@ each cell in tissue coordinates.
 cell_factors <- fit$cell_factors()
 celladmix_plot_spatial(cell_factors, color_by = "dominant_factor") +
   ggplot2::ggtitle("Dominant factor by cell")
+```
+
+## Admixture Audit
+
+Before correcting anything, the audit measures how much admixture the
+dataset carries and between which cell types, using only the spatial
+exposure structure (source-marker content in target cells rises with
+source-type neighbor exposure; unexposed target cells are the internal
+negative control). Each cell of the map shows a detected source → target
+pair's estimated admixture rate: the percent of the target type's
+molecules that leaked in from the source, extrapolated from a directly
+measured (and conservative) marker excess.
+
+```{r audit-map, fig.width=6.8, fig.height=5.2}
+audit <- fit$audit_admixture()
+audit$plot_map()
 ```
 
 ## Bridge Scoring
@@ -231,6 +250,24 @@ little impact on downstream summaries.
 
 ```{r molecule-removal, fig.width=6.5, fig.height=5}
 correction$plot_removed_molecules()
+```
+
+## Verify Cleanup
+
+The audit re-measures the same exposure gradients on the corrected counts.
+The report gives per-pair cleanup sensitivity and the own-marker
+false-removal rate, and warns about any detected pair the rules did not
+cover; the panels show the estimated admixture remaining after correction
+and the pooled exposure profile before and after cleanup.
+
+```{r audit-verify, warning=TRUE, fig.width=9.6, fig.height=4.0}
+report <- audit$evaluate(correction)
+report$summary()
+
+cowplot::plot_grid(
+  audit$plot_remaining(list(corrected = correction)),
+  audit$plot_exposure(correction = correction),
+  ncol = 2, align = "hv", axis = "tblr")
 ```
 
 ## Correction Diagnostics

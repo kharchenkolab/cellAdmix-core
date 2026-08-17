@@ -208,14 +208,16 @@ class CellAdmix:
     ) -> CellAdmixFit:
         """Fit NMF factors and molecule labels.
 
-        By default, rank is inferred from the active annotation and independent
-        NMF restarts use the dataset thread count.
+        By default, rank is inferred from the active annotation and at least
+        10 independent NMF restarts are run (more with higher thread counts),
+        so the stability diagnostic and the ensemble correction have a full
+        member pool.
         """
         self.ensure_store(force=False)
         threads = int(num_threads or self.num_threads)
         explicit_n_runs = nmf_n_runs
         rank = int(rank or recommended_rank(self.annotation, multiplier=rank_multiplier, cap=rank_cap))
-        nmf_n_runs = int(nmf_n_runs or threads)
+        nmf_n_runs = int(nmf_n_runs or max(threads, 10))
         run_id = run_id or f"fit_rank{rank}_{nmf_variant}"
         run_dir = self.runs_dir / run_id
         annotation_hash = _annotation_hash(self.annotation)

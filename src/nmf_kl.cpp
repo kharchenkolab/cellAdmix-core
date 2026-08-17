@@ -702,7 +702,18 @@ SparseNmfResult sparse_nmf_multirun(
   const auto objective_stats = mean_and_sd(final_objectives);
   const auto correlation_stats = mean_and_sd(stability.run_matched_means);
 
+  std::vector<DenseMatrix> retained_h;
+  std::vector<unsigned int> retained_seeds;
+  retained_h.reserve(static_cast<std::size_t>(n_runs));
+  retained_seeds.reserve(static_cast<std::size_t>(n_runs));
+  for (int run = 0; run < n_runs; ++run) {
+    retained_h.push_back(runs[static_cast<std::size_t>(run)].h);
+    retained_seeds.push_back(options.seed + static_cast<unsigned int>(run));
+  }
+
   auto best = std::move(runs[static_cast<std::size_t>(best_run)]);
+  best.candidate_h = std::move(retained_h);
+  best.candidate_seeds = std::move(retained_seeds);
   best.selected_run = best_run;
   best.selected_seed = options.seed + static_cast<unsigned int>(best_run);
   best.final_objective = best_objective;
@@ -796,6 +807,13 @@ void order_nmf_factors_by_training_importance(SparseNmfResult& result) {
           result.selected_factor_stability[static_cast<std::size_t>(old_factor)];
     }
     result.selected_factor_stability = std::move(ordered_stability);
+  }
+
+  // Keep the member pool's selected entry identical to the reordered h so
+  // that ensemble member selected_run shares the run's factor numbering.
+  if (result.selected_run >= 0 &&
+      static_cast<std::size_t>(result.selected_run) < result.candidate_h.size()) {
+    result.candidate_h[static_cast<std::size_t>(result.selected_run)] = result.h;
   }
 }
 

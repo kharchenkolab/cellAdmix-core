@@ -5,6 +5,7 @@ from .factor_sources import CellAdmixFactorSourceScore
 from .fit import CellAdmixFit
 from .score import CellAdmixScore
 from .correction import CellAdmixCorrection
+from .audit import CellAdmixAudit, CellAdmixCleanupReport
 from .io import read_annotation
 from .plotting import plot_spatial
 from .spatialdata import add_corrected_counts_to_spatialdata, add_fit_to_spatialdata, from_spatialdata

@@ -262,7 +262,9 @@
     tile_size = 100,
     parquet_row_group_size = 65536L,
     report_ncv_umap = FALSE,
-    verbose = FALSE
+    verbose = FALSE,
+    nmf_fixed_h = NULL,
+    nmf_fixed_h_genes = NULL
   ) {
   .Call(
     "_cellAdmixCore_celladmix_fit_store_run",
@@ -290,6 +292,8 @@
     as.integer(parquet_row_group_size),
     isTRUE(report_ncv_umap),
     isTRUE(verbose),
+    if (is.null(nmf_fixed_h)) NULL else as.matrix(nmf_fixed_h),
+    if (is.null(nmf_fixed_h_genes)) NULL else as.character(nmf_fixed_h_genes),
     PACKAGE = "cellAdmixCore"
   )
 }
@@ -394,7 +398,8 @@
     num_threads = 1L,
     seed = 1L,
     compute_null = TRUE,
-    verbose = FALSE
+    verbose = FALSE,
+    ensemble_member = -1L
   ) {
   .Call(
     "_cellAdmixCore_celladmix_bridge_scores_run",
@@ -420,6 +425,7 @@
     as.integer(seed),
     isTRUE(compute_null),
     isTRUE(verbose),
+    as.integer(ensemble_member),
     PACKAGE = "cellAdmixCore"
   )
 }
@@ -444,7 +450,8 @@
     line_samples = 16L,
     num_threads = 1L,
     seed = 1L,
-    verbose = FALSE
+    verbose = FALSE,
+    ensemble_member = -1L
   ) {
   .Call(
     "_cellAdmixCore_celladmix_membrane_scores_run",
@@ -468,6 +475,7 @@
     as.integer(num_threads),
     as.integer(seed),
     isTRUE(verbose),
+    as.integer(ensemble_member),
     PACKAGE = "cellAdmixCore"
   )
 }
@@ -510,7 +518,8 @@
     line_samples = 12L,
     patch_edge_weight_min = 0.1,
     num_threads = 1L,
-    verbose = FALSE
+    verbose = FALSE,
+    ensemble_member = -1L
   ) {
   .Call(
     "_cellAdmixCore_celladmix_coherence_scores_run",
@@ -552,6 +561,7 @@
     as.numeric(patch_edge_weight_min),
     as.integer(num_threads),
     isTRUE(verbose),
+    as.integer(ensemble_member),
     PACKAGE = "cellAdmixCore"
   )
 }
@@ -586,13 +596,34 @@
   )
 }
 
-.celladmix_correct_run <- function(path, rules, out_dir, cell_types = NULL) {
+.celladmix_correct_run <- function(path, rules, out_dir, cell_types = NULL,
+                                   rule_member = NULL, min_votes = 1L) {
   .Call(
     "_cellAdmixCore_celladmix_correct_run",
     path,
     rules,
     as.character(out_dir[[1]]),
     cell_types,
+    if (is.null(rule_member)) NULL else as.integer(rule_member),
+    as.integer(min_votes),
+    PACKAGE = "cellAdmixCore"
+  )
+}
+
+.celladmix_ensemble_prepare <- function(path, num_threads = 1L) {
+  .Call(
+    "_cellAdmixCore_celladmix_ensemble_prepare",
+    path,
+    as.integer(num_threads),
+    PACKAGE = "cellAdmixCore"
+  )
+}
+
+.celladmix_ensemble_member_fractions <- function(path, member) {
+  .Call(
+    "_cellAdmixCore_celladmix_ensemble_member_fractions",
+    path,
+    as.integer(member),
     PACKAGE = "cellAdmixCore"
   )
 }

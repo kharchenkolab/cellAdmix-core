@@ -38,6 +38,10 @@ struct WeightedNmfResult {
   int stability_comparison_runs = 0;
   int stable_factor_count = 0;
   double stability_threshold = 0.0;
+  // H matrices of every restart, in run order, retained as the member pool
+  // for ensemble correction. Empty for single-run fits.
+  std::vector<DenseMatrix> candidate_h;
+  std::vector<unsigned int> candidate_seeds;
 };
 
 // Compute default inverse column-frequency weights for a dense matrix.

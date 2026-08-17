@@ -1,0 +1,235 @@
+"dataset","pair","source","target","variant","method","seed","excess_molecules","n_exposed","n_e0","power","power_strict","excess_strict","n_strict_genes","removal_depth","safety_native","integrity_native","nnls_before","nnls_after","marker_removed_frac","rule_called","rule_kept","label_frac"
+"pancreas_seeds","Ductal/tumor epithelial -> Endothelial","Ductal/tumor epithelial","Endothelial","ls_nmf","membrane",1,2645,3700,3326,0.797,0.911,1653,15,0.675,0.97,0.9981,0.001,0,0.753,TRUE,TRUE,0.468
+"pancreas_seeds","Ductal/tumor epithelial -> Exocrine epithelial","Ductal/tumor epithelial","Exocrine epithelial","ls_nmf","membrane",1,10181,31869,4460,0.837,0.698,4686,15,0.272,0.931,0.9979,0.0291,0.0067,0.557,TRUE,TRUE,0.896
+"pancreas_seeds","Ductal/tumor epithelial -> Fibroblast / CAF","Ductal/tumor epithelial","Fibroblast / CAF","ls_nmf","membrane",1,14309,12056,16310,0.662,0.743,11566,15,0.471,0.987,1,0.0677,0.0276,0.619,TRUE,TRUE,0.571
+"pancreas_seeds","Ductal/tumor epithelial -> Immune","Ductal/tumor epithelial","Immune","ls_nmf","membrane",1,8477,8560,10691,0.448,0.253,3973,12,0.133,0.91,0.9995,0.0326,0.0338,0.364,TRUE,TRUE,0.64
+"pancreas_seeds","Ductal/tumor epithelial -> Mural / pericyte","Ductal/tumor epithelial","Mural / pericyte","ls_nmf","membrane",1,413,593,1960,0.012,0.013,296,12,0.009,0.993,1,0.064,0.0731,0.011,FALSE,FALSE,0.532
+"pancreas_seeds","Endocrine -> Ductal/tumor epithelial","Endocrine","Ductal/tumor epithelial","ls_nmf","membrane",1,2113,579,29407,0.804,0.868,1915,11,0.167,0.982,1,0.0888,0.008,0.727,TRUE,TRUE,0.732
+"pancreas_seeds","Endocrine -> Endothelial","Endocrine","Endothelial","ls_nmf","membrane",1,3678,359,6667,0.897,0.899,3613,13,0.528,0.924,0.9977,0.2282,0.0011,0.884,TRUE,TRUE,0.862
+"pancreas_seeds","Endocrine -> Exocrine epithelial","Endocrine","Exocrine epithelial","ls_nmf","membrane",1,5162,1247,35082,0.814,0.812,5065,12,0.438,0.938,0.9941,0.0905,0.0082,0.775,TRUE,TRUE,0.728
+"pancreas_seeds","Endocrine -> Fibroblast / CAF","Endocrine","Fibroblast / CAF","ls_nmf","membrane",1,2359,743,27623,0.803,0.808,2281,12,0.252,0.987,0.9999,0.0869,0.0106,0.748,TRUE,TRUE,0.688
+"pancreas_seeds","Endocrine -> Immune","Endocrine","Immune","ls_nmf","membrane",1,946,440,18811,0.671,0.668,886,9,0.302,0.917,0.999,0.0752,0.0439,0.621,TRUE,TRUE,0.743
+"pancreas_seeds","Endothelial -> Ductal/tumor epithelial","Endothelial","Ductal/tumor epithelial","ls_nmf","membrane",1,4071,6848,23138,0.483,0.597,3086,13,0.313,0.995,1,0.1194,0.0874,0.404,TRUE,TRUE,0.375
+"pancreas_seeds","Endothelial -> Endocrine","Endothelial","Endocrine","ls_nmf","membrane",1,535,1136,1076,0.575,0.655,432,14,0.462,0.995,0.9996,0.0607,0.0287,0.512,TRUE,TRUE,0.427
+"pancreas_seeds","Endothelial -> Exocrine epithelial","Endothelial","Exocrine epithelial","ls_nmf","membrane",1,6434,16987,19342,0.666,0.693,6009,15,0.55,0.955,0.9934,0.0422,0,0.596,TRUE,TRUE,0.482
+"pancreas_seeds","Endothelial -> Fibroblast / CAF","Endothelial","Fibroblast / CAF","ls_nmf","membrane",1,7187,10698,17668,0.529,0.661,3423,10,0.284,0.992,1,0.1157,0.0504,0.418,TRUE,TRUE,0.387
+"pancreas_seeds","Endothelial -> Immune","Endothelial","Immune","ls_nmf","membrane",1,2548,7839,11412,0.728,0.752,1914,9,0.397,0.933,0.9989,0.1323,0.1023,0.547,TRUE,TRUE,0.454
+"pancreas_seeds","Endothelial -> Mural / pericyte","Endothelial","Mural / pericyte","ls_nmf","membrane",1,803,1173,1380,0.001,0,406,7,0.005,0.998,0.9999,0.1833,0.1368,0.003,FALSE,FALSE,0.488
+"pancreas_seeds","Exocrine epithelial -> Ductal/tumor epithelial","Exocrine epithelial","Ductal/tumor epithelial","ls_nmf","membrane",1,362132,13207,16779,0.001,0.001,221588,3,0.01,0.996,1,0.6046,0.641,0.002,FALSE,FALSE,0.54
+"pancreas_seeds","Exocrine epithelial -> Endocrine","Exocrine epithelial","Endocrine","ls_nmf","membrane",1,6086,944,1268,0.742,0.829,1400,7,0.165,0.984,0.9998,0.1518,0.0566,0.596,TRUE,TRUE,0.487
+"pancreas_seeds","Exocrine epithelial -> Endothelial","Exocrine epithelial","Endothelial","ls_nmf","membrane",1,46048,3668,3358,0.723,0.718,44347,6,0.3,0.966,0.9978,0.2023,0,0.702,TRUE,TRUE,0.657
+"pancreas_seeds","Exocrine epithelial -> Fibroblast / CAF","Exocrine epithelial","Fibroblast / CAF","ls_nmf","membrane",1,38961,5312,23054,0.936,0.931,38044,8,0.293,0.963,1,0.2252,0.0049,0.884,TRUE,TRUE,0.747
+"pancreas_seeds","Exocrine epithelial -> Immune","Exocrine epithelial","Immune","ls_nmf","membrane",1,46804,6409,12842,0.815,0.795,44130,5,0.212,0.855,0.9997,0.2942,0.085,0.756,TRUE,TRUE,0.644
+"pancreas_seeds","Exocrine epithelial -> Mural / pericyte","Exocrine epithelial","Mural / pericyte","ls_nmf","membrane",1,650,304,2249,0.656,0.665,624,5,0.288,0.973,1,0.1068,0,0.605,TRUE,TRUE,0.577
+"pancreas_seeds","Fibroblast / CAF -> Ductal/tumor epithelial","Fibroblast / CAF","Ductal/tumor epithelial","ls_nmf","membrane",1,24080,15882,14104,0.56,0.747,14554,9,0.27,0.995,1,0.0549,0.0153,0.447,TRUE,TRUE,0.435
+"pancreas_seeds","Fibroblast / CAF -> Endocrine","Fibroblast / CAF","Endocrine","ls_nmf","membrane",1,1548,945,1267,0.635,0.698,1084,13,0.531,0.982,0.9987,0.0467,0.0061,0.608,TRUE,TRUE,0.517
+"pancreas_seeds","Fibroblast / CAF -> Endothelial","Fibroblast / CAF","Endothelial","ls_nmf","membrane",1,15510,5170,1856,0.661,0.974,4110,3,0.539,0.97,0.9965,0.0507,0,0.62,TRUE,TRUE,0.598
+"pancreas_seeds","Fibroblast / CAF -> Exocrine epithelial","Fibroblast / CAF","Exocrine epithelial","ls_nmf","membrane",1,12337,13567,22762,0.677,0.754,9256,14,0.519,0.945,0.9942,0.0149,0,0.607,TRUE,TRUE,0.443
+"pancreas_seeds","Fibroblast / CAF -> Immune","Fibroblast / CAF","Immune","ls_nmf","membrane",1,38636,16195,3056,-0.019,0,5717,2,0.094,0.85,0.9969,0.1488,0.1679,0.018,FALSE,FALSE,0.473
+"pancreas_seeds","Fibroblast / CAF -> Mural / pericyte","Fibroblast / CAF","Mural / pericyte","ls_nmf","membrane",1,2446,1862,691,0.001,0,155,2,0.002,0.998,0.9998,0.1367,0.1468,0.001,TRUE,FALSE,0.92
+"pancreas_seeds","Immune -> Ductal/tumor epithelial","Immune","Ductal/tumor epithelial","ls_nmf","membrane",1,5909,14749,15237,0.442,0.445,4224,14,0.341,0.994,1,0.0599,0.0464,0.388,TRUE,TRUE,0.341
+"pancreas_seeds","Immune -> Endocrine","Immune","Endocrine","ls_nmf","membrane",1,305,700,1512,0.806,0.806,305,20,0.626,0.977,0.9995,0.0366,0.0043,0.745,TRUE,TRUE,0.553
+"pancreas_seeds","Immune -> Endothelial","Immune","Endothelial","ls_nmf","membrane",1,3000,5312,1714,0.147,0.15,1137,7,0.227,0.968,0.9973,0.0091,0,0.181,FALSE,FALSE,0.416
+"pancreas_seeds","Immune -> Exocrine epithelial","Immune","Exocrine epithelial","ls_nmf","membrane",1,7844,17891,18438,0.598,0.66,6267,17,0.465,0.952,0.9947,0.0433,0.0166,0.531,TRUE,TRUE,0.426
+"pancreas_seeds","Immune -> Fibroblast / CAF","Immune","Fibroblast / CAF","ls_nmf","membrane",1,32837,24683,3683,-0.012,NA,0,0,0.041,0.988,0.9995,0.1546,0.1686,0.011,FALSE,FALSE,0.682
+"pancreas_seeds","Immune -> Mural / pericyte","Immune","Mural / pericyte","ls_nmf","membrane",1,1130,2082,471,0.004,0.004,1002,17,0,0.998,0.9997,0.132,0.1353,0.003,FALSE,FALSE,0.484
+"pancreas_seeds","Mural / pericyte -> Ductal/tumor epithelial","Mural / pericyte","Ductal/tumor epithelial","ls_nmf","membrane",1,997,1890,28096,0.362,0.401,598,7,0.179,0.974,1,0.0328,0.0336,0.25,FALSE,FALSE,0
+"pancreas_seeds","Mural / pericyte -> Endothelial","Mural / pericyte","Endothelial","ls_nmf","membrane",1,5012,1642,5384,0.309,0.465,946,4,0.344,0.972,0.9976,0.135,0.1025,0.323,FALSE,FALSE,0
+"pancreas_seeds","Mural / pericyte -> Exocrine epithelial","Mural / pericyte","Exocrine epithelial","ls_nmf","membrane",1,423,1047,35282,0.797,0.775,372,11,0.364,0.235,0.9939,0.0118,0.0044,0.531,FALSE,FALSE,0
+"pancreas_seeds","Mural / pericyte -> Fibroblast / CAF","Mural / pericyte","Fibroblast / CAF","ls_nmf","membrane",1,2270,5456,22910,0.013,0.016,604,2,0.042,0.993,0.9999,0.0559,0.0617,0.031,FALSE,FALSE,0
+"pancreas_seeds","Mural / pericyte -> Immune","Mural / pericyte","Immune","ls_nmf","membrane",1,2662,3817,15434,0.044,0.213,713,2,0.078,0.95,0.9987,0.0377,0.0388,0.065,FALSE,FALSE,0
+"pancreas_seeds","Ductal/tumor epithelial -> Endothelial","Ductal/tumor epithelial","Endothelial","invsqrt_kl","membrane",1,2645,3700,3326,0.999,0.999,1653,15,0.973,1,0.8642,0.001,0,0.991,TRUE,TRUE,0.783
+"pancreas_seeds","Ductal/tumor epithelial -> Exocrine epithelial","Ductal/tumor epithelial","Exocrine epithelial","invsqrt_kl","membrane",1,10181,31869,4460,0.999,0.998,4686,15,0.964,0.926,0.9142,0.0291,0,0.983,TRUE,TRUE,0.955
+"pancreas_seeds","Ductal/tumor epithelial -> Fibroblast / CAF","Ductal/tumor epithelial","Fibroblast / CAF","invsqrt_kl","membrane",1,14309,12056,16310,0.996,0.996,11566,15,0.972,0.993,1,0.0677,0.0045,0.991,TRUE,TRUE,0.944
+"pancreas_seeds","Ductal/tumor epithelial -> Immune","Ductal/tumor epithelial","Immune","invsqrt_kl","membrane",1,8477,8560,10691,0.912,0.899,3973,12,0.93,0.999,0.8749,0.0326,0,0.916,TRUE,TRUE,0.906
+"pancreas_seeds","Ductal/tumor epithelial -> Mural / pericyte","Ductal/tumor epithelial","Mural / pericyte","invsqrt_kl","membrane",1,413,593,1960,0.991,0.998,296,12,0.877,0.955,0.8737,0.064,0,0.968,TRUE,TRUE,0.948
+"pancreas_seeds","Endocrine -> Ductal/tumor epithelial","Endocrine","Ductal/tumor epithelial","invsqrt_kl","membrane",1,2113,579,29407,0.977,0.974,1915,11,0.907,0.999,0.9198,0.0888,0.0055,0.969,TRUE,TRUE,0.963
+"pancreas_seeds","Endocrine -> Endothelial","Endocrine","Endothelial","invsqrt_kl","membrane",1,3678,359,6667,0.983,0.982,3613,13,0.876,1,0.8502,0.2282,0,0.98,TRUE,TRUE,0.984
+"pancreas_seeds","Endocrine -> Exocrine epithelial","Endocrine","Exocrine epithelial","invsqrt_kl","membrane",1,5162,1247,35082,0.984,0.982,5065,12,0.884,0.933,0.9131,0.0905,0,0.973,TRUE,TRUE,0.973
+"pancreas_seeds","Endocrine -> Fibroblast / CAF","Endocrine","Fibroblast / CAF","invsqrt_kl","membrane",1,2359,743,27623,0.976,0.979,2281,12,0.533,0.997,0.9999,0.0869,0,0.932,TRUE,TRUE,0.913
+"pancreas_seeds","Endocrine -> Immune","Endocrine","Immune","invsqrt_kl","membrane",1,946,440,18811,0.99,0.984,886,9,0.621,0.997,0.8676,0.0752,0,0.946,TRUE,TRUE,0.929
+"pancreas_seeds","Endothelial -> Ductal/tumor epithelial","Endothelial","Ductal/tumor epithelial","invsqrt_kl","membrane",1,4071,6848,23138,0.824,1,3086,13,0.817,0.998,0.9266,0.1194,0.1122,0.821,TRUE,TRUE,0.686
+"pancreas_seeds","Endothelial -> Endocrine","Endothelial","Endocrine","invsqrt_kl","membrane",1,535,1136,1076,0.943,0.987,432,14,0.874,1,0.9156,0.0607,0,0.905,TRUE,TRUE,0.756
+"pancreas_seeds","Endothelial -> Exocrine epithelial","Endothelial","Exocrine epithelial","invsqrt_kl","membrane",1,6434,16987,19342,0.991,0.991,6009,15,0.968,0.949,0.9103,0.0422,0,0.977,TRUE,TRUE,0.868
+"pancreas_seeds","Endothelial -> Fibroblast / CAF","Endothelial","Fibroblast / CAF","invsqrt_kl","membrane",1,7187,10698,17668,0.859,0.994,3423,10,0.651,0.997,1,0.1157,0.0135,0.765,TRUE,TRUE,0.757
+"pancreas_seeds","Endothelial -> Immune","Endothelial","Immune","invsqrt_kl","membrane",1,2548,7839,11412,0.882,0.996,1914,9,0.679,0.999,0.864,0.1323,0.0797,0.771,TRUE,TRUE,0.736
+"pancreas_seeds","Endothelial -> Mural / pericyte","Endothelial","Mural / pericyte","invsqrt_kl","membrane",1,803,1173,1380,0.017,0.011,406,7,0.18,0.983,0.8413,0.1833,0.1297,0.088,TRUE,FALSE,0.771
+"pancreas_seeds","Exocrine epithelial -> Ductal/tumor epithelial","Exocrine epithelial","Ductal/tumor epithelial","invsqrt_kl","membrane",1,362132,13207,16779,0.553,0.723,221588,3,0.184,0.995,0.9289,0.6046,0.4192,0.536,TRUE,TRUE,0.531
+"pancreas_seeds","Exocrine epithelial -> Endocrine","Exocrine epithelial","Endocrine","invsqrt_kl","membrane",1,6086,944,1268,0.978,0.999,1400,7,0.726,1,0.9102,0.1518,0,0.914,TRUE,TRUE,0.777
+"pancreas_seeds","Exocrine epithelial -> Endothelial","Exocrine epithelial","Endothelial","invsqrt_kl","membrane",1,46048,3668,3358,0.997,1,44347,6,0.928,1,0.88,0.2023,0,0.993,TRUE,TRUE,0.91
+"pancreas_seeds","Exocrine epithelial -> Fibroblast / CAF","Exocrine epithelial","Fibroblast / CAF","invsqrt_kl","membrane",1,38961,5312,23054,1,1,38044,8,0.619,0.997,1,0.2252,0,0.972,TRUE,TRUE,0.813
+"pancreas_seeds","Exocrine epithelial -> Immune","Exocrine epithelial","Immune","invsqrt_kl","membrane",1,46804,6409,12842,0.129,0.127,44130,5,0.243,0.999,0.8663,0.2942,0.3022,0.14,FALSE,FALSE,0.84
+"pancreas_seeds","Exocrine epithelial -> Mural / pericyte","Exocrine epithelial","Mural / pericyte","invsqrt_kl","membrane",1,650,304,2249,0.983,0.999,624,5,0.74,0.983,0.871,0.1068,0,0.95,TRUE,TRUE,0.786
+"pancreas_seeds","Fibroblast / CAF -> Ductal/tumor epithelial","Fibroblast / CAF","Ductal/tumor epithelial","invsqrt_kl","membrane",1,24080,15882,14104,0.938,0.994,14554,9,0.873,1,0.9246,0.0549,0.008,0.912,TRUE,TRUE,0.898
+"pancreas_seeds","Fibroblast / CAF -> Endocrine","Fibroblast / CAF","Endocrine","invsqrt_kl","membrane",1,1548,945,1267,0.939,0.997,1084,13,0.914,1,0.9099,0.0467,0,0.932,TRUE,TRUE,0.89
+"pancreas_seeds","Fibroblast / CAF -> Endothelial","Fibroblast / CAF","Endothelial","invsqrt_kl","membrane",1,15510,5170,1856,0.014,0.017,4110,3,0.039,1,0.7773,0.0507,0.1155,0.023,FALSE,FALSE,0.94
+"pancreas_seeds","Fibroblast / CAF -> Exocrine epithelial","Fibroblast / CAF","Exocrine epithelial","invsqrt_kl","membrane",1,12337,13567,22762,0.997,0.998,9256,14,0.98,0.945,0.9149,0.0149,0,0.99,TRUE,TRUE,0.926
+"pancreas_seeds","Fibroblast / CAF -> Immune","Fibroblast / CAF","Immune","invsqrt_kl","membrane",1,38636,16195,3056,-0.007,0,5717,2,0.072,0.999,0.7825,0.1488,0.1587,0.019,FALSE,FALSE,0.814
+"pancreas_seeds","Fibroblast / CAF -> Mural / pericyte","Fibroblast / CAF","Mural / pericyte","invsqrt_kl","membrane",1,2446,1862,691,0.02,0,155,2,0.027,0.98,0.8115,0.1367,0.1871,0.023,FALSE,FALSE,0.97
+"pancreas_seeds","Immune -> Ductal/tumor epithelial","Immune","Ductal/tumor epithelial","invsqrt_kl","membrane",1,5909,14749,15237,1,1,4224,14,0.963,1,0.9359,0.0599,0.0114,0.985,TRUE,TRUE,0.974
+"pancreas_seeds","Immune -> Endocrine","Immune","Endocrine","invsqrt_kl","membrane",1,305,700,1512,0.982,0.982,305,20,0.966,0.999,0.9168,0.0366,0,0.978,TRUE,TRUE,0.949
+"pancreas_seeds","Immune -> Endothelial","Immune","Endothelial","invsqrt_kl","membrane",1,3000,5312,1714,0.955,0.989,1137,7,0.974,1,0.783,0.0091,0,0.963,TRUE,TRUE,0.946
+"pancreas_seeds","Immune -> Exocrine epithelial","Immune","Exocrine epithelial","invsqrt_kl","membrane",1,7844,17891,18438,0.999,0.998,6267,17,0.976,0.952,0.9174,0.0433,0,0.987,TRUE,TRUE,0.978
+"pancreas_seeds","Immune -> Fibroblast / CAF","Immune","Fibroblast / CAF","invsqrt_kl","membrane",1,32837,24683,3683,0.014,NA,0,0,0.011,0.996,0.9997,0.1546,0.1639,0.013,TRUE,FALSE,0.981
+"pancreas_seeds","Immune -> Mural / pericyte","Immune","Mural / pericyte","invsqrt_kl","membrane",1,1130,2082,471,0.969,0.965,1002,17,0.984,0.98,0.8765,0.132,0.005,0.972,TRUE,TRUE,0.959
+"pancreas_seeds","Mural / pericyte -> Ductal/tumor epithelial","Mural / pericyte","Ductal/tumor epithelial","invsqrt_kl","membrane",1,997,1890,28096,0.694,0.879,598,7,0.634,0.999,0.9209,0.0328,0.0274,0.657,FALSE,FALSE,0
+"pancreas_seeds","Mural / pericyte -> Endothelial","Mural / pericyte","Endothelial","invsqrt_kl","membrane",1,5012,1642,5384,0.019,0.085,946,4,0.054,1,0.8233,0.135,0.1629,0.033,FALSE,FALSE,0
+"pancreas_seeds","Mural / pericyte -> Exocrine epithelial","Mural / pericyte","Exocrine epithelial","invsqrt_kl","membrane",1,423,1047,35282,0.989,0.992,372,11,0.822,0.333,0.9126,0.0118,0,0.892,FALSE,FALSE,0
+"pancreas_seeds","Mural / pericyte -> Fibroblast / CAF","Mural / pericyte","Fibroblast / CAF","invsqrt_kl","membrane",1,2270,5456,22910,0.086,0.061,604,2,0.087,0.997,0.9999,0.0559,0.0657,0.086,FALSE,FALSE,0
+"pancreas_seeds","Mural / pericyte -> Immune","Mural / pericyte","Immune","invsqrt_kl","membrane",1,2662,3817,15434,0.06,0.083,713,2,0.075,0.998,0.8685,0.0377,0.0382,0.07,FALSE,FALSE,0
+"pancreas_seeds","Ductal/tumor epithelial -> Endothelial","Ductal/tumor epithelial","Endothelial","ls_nmf","membrane",2,2645,3700,3326,0.754,0.799,1653,15,0.452,0.955,0.9998,0.001,0.0014,0.645,TRUE,TRUE,0.379
+"pancreas_seeds","Ductal/tumor epithelial -> Exocrine epithelial","Ductal/tumor epithelial","Exocrine epithelial","ls_nmf","membrane",2,10181,31869,4460,0.825,0.684,4686,15,0.26,0.948,0.9996,0.0291,0.0075,0.545,TRUE,TRUE,0.919
+"pancreas_seeds","Ductal/tumor epithelial -> Fibroblast / CAF","Ductal/tumor epithelial","Fibroblast / CAF","ls_nmf","membrane",2,14309,12056,16310,0.533,0.574,11566,15,0.317,0.962,0.9999,0.0677,0.0538,0.484,TRUE,TRUE,0.422
+"pancreas_seeds","Ductal/tumor epithelial -> Immune","Ductal/tumor epithelial","Immune","ls_nmf","membrane",2,8477,8560,10691,0.804,0.907,3973,12,0.633,0.926,0.9972,0.0326,0,0.758,TRUE,TRUE,0.563
+"pancreas_seeds","Ductal/tumor epithelial -> Mural / pericyte","Ductal/tumor epithelial","Mural / pericyte","ls_nmf","membrane",2,413,593,1960,0.179,0.216,296,12,0.056,0.973,0.9675,0.064,0.0701,0.151,TRUE,TRUE,0.487
+"pancreas_seeds","Endocrine -> Ductal/tumor epithelial","Endocrine","Ductal/tumor epithelial","ls_nmf","membrane",2,2113,579,29407,0.813,0.877,1915,11,0.167,0.982,1,0.0888,0.0065,0.735,TRUE,TRUE,0.746
+"pancreas_seeds","Endocrine -> Endothelial","Endocrine","Endothelial","ls_nmf","membrane",2,3678,359,6667,0.941,0.944,3613,13,0.562,0.957,0.9994,0.2282,0,0.928,TRUE,TRUE,0.911
+"pancreas_seeds","Endocrine -> Exocrine epithelial","Endocrine","Exocrine epithelial","ls_nmf","membrane",2,5162,1247,35082,0.869,0.87,5065,12,0.424,0.955,0.9975,0.0905,0.0039,0.823,TRUE,TRUE,0.779
+"pancreas_seeds","Endocrine -> Fibroblast / CAF","Endocrine","Fibroblast / CAF","ls_nmf","membrane",2,2359,743,27623,0.377,0.377,2281,12,0.337,0.955,0.9997,0.0869,0.0536,0.373,TRUE,TRUE,0.767
+"pancreas_seeds","Endocrine -> Immune","Endocrine","Immune","ls_nmf","membrane",2,946,440,18811,0.495,0.485,886,9,0.469,0.922,0.997,0.0752,0.0745,0.491,TRUE,TRUE,0.759
+"pancreas_seeds","Endothelial -> Ductal/tumor epithelial","Endothelial","Ductal/tumor epithelial","ls_nmf","membrane",2,4071,6848,23138,0.483,0.619,3086,13,0.397,0.995,1,0.1194,0.0862,0.443,TRUE,TRUE,0.396
+"pancreas_seeds","Endothelial -> Endocrine","Endothelial","Endocrine","ls_nmf","membrane",2,535,1136,1076,0.625,0.706,432,14,0.489,0.995,0.9998,0.0607,0.0292,0.549,TRUE,TRUE,0.434
+"pancreas_seeds","Endothelial -> Exocrine epithelial","Endothelial","Exocrine epithelial","ls_nmf","membrane",2,6434,16987,19342,0.459,0.48,6009,15,0.39,0.967,0.9973,0.0422,0.0086,0.418,TRUE,TRUE,0.335
+"pancreas_seeds","Endothelial -> Fibroblast / CAF","Endothelial","Fibroblast / CAF","ls_nmf","membrane",2,7187,10698,17668,0.706,0.773,3423,10,0.562,0.967,0.9998,0.1157,0.0315,0.641,TRUE,TRUE,0.518
+"pancreas_seeds","Endothelial -> Immune","Endothelial","Immune","ls_nmf","membrane",2,2548,7839,11412,0.772,0.854,1914,9,0.619,0.933,0.9957,0.1323,0.0893,0.688,TRUE,TRUE,0.46
+"pancreas_seeds","Endothelial -> Mural / pericyte","Endothelial","Mural / pericyte","ls_nmf","membrane",2,803,1173,1380,0.005,-0.006,406,7,0.018,0.997,0.9942,0.1833,0.1287,0.011,TRUE,FALSE,0.631
+"pancreas_seeds","Exocrine epithelial -> Ductal/tumor epithelial","Exocrine epithelial","Ductal/tumor epithelial","ls_nmf","membrane",2,362132,13207,16779,0.001,0.002,221588,3,0.008,0.997,1,0.6046,0.6421,0.002,FALSE,FALSE,0.592
+"pancreas_seeds","Exocrine epithelial -> Endocrine","Exocrine epithelial","Endocrine","ls_nmf","membrane",2,6086,944,1268,0.785,0.918,1400,7,0.257,0.988,0.9998,0.1518,0.0399,0.652,TRUE,TRUE,0.573
+"pancreas_seeds","Exocrine epithelial -> Endothelial","Exocrine epithelial","Endothelial","ls_nmf","membrane",2,46048,3668,3358,0.83,0.823,44347,6,0.316,0.945,1,0.2023,0,0.804,TRUE,TRUE,0.756
+"pancreas_seeds","Exocrine epithelial -> Fibroblast / CAF","Exocrine epithelial","Fibroblast / CAF","ls_nmf","membrane",2,38961,5312,23054,0.98,0.976,38044,8,0.403,0.921,0.9999,0.2252,0,0.933,TRUE,TRUE,0.767
+"pancreas_seeds","Exocrine epithelial -> Immune","Exocrine epithelial","Immune","ls_nmf","membrane",2,46804,6409,12842,0.787,0.773,44130,5,0.409,0.928,0.9962,0.2942,0.1112,0.75,TRUE,TRUE,0.637
+"pancreas_seeds","Exocrine epithelial -> Mural / pericyte","Exocrine epithelial","Mural / pericyte","ls_nmf","membrane",2,650,304,2249,0.862,0.865,624,5,0.493,0.99,0.997,0.1068,0,0.811,TRUE,TRUE,0.683
+"pancreas_seeds","Fibroblast / CAF -> Ductal/tumor epithelial","Fibroblast / CAF","Ductal/tumor epithelial","ls_nmf","membrane",2,24080,15882,14104,0.636,0.837,14554,9,0.456,0.994,1,0.0549,0.0152,0.566,TRUE,TRUE,0.554
+"pancreas_seeds","Fibroblast / CAF -> Endocrine","Fibroblast / CAF","Endocrine","ls_nmf","membrane",2,1548,945,1267,0.671,0.722,1084,13,0.564,0.981,0.9999,0.0467,0.0066,0.643,TRUE,TRUE,0.571
+"pancreas_seeds","Fibroblast / CAF -> Endothelial","Fibroblast / CAF","Endothelial","ls_nmf","membrane",2,15510,5170,1856,-0.012,0.013,4110,3,0.136,0.943,0.9976,0.0507,0.0946,0.039,FALSE,FALSE,0.561
+"pancreas_seeds","Fibroblast / CAF -> Exocrine epithelial","Fibroblast / CAF","Exocrine epithelial","ls_nmf","membrane",2,12337,13567,22762,0.681,0.766,9256,14,0.502,0.957,0.9981,0.0149,0,0.601,TRUE,TRUE,0.45
+"pancreas_seeds","Fibroblast / CAF -> Immune","Fibroblast / CAF","Immune","ls_nmf","membrane",2,38636,16195,3056,0.538,0.572,5717,2,0.543,0.931,0.9926,0.1488,0.0633,0.54,TRUE,TRUE,0.503
+"pancreas_seeds","Fibroblast / CAF -> Mural / pericyte","Fibroblast / CAF","Mural / pericyte","ls_nmf","membrane",2,2446,1862,691,0.003,0,155,2,0.006,0.996,0.9545,0.1367,0.1489,0.004,FALSE,FALSE,0.93
+"pancreas_seeds","Immune -> Ductal/tumor epithelial","Immune","Ductal/tumor epithelial","ls_nmf","membrane",2,5909,14749,15237,0.569,0.648,4224,14,0.537,0.994,1,0.0599,0.0449,0.552,TRUE,TRUE,0.516
+"pancreas_seeds","Immune -> Endocrine","Immune","Endocrine","ls_nmf","membrane",2,305,700,1512,0.909,0.909,305,20,0.699,0.979,0.9999,0.0366,0.0021,0.838,TRUE,TRUE,0.716
+"pancreas_seeds","Immune -> Endothelial","Immune","Endothelial","ls_nmf","membrane",2,3000,5312,1714,0.204,0.316,1137,7,0.352,0.954,0.9979,0.0091,0,0.266,TRUE,TRUE,0.517
+"pancreas_seeds","Immune -> Exocrine epithelial","Immune","Exocrine epithelial","ls_nmf","membrane",2,7844,17891,18438,0.496,0.501,6267,17,0.397,0.964,0.9982,0.0433,0.0293,0.447,TRUE,TRUE,0.694
+"pancreas_seeds","Immune -> Fibroblast / CAF","Immune","Fibroblast / CAF","ls_nmf","membrane",2,32837,24683,3683,0.264,NA,0,0,0.372,0.965,0.9992,0.1546,0.1243,0.31,TRUE,TRUE,0.65
+"pancreas_seeds","Immune -> Mural / pericyte","Immune","Mural / pericyte","ls_nmf","membrane",2,1130,2082,471,0.004,0.003,1002,17,0,0.998,0.9997,0.132,0.1352,0.003,FALSE,FALSE,0.411
+"pancreas_seeds","Mural / pericyte -> Ductal/tumor epithelial","Mural / pericyte","Ductal/tumor epithelial","ls_nmf","membrane",2,997,1890,28096,0.462,0.559,598,7,0.235,0.974,1,0.0328,0.0312,0.322,FALSE,FALSE,0
+"pancreas_seeds","Mural / pericyte -> Endothelial","Mural / pericyte","Endothelial","ls_nmf","membrane",2,5012,1642,5384,-0.034,0.007,946,4,0.084,0.973,0.9992,0.135,0.15,0.013,FALSE,FALSE,0
+"pancreas_seeds","Mural / pericyte -> Exocrine epithelial","Mural / pericyte","Exocrine epithelial","ls_nmf","membrane",2,423,1047,35282,0.744,0.72,372,11,0.323,0.255,0.9975,0.0118,0.0031,0.486,FALSE,FALSE,0
+"pancreas_seeds","Mural / pericyte -> Fibroblast / CAF","Mural / pericyte","Fibroblast / CAF","ls_nmf","membrane",2,2270,5456,22910,0.015,0.043,604,2,0.061,0.97,0.9997,0.0559,0.0668,0.044,FALSE,FALSE,0
+"pancreas_seeds","Mural / pericyte -> Immune","Mural / pericyte","Immune","ls_nmf","membrane",2,2662,3817,15434,0.778,0.842,713,2,0.491,0.934,0.9971,0.0377,0.0014,0.601,FALSE,FALSE,0
+"pancreas_seeds","Ductal/tumor epithelial -> Endothelial","Ductal/tumor epithelial","Endothelial","invsqrt_kl","membrane",2,2645,3700,3326,0.891,0.847,1653,15,0.494,1,0.8649,0.001,0.0014,0.751,TRUE,TRUE,0.591
+"pancreas_seeds","Ductal/tumor epithelial -> Exocrine epithelial","Ductal/tumor epithelial","Exocrine epithelial","invsqrt_kl","membrane",2,10181,31869,4460,0.803,0.622,4686,15,0.279,0.963,0.9257,0.0291,0,0.543,TRUE,TRUE,0.514
+"pancreas_seeds","Ductal/tumor epithelial -> Fibroblast / CAF","Ductal/tumor epithelial","Fibroblast / CAF","invsqrt_kl","membrane",2,14309,12056,16310,0.31,0.218,11566,15,0.267,0.985,0.9996,0.0677,0.0825,0.3,TRUE,TRUE,0.255
+"pancreas_seeds","Ductal/tumor epithelial -> Immune","Ductal/tumor epithelial","Immune","invsqrt_kl","membrane",2,8477,8560,10691,0.586,0.289,3973,12,0.472,1,0.8038,0.0326,0.0294,0.556,TRUE,TRUE,0.462
+"pancreas_seeds","Ductal/tumor epithelial -> Mural / pericyte","Ductal/tumor epithelial","Mural / pericyte","invsqrt_kl","membrane",2,413,593,1960,0.318,0.408,296,12,0.255,0.945,0.8695,0.064,0.0917,0.304,TRUE,TRUE,0.296
+"pancreas_seeds","Endocrine -> Ductal/tumor epithelial","Endocrine","Ductal/tumor epithelial","invsqrt_kl","membrane",2,2113,579,29407,0.94,0.998,1915,11,0.705,0.999,0.9314,0.0888,0.0073,0.911,TRUE,TRUE,0.866
+"pancreas_seeds","Endocrine -> Endothelial","Endocrine","Endothelial","invsqrt_kl","membrane",2,3678,359,6667,0.996,0.997,3613,13,0.876,1,0.8446,0.2282,0,0.992,TRUE,TRUE,0.976
+"pancreas_seeds","Endocrine -> Exocrine epithelial","Endocrine","Exocrine epithelial","invsqrt_kl","membrane",2,5162,1247,35082,0.997,0.997,5065,12,0.943,0.966,0.9265,0.0905,0,0.992,TRUE,TRUE,0.947
+"pancreas_seeds","Endocrine -> Fibroblast / CAF","Endocrine","Fibroblast / CAF","invsqrt_kl","membrane",2,2359,743,27623,0.999,0.999,2281,12,0.848,0.985,0.9996,0.0869,0,0.987,TRUE,TRUE,0.896
+"pancreas_seeds","Endocrine -> Immune","Endocrine","Immune","invsqrt_kl","membrane",2,946,440,18811,0.999,1,886,9,0.778,1,0.8108,0.0752,0,0.972,TRUE,TRUE,0.91
+"pancreas_seeds","Endothelial -> Ductal/tumor epithelial","Endothelial","Ductal/tumor epithelial","invsqrt_kl","membrane",2,4071,6848,23138,0.815,0.983,3086,13,0.828,0.998,0.9367,0.1194,0.1498,0.821,TRUE,TRUE,0.69
+"pancreas_seeds","Endothelial -> Endocrine","Endothelial","Endocrine","invsqrt_kl","membrane",2,535,1136,1076,0.93,0.964,432,14,0.896,1,0.9464,0.0607,0,0.911,TRUE,TRUE,0.768
+"pancreas_seeds","Endothelial -> Exocrine epithelial","Endothelial","Exocrine epithelial","invsqrt_kl","membrane",2,6434,16987,19342,0.946,0.978,6009,15,0.897,0.975,0.9236,0.0422,0,0.916,TRUE,TRUE,0.816
+"pancreas_seeds","Endothelial -> Fibroblast / CAF","Endothelial","Fibroblast / CAF","invsqrt_kl","membrane",2,7187,10698,17668,0.977,0.966,3423,10,0.948,0.986,0.9997,0.1157,0.0145,0.964,TRUE,TRUE,0.759
+"pancreas_seeds","Endothelial -> Immune","Endothelial","Immune","invsqrt_kl","membrane",2,2548,7839,11412,0.94,0.969,1914,9,0.721,1,0.8106,0.1323,0,0.825,TRUE,TRUE,0.768
+"pancreas_seeds","Endothelial -> Mural / pericyte","Endothelial","Mural / pericyte","invsqrt_kl","membrane",2,803,1173,1380,0.872,0.992,406,7,0.725,0.941,0.862,0.1833,0.0246,0.807,TRUE,TRUE,0.751
+"pancreas_seeds","Exocrine epithelial -> Ductal/tumor epithelial","Exocrine epithelial","Ductal/tumor epithelial","invsqrt_kl","membrane",2,362132,13207,16779,0.654,0.851,221588,3,0.224,0.995,0.943,0.6046,0.309,0.634,TRUE,TRUE,0.633
+"pancreas_seeds","Exocrine epithelial -> Endocrine","Exocrine epithelial","Endocrine","invsqrt_kl","membrane",2,6086,944,1268,0.999,1,1400,7,0.922,1,0.9435,0.1518,0,0.98,TRUE,TRUE,0.878
+"pancreas_seeds","Exocrine epithelial -> Endothelial","Exocrine epithelial","Endothelial","invsqrt_kl","membrane",2,46048,3668,3358,0.999,1,44347,6,0.872,1,0.8731,0.2023,0,0.993,TRUE,TRUE,0.934
+"pancreas_seeds","Exocrine epithelial -> Fibroblast / CAF","Exocrine epithelial","Fibroblast / CAF","invsqrt_kl","membrane",2,38961,5312,23054,1,1,38044,8,0.644,0.979,0.9997,0.2252,0,0.975,TRUE,TRUE,0.852
+"pancreas_seeds","Exocrine epithelial -> Immune","Exocrine epithelial","Immune","invsqrt_kl","membrane",2,46804,6409,12842,1,1,44130,5,0.714,1,0.8034,0.2942,0,0.983,TRUE,TRUE,0.886
+"pancreas_seeds","Exocrine epithelial -> Mural / pericyte","Exocrine epithelial","Mural / pericyte","invsqrt_kl","membrane",2,650,304,2249,1,1,624,5,0.816,0.83,0.8685,0.1068,0,0.975,TRUE,TRUE,0.847
+"pancreas_seeds","Fibroblast / CAF -> Ductal/tumor epithelial","Fibroblast / CAF","Ductal/tumor epithelial","invsqrt_kl","membrane",2,24080,15882,14104,0.94,0.997,14554,9,0.873,1,0.9324,0.0549,0.0064,0.914,TRUE,TRUE,0.9
+"pancreas_seeds","Fibroblast / CAF -> Endocrine","Fibroblast / CAF","Endocrine","invsqrt_kl","membrane",2,1548,945,1267,0.989,0.994,1084,13,0.939,1,0.9477,0.0467,0,0.976,TRUE,TRUE,0.94
+"pancreas_seeds","Fibroblast / CAF -> Endothelial","Fibroblast / CAF","Endothelial","invsqrt_kl","membrane",2,15510,5170,1856,0.967,0.985,4110,3,0.965,1,0.7883,0.0507,0,0.967,TRUE,TRUE,0.957
+"pancreas_seeds","Fibroblast / CAF -> Exocrine epithelial","Fibroblast / CAF","Exocrine epithelial","invsqrt_kl","membrane",2,12337,13567,22762,0.982,0.977,9256,14,0.949,0.973,0.929,0.0149,0,0.967,TRUE,TRUE,0.924
+"pancreas_seeds","Fibroblast / CAF -> Immune","Fibroblast / CAF","Immune","invsqrt_kl","membrane",2,38636,16195,3056,-0.004,0,5717,2,0.024,1,0.7017,0.1488,0.1911,0.005,FALSE,FALSE,0.884
+"pancreas_seeds","Fibroblast / CAF -> Mural / pericyte","Fibroblast / CAF","Mural / pericyte","invsqrt_kl","membrane",2,2446,1862,691,0.009,0,155,2,0.019,0.945,0.8519,0.1367,0.2079,0.013,TRUE,FALSE,0.985
+"pancreas_seeds","Immune -> Ductal/tumor epithelial","Immune","Ductal/tumor epithelial","invsqrt_kl","membrane",2,5909,14749,15237,1,1,4224,14,0.962,1,0.9385,0.0599,0.0151,0.986,TRUE,TRUE,0.972
+"pancreas_seeds","Immune -> Endocrine","Immune","Endocrine","invsqrt_kl","membrane",2,305,700,1512,0.698,0.698,305,20,0.715,0.999,0.942,0.0366,0,0.703,TRUE,TRUE,0.949
+"pancreas_seeds","Immune -> Endothelial","Immune","Endothelial","invsqrt_kl","membrane",2,3000,5312,1714,0.631,0.642,1137,7,0.656,1,0.7253,0.0091,0,0.641,TRUE,TRUE,0.959
+"pancreas_seeds","Immune -> Exocrine epithelial","Immune","Exocrine epithelial","invsqrt_kl","membrane",2,7844,17891,18438,0.994,0.993,6267,17,0.972,0.977,0.9298,0.0433,0,0.983,TRUE,TRUE,0.972
+"pancreas_seeds","Immune -> Fibroblast / CAF","Immune","Fibroblast / CAF","invsqrt_kl","membrane",2,32837,24683,3683,0.999,NA,0,0,0.985,0.982,0.9998,0.1546,0,0.993,TRUE,TRUE,0.99
+"pancreas_seeds","Immune -> Mural / pericyte","Immune","Mural / pericyte","invsqrt_kl","membrane",2,1130,2082,471,0.989,0.988,1002,17,1,0.949,0.7946,0.132,0.0134,0.991,TRUE,TRUE,0.951
+"pancreas_seeds","Mural / pericyte -> Ductal/tumor epithelial","Mural / pericyte","Ductal/tumor epithelial","invsqrt_kl","membrane",2,997,1890,28096,0.893,0.994,598,7,0.758,0.999,0.9313,0.0328,0.0165,0.81,FALSE,FALSE,0
+"pancreas_seeds","Mural / pericyte -> Endothelial","Mural / pericyte","Endothelial","invsqrt_kl","membrane",2,5012,1642,5384,0.561,0.991,946,4,0.632,1,0.8457,0.135,0.0402,0.589,FALSE,FALSE,0
+"pancreas_seeds","Mural / pericyte -> Exocrine epithelial","Mural / pericyte","Exocrine epithelial","invsqrt_kl","membrane",2,423,1047,35282,0.983,0.987,372,11,0.747,0.549,0.9262,0.0118,0,0.84,FALSE,FALSE,0
+"pancreas_seeds","Mural / pericyte -> Fibroblast / CAF","Mural / pericyte","Fibroblast / CAF","invsqrt_kl","membrane",2,2270,5456,22910,0.099,0.065,604,2,0.098,0.988,0.9996,0.0559,0.0796,0.099,FALSE,FALSE,0
+"pancreas_seeds","Mural / pericyte -> Immune","Mural / pericyte","Immune","invsqrt_kl","membrane",2,2662,3817,15434,0.013,0.068,713,2,0.054,1,0.8108,0.0377,0.0497,0.038,FALSE,FALSE,0
+"pancreas_seeds","Ductal/tumor epithelial -> Endothelial","Ductal/tumor epithelial","Endothelial","ls_nmf","membrane",3,2645,3700,3326,0.886,0.878,1653,15,0.78,0.949,0.9976,0.001,0,0.847,TRUE,TRUE,0.566
+"pancreas_seeds","Ductal/tumor epithelial -> Exocrine epithelial","Ductal/tumor epithelial","Exocrine epithelial","ls_nmf","membrane",3,10181,31869,4460,0.163,0.312,4686,15,0.642,0.999,1,0.0291,0.0257,0.4,TRUE,TRUE,0.908
+"pancreas_seeds","Ductal/tumor epithelial -> Fibroblast / CAF","Ductal/tumor epithelial","Fibroblast / CAF","ls_nmf","membrane",3,14309,12056,16310,0.858,0.976,11566,15,0.775,0.946,0.9993,0.0677,0.022,0.839,TRUE,TRUE,0.78
+"pancreas_seeds","Ductal/tumor epithelial -> Immune","Ductal/tumor epithelial","Immune","ls_nmf","membrane",3,8477,8560,10691,0.852,0.982,3973,12,0.711,0.954,0.9972,0.0326,0,0.814,TRUE,TRUE,0.674
+"pancreas_seeds","Ductal/tumor epithelial -> Mural / pericyte","Ductal/tumor epithelial","Mural / pericyte","ls_nmf","membrane",3,413,593,1960,0.02,0.014,296,12,0.006,1,0.999,0.064,0.0762,0.017,FALSE,FALSE,0.674
+"pancreas_seeds","Endocrine -> Ductal/tumor epithelial","Endocrine","Ductal/tumor epithelial","ls_nmf","membrane",3,2113,579,29407,0.823,0.885,1915,11,0.208,0.991,1,0.0888,0.006,0.749,TRUE,TRUE,0.753
+"pancreas_seeds","Endocrine -> Endothelial","Endocrine","Endothelial","ls_nmf","membrane",3,3678,359,6667,0.913,0.915,3613,13,0.706,0.956,0.997,0.2282,0.0022,0.905,TRUE,TRUE,0.887
+"pancreas_seeds","Endocrine -> Exocrine epithelial","Endocrine","Exocrine epithelial","ls_nmf","membrane",3,5162,1247,35082,0.887,0.895,5065,12,0.351,0.998,1,0.0905,0.0026,0.831,TRUE,TRUE,0.824
+"pancreas_seeds","Endocrine -> Fibroblast / CAF","Endocrine","Fibroblast / CAF","ls_nmf","membrane",3,2359,743,27623,0.929,0.938,2281,12,0.53,0.94,0.9994,0.0869,0.0033,0.89,TRUE,TRUE,0.806
+"pancreas_seeds","Endocrine -> Immune","Endocrine","Immune","ls_nmf","membrane",3,946,440,18811,0.736,0.727,886,9,0.487,0.961,0.9968,0.0752,0.0587,0.703,TRUE,TRUE,0.822
+"pancreas_seeds","Endothelial -> Ductal/tumor epithelial","Endothelial","Ductal/tumor epithelial","ls_nmf","membrane",3,4071,6848,23138,0.438,0.563,3086,13,0.39,0.999,1,0.1194,0.0885,0.416,TRUE,TRUE,0.375
+"pancreas_seeds","Endothelial -> Endocrine","Endothelial","Endocrine","ls_nmf","membrane",3,535,1136,1076,0.629,0.634,432,14,0.53,0.997,0.9977,0.0607,0.0295,0.574,TRUE,TRUE,0.441
+"pancreas_seeds","Endothelial -> Exocrine epithelial","Endothelial","Exocrine epithelial","ls_nmf","membrane",3,6434,16987,19342,0.457,0.481,6009,15,0.33,0.999,1,0.0422,0.0174,0.381,TRUE,TRUE,0.353
+"pancreas_seeds","Endothelial -> Fibroblast / CAF","Endothelial","Fibroblast / CAF","ls_nmf","membrane",3,7187,10698,17668,0.846,0.878,3423,10,0.795,0.945,0.9995,0.1157,0.0302,0.823,TRUE,TRUE,0.607
+"pancreas_seeds","Endothelial -> Immune","Endothelial","Immune","ls_nmf","membrane",3,2548,7839,11412,0.725,0.779,1914,9,0.595,0.965,0.9958,0.1323,0.0426,0.654,TRUE,TRUE,0.456
+"pancreas_seeds","Endothelial -> Mural / pericyte","Endothelial","Mural / pericyte","ls_nmf","membrane",3,803,1173,1380,0.011,0,406,7,0.005,1,0.9998,0.1833,0.1291,0.008,TRUE,FALSE,0.711
+"pancreas_seeds","Exocrine epithelial -> Ductal/tumor epithelial","Exocrine epithelial","Ductal/tumor epithelial","ls_nmf","membrane",3,362132,13207,16779,0,0,221588,3,0.008,0.998,1,0.6046,0.6506,0.001,FALSE,FALSE,0.534
+"pancreas_seeds","Exocrine epithelial -> Endocrine","Exocrine epithelial","Endocrine","ls_nmf","membrane",3,6086,944,1268,0.733,0.931,1400,7,0.276,0.99,0.9981,0.1518,0.0593,0.618,TRUE,TRUE,0.497
+"pancreas_seeds","Exocrine epithelial -> Endothelial","Exocrine epithelial","Endothelial","ls_nmf","membrane",3,46048,3668,3358,0.86,0.853,44347,6,0.56,0.942,0.9977,0.2023,0,0.845,TRUE,TRUE,0.769
+"pancreas_seeds","Exocrine epithelial -> Fibroblast / CAF","Exocrine epithelial","Fibroblast / CAF","ls_nmf","membrane",3,38961,5312,23054,0.997,0.994,38044,8,0.487,0.905,0.9996,0.2252,0,0.957,TRUE,TRUE,0.79
+"pancreas_seeds","Exocrine epithelial -> Immune","Exocrine epithelial","Immune","ls_nmf","membrane",3,46804,6409,12842,0.959,0.952,44130,5,0.542,0.942,0.9963,0.2942,0.0026,0.919,TRUE,TRUE,0.791
+"pancreas_seeds","Exocrine epithelial -> Mural / pericyte","Exocrine epithelial","Mural / pericyte","ls_nmf","membrane",3,650,304,2249,0.788,0.797,624,5,0.33,1,0.9993,0.1068,0,0.725,TRUE,TRUE,0.706
+"pancreas_seeds","Fibroblast / CAF -> Ductal/tumor epithelial","Fibroblast / CAF","Ductal/tumor epithelial","ls_nmf","membrane",3,24080,15882,14104,0.62,0.835,14554,9,0.348,0.999,1,0.0549,0.0116,0.514,TRUE,TRUE,0.504
+"pancreas_seeds","Fibroblast / CAF -> Endocrine","Fibroblast / CAF","Endocrine","ls_nmf","membrane",3,1548,945,1267,0.708,0.784,1084,13,0.595,0.985,0.999,0.0467,0.0033,0.679,TRUE,TRUE,0.602
+"pancreas_seeds","Fibroblast / CAF -> Endothelial","Fibroblast / CAF","Endothelial","ls_nmf","membrane",3,15510,5170,1856,0.622,0.987,4110,3,0.557,0.94,0.9952,0.0507,0,0.6,TRUE,TRUE,0.559
+"pancreas_seeds","Fibroblast / CAF -> Exocrine epithelial","Fibroblast / CAF","Exocrine epithelial","ls_nmf","membrane",3,12337,13567,22762,0.584,0.701,9256,14,0.503,0.998,1,0.0149,0,0.548,TRUE,TRUE,0.503
+"pancreas_seeds","Fibroblast / CAF -> Immune","Fibroblast / CAF","Immune","ls_nmf","membrane",3,38636,16195,3056,0.542,0.666,5717,2,0.558,0.941,0.9917,0.1488,0.0708,0.547,TRUE,TRUE,0.512
+"pancreas_seeds","Fibroblast / CAF -> Mural / pericyte","Fibroblast / CAF","Mural / pericyte","ls_nmf","membrane",3,2446,1862,691,0.003,0,155,2,0.002,1,0.9993,0.1367,0.1482,0.002,FALSE,FALSE,0.926
+"pancreas_seeds","Immune -> Ductal/tumor epithelial","Immune","Ductal/tumor epithelial","ls_nmf","membrane",3,5909,14749,15237,0.773,0.91,4224,14,0.634,0.999,1,0.0599,0.0383,0.698,TRUE,TRUE,0.678
+"pancreas_seeds","Immune -> Endocrine","Immune","Endocrine","ls_nmf","membrane",3,305,700,1512,0.879,0.879,305,20,0.726,0.983,0.9984,0.0366,0,0.827,TRUE,TRUE,0.721
+"pancreas_seeds","Immune -> Endothelial","Immune","Endothelial","ls_nmf","membrane",3,3000,5312,1714,0.801,0.953,1137,7,0.864,0.949,0.9959,0.0091,0,0.827,TRUE,TRUE,0.715
+"pancreas_seeds","Immune -> Exocrine epithelial","Immune","Exocrine epithelial","ls_nmf","membrane",3,7844,17891,18438,0.861,0.955,6267,17,0.755,0.998,1,0.0433,0.0135,0.808,TRUE,TRUE,0.8
+"pancreas_seeds","Immune -> Fibroblast / CAF","Immune","Fibroblast / CAF","ls_nmf","membrane",3,32837,24683,3683,0.885,NA,0,0,0.844,0.936,0.9991,0.1546,0,0.867,TRUE,TRUE,0.858
+"pancreas_seeds","Immune -> Mural / pericyte","Immune","Mural / pericyte","ls_nmf","membrane",3,1130,2082,471,0.003,0.003,1002,17,0,1,0.9997,0.132,0.1358,0.002,FALSE,FALSE,0.713
+"pancreas_seeds","Mural / pericyte -> Ductal/tumor epithelial","Mural / pericyte","Ductal/tumor epithelial","ls_nmf","membrane",3,997,1890,28096,0.47,0.599,598,7,0.291,0.996,1,0.0328,0.0306,0.359,FALSE,FALSE,0
+"pancreas_seeds","Mural / pericyte -> Endothelial","Mural / pericyte","Endothelial","ls_nmf","membrane",3,5012,1642,5384,0.304,0.458,946,4,0.366,0.967,0.9971,0.135,0.1044,0.329,FALSE,FALSE,0
+"pancreas_seeds","Mural / pericyte -> Exocrine epithelial","Mural / pericyte","Exocrine epithelial","ls_nmf","membrane",3,423,1047,35282,0.615,0.65,372,11,0.376,0.941,1,0.0118,0.0024,0.468,FALSE,FALSE,0
+"pancreas_seeds","Mural / pericyte -> Fibroblast / CAF","Mural / pericyte","Fibroblast / CAF","ls_nmf","membrane",3,2270,5456,22910,0.027,0.043,604,2,0.087,0.951,0.9993,0.0559,0.0801,0.065,FALSE,FALSE,0
+"pancreas_seeds","Mural / pericyte -> Immune","Mural / pericyte","Immune","ls_nmf","membrane",3,2662,3817,15434,0.799,0.881,713,2,0.503,0.967,0.9969,0.0377,0.0021,0.616,FALSE,FALSE,0
+"pancreas_seeds","Ductal/tumor epithelial -> Endothelial","Ductal/tumor epithelial","Endothelial","invsqrt_kl","membrane",3,2645,3700,3326,0.998,0.997,1653,15,0.996,1,0.7888,0.001,0,0.997,TRUE,TRUE,0.833
+"pancreas_seeds","Ductal/tumor epithelial -> Exocrine epithelial","Ductal/tumor epithelial","Exocrine epithelial","invsqrt_kl","membrane",3,10181,31869,4460,0.824,0.666,4686,15,0.304,0.93,0.9108,0.0291,0,0.566,TRUE,TRUE,0.953
+"pancreas_seeds","Ductal/tumor epithelial -> Fibroblast / CAF","Ductal/tumor epithelial","Fibroblast / CAF","invsqrt_kl","membrane",3,14309,12056,16310,0.996,0.996,11566,15,0.979,0.993,0.9995,0.0677,0.007,0.992,TRUE,TRUE,0.938
+"pancreas_seeds","Ductal/tumor epithelial -> Immune","Ductal/tumor epithelial","Immune","invsqrt_kl","membrane",3,8477,8560,10691,0.912,0.872,3973,12,0.919,0.983,0.823,0.0326,0,0.914,TRUE,TRUE,0.912
+"pancreas_seeds","Ductal/tumor epithelial -> Mural / pericyte","Ductal/tumor epithelial","Mural / pericyte","invsqrt_kl","membrane",3,413,593,1960,0.739,0.667,296,12,0.732,0.963,0.8496,0.064,0.0129,0.737,TRUE,TRUE,0.951
+"pancreas_seeds","Endocrine -> Ductal/tumor epithelial","Endocrine","Ductal/tumor epithelial","invsqrt_kl","membrane",3,2113,579,29407,0.967,0.979,1915,11,0.723,1,0.9186,0.0888,0.0034,0.938,TRUE,TRUE,0.926
+"pancreas_seeds","Endocrine -> Endothelial","Endocrine","Endothelial","invsqrt_kl","membrane",3,3678,359,6667,1,0.999,3613,13,0.989,1,0.8222,0.2282,0,0.999,TRUE,TRUE,0.966
+"pancreas_seeds","Endocrine -> Exocrine epithelial","Endocrine","Exocrine epithelial","invsqrt_kl","membrane",3,5162,1247,35082,0.997,0.998,5065,12,0.835,0.939,0.9207,0.0905,0,0.98,TRUE,TRUE,0.944
+"pancreas_seeds","Endocrine -> Fibroblast / CAF","Endocrine","Fibroblast / CAF","invsqrt_kl","membrane",3,2359,743,27623,1,0.999,2281,12,0.808,0.994,0.9995,0.0869,0,0.981,TRUE,TRUE,0.897
+"pancreas_seeds","Endocrine -> Immune","Endocrine","Immune","invsqrt_kl","membrane",3,946,440,18811,1,1,886,9,0.683,0.985,0.8156,0.0752,0,0.968,TRUE,TRUE,0.91
+"pancreas_seeds","Endothelial -> Ductal/tumor epithelial","Endothelial","Ductal/tumor epithelial","invsqrt_kl","membrane",3,4071,6848,23138,0.815,0.994,3086,13,0.86,1,0.9212,0.1194,0.0593,0.836,TRUE,TRUE,0.737
+"pancreas_seeds","Endothelial -> Endocrine","Endothelial","Endocrine","invsqrt_kl","membrane",3,535,1136,1076,0.871,0.954,432,14,0.774,0.991,0.8837,0.0607,0,0.817,TRUE,TRUE,0.703
+"pancreas_seeds","Endothelial -> Exocrine epithelial","Endothelial","Exocrine epithelial","invsqrt_kl","membrane",3,6434,16987,19342,0.993,0.992,6009,15,0.977,0.953,0.9199,0.0422,0,0.983,TRUE,TRUE,0.877
+"pancreas_seeds","Endothelial -> Fibroblast / CAF","Endothelial","Fibroblast / CAF","invsqrt_kl","membrane",3,7187,10698,17668,0.997,0.998,3423,10,0.979,0.994,0.9996,0.1157,0.0083,0.989,TRUE,TRUE,0.814
+"pancreas_seeds","Endothelial -> Immune","Endothelial","Immune","invsqrt_kl","membrane",3,2548,7839,11412,0.896,0.998,1914,9,0.736,0.984,0.8036,0.1323,0.0627,0.809,TRUE,TRUE,0.761
+"pancreas_seeds","Endothelial -> Mural / pericyte","Endothelial","Mural / pericyte","invsqrt_kl","membrane",3,803,1173,1380,0.008,0.014,406,7,0.142,0.977,0.8561,0.1833,0.1295,0.067,TRUE,FALSE,0.767
+"pancreas_seeds","Exocrine epithelial -> Ductal/tumor epithelial","Exocrine epithelial","Ductal/tumor epithelial","invsqrt_kl","membrane",3,362132,13207,16779,0.004,0,221588,3,0.027,1,0.9212,0.6046,0.6852,0.005,FALSE,FALSE,0.545
+"pancreas_seeds","Exocrine epithelial -> Endocrine","Exocrine epithelial","Endocrine","invsqrt_kl","membrane",3,6086,944,1268,0.993,0.977,1400,7,0.933,0.984,0.8824,0.1518,0,0.978,TRUE,TRUE,0.835
+"pancreas_seeds","Exocrine epithelial -> Endothelial","Exocrine epithelial","Endothelial","invsqrt_kl","membrane",3,46048,3668,3358,1,1,44347,6,0.994,1,0.7839,0.2023,0,1,TRUE,TRUE,0.912
+"pancreas_seeds","Exocrine epithelial -> Fibroblast / CAF","Exocrine epithelial","Fibroblast / CAF","invsqrt_kl","membrane",3,38961,5312,23054,1,1,38044,8,0.926,0.994,0.9997,0.2252,0,0.998,TRUE,TRUE,0.819
+"pancreas_seeds","Exocrine epithelial -> Immune","Exocrine epithelial","Immune","invsqrt_kl","membrane",3,46804,6409,12842,0.12,0.12,44130,5,0.174,0.983,0.8075,0.2942,0.3081,0.125,FALSE,FALSE,0.844
+"pancreas_seeds","Exocrine epithelial -> Mural / pericyte","Exocrine epithelial","Mural / pericyte","invsqrt_kl","membrane",3,650,304,2249,0.847,0.86,624,5,0.601,0.93,0.8538,0.1068,0,0.813,TRUE,TRUE,0.802
+"pancreas_seeds","Fibroblast / CAF -> Ductal/tumor epithelial","Fibroblast / CAF","Ductal/tumor epithelial","invsqrt_kl","membrane",3,24080,15882,14104,0.997,0.995,14554,9,0.966,1,0.9155,0.0549,0.0057,0.985,TRUE,TRUE,0.978
+"pancreas_seeds","Fibroblast / CAF -> Endocrine","Fibroblast / CAF","Endocrine","invsqrt_kl","membrane",3,1548,945,1267,0.959,0.963,1084,13,0.903,0.982,0.9007,0.0467,0,0.944,TRUE,TRUE,0.936
+"pancreas_seeds","Fibroblast / CAF -> Endothelial","Fibroblast / CAF","Endothelial","invsqrt_kl","membrane",3,15510,5170,1856,0.921,0.999,4110,3,0.85,1,0.7548,0.0507,0,0.897,TRUE,TRUE,0.874
+"pancreas_seeds","Fibroblast / CAF -> Exocrine epithelial","Fibroblast / CAF","Exocrine epithelial","invsqrt_kl","membrane",3,12337,13567,22762,0.983,0.979,9256,14,0.955,0.949,0.9213,0.0149,0,0.97,TRUE,TRUE,0.939
+"pancreas_seeds","Fibroblast / CAF -> Immune","Fibroblast / CAF","Immune","invsqrt_kl","membrane",3,38636,16195,3056,-0.004,0,5717,2,0.087,0.984,0.7535,0.1488,0.1616,0.026,FALSE,FALSE,0.934
+"pancreas_seeds","Fibroblast / CAF -> Mural / pericyte","Fibroblast / CAF","Mural / pericyte","invsqrt_kl","membrane",3,2446,1862,691,-0.001,0,155,2,0.026,0.973,0.8311,0.1367,0.1737,0.01,FALSE,FALSE,0.986
+"pancreas_seeds","Immune -> Ductal/tumor epithelial","Immune","Ductal/tumor epithelial","invsqrt_kl","membrane",3,5909,14749,15237,1,1,4224,14,0.96,1,0.9221,0.0599,0,0.982,TRUE,TRUE,0.974
+"pancreas_seeds","Immune -> Endocrine","Immune","Endocrine","invsqrt_kl","membrane",3,305,700,1512,0.977,0.977,305,20,0.961,0.974,0.89,0.0366,0,0.972,TRUE,TRUE,0.972
+"pancreas_seeds","Immune -> Endothelial","Immune","Endothelial","invsqrt_kl","membrane",3,3000,5312,1714,0.994,0.99,1137,7,0.993,1,0.7643,0.0091,0,0.994,TRUE,TRUE,0.986
+"pancreas_seeds","Immune -> Exocrine epithelial","Immune","Exocrine epithelial","invsqrt_kl","membrane",3,7844,17891,18438,0.996,0.996,6267,17,0.978,0.956,0.9236,0.0433,0,0.987,TRUE,TRUE,0.983
+"pancreas_seeds","Immune -> Fibroblast / CAF","Immune","Fibroblast / CAF","invsqrt_kl","membrane",3,32837,24683,3683,0.999,NA,0,0,0.991,0.994,0.9991,0.1546,0,0.995,TRUE,TRUE,0.984
+"pancreas_seeds","Immune -> Mural / pericyte","Immune","Mural / pericyte","invsqrt_kl","membrane",3,1130,2082,471,0.552,0.512,1002,17,0.672,0.964,0.9315,0.132,0.0585,0.574,TRUE,TRUE,0.962
+"pancreas_seeds","Mural / pericyte -> Ductal/tumor epithelial","Mural / pericyte","Ductal/tumor epithelial","invsqrt_kl","membrane",3,997,1890,28096,0.789,0.998,598,7,0.757,1,0.9186,0.0328,0.0209,0.769,TRUE,TRUE,0
+"pancreas_seeds","Mural / pericyte -> Endothelial","Mural / pericyte","Endothelial","invsqrt_kl","membrane",3,5012,1642,5384,0.488,0.631,946,4,0.634,1,0.7978,0.135,0.0679,0.545,TRUE,TRUE,0.001
+"pancreas_seeds","Mural / pericyte -> Exocrine epithelial","Mural / pericyte","Exocrine epithelial","invsqrt_kl","membrane",3,423,1047,35282,0.976,0.975,372,11,0.796,0.451,0.9203,0.0118,0,0.867,FALSE,FALSE,0
+"pancreas_seeds","Mural / pericyte -> Fibroblast / CAF","Mural / pericyte","Fibroblast / CAF","invsqrt_kl","membrane",3,2270,5456,22910,0.125,0.069,604,2,0.238,0.994,0.9994,0.0559,0.0797,0.195,TRUE,TRUE,0.018
+"pancreas_seeds","Mural / pericyte -> Immune","Mural / pericyte","Immune","invsqrt_kl","membrane",3,2662,3817,15434,0.123,0.178,713,2,0.118,0.984,0.8147,0.0377,0.0374,0.12,FALSE,FALSE,0.004

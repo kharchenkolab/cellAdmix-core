@@ -54,13 +54,15 @@ CellAdmixCorrection <- R6::R6Class(
     score_name = NULL,
     run = NULL,
     params = NULL,
+    rules = NULL,
 
-    initialize = function(name, fit, score, run, params = list()) {
+    initialize = function(name, fit, score, run, params = list(), rules = NULL) {
       self$name <- .celladmix_clean_name(name, "correction")
       self$fit <- fit
       self$score_name <- score$name
       self$run <- run
       self$params <- params
+      self$rules <- rules
     },
 
     save_metadata = function() {
@@ -75,6 +77,19 @@ CellAdmixCorrection <- R6::R6Class(
 
     summary = function() .celladmix_compact_correction_summary(self$cell_summary()),
     cell_summary = function() celladmix_collect_correction_summary(self$run),
+    ensemble = function() {
+      histogram <- self$run$vote_histogram
+      if (length(histogram)) {
+        names(histogram) <- paste0("votes_", seq_along(histogram))
+      }
+      list(
+        members = self$params$ensemble %||% 1L,
+        vote = self$params$vote %||% NA_real_,
+        min_votes = self$run$min_votes %||% 1L,
+        n_removed = self$run$n_removed %||% NA_real_,
+        vote_histogram = histogram
+      )
+    },
     counts = function(...) celladmix_collect_counts_sparse(self$run, ...),
     cells = function() celladmix_collect_cells(self$run),
     molecules = function(...) celladmix_collect_transcripts(self$run, ...),

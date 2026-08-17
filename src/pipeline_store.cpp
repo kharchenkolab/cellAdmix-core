@@ -1440,7 +1440,35 @@ StorePipelineResult run_basic_pipeline_store(
   const auto nmf_init_groups = build_training_init_groups(selection, cell_strata, options.nmf_init);
   stage_start = std::chrono::steady_clock::now();
   NcvFeatureTransform compact_transform;
-  if (is_weighted_ls_variant(options.nmf_variant)) {
+  if (!options.nmf_fixed_h.empty()) {
+    // Externally supplied loadings: no factorization. H is used as given in
+    // raw (identity) feature space; training rows are projected onto it.
+    const int n_genes_full = static_cast<int>(counts.genes.size());
+    if (options.nmf_fixed_h.size() % static_cast<std::size_t>(n_genes_full) != 0) {
+      throw std::runtime_error("nmf_fixed_h length must be a multiple of the gene count");
+    }
+    const int fixed_rank = static_cast<int>(
+        options.nmf_fixed_h.size() / static_cast<std::size_t>(n_genes_full));
+    const auto& kept_cols = compact_training.kept_cols;
+    const int n_compact = kept_cols.empty()
+        ? n_genes_full : static_cast<int>(kept_cols.size());
+    DenseMatrix h_compact(fixed_rank, n_compact);
+    for (int f = 0; f < fixed_rank; ++f) {
+      for (int c = 0; c < n_compact; ++c) {
+        const int full_col = kept_cols.empty() ? c : kept_cols[static_cast<std::size_t>(c)];
+        h_compact(f, c) = options.nmf_fixed_h[
+            static_cast<std::size_t>(f) * static_cast<std::size_t>(n_genes_full) +
+            static_cast<std::size_t>(full_col)];
+      }
+    }
+    compact_transform = make_ncv_feature_transform(compact_training.matrix, "kl");
+    SparseNmfResult fixed;
+    fixed.h = h_compact;
+    fixed.w = project_rows_to_factors_kl(compact_training.matrix, fixed.h, options.num_threads);
+    fixed.selected_run = 0;
+    fixed.selected_seed = options.seed;
+    result.nmf = fixed;
+  } else if (is_weighted_ls_variant(options.nmf_variant)) {
     const auto column_weights = default_column_weights(compact_training.matrix);
     WeightedNmfOptions nmf_options;
     nmf_options.rank = options.rank;
@@ -1476,6 +1504,12 @@ StorePipelineResult run_basic_pipeline_store(
         result.nmf.h,
         static_cast<int>(counts.genes.size()),
         compact_training.kept_cols);
+    for (auto& candidate : result.nmf.candidate_h) {
+      candidate = expand_h_to_full_genes(
+          candidate,
+          static_cast<int>(counts.genes.size()),
+          compact_training.kept_cols);
+    }
     full_transform = expand_ncv_feature_transform(
         compact_transform,
         static_cast<int>(counts.genes.size()),
@@ -1485,9 +1519,11 @@ StorePipelineResult run_basic_pipeline_store(
       std::chrono::duration<double>(std::chrono::steady_clock::now() - stage_start).count();
   if (verbose) {
     std::ostringstream message;
-    message << (is_weighted_ls_variant(options.nmf_variant)
-        ? "Fit store-backed weighted LS-NMF"
-        : "Fit store-backed sparse KL NMF");
+    message << (!options.nmf_fixed_h.empty()
+        ? "Projected store-backed training rows onto fixed loadings"
+        : is_weighted_ls_variant(options.nmf_variant)
+            ? "Fit store-backed weighted LS-NMF"
+            : "Fit store-backed sparse KL NMF");
     if (options.nmf_variant != "kl" && !is_weighted_ls_variant(options.nmf_variant)) {
       message << " [" << options.nmf_variant << "]";
     }
@@ -1512,6 +1548,12 @@ StorePipelineResult run_basic_pipeline_store(
       counts.genes,
       result.nmf.h,
       storage_options.parquet_row_group_size);
+  if (!result.nmf.candidate_h.empty()) {
+    write_ensemble_h_parquet(
+        ensemble_h_parquet_path(result.manifest.paths.root_dir),
+        result.nmf.candidate_h,
+        storage_options.parquet_row_group_size);
+  }
   write_training_rows_parquet(
       result.manifest.paths.training_rows_parquet,
       selection.global_rows,

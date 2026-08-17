@@ -102,8 +102,11 @@ across datasets it recovers cell-type-native factors far more reproducibly
 than the KL variants (see [nmf_stability.md](nmf_stability.md)), and the
 factor decomposition it aims for — native factors per cell type or state,
 with admixture read from their minor contributions in non-native cells —
-matches the scoring model directly. `invsqrt_kl` remains available for
-marker-driven loadings.
+matches the scoring model directly. In cleanup benchmarks
+([benchmarks.md](benchmarks.md)) the most effective variant follows the
+scoring method: `invsqrt_kl` paired with membrane scoring on stained data,
+`ls_nmf` paired with bridge scoring — the pancreas quickstart follows this
+pairing.
 
 The NCV neighborhood size `ncv_k` is resolved automatically from the data:
 it grows with the square root of the panel size (a ~400-gene panel keeps the
@@ -180,6 +183,41 @@ cells are flagged `keep = FALSE` with the reason in the `native_check` column
 related thresholds. See the Native-Factor Check section in
 [scoring_methods.md](scoring_methods.md).
 
+## Auditing Admixture and Verifying Cleanup
+
+Independently of factorization and scoring, the amount of admixture in a
+dataset can be estimated from its spatial structure: source-marker content
+in target cells rises with the number of source-type neighbor cells, while
+unexposed target cells provide an internal negative control (see
+[benchmarks.md](benchmarks.md) for the methodology). The audit measures
+this for every ordered cell-type pair:
+
+```r
+audit <- fit$audit_admixture()
+audit$pairs()                      # per-pair admixture rates and molecule estimates
+audit$plot_map()                   # admixture-rate map (% of target-type molecules)
+audit$plot_exposure()              # cumulative exposure profile, 95% intervals
+audit$plot_exposure("Exocrine epithelial", "Endothelial", correction = correction)
+audit$plot_remaining(list(membrane = correction))  # admixture left per correction
+```
+
+`audit$evaluate(correction)` verifies a correction against the same
+measurements: per-pair cleanup sensitivity, the own-marker false-removal
+rate per cell type (removal of near-surely-genuine molecules), and a
+warning for any detected pair that no removal rule covers.
+
+```r
+report <- audit$evaluate(correction)
+report$summary()
+report$plot_cleanup()
+```
+
+The audit's directly measured marker excess is a conservative lower bound
+(contamination that reaches even unexposed cells raises the reference
+level and is not counted); the reported rates and molecule counts
+extrapolate it by the markers' share of the source transcriptome, kept as
+the `coverage` column of `audit$pairs()`.
+
 Example-cell overlays show molecule-level evidence around selected target
 cells. For Xenium-backed fits, the DAPI/membrane stain background, cell
 boundaries, and cell-type contour coloring are discovered automatically:
@@ -202,10 +240,36 @@ correction <- score$correct(rules = rules, name = "clean")
 corrected_counts <- correction$counts()
 correction$summary()
 correction$plot_removed_molecules()
+correction$ensemble()   # member count, vote threshold, vote histogram
 ```
 
 Correction removes molecules assigned to rule-supported admixture factors in
 their target cell types and returns sparse corrected counts.
+
+By default the correction is a molecule-vote ensemble over the fit's NMF
+restarts: each restart's factorization labels every molecule, is scored with
+the same method and parameters, and is vetted by its own native-factor
+check; a molecule is removed when at least `vote` (default 0.3) of the
+members remove it. Single-fit corrections are highly seed-dependent, and the
+vote both stabilizes them and outperforms every individual restart on the
+cleanup benchmark (see [benchmarks.md](benchmarks.md)), with the threshold
+acting as a sensitivity/specificity dial:
+
+```r
+score$correct()               # ensemble over up to 10 restarts, vote = 0.3
+score$correct(vote = 0.5)     # stricter: majority vote, higher specificity
+score$correct(ensemble = 1)   # single-fit correction from the selected restart
+```
+
+The first ensemble correction computes and caches per-member molecule
+labelings in the run directory (one projection and smoothing pass per
+member); re-voting at a different threshold reuses the cached member rules.
+When `rules` is passed explicitly, its source→target pairs restrict every
+member, so vetoed pairs stay vetoed across the ensemble; the returned
+correction's `rules` carry a `support` column giving the fraction of members
+that independently kept each pair. Runs fitted with `nmf_n_runs = 1` (or
+cached runs from fits that predate member pools) fall back to the single-fit
+correction with a message.
 
 ## Clustering and Annotation
 
@@ -248,13 +312,17 @@ for the full option list.
 
 ## Example Notebooks
 
+- [Pancreas quickstart](../examples/xenium_pancreas_membrane_377_full/pancreas_quickstart.ipynb): the recommended workflow in its shortest form - audit, fit, correct, verify.
 - [Minimal CosMx NSCLC tutorial](../examples/cosmx_nsclc_giotto/celladmix_cosmx_minimal.ipynb): a compact tabular example mirroring the original cellAdmix [NSCLC tutorial](https://github.com/kharchenkolab/cellAdmix/blob/main/vignettes/NSCLC_tutorial_fulldata.ipynb).
-- [Xenium pancreas membrane/bridge scoring tutorial](../examples/xenium_pancreas_membrane_377_full/pancreas_membrane_scoring_clean.ipynb): a modern Xenium bundle example with membrane cell staining.
+- [Detailed Xenium pancreas tutorial](../examples/xenium_pancreas_membrane_377_full/pancreas_membrane_scoring_clean.ipynb): the full walkthrough on a membrane-stained Xenium bundle - audit, membrane and bridge scoring on their recommended factorizations, and the variant comparison behind that pairing.
 - [Seurat Xenium integration tutorial](../examples/xenium_pancreas_membrane_377_full/pancreas_seurat_integration.ipynb): the same pancreas dataset, using Seurat for cell-level state and cellAdmix for molecule-complete fitting, scoring, and correction.
+- [Xenium breast 5K membrane scoring tutorial](../examples/xenium_breast_membrane_5k_full/breast_5k_membrane_scoring.ipynb): the same workflow at full 5K-panel scale.
 
 ## Detailed Pages
 
 - [Inputs](inputs.md)
 - [Installation](install.md)
 - [Scoring methods](scoring_methods.md)
+- [NMF restart stability](nmf_stability.md)
+- [Cleanup benchmarks](benchmarks.md)
 - [Documentation index](README.md)

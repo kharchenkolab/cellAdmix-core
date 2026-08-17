@@ -54,6 +54,20 @@ to disable, or tune `native_median_thresh` and related thresholds. See the
 Native-Factor Check section in
 [docs/scoring_methods.md](scoring_methods.md).
 
+`score.correct()` applies the correction as a molecule-vote ensemble by
+default: every NMF restart retained by the fit is scored and vetted
+independently (each with its own native-factor check), and a molecule is
+removed when at least `vote` (default 0.3) of the members remove it. The
+vote stabilizes the seed-dependence of single-fit corrections and acts as a
+sensitivity/specificity dial (see [benchmarks.md](benchmarks.md)). Pass
+`ensemble=1` for a single-fit correction from the selected restart;
+`correction.ensemble()` reports the member count, vote threshold, and vote
+histogram, and the returned `correction.rules` carry a `support` column with
+the fraction of members keeping each source→target pair. The first ensemble
+correction computes and caches per-member molecule labelings in the run
+directory; runs fitted with `nmf_n_runs=1` (or cached runs from fits that
+predate member pools) fall back to the single-fit correction with a message.
+
 Default behavior mirrors the R API:
 
 - NMF method: `ls_nmf`.
@@ -61,7 +75,8 @@ Default behavior mirrors the R API:
 - Rank: `ceil(1.2 * number_of_annotation_labels)`, capped at 30.
 - Xenium control/codeword/non-gene features are excluded during input-store
   construction. Pass `keep_non_gene=True` only for control-feature diagnostics.
-- NMF restarts: default to the dataset thread count.
+- NMF restarts: at least 10 by default (more on higher thread counts), with
+  every restart's loadings kept as the ensemble member pool.
 
 ### Loading Existing Runs
 
@@ -135,6 +150,34 @@ iterative hard-label ICM, not marginal-probability CRF inference, so the
 Cell-level `factor_K_fraction` values are fractions of molecules assigned to
 each hard factor label after smoothing. They are not soft cell probabilities.
 
+### Auditing Admixture and Verifying Cleanup
+
+Independently of factorization and scoring, admixture can be estimated
+from the dataset's spatial structure: source-marker content in target
+cells rises with source-type neighbor exposure, while unexposed target
+cells provide an internal negative control (see
+[benchmarks.md](benchmarks.md) for the methodology). The audit measures
+this per ordered cell-type pair and verifies corrections against the same
+measurements:
+
+```python
+audit = fit.audit_admixture()
+audit.pairs()                       # per-pair admixture rates and molecule estimates
+audit.plot_map()                    # admixture-rate map (% of target-type molecules)
+audit.plot_exposure()               # pooled exposure profile, 95% intervals
+audit.plot_remaining({"membrane": correction})
+
+report = audit.evaluate(correction) # per-pair sensitivity, false removal,
+report.summary()                    # and warnings for uncovered pairs
+report.plot_cleanup()
+```
+
+The audit's directly measured marker excess is a conservative lower bound
+(contamination reaching even unexposed cells raises the reference level
+and is not counted); the reported rates and molecule counts extrapolate it
+by the markers' share of the source transcriptome, kept as the `coverage`
+column of `audit.pairs()`.
+
 ## SpatialData API
 
 SpatialData integration keeps SpatialData as the Python-side source of
@@ -177,6 +220,9 @@ streaming reads and membrane-image discovery.
   reads the same dataset as a `SpatialData` object, adds cellAdmix factors and
   corrected counts back into the SpatialData table, and illustrates Scanpy /
   SpatialData plotting on the outputs.
+- [Standalone Xenium breast 5K workflow](../examples/xenium_breast_membrane_5k_full/breast_5k_python_standalone.ipynb) -
+  the same core workflow on a full 5K-panel dataset (96.6M molecules,
+  694K cells).
 
 These notebooks are intended as starting templates. The SpatialData notebook
 needs a Python 3.11+ environment with `spatialdata`, `spatialdata-io`, and

@@ -110,6 +110,10 @@ Notes:
     score.add_argument("--targets", help="Comma-separated target cell types")
     score.add_argument("--no-correct", action="store_true")
     score.add_argument("--correction-name")
+    score.add_argument("--ensemble", type=int, default=10,
+                       help="Ensemble member cap; 1 = single-fit correction")
+    score.add_argument("--vote", type=float, default=0.3,
+                       help="Ensemble vote threshold fraction")
     score.add_argument("--max-cells-per-type-pair", type=int, default=400)
     score.add_argument("--candidate-pairs-per-type-pair", type=int, default=400)
     score.add_argument("--min-factor-molecules", type=int, default=5)
@@ -654,7 +658,9 @@ def main(argv: list[str] | None = None) -> int:
         else:
             correction_name = args.correction_name or f"{score_name}_clean"
             log("Applying correction rules")
-            correction = score.correct(rules=rules, name=correction_name)
+            correction = score.correct(
+                rules=rules, name=correction_name,
+                ensemble=args.ensemble, vote=args.vote)
             print(correction.summary())
 
     top_genes = factor_top_genes(fit, args.top_genes)

@@ -91,6 +91,8 @@ SparseNmfResult weighted_to_sparse_nmf_result(const WeightedNmfResult& fit) {
   out.stability_comparison_runs = fit.stability_comparison_runs;
   out.stable_factor_count = fit.stable_factor_count;
   out.stability_threshold = fit.stability_threshold;
+  out.candidate_h = fit.candidate_h;
+  out.candidate_seeds = fit.candidate_seeds;
   return out;
 }
 

@@ -35,7 +35,7 @@ seu$cell_type <- ...
 
 ds <- cellAdmix(seu, xenium_dir = "data", output_dir = "out",
   annotation = "cell_type")
-fit <- ds$fit()
+fit <- ds$fit(nmf_variant = "invsqrt_kl")
 score <- fit$score_membrane()
 correction <- score$correct()
 
@@ -143,10 +143,13 @@ ds
 `fit()` samples neighborhood composition vectors from molecules inside cells and
 fits NMF factors. The default rank is chosen from the number of annotation
 classes. Multiple random/cluster-initialized NMF runs are run in parallel by
-default, and the lowest-loss solution is retained.
+default, and the lowest-loss solution is retained. Because this
+membrane-stained dataset will be cleaned with membrane scoring, we fit the
+`invsqrt_kl` variant, the recommended pairing for membrane scoring (see
+[docs/benchmarks.md](../../docs/benchmarks.md)).
 
 ```{r fit}
-fit <- ds$fit(verbose = TRUE)
+fit <- ds$fit(nmf_variant = "invsqrt_kl", verbose = TRUE)
 fit
 ```
 
@@ -160,6 +163,18 @@ fit$plot_loadings()
 
 ```{r factor-stability, fig.width=6, fig.height=5}
 fit$plot_stability()
+```
+
+## Admixture Audit
+
+The audit estimates, before any correction, each ordered cell-type pair's
+admixture rate — the percent of the target type's molecules that leaked in
+from the source — using only the spatial exposure structure of the data.
+It frames what the correction below should fix.
+
+```{r audit-map, fig.width=6.8, fig.height=5.2}
+audit <- fit$audit_admixture()
+audit$plot_map()
 ```
 
 ## Membrane-Based Scoring
@@ -198,9 +213,11 @@ head(membrane_rules[, c("factor", "source_cell_type", "target_cell_type", "p_val
 
 ## Correct Counts
 
-The correction step removes molecules assigned to significant admixture factors
-in their target cell types. The result is persisted on disk and can be collected
-as a sparse gene-by-cell matrix.
+The correction step removes molecules assigned to significant admixture
+factors in their target cell types, by default as a molecule-vote ensemble
+across the fit's NMF restarts (a molecule is removed when at least 30% of
+the independently scored restarts remove it). The result is persisted on
+disk and can be collected as a sparse gene-by-cell matrix.
 
 ```{r correction}
 membrane_correction <- membrane_score$correct(rules = membrane_rules,
@@ -214,6 +231,21 @@ applied across cell types. Large removals should be inspected carefully.
 
 ```{r molecule-removal, fig.width=8, fig.height=6}
 membrane_correction$plot_removed_molecules()
+```
+
+The audit verifies the cleanup against the same exposure measurements: the
+report gives per-pair sensitivity and the own-marker false-removal rate,
+and the panels show the estimated admixture remaining and the pooled
+exposure profile before and after cleanup.
+
+```{r audit-verify, warning=TRUE, fig.width=9.6, fig.height=4.0}
+report <- audit$evaluate(membrane_correction)
+report$summary()
+
+cowplot::plot_grid(
+  audit$plot_remaining(list(corrected = membrane_correction)),
+  audit$plot_exposure(correction = membrane_correction),
+  ncol = 2, align = "hv", axis = "tblr")
 ```
 
 ## Add Results Back to Seurat

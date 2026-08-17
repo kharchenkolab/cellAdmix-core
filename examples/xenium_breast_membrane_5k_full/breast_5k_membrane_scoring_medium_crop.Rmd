@@ -79,8 +79,12 @@ ds
 
 ## Fit Factors
 
+The fit uses the `invsqrt_kl` NMF variant, the recommended pairing for
+membrane scoring on stained data (see
+[docs/benchmarks.md](../../docs/benchmarks.md)).
+
 ```{r fit-default}
-fit <- ds$fit(verbose = TRUE)
+fit <- ds$fit(nmf_variant = "invsqrt_kl", verbose = TRUE)
 
 fit
 ```
@@ -95,6 +99,18 @@ for reproducibly re-found ones). Factor importance (the x-axis, echoed by dot si
 
 ```{r factor-stability, fig.width=6.2, fig.height=4.2}
 fit$plot_stability()
+```
+
+## Admixture Audit
+
+Before correcting anything, the audit estimates each ordered cell-type
+pair's admixture rate within the crop — the percent of the target type's
+molecules that leaked in from the source — using only the spatial
+exposure structure of the data.
+
+```{r audit-map, fig.width=8.6, fig.height=6.4}
+audit <- fit$audit_admixture()
+audit$plot_map()
 ```
 
 ## Tissue Context
@@ -226,6 +242,19 @@ membrane_de <- celladmix_de_by_group(membrane_counts, cell_spatial,
 
 ```{r membrane-removal, fig.width=6.8, fig.height=5.2}
 membrane_correction$plot_removed_molecules()
+```
+
+The audit verifies the cleanup against the same exposure measurements it
+used to detect the admixture.
+
+```{r audit-verify, warning=TRUE, fig.width=9.6, fig.height=4.0}
+report <- audit$evaluate(membrane_correction)
+report$summary()
+
+cowplot::plot_grid(
+  audit$plot_remaining(list(corrected = membrane_correction)),
+  audit$plot_exposure(correction = membrane_correction),
+  ncol = 2, align = "hv", axis = "tblr")
 ```
 
 ```{r membrane-marker-expression, fig.width=11.0, fig.height=4.2}

@@ -28,6 +28,11 @@ struct BasicPipelineOptions {
   bool return_ncv = true;
   unsigned int seed = 1;
   std::vector<std::string> training_cell_strata;
+  // Optional externally supplied gene loadings (row-major rank x n_genes over
+  // the full gene vocabulary). When non-empty, no factorization is run: H is
+  // taken as given (identity feature space) and training rows are projected
+  // onto it. Used for anchor-based / consensus factor injection.
+  std::vector<double> nmf_fixed_h;
   // Provenance of the annotation the strata came from (binding-provided).
   std::string annotation_hash;
   // Optional cell types used only to select NMF training rows. Projection and

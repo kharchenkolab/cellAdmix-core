@@ -108,6 +108,9 @@ struct RunLoadOptions {
   std::optional<CropBox> region;
   int sample_n = -1;
   unsigned int seed = 1U;
+  // When >= 0, molecule labels are replaced by this ensemble member's
+  // labels (see ensure_ensemble_labels), matched per molecule by obs id.
+  int ensemble_member = -1;
 };
 
 // In-memory representation of a run reloaded from parquet outputs.
@@ -197,5 +200,49 @@ RunManifest write_corrected_run(
     const std::string& parent_run_path_or_dir,
     const RunData& run_data,
     const std::vector<bool>& keep_mask);
+
+// --- Ensemble member pool (per-restart factorizations and labelings) ---
+
+// Path of the persisted restart-H pool inside a run directory.
+std::string ensemble_h_parquet_path(const std::string& run_path_or_dir);
+// Path of one member's persisted molecule labels.
+std::string ensemble_labels_parquet_path(
+    const std::string& run_path_or_dir,
+    int member);
+
+// Persist the restart member pool as full-gene-space H matrices.
+void write_ensemble_h_parquet(
+    const std::string& path,
+    const std::vector<DenseMatrix>& candidate_h,
+    int row_group_size);
+
+// Load the restart member pool; empty when the run has none persisted.
+std::vector<DenseMatrix> load_ensemble_h(const std::string& run_path_or_dir);
+
+// Number of members whose molecule labels are already persisted.
+int ensemble_member_count(const std::string& run_path_or_dir);
+
+// Compute (or reuse) molecule labels for every restart in the member pool
+// and persist them aligned row-for-row with molecules.parquet. Returns the
+// member count (0 when the run carries no member pool).
+int ensure_ensemble_labels(
+    const std::string& run_path_or_dir,
+    int num_threads);
+
+// One member's molecule labels keyed by obs id (ascending, for lookup).
+struct EnsembleMemberLabels {
+  std::vector<std::int64_t> obs_ids;
+  std::vector<int> labels;
+  int label_for(std::int64_t obs_id) const;
+};
+EnsembleMemberLabels load_ensemble_member_labels(
+    const std::string& run_path_or_dir,
+    int member);
+
+// Cell-by-factor molecule fractions under one member's labeling; rows
+// follow cells.parquet order, columns are factors.
+DenseMatrix ensemble_member_cell_fractions(
+    const std::string& run_path_or_dir,
+    int member);
 
 }  // namespace celladmix
