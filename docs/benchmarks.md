@@ -270,7 +270,12 @@ cellAdmix it yields three conclusions:
    scoring passes, which parallelize trivially). Remove a molecule when at
    least ~30% of restarts remove it, keeping each restart's native-factor
    check as its internal safety vet. This is what `correct()` does by
-   default, voting over the fit's restart pool at `vote = 0.3`. On the
+   default, voting over the fit's restart pool at `vote = 0.3`. Voting over
+   raw single-init restarts matches or exceeds voting over independent
+   best-of-restart fits at this threshold (pancreas membrane under invsqrt
+   KL-NMF: 0.848 vs 0.857 strict-tier sensitivity at equal false removal;
+   ls-NMF bridge improves to 0.67 at 0.5% false removal;
+   `results/pancreas_restart_vs_seed_members.csv`). On the
    benchmark this default achieves
    0.45-0.86 strict-tier sensitivity at 0.03-3.2% own-marker false removal,
    always at or above the best individual restart, with the threshold
