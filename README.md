@@ -42,6 +42,9 @@ short steps.
 - Admixture audit: exposure-gradient estimates of leaked molecules per
   cell-type pair, independent of the factorization, with post-correction
   verification of cleanup sensitivity and false removal.
+- Ensemble correction by default: molecule-level voting across NMF restarts
+  stabilizes seed-dependent corrections, with the vote threshold as a
+  sensitivity/specificity dial.
 
 ## NMF Methods
 

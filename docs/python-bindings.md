@@ -54,6 +54,20 @@ to disable, or tune `native_median_thresh` and related thresholds. See the
 Native-Factor Check section in
 [docs/scoring_methods.md](scoring_methods.md).
 
+`score.correct()` applies the correction as a molecule-vote ensemble by
+default: every NMF restart retained by the fit is scored and vetted
+independently (each with its own native-factor check), and a molecule is
+removed when at least `vote` (default 0.3) of the members remove it. The
+vote stabilizes the seed-dependence of single-fit corrections and acts as a
+sensitivity/specificity dial (see [benchmarks.md](benchmarks.md)). Pass
+`ensemble=1` for a single-fit correction from the selected restart;
+`correction.ensemble()` reports the member count, vote threshold, and vote
+histogram, and the returned `correction.rules` carry a `support` column with
+the fraction of members keeping each source→target pair. The first ensemble
+correction computes and caches per-member molecule labelings in the run
+directory; runs fitted with `nmf_n_runs=1` (or cached runs from fits that
+predate member pools) fall back to the single-fit correction with a message.
+
 Default behavior mirrors the R API:
 
 - NMF method: `ls_nmf`.
@@ -61,7 +75,8 @@ Default behavior mirrors the R API:
 - Rank: `ceil(1.2 * number_of_annotation_labels)`, capped at 30.
 - Xenium control/codeword/non-gene features are excluded during input-store
   construction. Pass `keep_non_gene=True` only for control-feature diagnostics.
-- NMF restarts: default to the dataset thread count.
+- NMF restarts: at least 10 by default (more on higher thread counts), with
+  every restart's loadings kept as the ensemble member pool.
 
 ### Loading Existing Runs
 

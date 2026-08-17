@@ -772,7 +772,9 @@ celladmix_cluster_cells <- function(
 #' @noRd
 .celladmix_resolve_nmf_n_runs <- function(nmf_n_runs, nmf_init, num_threads) {
   if (is.null(nmf_n_runs) || !length(nmf_n_runs) || is.na(nmf_n_runs[[1]])) {
-    return(max(1L, as.integer(num_threads)))
+    # At least 10 restarts so the stability diagnostic and the ensemble
+    # correction have a full member pool even on low-thread machines.
+    return(max(10L, as.integer(num_threads)))
   }
   nmf_n_runs <- as.integer(nmf_n_runs[[1]])
   if (is.na(nmf_n_runs) || nmf_n_runs < 1L) {
@@ -947,9 +949,10 @@ celladmix_cluster_cells <- function(
 #'   older mixed policy: `"gene_loadings"` for `"ls_nmf"` and
 #'   `"ncv_projection"` for KL variants.
 #' @param nmf_n_runs Number of independent NMF restarts. When `NA`, the default
-#'   is `num_threads` restarts. When greater than `1`, the native fit runs multiple seeds,
-#'   keeps the lowest-loss result, and returns loss/stability diagnostics for
-#'   the candidates.
+#'   is `max(10, num_threads)` restarts. When greater than `1`, the native fit
+#'   runs multiple seeds, keeps the lowest-loss result, returns loss/stability
+#'   diagnostics for the candidates, and persists every restart's loadings as
+#'   the member pool for the ensemble correction.
 #' @param nmf_train_max_rows Optional cap on the number of NCV rows used for NMF
 #'   training.
 #' @param nmf_min_molecules Minimum number of molecules required for a cell to
@@ -1528,6 +1531,9 @@ celladmix_collect_region <- function(
 #' @param analysis_crop Optional crop identifier.
 #' @param analysis_bbox Optional spatial bounding box given as
 #'   `c(xmin, xmax, ymin, ymax)`.
+#' @param ensemble_member Zero-based ensemble member index whose labeling is
+#'   scored instead of the run's own labels; `-1` (the default) scores the
+#'   selected factorization.
 #'
 #' @return A `celladmix_bridge_result` list with per-pair `scores`, statistical
 #'   `summary`, and output `paths`.
@@ -1558,7 +1564,8 @@ celladmix_score_bridge <- function(
     compute_null = TRUE,
     verbose = FALSE,
     analysis_crop = NULL,
-    analysis_bbox = NULL
+    analysis_bbox = NULL,
+    ensemble_member = -1L
   ) {
   if (!inherits(run, "celladmix_run")) {
     stop("celladmix_score_bridge() expects a celladmix_run")
@@ -1591,7 +1598,8 @@ celladmix_score_bridge <- function(
     num_threads = num_threads,
     seed = seed,
     compute_null = compute_null,
-    verbose = verbose
+    verbose = verbose,
+    ensemble_member = ensemble_member
   )
   if (!is.null(factor)) {
     factor <- as.integer(factor)
@@ -2298,6 +2306,9 @@ celladmix_read_stain_crop <- function(
 #' @param analysis_crop Optional crop identifier.
 #' @param analysis_bbox Optional spatial bounding box given as
 #'   `c(xmin, xmax, ymin, ymax)`.
+#' @param ensemble_member Zero-based ensemble member index whose labeling is
+#'   scored instead of the run's own labels; `-1` (the default) scores the
+#'   selected factorization.
 #'
 #' @return A `celladmix_membrane_result` list with per-pair `scores`,
 #'   statistical `summary`, image metadata, and output `paths`.
@@ -2327,7 +2338,8 @@ celladmix_score_membrane <- function(
     seed = 1L,
     verbose = FALSE,
     analysis_crop = NULL,
-    analysis_bbox = NULL
+    analysis_bbox = NULL,
+    ensemble_member = -1L
   ) {
   if (!inherits(run, "celladmix_run")) {
     stop("celladmix_score_membrane() expects a celladmix_run")
@@ -2365,7 +2377,8 @@ celladmix_score_membrane <- function(
     line_samples = line_samples,
     num_threads = num_threads,
     seed = seed,
-    verbose = verbose
+    verbose = verbose,
+    ensemble_member = ensemble_member
   )
   out$image$source <- image$source
   out$image$manifest_path <- image$manifest_path
@@ -2537,6 +2550,9 @@ celladmix_plot_membrane_heatmap <- function(
 #' @param analysis_crop Optional crop identifier.
 #' @param analysis_bbox Optional spatial bounding box given as
 #'   `c(xmin, xmax, ymin, ymax)`.
+#' @param ensemble_member Zero-based ensemble member index whose labeling is
+#'   scored instead of the run's own labels; `-1` (the default) scores the
+#'   selected factorization.
 #'
 #' @return A `celladmix_coherence_result` list with per-cell `scores`,
 #'   statistical `summary`, and output `paths`.
@@ -2584,7 +2600,8 @@ celladmix_score_coherence <- function(
     num_threads = 1L,
     verbose = FALSE,
     analysis_crop = NULL,
-    analysis_bbox = NULL
+    analysis_bbox = NULL,
+    ensemble_member = -1L
   ) {
   if (!inherits(run, "celladmix_run")) {
     stop("celladmix_score_coherence() expects a celladmix_run")
@@ -2645,7 +2662,8 @@ celladmix_score_coherence <- function(
     line_samples = line_samples,
     patch_edge_weight_min = patch_edge_weight_min,
     num_threads = num_threads,
-    verbose = verbose
+    verbose = verbose,
+    ensemble_member = ensemble_member
   )
   if (!is.null(image)) {
     out$image <- image
@@ -2995,6 +3013,12 @@ celladmix_plot_coherence_heatmap <- function(
 #' @param annotation_col Candidate annotation columns to use when `annotation`
 #'   is a data frame or CSV path.
 #' @param cell_id_col Cell identifier column in `annotation`.
+#' @param rule_member Optional integer vector, one entry per rule row, giving
+#'   the zero-based ensemble member whose labeling each rule votes with
+#'   (`NA` or `-1` for the run's own labels). Molecules are removed when at
+#'   least `min_votes` member labelings remove them.
+#' @param min_votes Minimum number of member votes required to remove a
+#'   molecule.
 #'
 #' @return A `celladmix_correction_run` object.
 #' @keywords internal
@@ -3005,7 +3029,9 @@ celladmix_correct <- function(
     out_dir = NULL,
     annotation = NULL,
     annotation_col = c("merged_annotation", "cell_type", "cluster_label", "cluster"),
-    cell_id_col = "cell_id"
+    cell_id_col = "cell_id",
+    rule_member = NULL,
+    min_votes = 1L
   ) {
   if (!inherits(run, "celladmix_run")) {
     stop("celladmix_correct() expects a celladmix_run")
@@ -3018,7 +3044,8 @@ celladmix_correct <- function(
   )
   out_dir <- out_dir %||% file.path(run$paths$corrected_dir, paste0("corrected_", format(Sys.time(), "%Y%m%d_%H%M%S")))
   .celladmix_make_run_object(
-    .celladmix_correct_run(run$path, rules, out_dir = out_dir, cell_types = cell_types),
+    .celladmix_correct_run(run$path, rules, out_dir = out_dir, cell_types = cell_types,
+      rule_member = rule_member, min_votes = min_votes),
     class = "celladmix_correction_run"
   )
 }

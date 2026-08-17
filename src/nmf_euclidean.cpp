@@ -735,7 +735,18 @@ WeightedNmfResult weighted_nmf_multirun(
   const auto stability =
       matched_ownership_stability(candidate_h, best_run, comparison_runs);
 
+  std::vector<DenseMatrix> retained_h;
+  std::vector<unsigned int> retained_seeds;
+  retained_h.reserve(static_cast<std::size_t>(n_runs));
+  retained_seeds.reserve(static_cast<std::size_t>(n_runs));
+  for (int run = 0; run < n_runs; ++run) {
+    retained_h.push_back(runs[static_cast<std::size_t>(run)].h);
+    retained_seeds.push_back(options.seed + static_cast<unsigned int>(run));
+  }
+
   auto best = std::move(runs[static_cast<std::size_t>(best_run)]);
+  best.candidate_h = std::move(retained_h);
+  best.candidate_seeds = std::move(retained_seeds);
   best.selected_run = best_run;
   best.selected_seed = options.seed + static_cast<unsigned int>(best_run);
   best.candidate_final_losses = std::move(final_losses);

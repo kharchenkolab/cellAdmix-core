@@ -27,6 +27,16 @@ class CellAdmixCorrection:
         """Return a compact per-cell-type correction summary."""
         return _compact_correction_summary(self.cell_summary())
 
+    def ensemble(self) -> dict:
+        """Return molecule-vote ensemble diagnostics for this correction."""
+        histogram = self.manifest.get("vote_histogram")
+        return {
+            "members": self.manifest.get("n_members", 1),
+            "min_votes": self.manifest.get("min_votes", 1),
+            "n_removed": self.manifest.get("n_removed"),
+            "vote_histogram": histogram,
+        }
+
     def cell_summary(self) -> pd.DataFrame:
         """Return per-cell molecule removal statistics."""
         path = self.manifest.get("correction_summary_parquet")

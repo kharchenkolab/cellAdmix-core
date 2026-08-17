@@ -9,6 +9,10 @@ import pyarrow.parquet as pq
 
 import sys
 DATASET = sys.argv[1] if len(sys.argv) > 1 else 'pancreas'
+# optional second arg "restart": pool bench_rst* runs (single-init members)
+RESTART = len(sys.argv) > 2 and sys.argv[2] == 'restart'
+PREFIX = 'bench_rst' if RESTART else 'bench_seed'
+TAG = 'rstvote' if RESTART else 'vote'
 OUT, METHODS = {
     'pancreas': ('examples/xenium_pancreas_membrane_377_full/out', ['membrane', 'bridge']),
     'breast_crop': ('examples/xenium_breast_membrane_5k_full/out_medium_crop', ['membrane', 'bridge']),
@@ -33,7 +37,7 @@ for variant in ['ls_nmf', 'invsqrt_kl']:
         votes = np.zeros(max_obs, dtype=np.int16)
         n_seeds = 0
         for s in SEEDS:
-            cdir = (f'{OUT}/runs/bench_seed{s}_{variant}/corrected/'
+            cdir = (f'{OUT}/runs/{PREFIX}{s}_{variant}/corrected/'
                     f'cmp_{method}_{variant}_s{s}')
             if not os.path.isdir(cdir):
                 print(f'missing: {cdir}', flush=True)
@@ -51,7 +55,7 @@ for variant in ['ls_nmf', 'invsqrt_kl']:
             rm = votes[obs] >= thr
             sub = mol.loc[rm]
             agg = sub.groupby(['gene_idx', 'cell_idx']).size().reset_index(name='n')
-            path = f'{RESULTS}/{DATASET}_vote{thr}of{n_seeds}_{variant}_{method}.csv.gz'
+            path = f'{RESULTS}/{DATASET}_{TAG}{thr}of{n_seeds}_{variant}_{method}.csv.gz'
             with gzip.open(path, 'wt') as f:
                 f.write('gene,cell_id,n\n')
                 for gi, ci, n in agg.itertuples(index=False):

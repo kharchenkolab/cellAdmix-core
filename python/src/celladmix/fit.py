@@ -275,6 +275,7 @@ class CellAdmixFit:
         cell_ids, labels = annotation_vectors(self.dataset.annotation)
         # Annotation vectors are passed explicitly because stored runs can be
         # scored against different cell-type labels without refitting.
+        ensemble_member = int(kwargs.pop("ensemble_member", -1))
         result = _core.score_membrane(
             str(self.run_path),
             str(image_path),
@@ -283,31 +284,52 @@ class CellAdmixFit:
             annotation_cell_ids=cell_ids,
             annotation_labels=labels,
             verbose=verbose,
+            ensemble_member=ensemble_member,
             **kwargs,
         )
-        return CellAdmixScore(self, "membrane", result)
+        params = dict(kwargs)
+        params.update(
+            image_path=str(image_path),
+            pixel_size=float(pixel_size),
+            num_threads=int(num_threads or self.dataset.num_threads),
+            verbose=False,
+        )
+        return CellAdmixScore(self, "membrane", result, params=params)
 
     def score_bridge(self, *, num_threads=None, verbose=True, **kwargs):
         """Score admixture using the molecular bridge heuristic."""
         cell_ids, labels = annotation_vectors(self.dataset.annotation)
         # Keep the bridge wrapper parallel to membrane scoring: same run,
         # current annotation, and method-specific native options.
+        ensemble_member = int(kwargs.pop("ensemble_member", -1))
         result = _core.score_bridge(
             str(self.run_path),
             num_threads=int(num_threads or self.dataset.num_threads),
             annotation_cell_ids=cell_ids,
             annotation_labels=labels,
             verbose=verbose,
+            ensemble_member=ensemble_member,
             **kwargs,
         )
-        return CellAdmixScore(self, "bridge", result)
+        params = dict(kwargs)
+        params.update(
+            num_threads=int(num_threads or self.dataset.num_threads),
+            verbose=False,
+        )
+        return CellAdmixScore(self, "bridge", result, params=params)
 
     def score_neighbor_frequency(self, **kwargs):
         """Alias for :meth:`score_neighbor_enrichment`."""
         return self.score_neighbor_enrichment(**kwargs)
 
-    def correct(self, rules: pd.DataFrame, *, name: str = "clean"):
-        """Remove molecules matching factor/target-cell-type correction rules."""
+    def correct(self, rules: pd.DataFrame, *, name: str = "clean",
+                rule_members=None, min_votes: int = 1):
+        """Remove molecules matching factor/target-cell-type correction rules.
+
+        With ``rule_members``, each rule row votes with the labeling of one
+        ensemble member (see :meth:`CellAdmixScore.correct`); a molecule is
+        removed when at least ``min_votes`` members remove it.
+        """
         from .correction import CellAdmixCorrection
 
         if rules.empty:
@@ -321,6 +343,8 @@ class CellAdmixFit:
             target_cell_types=rules["target_cell_type"].astype(str).tolist(),
             annotation_cell_ids=cell_ids,
             annotation_labels=labels,
+            rule_members=[int(m) for m in (rule_members or [])],
+            min_votes=int(min_votes),
         )
         return CellAdmixCorrection(str(out_dir), result, rules=rules)
 

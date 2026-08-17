@@ -175,6 +175,7 @@ def apply_native_check(
     expr_thresh: float = 0.05,
     outlier_min_frac: float = 0.1,
     neighbor_k: int = 15,
+    cell_factors: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Flag likely-native factor/target rules using source-distant cells.
 
@@ -197,7 +198,7 @@ def apply_native_check(
         return rules
 
     annotation = getattr(getattr(fit, "dataset", None), "annotation", None)
-    cells = fit.cell_factors()
+    cells = cell_factors if cell_factors is not None else fit.cell_factors()
     if annotation is None or cells.empty:
         raise ValueError("native_check requires an annotation and cell factors")
     counts, types = source_exposure_counts(cells, annotation, neighbor_k=neighbor_k)

@@ -263,13 +263,15 @@ cellAdmix it yields three conclusions:
    diffuse leakage regardless of variant and benefits from ls-NMF's
    concentrated per-type evidence. Pooling votes across scoring methods as
    well as restarts is the natural next increment.
-3. **Recommended solution: ensemble correction by molecule vote.** Derive
+3. **Ensemble correction by molecule vote — the package's default.** Derive
    the correction from N independent restarts of the full
    fit-score-correct pipeline (the fit already computes such restarts
    internally for its stability diagnostic; the additional cost is N
    scoring passes, which parallelize trivially). Remove a molecule when at
    least ~30% of restarts remove it, keeping each restart's native-factor
-   check as its internal safety vet. On the benchmark this default achieves
+   check as its internal safety vet. This is what `correct()` does by
+   default, voting over the fit's restart pool at `vote = 0.3`. On the
+   benchmark this default achieves
    0.45-0.86 strict-tier sensitivity at 0.03-3.2% own-marker false removal,
    always at or above the best individual restart, with the threshold
    exposed as the user's sensitivity/specificity dial — calibrable per

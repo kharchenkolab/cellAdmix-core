@@ -190,7 +190,8 @@ CellAdmixFit <- R6::R6Class(
     },
 
     correct = function(score, name = NULL, p_thresh = 0.1, adjust_p = FALSE,
-                       targets = NULL, rules = NULL, ...) {
+                       targets = NULL, rules = NULL, ensemble = NULL,
+                       vote = 0.3, ...) {
       score_obj <- if (inherits(score, "CellAdmixScore")) {
         score
       } else if (is.character(score) && length(score) == 1L) {
@@ -198,6 +199,7 @@ CellAdmixFit <- R6::R6Class(
       } else {
         stop("score must be a CellAdmixScore or registered score name")
       }
+      user_rules <- !is.null(rules)
       if (is.null(rules)) {
         rules <- score_obj$rules(p_thresh = p_thresh, adjust_p = adjust_p, targets = targets)
       }
@@ -207,14 +209,65 @@ CellAdmixFit <- R6::R6Class(
       }
       name <- .celladmix_clean_name(name %||% paste0(score_obj$name, "_clean"), "correction")
       out_dir <- file.path(self$run$paths$corrected_dir, name)
-      corrected <- celladmix_correct(
-        self$run,
-        rules = rules,
-        out_dir = out_dir,
-        annotation = score_obj$annotation_vector()
-      )
+
+      # Ensemble correction (the default): every NMF restart is scored and
+      # vetted independently, and a molecule is removed when at least
+      # `vote` of the members remove it. `ensemble = 1` applies the
+      # single-fit correction from the selected restart only.
+      ensemble <- if (is.null(ensemble)) 10L else max(1L, as.integer(ensemble))
+      member_rules <- NULL
+      members <- integer(0)
+      if (ensemble > 1L) {
+        available <- .celladmix_ensemble_prepare(self$run$path, self$dataset$num_threads)
+        if (available < 2L) {
+          message(
+            "Run carries no ensemble member pool (single-restart fit, or a run ",
+            "cached before member pools were stored; refit with overwrite = TRUE ",
+            "to enable it); applying a single-fit correction.")
+        } else {
+          selected <- as.integer(self$run$nmf_diagnostics$selected_run) - 1L
+          members <- unique(c(selected, setdiff(seq_len(available) - 1L, selected)))
+          members <- members[seq_len(min(ensemble, length(members)))]
+          member_rules <- .celladmix_ensemble_member_rules(
+            self, score_obj, members, selected = selected,
+            primary_rules = rules,
+            p_thresh = p_thresh, adjust_p = adjust_p, targets = targets,
+            restrict_pairs = if (user_rules) {
+              unique(rules[, c("source_cell_type", "target_cell_type"), drop = FALSE])
+            } else {
+              NULL
+            })
+        }
+      }
+
+      if (is.null(member_rules)) {
+        corrected <- celladmix_correct(
+          self$run,
+          rules = rules,
+          out_dir = out_dir,
+          annotation = score_obj$annotation_vector()
+        )
+      } else {
+        min_votes <- max(1L, as.integer(ceiling(vote * length(members))))
+        corrected <- celladmix_correct(
+          self$run,
+          rules = member_rules$rules,
+          out_dir = out_dir,
+          annotation = score_obj$annotation_vector(),
+          rule_member = member_rules$member,
+          min_votes = min_votes
+        )
+        rules$support <- .celladmix_rule_support(rules, member_rules$pair_sets)
+        message(sprintf(
+          "Ensemble correction over %d members: molecules removed by >= %d members (vote >= %.2f) are dropped (%s molecules).",
+          length(members), min_votes, vote,
+          format(corrected$n_removed, big.mark = ",")))
+      }
+
       correction <- CellAdmixCorrection$new(name, self, score_obj, corrected,
-        params = c(list(p_thresh = p_thresh, adjust_p = adjust_p, targets = targets), list(...)),
+        params = c(list(p_thresh = p_thresh, adjust_p = adjust_p, targets = targets,
+          ensemble = max(1L, length(members)), vote = if (length(members) > 1L) vote else NA_real_),
+          list(...)),
         rules = rules)
       self$corrections_registry[[name]] <- correction
       correction$save_metadata()

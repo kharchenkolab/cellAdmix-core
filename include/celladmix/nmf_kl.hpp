@@ -47,6 +47,11 @@ struct SparseNmfResult {
   int stability_comparison_runs = 0;
   int stable_factor_count = 0;
   double stability_threshold = 0.0;
+  // H matrices of every restart, in run order, retained as the member pool
+  // for ensemble correction. Entry selected_run mirrors `h` (kept in sync
+  // when factors are reordered). Empty for single-run fits.
+  std::vector<DenseMatrix> candidate_h;
+  std::vector<unsigned int> candidate_seeds;
 };
 
 // Fit sparse NMF under the requested objective and initialization strategy.

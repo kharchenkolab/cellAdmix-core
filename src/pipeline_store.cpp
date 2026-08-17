@@ -1504,6 +1504,12 @@ StorePipelineResult run_basic_pipeline_store(
         result.nmf.h,
         static_cast<int>(counts.genes.size()),
         compact_training.kept_cols);
+    for (auto& candidate : result.nmf.candidate_h) {
+      candidate = expand_h_to_full_genes(
+          candidate,
+          static_cast<int>(counts.genes.size()),
+          compact_training.kept_cols);
+    }
     full_transform = expand_ncv_feature_transform(
         compact_transform,
         static_cast<int>(counts.genes.size()),
@@ -1542,6 +1548,12 @@ StorePipelineResult run_basic_pipeline_store(
       counts.genes,
       result.nmf.h,
       storage_options.parquet_row_group_size);
+  if (!result.nmf.candidate_h.empty()) {
+    write_ensemble_h_parquet(
+        ensemble_h_parquet_path(result.manifest.paths.root_dir),
+        result.nmf.candidate_h,
+        storage_options.parquet_row_group_size);
+  }
   write_training_rows_parquet(
       result.manifest.paths.training_rows_parquet,
       selection.global_rows,

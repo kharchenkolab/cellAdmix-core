@@ -16,6 +16,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
+#include <map>
 #include <memory>
 #include <numeric>
 #include <optional>
@@ -4305,7 +4306,8 @@ extern "C" SEXP _cellAdmixCore_celladmix_bridge_scores_run(
     SEXP num_threads_sexp,
     SEXP seed_sexp,
     SEXP compute_null_sexp,
-    SEXP verbose_sexp) {
+    SEXP verbose_sexp,
+    SEXP ensemble_member_sexp) {
   try {
     const auto bridge_start = std::chrono::steady_clock::now();
     auto stage_start = bridge_start;
@@ -4336,6 +4338,7 @@ extern "C" SEXP _cellAdmixCore_celladmix_bridge_scores_run(
     celladmix::RunLoadOptions options;
     options.crop_id = optional_string_sexp(analysis_crop_sexp);
     options.region = optional_bbox_sexp(bbox_sexp);
+    options.ensemble_member = as<int>(ensemble_member_sexp);
     auto run_data = celladmix::load_run_bridge_data(as<std::string>(path_sexp), options);
     apply_cell_type_overrides(run_data.cells, cell_types_sexp);
     log_info(
@@ -4372,7 +4375,10 @@ extern "C" SEXP _cellAdmixCore_celladmix_bridge_scores_run(
         "Ran bridge test: score_rows=" + std::to_string(result.pair_scores.size()) +
             ", summaries=" + std::to_string(result.summaries.size()),
         std::chrono::duration<double>(std::chrono::steady_clock::now() - stage_start).count());
-    const auto suffix = options.crop_id.has_value() ? "_" + *options.crop_id : std::string();
+    auto suffix = options.crop_id.has_value() ? "_" + *options.crop_id : std::string();
+    if (options.ensemble_member >= 0) {
+      suffix += "_m" + std::to_string(options.ensemble_member);
+    }
     const auto pair_score_path =
         std::filesystem::path(run_data.manifest.paths.scores_dir) /
         (std::string("bridge_pair_scores") + suffix + ".parquet");
@@ -4431,7 +4437,8 @@ extern "C" SEXP _cellAdmixCore_celladmix_membrane_scores_run(
     SEXP line_samples_sexp,
     SEXP num_threads_sexp,
     SEXP seed_sexp,
-    SEXP verbose_sexp) {
+    SEXP verbose_sexp,
+    SEXP ensemble_member_sexp) {
   try {
     const auto membrane_start = std::chrono::steady_clock::now();
     auto stage_start = membrane_start;
@@ -4462,6 +4469,7 @@ extern "C" SEXP _cellAdmixCore_celladmix_membrane_scores_run(
     celladmix::RunLoadOptions options;
     options.crop_id = optional_string_sexp(analysis_crop_sexp);
     options.region = optional_bbox_sexp(bbox_sexp);
+    options.ensemble_member = as<int>(ensemble_member_sexp);
     auto run_data = celladmix::load_run_bridge_data(as<std::string>(path_sexp), options);
     apply_cell_type_overrides(run_data.cells, cell_types_sexp);
     log_info(
@@ -4515,6 +4523,9 @@ extern "C" SEXP _cellAdmixCore_celladmix_membrane_scores_run(
       std::ostringstream hashed;
       hashed << std::hex << std::hash<std::string>{}(key.str());
       suffix = "_bbox_" + hashed.str();
+    }
+    if (options.ensemble_member >= 0) {
+      suffix += "_m" + std::to_string(options.ensemble_member);
     }
     const auto pair_score_path =
         std::filesystem::path(run_data.manifest.paths.scores_dir) /
@@ -4597,7 +4608,8 @@ extern "C" SEXP _cellAdmixCore_celladmix_coherence_scores_run(
     SEXP line_samples_sexp,
     SEXP patch_edge_weight_min_sexp,
     SEXP num_threads_sexp,
-    SEXP verbose_sexp) {
+    SEXP verbose_sexp,
+    SEXP ensemble_member_sexp) {
   try {
     const auto coherence_start = std::chrono::steady_clock::now();
     auto stage_start = coherence_start;
@@ -4628,6 +4640,7 @@ extern "C" SEXP _cellAdmixCore_celladmix_coherence_scores_run(
     celladmix::RunLoadOptions load_options;
     load_options.crop_id = optional_string_sexp(analysis_crop_sexp);
     load_options.region = optional_bbox_sexp(bbox_sexp);
+    load_options.ensemble_member = as<int>(ensemble_member_sexp);
     auto run_data = celladmix::load_run_data(as<std::string>(path_sexp), load_options);
     apply_cell_type_overrides(run_data.cells, cell_types_sexp);
     log_info(
@@ -4736,6 +4749,9 @@ extern "C" SEXP _cellAdmixCore_celladmix_coherence_scores_run(
       std::ostringstream hashed;
       hashed << std::hex << std::hash<std::string>{}(key.str());
       suffix += "_bbox_" + hashed.str();
+    }
+    if (load_options.ensemble_member >= 0) {
+      suffix += "_m" + std::to_string(load_options.ensemble_member);
     }
     const auto score_path =
         std::filesystem::path(run_data.manifest.paths.scores_dir) /
@@ -4903,7 +4919,9 @@ extern "C" SEXP _cellAdmixCore_celladmix_correct_run(
     SEXP path_sexp,
     SEXP rules_sexp,
     SEXP out_dir_sexp,
-    SEXP cell_types_sexp) {
+    SEXP cell_types_sexp,
+    SEXP rule_member_sexp,
+    SEXP min_votes_sexp) {
   try {
     auto run_data = celladmix::load_run_data(as<std::string>(path_sexp));
     const DataFrame rules = as<DataFrame>(rules_sexp);
@@ -4912,6 +4930,25 @@ extern "C" SEXP _cellAdmixCore_celladmix_correct_run(
     }
     const auto factor = as<std::vector<int>>(rules["factor"]);
     const auto target_cell_type = as<std::vector<std::string>>(rules["target_cell_type"]);
+
+    // Ensemble voting: each rule belongs to one member labeling (-1 = the
+    // run's own labels); a molecule is removed when at least min_votes
+    // member labelings remove it.
+    std::vector<int> rule_member(factor.size(), -1);
+    if (!Rf_isNull(rule_member_sexp)) {
+      const IntegerVector member_vec(rule_member_sexp);
+      if (static_cast<std::size_t>(member_vec.size()) == factor.size()) {
+        for (R_xlen_t i = 0; i < member_vec.size(); ++i) {
+          rule_member[static_cast<std::size_t>(i)] =
+              member_vec[i] == NA_INTEGER ? -1 : member_vec[i];
+        }
+      } else if (member_vec.size() != 0) {
+        stop("rule member vector must match the rule count");
+      }
+    }
+    const int min_votes = Rf_isNull(min_votes_sexp)
+        ? 1
+        : std::max(1, as<int>(min_votes_sexp));
 
     std::unordered_map<std::string, std::string> cell_type_override;
     if (!Rf_isNull(cell_types_sexp)) {
@@ -4966,30 +5003,70 @@ extern "C" SEXP _cellAdmixCore_celladmix_correct_run(
       }
     }
 
-    std::vector<bool> keep_mask(run_data.transcripts.size(), true);
+    if (run_data.labels.size() != run_data.transcripts.size()) {
+      stop("labels length must match TranscriptTable size");
+    }
+    std::map<int, std::vector<std::size_t>> rules_by_member;
     for (std::size_t rule = 0; rule < factor.size(); ++rule) {
-      std::vector<bool> rule_keep;
+      rules_by_member[rule_member[rule]].push_back(rule);
+    }
+
+    auto mark_rule_removed = [&](
+        const std::vector<int>& labels,
+        std::size_t rule,
+        std::vector<bool>& removed) {
       if (!transcript_cell_types.empty()) {
-        if (run_data.labels.size() != run_data.transcripts.size()) {
-          stop("labels length must match TranscriptTable size");
-        }
-        rule_keep.assign(run_data.transcripts.size(), true);
         for (std::size_t i = 0; i < run_data.transcripts.size(); ++i) {
-          if (run_data.labels[i] == factor[rule] - 1 &&
+          if (labels[i] == factor[rule] - 1 &&
               transcript_cell_types[i] == target_cell_type[rule]) {
-            rule_keep[i] = false;
+            removed[i] = true;
           }
         }
       } else {
-        rule_keep = celladmix::apply_removal_rule(
+        const auto rule_keep = celladmix::apply_removal_rule(
             run_data.transcripts,
-            run_data.labels,
+            labels,
             factor[rule] - 1,
             target_cell_type[rule]);
+        for (std::size_t i = 0; i < rule_keep.size(); ++i) {
+          if (!rule_keep[i]) {
+            removed[i] = true;
+          }
+        }
       }
-      for (std::size_t i = 0; i < keep_mask.size(); ++i) {
-        keep_mask[i] = keep_mask[i] && rule_keep[i];
+    };
+
+    std::vector<int> votes(run_data.transcripts.size(), 0);
+    for (const auto& [member, rule_ids] : rules_by_member) {
+      std::vector<int> member_label_vec;
+      const std::vector<int>* labels_ptr = &run_data.labels;
+      if (member >= 0) {
+        const auto member_labels = celladmix::load_ensemble_member_labels(
+            as<std::string>(path_sexp), member);
+        member_label_vec.resize(run_data.transcripts.size());
+        for (std::size_t i = 0; i < run_data.transcripts.size(); ++i) {
+          member_label_vec[i] = member_labels.label_for(run_data.obs_ids[i]);
+        }
+        labels_ptr = &member_label_vec;
       }
+      std::vector<bool> removed(run_data.transcripts.size(), false);
+      for (const auto rule : rule_ids) {
+        mark_rule_removed(*labels_ptr, rule, removed);
+      }
+      for (std::size_t i = 0; i < removed.size(); ++i) {
+        if (removed[i]) {
+          votes[i] += 1;
+        }
+      }
+    }
+
+    // min_votes is interpreted against the caller's intended member count:
+    // members that contributed no rules simply never vote, so a threshold
+    // above the voting-member count removes nothing.
+    const int n_members = static_cast<int>(rules_by_member.size());
+    std::vector<bool> keep_mask(run_data.transcripts.size(), true);
+    for (std::size_t i = 0; i < keep_mask.size(); ++i) {
+      keep_mask[i] = votes[i] < min_votes;
     }
 
     const auto manifest = celladmix::write_corrected_run(
@@ -5001,10 +5078,19 @@ extern "C" SEXP _cellAdmixCore_celladmix_correct_run(
     for (bool keep : keep_mask) {
       kept += keep ? 1 : 0;
     }
+    IntegerVector vote_histogram(n_members);
+    for (std::size_t i = 0; i < votes.size(); ++i) {
+      if (votes[i] > 0 && votes[i] <= n_members) {
+        vote_histogram[votes[i] - 1] += 1;
+      }
+    }
     auto out = run_manifest_to_r(manifest);
     out["h"] = load_factor_matrix_from_run(manifest);
     out["genes"] = manifest.genes;
     out["n_removed"] = static_cast<double>(keep_mask.size() - kept);
+    out["n_members"] = n_members;
+    out["min_votes"] = min_votes;
+    out["vote_histogram"] = vote_histogram;
     out["correction_summary"] =
         parquet_table_to_df(celladmix::correction_summary_parquet_path(manifest.paths.root_dir));
     return out;
@@ -5012,6 +5098,41 @@ extern "C" SEXP _cellAdmixCore_celladmix_correct_run(
     forward_exception_to_r(ex);
   } catch (...) {
     ::Rf_error("celladmix_correct_run: unknown C++ exception");
+  }
+  return R_NilValue;
+}
+
+extern "C" SEXP _cellAdmixCore_celladmix_ensemble_prepare(
+    SEXP path_sexp,
+    SEXP num_threads_sexp) {
+  try {
+    const int count = celladmix::ensure_ensemble_labels(
+        as<std::string>(path_sexp),
+        as<int>(num_threads_sexp));
+    return Rcpp::wrap(count);
+  } catch (std::exception& ex) {
+    forward_exception_to_r(ex);
+  } catch (...) {
+    ::Rf_error("celladmix_ensemble_prepare: unknown C++ exception");
+  }
+  return R_NilValue;
+}
+
+extern "C" SEXP _cellAdmixCore_celladmix_ensemble_member_fractions(
+    SEXP path_sexp,
+    SEXP member_sexp) {
+  try {
+    const auto fractions = celladmix::ensemble_member_cell_fractions(
+        as<std::string>(path_sexp),
+        as<int>(member_sexp));
+    const auto cells = celladmix::load_run_cells(as<std::string>(path_sexp));
+    return List::create(
+        _["fractions"] = matrix_to_r(fractions),
+        _["cell_id"] = cells.cell_ids);
+  } catch (std::exception& ex) {
+    forward_exception_to_r(ex);
+  } catch (...) {
+    ::Rf_error("celladmix_ensemble_member_fractions: unknown C++ exception");
   }
   return R_NilValue;
 }

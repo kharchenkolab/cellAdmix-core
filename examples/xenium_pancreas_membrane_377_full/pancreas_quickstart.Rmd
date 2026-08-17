@@ -53,8 +53,12 @@ above the 0.3 stability threshold:
 fit$plot_stability()
 ```
 
-Scoring turns factors into removal rules (each vetted by a native-factor
-false-positive check), and correction removes the matching molecules:
+Scoring turns factors into removal rules, and correction removes the
+matching molecules by a vote across the fit's NMF restarts: each restart is
+scored and vetted independently (including the native-factor false-positive
+check), and a molecule is removed when at least 30% of the restarts remove
+it. The vote stabilizes the seed-dependence of single-fit corrections and
+outperforms every individual restart in our benchmarks:
 
 ```{r correct}
 score <- fit$score_membrane()

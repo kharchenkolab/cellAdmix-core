@@ -1,6 +1,9 @@
 # Build per-seed corrections for the molecule-vote ensemble.
-# Usage: Rscript analysis/cleanup_benchmark/seeds10.R <dataset> <variant> <seed_expr>
+# Usage: Rscript analysis/cleanup_benchmark/seeds10.R <dataset> <variant> <seed_expr> [restart]
 #   e.g. seeds10.R breast_crop ls_nmf 4:7
+# With the optional "restart" mode, each member is a single-init fit
+# (nmf_n_runs = 1) instead of a best-of-restarts fit, mirroring the
+# product ensemble that votes over one fit's raw NMF restarts.
 .libPaths(c(Sys.getenv("CELLADMIX_R_LIB", "/tmp/celladmix_r_lib"), .libPaths()))
 suppressMessages(library(cellAdmixCore))
 
@@ -8,6 +11,7 @@ args <- commandArgs(trailingOnly = TRUE)
 dataset <- args[[1]]
 variant <- args[[2]]
 seeds <- eval(parse(text = args[[3]]))
+restart_members <- length(args) >= 4 && args[[4]] == "restart"
 
 cfg <- switch(dataset,
   pancreas = list(dir = "examples/xenium_pancreas_membrane_377_full",
@@ -32,8 +36,14 @@ setwd(cfg$dir)
 ds <- cfg$build(cell_annotation)
 
 for (s in seeds) {
-  run_id <- sprintf("bench_seed%d_%s", s, variant)
-  fit <- ds$fit(nmf_variant = variant, seed = s, verbose = FALSE, run_id = run_id)
+  run_id <- sprintf(if (restart_members) "bench_rst%d_%s" else "bench_seed%d_%s",
+    s, variant)
+  fit <- if (restart_members) {
+    ds$fit(nmf_variant = variant, seed = s, nmf_n_runs = 1L, verbose = FALSE,
+      run_id = run_id)
+  } else {
+    ds$fit(nmf_variant = variant, seed = s, verbose = FALSE, run_id = run_id)
+  }
   for (method in cfg$methods) {
     corr_name <- sprintf("cmp_%s_%s_s%d", method, variant, s)
     corr_dir <- file.path(cfg$out, "runs", run_id, "corrected", corr_name)

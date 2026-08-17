@@ -237,10 +237,36 @@ correction <- score$correct(rules = rules, name = "clean")
 corrected_counts <- correction$counts()
 correction$summary()
 correction$plot_removed_molecules()
+correction$ensemble()   # member count, vote threshold, vote histogram
 ```
 
 Correction removes molecules assigned to rule-supported admixture factors in
 their target cell types and returns sparse corrected counts.
+
+By default the correction is a molecule-vote ensemble over the fit's NMF
+restarts: each restart's factorization labels every molecule, is scored with
+the same method and parameters, and is vetted by its own native-factor
+check; a molecule is removed when at least `vote` (default 0.3) of the
+members remove it. Single-fit corrections are highly seed-dependent, and the
+vote both stabilizes them and outperforms every individual restart on the
+cleanup benchmark (see [benchmarks.md](benchmarks.md)), with the threshold
+acting as a sensitivity/specificity dial:
+
+```r
+score$correct()               # ensemble over up to 10 restarts, vote = 0.3
+score$correct(vote = 0.5)     # stricter: majority vote, higher specificity
+score$correct(ensemble = 1)   # single-fit correction from the selected restart
+```
+
+The first ensemble correction computes and caches per-member molecule
+labelings in the run directory (one projection and smoothing pass per
+member); re-voting at a different threshold reuses the cached member rules.
+When `rules` is passed explicitly, its source→target pairs restrict every
+member, so vetoed pairs stay vetoed across the ensemble; the returned
+correction's `rules` carry a `support` column giving the fraction of members
+that independently kept each pair. Runs fitted with `nmf_n_runs = 1` (or
+cached runs from fits that predate member pools) fall back to the single-fit
+correction with a message.
 
 ## Clustering and Annotation
 

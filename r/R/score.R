@@ -11,6 +11,7 @@ CellAdmixScore <- R6::R6Class(
     annotation_hash = NULL,
     paths = NULL,
     params = NULL,
+    member_rules_cache = NULL,
 
     initialize = function(name, method, fit, result, annotation, params = list()) {
       self$name <- .celladmix_clean_name(name, "score")
@@ -21,6 +22,7 @@ CellAdmixScore <- R6::R6Class(
       self$annotation_hash <- annotation$hash
       self$paths <- result$paths %||% list()
       self$params <- params
+      self$member_rules_cache <- list()
       private$.annotation <- annotation
     },
 
@@ -143,7 +145,8 @@ CellAdmixScore <- R6::R6Class(
     plot = function(...) self$plot_heatmap(...),
 
     correct = function(name = NULL, p_thresh = 0.1, adjust_p = FALSE,
-                       targets = NULL, rules = NULL, ...) {
+                       targets = NULL, rules = NULL, ensemble = NULL,
+                       vote = 0.3, ...) {
       self$fit$correct(
         self,
         name = name,
@@ -151,6 +154,8 @@ CellAdmixScore <- R6::R6Class(
         adjust_p = adjust_p,
         targets = targets,
         rules = rules,
+        ensemble = ensemble,
+        vote = vote,
         ...
       )
     }
@@ -189,7 +194,8 @@ CellAdmixScore <- R6::R6Class(
     median_thresh = 0.1,
     expr_thresh = 0.05,
     outlier_min_frac = 0.1,
-    neighbor_k = 15L
+    neighbor_k = 15L,
+    cell_factors = NULL
   ) {
   empty_cols <- function(df) {
     df$keep <- logical(0)
@@ -207,7 +213,7 @@ CellAdmixScore <- R6::R6Class(
   annotation <- tryCatch(
     fit$dataset$annotation(fit$annotation_name, as_vector = TRUE),
     error = function(e) NULL)
-  cells <- fit$cell_factors()
+  cells <- cell_factors %||% fit$cell_factors()
   if (is.null(annotation) || !nrow(cells)) {
     stop("native_check requires an annotation and cell factors")
   }
@@ -283,4 +289,105 @@ CellAdmixScore <- R6::R6Class(
   rules$native_exposure_gradient <- gradient
   rules$native_distant_expr_frac <- expr_frac
   rules
+}
+
+#' Score one ensemble member with the same method and parameters
+#' @noRd
+.celladmix_score_member <- function(fit, score_obj, member) {
+  fn <- switch(score_obj$method,
+    membrane = celladmix_score_membrane,
+    coherence = celladmix_score_coherence,
+    celladmix_score_bridge)
+  do.call(fn, c(
+    list(fit$run,
+      annotation = score_obj$annotation_vector(),
+      ensemble_member = as.integer(member)),
+    score_obj$params))
+}
+
+#' Cell factor fractions under one ensemble member's labeling
+#' @noRd
+.celladmix_member_cell_factors <- function(fit, member) {
+  cells <- fit$cell_factors()
+  member_fr <- .celladmix_ensemble_member_fractions(fit$run$path, member)
+  idx <- match(as.character(cells$cell_id), as.character(member_fr$cell_id))
+  for (k in seq_len(ncol(member_fr$fractions))) {
+    cells[[paste0("factor_", k, "_fraction")]] <-
+      as.numeric(member_fr$fractions[idx, k])
+  }
+  cells
+}
+
+#' Build per-member kept-rule tables for the molecule-vote ensemble
+#'
+#' Each member's rules are derived exactly like the primary member's: score
+#' with the member's labeling, threshold, and vet with the native-factor
+#' check computed on the member's own cell factor fractions. Returns the
+#' stacked rule rows, their member indices, and the kept source->target
+#' pair set per member (for the support diagnostic).
+#' @noRd
+.celladmix_ensemble_member_rules <- function(
+    fit, score_obj, members, selected, primary_rules,
+    p_thresh = 0.1, adjust_p = FALSE, targets = NULL,
+    restrict_pairs = NULL) {
+  pair_key <- function(df) paste(df$source_cell_type, df$target_cell_type, sep = "\r")
+  cache_key <- function(r) paste(r, p_thresh, adjust_p,
+    paste(targets %||% "", collapse = ","), sep = "|")
+  frames <- list()
+  frame_members <- integer(0)
+  pair_sets <- list()
+  for (r in members) {
+    rr <- if (r == selected) {
+      primary_rules
+    } else {
+      cached <- score_obj$member_rules_cache[[cache_key(r)]]
+      if (!is.null(cached)) {
+        cached
+      } else {
+        result_r <- .celladmix_score_member(fit, score_obj, r)
+        rules_r <- switch(score_obj$method,
+          membrane = celladmix_membrane_rules(result_r, p_thresh = p_thresh,
+            adjust_p = adjust_p, target_cell_types = targets),
+          coherence = celladmix_coherence_rules(result_r, p_thresh = p_thresh,
+            adjust_p = adjust_p, target_cell_types = targets),
+          celladmix_bridge_rules(result_r, p_thresh = p_thresh,
+            adjust_p = adjust_p, target_cell_types = targets))
+        rules_r <- .celladmix_apply_native_check(rules_r, fit = fit,
+          cell_factors = .celladmix_member_cell_factors(fit, r))
+        rules_r <- rules_r[is.na(rules_r$keep) | rules_r$keep, , drop = FALSE]
+        score_obj$member_rules_cache[[cache_key(r)]] <- rules_r
+        rules_r
+      }
+    }
+    if (!is.null(restrict_pairs) && nrow(rr)) {
+      rr <- rr[pair_key(rr) %in% pair_key(restrict_pairs), , drop = FALSE]
+    }
+    pair_sets[[as.character(r)]] <- unique(pair_key(rr))
+    if (nrow(rr)) {
+      frames[[length(frames) + 1L]] <- data.frame(
+        factor = as.integer(rr$factor),
+        target_cell_type = as.character(rr$target_cell_type),
+        stringsAsFactors = FALSE)
+      frame_members <- c(frame_members, rep(as.integer(r), nrow(rr)))
+    }
+  }
+  list(
+    rules = if (length(frames)) do.call(rbind, frames) else
+      data.frame(factor = integer(0), target_cell_type = character(0),
+        stringsAsFactors = FALSE),
+    member = frame_members,
+    pair_sets = pair_sets)
+}
+
+#' Fraction of ensemble members keeping a rule for each pair
+#' @noRd
+.celladmix_rule_support <- function(rules, pair_sets) {
+  if (is.null(rules) || !nrow(rules)) {
+    return(numeric(0))
+  }
+  key <- paste(rules$source_cell_type, rules$target_cell_type, sep = "\r")
+  n <- max(length(pair_sets), 1L)
+  vapply(key, function(k) {
+    sum(vapply(pair_sets, function(s) k %in% s, logical(1))) / n
+  }, numeric(1), USE.NAMES = FALSE)
 }

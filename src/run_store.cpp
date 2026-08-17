@@ -26,7 +26,10 @@
 #include <utility>
 #include <vector>
 
+#include "celladmix/graph.hpp"
+#include "celladmix/ncv.hpp"
 #include "celladmix/nmf_kl.hpp"
+#include "celladmix/pipeline_common.hpp"
 #include "celladmix/workflow.hpp"
 
 namespace celladmix {
@@ -1347,6 +1350,12 @@ RunManifest write_basic_run(
       table,
       fit,
       storage_options.parquet_row_group_size);
+  if (!fit.nmf.candidate_h.empty()) {
+    write_ensemble_h_parquet(
+        ensemble_h_parquet_path(paths.root_dir),
+        fit.nmf.candidate_h,
+        storage_options.parquet_row_group_size);
+  }
   write_cells_parquet(
       paths.cells_parquet,
       table,
@@ -1647,6 +1656,12 @@ BridgeRunData load_run_bridge_data(const std::string& path_or_dir, const RunLoad
   std::shared_ptr<arrow::Schema> schema;
   arrow_check(reader->GetSchema(&schema), "Get molecules schema");
 
+  const bool member_labels_active = options.ensemble_member >= 0;
+  EnsembleMemberLabels member_labels;
+  if (member_labels_active) {
+    member_labels = load_ensemble_member_labels(path_or_dir, options.ensemble_member);
+  }
+
   std::vector<int> projected = {
       find_column_index(schema, "crop_idx"),
       find_column_index(schema, "x"),
@@ -1655,6 +1670,9 @@ BridgeRunData load_run_bridge_data(const std::string& path_or_dir, const RunLoad
       find_column_index(schema, "cell_idx"),
       find_column_index(schema, "factor_label"),
   };
+  if (member_labels_active) {
+    projected.push_back(find_column_index(schema, "obs_id"));
+  }
 
   const auto row_groups = select_molecule_row_groups(out.manifest, crop_idx_filter, options.region);
   auto batch_reader = arrow_unwrap(
@@ -1674,6 +1692,11 @@ BridgeRunData load_run_bridge_data(const std::string& path_or_dir, const RunLoad
     NumericArrayView z_view(batch->column(col++));
     NumericArrayView cell_view(batch->column(col++));
     NumericArrayView label_view(batch->column(col++));
+    std::shared_ptr<arrow::Array> obs_array;
+    if (member_labels_active) {
+      obs_array = batch->column(col++);
+    }
+    NumericArrayView obs_view(obs_array);
 
     for (int64_t i = 0; i < batch->num_rows(); ++i) {
       const int crop_idx = crop_view.int_value(i);
@@ -1702,7 +1725,9 @@ BridgeRunData load_run_bridge_data(const std::string& path_or_dir, const RunLoad
       out.transcripts.y.push_back(y);
       out.transcripts.z.push_back(z);
       out.transcripts.cell_index.push_back(cell_idx);
-      out.labels.push_back(label_view.int_value(i));
+      out.labels.push_back(member_labels_active
+          ? member_labels.label_for(static_cast<std::int64_t>(obs_view.value(i)))
+          : label_view.int_value(i));
     }
   }
 
@@ -1975,6 +2000,14 @@ RunData load_run_data(const std::string& path_or_dir, const RunLoadOptions& opti
     }
   }
 
+  if (options.ensemble_member >= 0) {
+    const auto member_labels =
+        load_ensemble_member_labels(path_or_dir, options.ensemble_member);
+    for (std::size_t i = 0; i < out.labels.size(); ++i) {
+      out.labels[i] = member_labels.label_for(out.obs_ids[i]);
+    }
+  }
+
   if (options.sample_n > 0 && static_cast<std::size_t>(options.sample_n) < out.transcripts.size()) {
     std::vector<std::size_t> order(out.transcripts.size());
     std::iota(order.begin(), order.end(), 0U);
@@ -2099,6 +2132,323 @@ RunManifest write_corrected_run(
   manifest.n_cells = run_data.cells.size();
   write_manifest_json(manifest);
   return manifest;
+}
+
+// --- Ensemble member pool (per-restart factorizations and labelings) ---
+
+namespace {
+
+std::vector<int> read_int32_parquet_column(
+    const std::string& path,
+    const std::string& name) {
+  auto input = arrow_unwrap(
+      arrow::io::ReadableFile::Open(path),
+      "Open parquet column source");
+  parquet::arrow::FileReaderBuilder builder;
+  arrow_check(builder.Open(input), "Open parquet column reader");
+  auto reader = arrow_unwrap(builder.Build(), "Build parquet column reader");
+  std::shared_ptr<arrow::Schema> schema;
+  arrow_check(reader->GetSchema(&schema), "Get parquet column schema");
+  std::vector<int> row_groups(static_cast<std::size_t>(reader->num_row_groups()));
+  std::iota(row_groups.begin(), row_groups.end(), 0);
+  auto batch_reader = arrow_unwrap(
+      reader->GetRecordBatchReader(row_groups, {find_column_index(schema, name)}),
+      "Get parquet column batch reader");
+  std::vector<int> out;
+  std::shared_ptr<arrow::RecordBatch> batch;
+  while (true) {
+    arrow_check(batch_reader->ReadNext(&batch), "Read parquet column batch");
+    if (!batch) break;
+    NumericArrayView view(batch->column(0));
+    for (int64_t i = 0; i < batch->num_rows(); ++i) {
+      out.push_back(view.int_value(i));
+    }
+  }
+  return out;
+}
+
+std::vector<std::int64_t> read_int64_parquet_column(
+    const std::string& path,
+    const std::string& name) {
+  auto input = arrow_unwrap(
+      arrow::io::ReadableFile::Open(path),
+      "Open parquet column source");
+  parquet::arrow::FileReaderBuilder builder;
+  arrow_check(builder.Open(input), "Open parquet column reader");
+  auto reader = arrow_unwrap(builder.Build(), "Build parquet column reader");
+  std::shared_ptr<arrow::Schema> schema;
+  arrow_check(reader->GetSchema(&schema), "Get parquet column schema");
+  std::vector<int> row_groups(static_cast<std::size_t>(reader->num_row_groups()));
+  std::iota(row_groups.begin(), row_groups.end(), 0);
+  auto batch_reader = arrow_unwrap(
+      reader->GetRecordBatchReader(row_groups, {find_column_index(schema, name)}),
+      "Get parquet column batch reader");
+  std::vector<std::int64_t> out;
+  std::shared_ptr<arrow::RecordBatch> batch;
+  while (true) {
+    arrow_check(batch_reader->ReadNext(&batch), "Read parquet column batch");
+    if (!batch) break;
+    NumericArrayView view(batch->column(0));
+    for (int64_t i = 0; i < batch->num_rows(); ++i) {
+      out.push_back(static_cast<std::int64_t>(view.value(i)));
+    }
+  }
+  return out;
+}
+
+}  // namespace
+
+std::string ensemble_h_parquet_path(const std::string& run_path_or_dir) {
+  return (resolve_run_dir(run_path_or_dir) / "ensemble_h.parquet").string();
+}
+
+std::string ensemble_labels_parquet_path(
+    const std::string& run_path_or_dir,
+    int member) {
+  return (resolve_run_dir(run_path_or_dir) /
+      ("ensemble_labels_m" + std::to_string(member) + ".parquet")).string();
+}
+
+void write_ensemble_h_parquet(
+    const std::string& path,
+    const std::vector<DenseMatrix>& candidate_h,
+    int row_group_size) {
+  std::vector<int> member;
+  std::vector<int> factor_id;
+  std::vector<int> gene_idx;
+  std::vector<double> loading;
+  std::size_t total = 0;
+  for (const auto& h : candidate_h) {
+    total += static_cast<std::size_t>(h.rows()) * static_cast<std::size_t>(h.cols());
+  }
+  member.reserve(total);
+  factor_id.reserve(total);
+  gene_idx.reserve(total);
+  loading.reserve(total);
+  for (std::size_t m = 0; m < candidate_h.size(); ++m) {
+    const auto& h = candidate_h[m];
+    for (int factor = 0; factor < h.rows(); ++factor) {
+      for (int gene_i = 0; gene_i < h.cols(); ++gene_i) {
+        member.push_back(static_cast<int>(m));
+        factor_id.push_back(factor + 1);
+        gene_idx.push_back(gene_i);
+        loading.push_back(h(factor, gene_i));
+      }
+    }
+  }
+  const auto table_out = arrow::Table::Make(
+      arrow::schema({
+          arrow::field("member", arrow::int32()),
+          arrow::field("factor_id", arrow::int32()),
+          arrow::field("gene_idx", arrow::int32()),
+          arrow::field("loading", arrow::float64()),
+      }),
+      {
+          build_int32_array(member),
+          build_int32_array(factor_id),
+          build_int32_array(gene_idx),
+          build_double_array(loading),
+      });
+  write_parquet_table(table_out, std::filesystem::path(path), row_group_size);
+}
+
+std::vector<DenseMatrix> load_ensemble_h(const std::string& run_path_or_dir) {
+  const auto path = ensemble_h_parquet_path(run_path_or_dir);
+  if (!std::filesystem::exists(path)) {
+    return {};
+  }
+  const auto member = read_int32_parquet_column(path, "member");
+  const auto factor_id = read_int32_parquet_column(path, "factor_id");
+  const auto gene_idx = read_int32_parquet_column(path, "gene_idx");
+
+  auto input = arrow_unwrap(
+      arrow::io::ReadableFile::Open(path),
+      "Open ensemble H parquet");
+  parquet::arrow::FileReaderBuilder builder;
+  arrow_check(builder.Open(input), "Open ensemble H reader");
+  auto reader = arrow_unwrap(builder.Build(), "Build ensemble H reader");
+  std::shared_ptr<arrow::Schema> schema;
+  arrow_check(reader->GetSchema(&schema), "Get ensemble H schema");
+  std::vector<int> row_groups(static_cast<std::size_t>(reader->num_row_groups()));
+  std::iota(row_groups.begin(), row_groups.end(), 0);
+  auto batch_reader = arrow_unwrap(
+      reader->GetRecordBatchReader(row_groups, {find_column_index(schema, "loading")}),
+      "Get ensemble H batch reader");
+  std::vector<double> loading;
+  loading.reserve(member.size());
+  std::shared_ptr<arrow::RecordBatch> batch;
+  while (true) {
+    arrow_check(batch_reader->ReadNext(&batch), "Read ensemble H batch");
+    if (!batch) break;
+    NumericArrayView view(batch->column(0));
+    for (int64_t i = 0; i < batch->num_rows(); ++i) {
+      loading.push_back(view.value(i));
+    }
+  }
+
+  int n_members = 0;
+  int rank = 0;
+  int n_genes = 0;
+  for (std::size_t i = 0; i < member.size(); ++i) {
+    n_members = std::max(n_members, member[i] + 1);
+    rank = std::max(rank, factor_id[i]);
+    n_genes = std::max(n_genes, gene_idx[i] + 1);
+  }
+  std::vector<DenseMatrix> out(
+      static_cast<std::size_t>(n_members),
+      DenseMatrix(rank, n_genes, 0.0));
+  for (std::size_t i = 0; i < member.size(); ++i) {
+    out[static_cast<std::size_t>(member[i])](factor_id[i] - 1, gene_idx[i]) =
+        loading[i];
+  }
+  return out;
+}
+
+int ensemble_member_count(const std::string& run_path_or_dir) {
+  int count = 0;
+  while (std::filesystem::exists(
+      ensemble_labels_parquet_path(run_path_or_dir, count))) {
+    ++count;
+  }
+  return count;
+}
+
+int ensure_ensemble_labels(
+    const std::string& run_path_or_dir,
+    int num_threads) {
+  const auto pool = load_ensemble_h(run_path_or_dir);
+  if (pool.empty()) {
+    return 0;
+  }
+  const int n_members = static_cast<int>(pool.size());
+  bool all_exist = true;
+  for (int m = 0; m < n_members; ++m) {
+    if (!std::filesystem::exists(ensemble_labels_parquet_path(run_path_or_dir, m))) {
+      all_exist = false;
+      break;
+    }
+  }
+  if (all_exist) {
+    return n_members;
+  }
+
+  const auto run = load_run_data(run_path_or_dir);
+  const auto& opts = run.manifest.pipeline_options;
+  NcvOptions ncv_options;
+  ncv_options.k = opts.ncv_k + 1;
+  ncv_options.include_self = true;
+  ncv_options.within_cell = true;
+  const std::string molecule_scoring = resolve_molecule_scoring(opts);
+  NcvFeatureTransform transform;
+  transform.mode = opts.nmf_variant;
+  transform.gene_weights = run.manifest.nmf_gene_weights;
+  transform.target_row_sum = run.manifest.nmf_transform_target_row_sum;
+  const int threads = std::max(1, num_threads);
+  const int selected = run.manifest.nmf_diagnostics.selected_run;
+
+  for (int m = 0; m < n_members; ++m) {
+    const auto member_path = ensemble_labels_parquet_path(run_path_or_dir, m);
+    if (std::filesystem::exists(member_path)) {
+      continue;
+    }
+    std::vector<int> labels;
+    if (m == selected) {
+      labels = run.labels;
+    } else {
+      const DenseMatrix scores = molecule_scoring == "gene_loadings"
+          ? project_gene_loadings_to_factors(
+                run.transcripts, pool[static_cast<std::size_t>(m)], ncv_options, threads)
+          : is_weighted_ls_variant(opts.nmf_variant)
+              ? project_ncv_to_factors(
+                    run.transcripts, pool[static_cast<std::size_t>(m)], ncv_options, threads)
+              : project_ncv_to_factors_kl(
+                    run.transcripts, pool[static_cast<std::size_t>(m)], ncv_options, threads,
+                    10, 1e-4, 1e-10, transform);
+      labels = assign_factors_per_cell(
+          run.transcripts, scores, opts.graph_k, opts.same_label_ratio, 20, threads);
+    }
+    const auto table_out = arrow::Table::Make(
+        arrow::schema({arrow::field("label", arrow::int32())}),
+        {build_int32_array(labels)});
+    write_parquet_table(
+        table_out,
+        std::filesystem::path(member_path),
+        run.manifest.storage_options.parquet_row_group_size);
+  }
+  return n_members;
+}
+
+int EnsembleMemberLabels::label_for(std::int64_t obs_id) const {
+  const auto it = std::lower_bound(obs_ids.begin(), obs_ids.end(), obs_id);
+  if (it == obs_ids.end() || *it != obs_id) {
+    throw std::runtime_error("obs id missing from ensemble member labels");
+  }
+  return labels[static_cast<std::size_t>(it - obs_ids.begin())];
+}
+
+EnsembleMemberLabels load_ensemble_member_labels(
+    const std::string& run_path_or_dir,
+    int member) {
+  const auto manifest = read_run_manifest(run_path_or_dir);
+  const auto raw_labels = read_int32_parquet_column(
+      ensemble_labels_parquet_path(run_path_or_dir, member), "label");
+  const auto raw_obs = read_int64_parquet_column(
+      manifest.paths.molecules_parquet, "obs_id");
+  if (raw_labels.size() != raw_obs.size()) {
+    throw std::runtime_error(
+        "ensemble member labels do not match molecules.parquet row count");
+  }
+  std::vector<std::size_t> order(raw_obs.size());
+  std::iota(order.begin(), order.end(), 0U);
+  std::sort(order.begin(), order.end(), [&](std::size_t left, std::size_t right) {
+    return raw_obs[left] < raw_obs[right];
+  });
+  EnsembleMemberLabels out;
+  out.obs_ids.reserve(raw_obs.size());
+  out.labels.reserve(raw_obs.size());
+  for (const auto idx : order) {
+    out.obs_ids.push_back(raw_obs[idx]);
+    out.labels.push_back(raw_labels[idx]);
+  }
+  return out;
+}
+
+DenseMatrix ensemble_member_cell_fractions(
+    const std::string& run_path_or_dir,
+    int member) {
+  const auto manifest = read_run_manifest(run_path_or_dir);
+  const auto labels = read_int32_parquet_column(
+      ensemble_labels_parquet_path(run_path_or_dir, member), "label");
+  const auto cell_idx = read_int32_parquet_column(
+      manifest.paths.molecules_parquet, "cell_idx");
+  if (labels.size() != cell_idx.size()) {
+    throw std::runtime_error(
+        "ensemble member labels do not match molecules.parquet row count");
+  }
+  const auto cells = load_run_cells(run_path_or_dir);
+  const int n_cells = static_cast<int>(cells.size());
+  const int rank = static_cast<int>(manifest.n_factors);
+  DenseMatrix out(n_cells, rank, 0.0);
+  std::vector<double> totals(static_cast<std::size_t>(n_cells), 0.0);
+  for (std::size_t i = 0; i < labels.size(); ++i) {
+    const int cell = cell_idx[i];
+    if (cell < 0 || cell >= n_cells) {
+      continue;
+    }
+    totals[static_cast<std::size_t>(cell)] += 1.0;
+    const int factor = labels[i];
+    if (factor >= 0 && factor < rank) {
+      out(cell, factor) += 1.0;
+    }
+  }
+  for (int cell = 0; cell < n_cells; ++cell) {
+    const double total = totals[static_cast<std::size_t>(cell)];
+    if (total <= 0.0) continue;
+    for (int factor = 0; factor < rank; ++factor) {
+      out(cell, factor) /= total;
+    }
+  }
+  return out;
 }
 
 }  // namespace celladmix
