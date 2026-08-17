@@ -202,6 +202,9 @@ streaming reads and membrane-image discovery.
   reads the same dataset as a `SpatialData` object, adds cellAdmix factors and
   corrected counts back into the SpatialData table, and illustrates Scanpy /
   SpatialData plotting on the outputs.
+- [Standalone Xenium breast 5K workflow](../examples/xenium_breast_membrane_5k_full/breast_5k_python_standalone.ipynb) -
+  the same core workflow on a full 5K-panel dataset (96.6M molecules,
+  694K cells).
 
 These notebooks are intended as starting templates. The SpatialData notebook
 needs a Python 3.11+ environment with `spatialdata`, `spatialdata-io`, and

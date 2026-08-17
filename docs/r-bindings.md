@@ -102,8 +102,11 @@ across datasets it recovers cell-type-native factors far more reproducibly
 than the KL variants (see [nmf_stability.md](nmf_stability.md)), and the
 factor decomposition it aims for — native factors per cell type or state,
 with admixture read from their minor contributions in non-native cells —
-matches the scoring model directly. `invsqrt_kl` remains available for
-marker-driven loadings.
+matches the scoring model directly. In cleanup benchmarks
+([benchmarks.md](benchmarks.md)) the most effective variant follows the
+scoring method: `invsqrt_kl` paired with membrane scoring on stained data,
+`ls_nmf` paired with bridge scoring — the pancreas quickstart follows this
+pairing.
 
 The NCV neighborhood size `ncv_k` is resolved automatically from the data:
 it grows with the square root of the panel size (a ~400-gene panel keeps the
@@ -284,10 +287,13 @@ for the full option list.
 - [Minimal CosMx NSCLC tutorial](../examples/cosmx_nsclc_giotto/celladmix_cosmx_minimal.ipynb): a compact tabular example mirroring the original cellAdmix [NSCLC tutorial](https://github.com/kharchenkolab/cellAdmix/blob/main/vignettes/NSCLC_tutorial_fulldata.ipynb).
 - [Xenium pancreas membrane/bridge scoring tutorial](../examples/xenium_pancreas_membrane_377_full/pancreas_membrane_scoring_clean.ipynb): a modern Xenium bundle example with membrane cell staining.
 - [Seurat Xenium integration tutorial](../examples/xenium_pancreas_membrane_377_full/pancreas_seurat_integration.ipynb): the same pancreas dataset, using Seurat for cell-level state and cellAdmix for molecule-complete fitting, scoring, and correction.
+- [Xenium breast 5K membrane scoring tutorial](../examples/xenium_breast_membrane_5k_full/breast_5k_membrane_scoring.ipynb): the same workflow at full 5K-panel scale.
 
 ## Detailed Pages
 
 - [Inputs](inputs.md)
 - [Installation](install.md)
 - [Scoring methods](scoring_methods.md)
+- [NMF restart stability](nmf_stability.md)
+- [Cleanup benchmarks](benchmarks.md)
 - [Documentation index](README.md)
