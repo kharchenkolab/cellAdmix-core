@@ -25,7 +25,7 @@ This folder contains user-facing documentation for `cellAdmix-core`.
 
 - [Pancreas quickstart](../examples/xenium_pancreas_membrane_377_full/pancreas_quickstart.ipynb)
 - [Minimal CosMx NSCLC tutorial](../examples/cosmx_nsclc_giotto/celladmix_cosmx_minimal.ipynb)
-- [Xenium pancreas membrane/bridge scoring tutorial](../examples/xenium_pancreas_membrane_377_full/pancreas_membrane_scoring_clean.ipynb)
+- [Detailed Xenium pancreas tutorial](../examples/xenium_pancreas_membrane_377_full/pancreas_membrane_scoring_clean.ipynb)
 - [Seurat Xenium integration tutorial](../examples/xenium_pancreas_membrane_377_full/pancreas_seurat_integration.ipynb)
 - [Xenium breast 5K membrane scoring tutorial](../examples/xenium_breast_membrane_5k_full/breast_5k_membrane_scoring.ipynb)
 - [Python Xenium standalone tutorial](../examples/xenium_pancreas_membrane_377_full/pancreas_python_standalone.ipynb)
