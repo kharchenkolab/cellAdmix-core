@@ -302,12 +302,6 @@ class CellAdmixFit:
         )
         return CellAdmixScore(self, "bridge", result)
 
-    def score_neighbor_enrichment(self, **kwargs):
-        """Score admixture by source-cell neighborhood enrichment."""
-        from .neighbor import score_neighbor_enrichment
-
-        return score_neighbor_enrichment(self, **kwargs)
-
     def score_neighbor_frequency(self, **kwargs):
         """Alias for :meth:`score_neighbor_enrichment`."""
         return self.score_neighbor_enrichment(**kwargs)
