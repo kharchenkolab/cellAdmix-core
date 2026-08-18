@@ -242,17 +242,37 @@ class CellAdmixAudit:
 
     def _state_rates(self, matrix, source=None, target=None, strict=True):
         if source is None:
-            mk_all, tot_all, bins_all = [], [], []
+            # Pool each pair's excess over its own unexposed reference.
+            # Pooling raw rates would mix pairs with very different
+            # baselines, and the shifting pair composition across bins can
+            # then produce spurious non-monotone curves (Simpson's paradox).
+            excess = np.zeros(len(BIN_LABELS))
+            var_tot = np.zeros(len(BIN_LABELS))
+            totals = np.zeros(len(BIN_LABELS))
+            n_pairs = 0
             for d in self._pairs.values():
                 if not d["detected"]:
                     continue
+                n_pairs += 1
                 genes = d["strict"] if strict and len(d["strict"]) >= 2 else d["pool"]
                 mk = np.asarray(matrix[genes][:, d["cols"]].sum(axis=0)).ravel()
-                mk_all.append(mk)
-                tot_all.append(self._totals[d["cols"]])
-                bins_all.append(np.asarray(d["bins"]))
-            return _bin_rates(np.concatenate(mk_all), np.concatenate(tot_all),
-                np.concatenate(bins_all))
+                rates = _bin_rates(mk, self._totals[d["cols"]], np.asarray(d["bins"]))
+                r0 = float(rates.loc[rates["bin"] == "0", "rate"].iloc[0])
+                m0 = float(rates.loc[rates["bin"] == "0", "markers"].iloc[0])
+                M0 = max(float(rates.loc[rates["bin"] == "0", "totals"].iloc[0]), 1.0)
+                for bi, b in enumerate(BIN_LABELS):
+                    row = rates[rates["bin"] == b].iloc[0]
+                    excess[bi] += max(row["rate"] - r0, 0.0) * row["totals"]
+                    var_tot[bi] += row["markers"] + (row["totals"] / M0) ** 2 * m0
+                    totals[bi] += row["totals"]
+            if n_pairs == 0:
+                raise ValueError("No detected pairs to pool")
+            sd = np.sqrt(var_tot)
+            denom = np.maximum(totals, 1.0)
+            return pd.DataFrame(dict(bin=BIN_LABELS,
+                rate=excess / denom,
+                rate_lo=np.maximum(excess - 1.96 * sd, 0.0) / denom,
+                rate_hi=(excess + 1.96 * sd) / denom))
         d = self._pair(source, target)
         genes = d["strict"] if strict and len(d["strict"]) >= 2 else d["pool"]
         mk = np.asarray(matrix[genes][:, d["cols"]].sum(axis=0)).ravel()
@@ -270,6 +290,7 @@ class CellAdmixAudit:
             after = _align_counts(after, pd.Index(genes),
                 pd.Index([str(c) for c in cells]), self._genes, self._cells)
             states.append(("after cleanup", after, "#2980b9"))
+        pooled = source is None
         for name, mat, color in states:
             rates = self._state_rates(mat, source, target, strict)
             x = np.arange(len(BIN_LABELS))
@@ -277,11 +298,12 @@ class CellAdmixAudit:
                 yerr=[(rates["rate"] - rates["rate_lo"]) * 1e3,
                       (rates["rate_hi"] - rates["rate"]) * 1e3],
                 fmt="o-", ms=4, capsize=2, color=color, label=name)
-            if name == "before":
+            if name == "before" and not pooled:
                 ax.axhline(rates["rate"].iloc[0] * 1e3, ls=":", c="grey", lw=0.8)
         ax.set_xticks(range(len(BIN_LABELS)), BIN_LABELS)
         ax.set_xlabel("source-type cells among nearest neighbors")
-        ax.set_ylabel("pool-marker rate (per 1,000 molecules)")
+        ax.set_ylabel("excess pool-marker rate over pair reference\n(per 1,000 molecules)"
+            if pooled else "pool-marker rate (per 1,000 molecules)")
         title = ("Admixture exposure profile (pooled over detected pairs)"
             if source is None else f"{source} → {target}")
         ax.set_title(title, fontsize=10)

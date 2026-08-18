@@ -275,30 +275,53 @@ CellAdmixAudit <- R6::R6Class(
       if (is.null(source) != is.null(target)) {
         stop("Provide both source and target, or neither for the cumulative view")
       }
+      pooled <- is.null(source)
       build <- function(counts_mat, state) {
-        if (is.null(source)) {
-          m_tot <- NULL
+        if (pooled) {
+          # Pool each pair's excess over its own unexposed reference. Pooling
+          # the raw rates instead would mix pairs with very different
+          # baselines, and the shifting pair composition across bins can then
+          # produce spurious non-monotone curves (Simpson's paradox).
+          bins <- c("0", "1", "2", "3+")
+          excess <- stats::setNames(numeric(4), bins)
+          var_tot <- stats::setNames(numeric(4), bins)
+          totals <- stats::setNames(numeric(4), bins)
+          n_pairs <- 0L
           for (d in private$.pair_defs) {
             if (!d$detected) next
+            n_pairs <- n_pairs + 1L
             genes <- if (strict && length(d$strict) >= 2) d$strict else d$pool
-            mk <- .celladmix_audit_mcount(counts_mat, genes, d$T_cells)
-            part <- data.frame(bin = d$bins, mk = mk,
-              tot = private$.totals[d$T_cells])
-            m_tot <- rbind(m_tot, part)
+            rates <- .celladmix_audit_bin_rates(
+              .celladmix_audit_mcount(counts_mat, genes, d$T_cells),
+              private$.totals[d$T_cells], d$bins)
+            r0 <- rates$rate[rates$bin == "0"]
+            m0 <- rates$markers[rates$bin == "0"]
+            M0 <- max(rates$totals[rates$bin == "0"], 1)
+            for (b in bins) {
+              row <- rates[rates$bin == b, ]
+              excess[b] <- excess[b] + max(row$rate - r0, 0) * row$totals
+              var_tot[b] <- var_tot[b] + row$markers + (row$totals / M0)^2 * m0
+              totals[b] <- totals[b] + row$totals
+            }
           }
-          if (is.null(m_tot)) {
+          if (n_pairs == 0L) {
             stop("No detected pairs to pool")
           }
-          rates <- .celladmix_audit_bin_rates(m_tot$mk, m_tot$tot, m_tot$bin)
+          sd <- sqrt(var_tot)
+          data.frame(bin = bins,
+            rate = excess / pmax(totals, 1),
+            rate_lo = pmax(excess - 1.96 * sd, 0) / pmax(totals, 1),
+            rate_hi = (excess + 1.96 * sd) / pmax(totals, 1),
+            state = state, stringsAsFactors = FALSE)
         } else {
           d <- private$.pair(source, target)
           genes <- if (strict && length(d$strict) >= 2) d$strict else d$pool
           rates <- .celladmix_audit_bin_rates(
             .celladmix_audit_mcount(counts_mat, genes, d$T_cells),
             private$.totals[d$T_cells], d$bins)
+          rates$state <- state
+          rates
         }
-        rates$state <- state
-        rates
       }
       df <- build(private$.counts, "before")
       if (!is.null(counts_after)) {
@@ -307,27 +330,40 @@ CellAdmixAudit <- R6::R6Class(
       }
       df$bin <- factor(df$bin, levels = c("0", "1", "2", "3+"))
       r0 <- df$rate[df$bin == "0" & df$state == "before"]
-      title <- if (is.null(source)) {
+      title <- if (pooled) {
         "Admixture exposure profile (pooled over detected pairs)"
       } else {
         sprintf("%s → %s", source, target)
       }
+      ylab <- if (pooled) {
+        "excess pool-marker rate over pair reference\n(per 1,000 molecules)"
+      } else {
+        "pool-marker rate (per 1,000 molecules)"
+      }
+      subtitle <- if (pooled) {
+        "each pair's excess over its own unexposed reference, pooled;\nerror bars: 95% intervals"
+      } else {
+        "error bars: 95% Poisson intervals (often narrower than the symbols);\ndotted line: unexposed reference"
+      }
       cols <- c("before" = "#c0392b", "after cleanup" = "#2980b9")
-      ggplot2::ggplot(df, ggplot2::aes(x = bin, group = state)) +
+      p <- ggplot2::ggplot(df, ggplot2::aes(x = bin, group = state)) +
         ggplot2::geom_ribbon(ggplot2::aes(ymin = rate_lo * 1e3, ymax = rate_hi * 1e3,
           fill = state), alpha = 0.25) +
         ggplot2::geom_errorbar(ggplot2::aes(ymin = rate_lo * 1e3,
           ymax = rate_hi * 1e3, color = state), width = 0.12, linewidth = 0.4) +
         ggplot2::geom_line(ggplot2::aes(y = rate * 1e3, color = state)) +
-        ggplot2::geom_point(ggplot2::aes(y = rate * 1e3, color = state), size = 1.8) +
-        ggplot2::geom_hline(yintercept = r0 * 1e3, linetype = "dotted",
-          color = "grey40") +
+        ggplot2::geom_point(ggplot2::aes(y = rate * 1e3, color = state), size = 1.8)
+      if (!pooled) {
+        p <- p + ggplot2::geom_hline(yintercept = r0 * 1e3, linetype = "dotted",
+          color = "grey40")
+      }
+      p +
         ggplot2::scale_color_manual(values = cols, name = NULL) +
         ggplot2::scale_fill_manual(values = cols, name = NULL) +
         ggplot2::labs(x = "source-type cells among nearest neighbors",
-          y = "pool-marker rate (per 1,000 molecules)",
+          y = ylab,
           title = title,
-          subtitle = "error bars: 95% Poisson intervals (often narrower than the symbols);\ndotted line: unexposed reference") +
+          subtitle = subtitle) +
         ggplot2::theme_classic(base_size = 10) +
         ggplot2::theme(legend.position = if (is.null(counts_after)) "none" else "bottom")
     },

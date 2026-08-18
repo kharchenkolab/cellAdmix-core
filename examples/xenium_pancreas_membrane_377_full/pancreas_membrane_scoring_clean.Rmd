@@ -178,10 +178,12 @@ type's molecules that leaked in from the source.
 audit$plot_map()
 ```
 
-The default exposure view pools all detected pairs into one cumulative
-curve of source-marker content versus source-neighbor exposure (error bars
-are 95% Poisson intervals, often narrower than the symbols); passing a
-specific pair shows that pair's own profile.
+The default exposure view pools all detected pairs into one curve of
+excess source-marker content — each pair's rise above its own unexposed
+reference — versus source-neighbor exposure (error bars are 95%
+intervals); pooling the excess rather than the raw rates keeps the curve
+comparable across pairs with different native baselines. Passing a
+specific pair shows that pair's own raw profile.
 
 ```{r audit-exposure, fig.width=9.6, fig.height=3.8}
 cowplot::plot_grid(

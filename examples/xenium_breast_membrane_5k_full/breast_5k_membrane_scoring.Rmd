@@ -349,6 +349,77 @@ plots <- lapply(diagnostic_cell_types, function(target_type) {
 cowplot::plot_grid(plotlist = plots, ncol = length(plots), align = "hv", axis = "tblr")
 ```
 
+## Bridge Scoring for Stain-Weak Targets
+
+The audit warnings above flag large pairs that membrane scoring issued no
+rule for — most prominently epithelial leakage into endothelial and
+fibroblast cells, exactly the diagnostic targets whose volcano plots
+barely move. Membrane scoring depends on stain-path contrast along
+molecule-to-centroid lines, which is weak for thin, elongated cell types
+such as endothelium and fibroblasts. Bridge scoring uses molecule
+adjacency instead of the stain image and pairs best with the `ls_nmf`
+factorization (see [docs/benchmarks.md](../../docs/benchmarks.md)); it
+covers these pairs decisively:
+
+```{r bridge-score}
+fit_ls <- ds$fit()
+bridge_score <- fit_ls$score_bridge()
+bridge_rules <- bridge_score$rules(p_thresh = p_thresh)
+
+head(bridge_rules[bridge_rules$keep &
+  bridge_rules$target_cell_type %in% diagnostic_cell_types,
+  c("factor", "source_cell_type", "target_cell_type", "p_value")])
+```
+
+```{r bridge-cleanup}
+bridge_correction <- bridge_score$correct(rules = bridge_rules,
+  name = "bridge_clean")
+bridge_counts <- bridge_correction$counts()
+bridge_de <- celladmix_de_by_group(bridge_counts, cell_spatial,
+  subset_by = "merged_annotation", subsets = diagnostic_cell_types,
+  group_by = "domain_label", contrast = c("tumor_epithelial", "immune_rich"))
+
+bridge_correction$summary()
+```
+
+The audit verifies the bridge correction against the same measurements,
+and the side-by-side comparison shows what each method removes:
+
+```{r bridge-verify, warning=TRUE, fig.width=9.6, fig.height=4.0}
+bridge_report <- audit$evaluate(bridge_correction)
+bridge_report$summary()
+
+cowplot::plot_grid(
+  audit$plot_remaining(list(
+    `membrane\n(invsqrt_kl)` = membrane_correction,
+    `bridge\n(ls_nmf)` = bridge_correction)),
+  audit$plot_exposure(correction = bridge_correction),
+  ncol = 2, align = "hv", axis = "tblr")
+```
+
+The diagnostic volcano and p-value shift plots now show the improvement
+membrane scoring could not deliver for these targets:
+
+```{r bridge-volcano, fig.width=11.0, fig.height=4.8}
+for (target_type in diagnostic_cell_types) {
+  p_before <- celladmix_plot_volcano(diagnostic_de_original[[target_type]],
+    markers = source_marker_sets, title = paste(target_type, "before cleanup")) +
+    theme(legend.position = "none")
+  p_after <- celladmix_plot_volcano(bridge_de[[target_type]],
+    markers = source_marker_sets, title = paste(target_type, "after bridge cleanup"))
+  print(cowplot::plot_grid(plotlist = list(p_before, p_after),
+    ncol = 2, align = "hv", axis = "tblr"))
+}
+```
+
+```{r bridge-pvalue-shift, fig.width=11.0, fig.height=5.0}
+plots <- lapply(diagnostic_cell_types, function(target_type) {
+  celladmix_plot_de_shift(diagnostic_de_original[[target_type]], bridge_de[[target_type]],
+    markers = source_marker_sets, title = paste("Bridge", target_type, "p-value shift"))
+})
+cowplot::plot_grid(plotlist = plots, ncol = length(plots), align = "hv", axis = "tblr")
+```
+
 ## Cell-State UMAP Before and After Cleanup
 
 As a compact global diagnostic, compute cell-state UMAPs from sparse cell-level

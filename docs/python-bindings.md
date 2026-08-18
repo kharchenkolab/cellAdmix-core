@@ -164,7 +164,7 @@ measurements:
 audit = fit.audit_admixture()
 audit.pairs()                       # per-pair admixture rates and molecule estimates
 audit.plot_map()                    # admixture-rate map (% of target-type molecules)
-audit.plot_exposure()               # pooled exposure profile, 95% intervals
+audit.plot_exposure()               # pooled excess-exposure profile, 95% intervals
 audit.plot_remaining({"membrane": correction})
 
 report = audit.evaluate(correction) # per-pair sensitivity, false removal,
