@@ -1735,6 +1735,71 @@ BridgeRunData load_run_bridge_data(const std::string& path_or_dir, const RunLoad
   return out;
 }
 
+// Load only coordinates, integer indices, and labels for member labeling.
+LabelingRunData load_run_labeling_data(const std::string& path_or_dir) {
+  LabelingRunData out;
+  out.manifest = read_run_manifest(path_or_dir);
+  const auto cells = load_run_cells(path_or_dir);
+
+  auto input = arrow_unwrap(
+      arrow::io::ReadableFile::Open(out.manifest.paths.molecules_parquet),
+      "Open molecules parquet");
+  parquet::arrow::FileReaderBuilder builder;
+  arrow_check(builder.Open(input), "Open molecules reader");
+  auto reader = arrow_unwrap(builder.Build(), "Build molecules reader");
+  std::shared_ptr<arrow::Schema> schema;
+  arrow_check(reader->GetSchema(&schema), "Get molecules schema");
+
+  const std::vector<int> projected = {
+      find_column_index(schema, "x"),
+      find_column_index(schema, "y"),
+      find_column_index(schema, "z"),
+      find_column_index(schema, "gene_idx"),
+      find_column_index(schema, "cell_idx"),
+      find_column_index(schema, "factor_label"),
+  };
+  std::vector<int> row_groups(static_cast<std::size_t>(reader->num_row_groups()));
+  std::iota(row_groups.begin(), row_groups.end(), 0);
+  auto batch_reader = arrow_unwrap(
+      reader->GetRecordBatchReader(row_groups, projected),
+      "Get labeling molecule record batch reader");
+
+  const std::size_t n_rows = static_cast<std::size_t>(out.manifest.n_transcripts);
+  out.transcripts.x.reserve(n_rows);
+  out.transcripts.y.reserve(n_rows);
+  out.transcripts.z.reserve(n_rows);
+  out.transcripts.gene_index.reserve(n_rows);
+  out.transcripts.cell_index.reserve(n_rows);
+  out.labels.reserve(n_rows);
+
+  std::shared_ptr<arrow::RecordBatch> batch;
+  while (true) {
+    arrow_check(batch_reader->ReadNext(&batch), "Read labeling molecule record batch");
+    if (!batch) {
+      break;
+    }
+    int col = 0;
+    NumericArrayView x_view(batch->column(col++));
+    NumericArrayView y_view(batch->column(col++));
+    NumericArrayView z_view(batch->column(col++));
+    NumericArrayView gene_view(batch->column(col++));
+    NumericArrayView cell_view(batch->column(col++));
+    NumericArrayView label_view(batch->column(col++));
+    for (int64_t i = 0; i < batch->num_rows(); ++i) {
+      out.transcripts.x.push_back(x_view.value(i));
+      out.transcripts.y.push_back(y_view.value(i));
+      out.transcripts.z.push_back(z_view.value(i));
+      out.transcripts.gene_index.push_back(gene_view.int_value(i));
+      out.transcripts.cell_index.push_back(cell_view.int_value(i));
+      out.labels.push_back(label_view.int_value(i));
+    }
+  }
+
+  out.transcripts.genes = out.manifest.genes;
+  out.transcripts.cells = cells.cell_ids;
+  return out;
+}
+
 CellCountMatrix collect_run_counts(const std::string& path_or_dir, const RunLoadOptions& options) {
   const auto manifest = read_run_manifest(path_or_dir);
   CellCountMatrix out;
@@ -2332,7 +2397,7 @@ int ensure_ensemble_labels(
     return n_members;
   }
 
-  const auto run = load_run_data(run_path_or_dir);
+  const auto run = load_run_labeling_data(run_path_or_dir);
   const auto& opts = run.manifest.pipeline_options;
   NcvOptions ncv_options;
   ncv_options.k = opts.ncv_k + 1;
@@ -2395,6 +2460,9 @@ int ensure_ensemble_labels(
         run.transcripts.gene_index.begin() + row_end);
     local.cell_index.assign(run.transcripts.cell_index.begin() + row_start,
         run.transcripts.cell_index.begin() + row_end);
+    // The smoothing graphs depend only on coordinates, so they are shared
+    // across the chunk's members instead of being rebuilt per member.
+    const CellGraphs cell_graphs = build_cell_graphs(local, opts.graph_k, threads);
     for (std::size_t p = 0; p < pending.size(); ++p) {
       const auto& member_h = pool[static_cast<std::size_t>(pending[p])];
       const DenseMatrix scores = molecule_scoring == "gene_loadings"
@@ -2404,7 +2472,7 @@ int ensure_ensemble_labels(
               : project_ncv_to_factors_kl(
                     local, member_h, ncv_options, threads, 10, 1e-4, 1e-10, transform);
       const auto labels = assign_factors_per_cell(
-          local, scores, opts.graph_k, opts.same_label_ratio, 20, threads);
+          local, scores, cell_graphs, opts.same_label_ratio, 20, threads);
       std::copy(labels.begin(), labels.end(), computed[p].begin() + row_start);
     }
   }

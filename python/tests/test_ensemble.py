@@ -112,6 +112,29 @@ class EnsembleTests(unittest.TestCase):
             rules4, name="vote_hist", rule_members=[0, 1, 2, 3], min_votes=1)
         self.assertEqual(sum(union.manifest["vote_histogram"]), union.manifest["n_removed"])
 
+    def test_member_rules_disk_cache(self):
+        rules = pd.DataFrame({
+            "factor": [1], "target_cell_type": ["B"], "source_cell_type": ["A"]})
+        kwargs = dict(candidate_k=5, crossing_k=5, min_type_pair_contacts=1,
+            min_factor_molecules=1, min_pairs=1, null_iterations=1,
+            null_max_iterations=2, compute_null=True, verbose=False)
+        score = self.fit.score_bridge(**kwargs)
+        c1 = score.correct(rules, p_thresh=0.9, name="cache_a")
+        cache = sorted((Path(self.fit.run_path) / "scores").glob(
+            "ensemble_rules_bridge_m*.pkl"))
+        self.assertEqual(len(cache), 3)
+        mtimes = [p.stat().st_mtime_ns for p in cache]
+
+        # A fresh score object reuses the disk cache instead of re-scoring.
+        score2 = self.fit.score_bridge(**kwargs)
+        c2 = score2.correct(rules, p_thresh=0.9, name="cache_b")
+        self.assertEqual(c1.manifest["n_removed"], c2.manifest["n_removed"])
+        self.assertEqual(mtimes, [p.stat().st_mtime_ns for p in cache])
+
+        # A changed rule threshold invalidates and rewrites the cache.
+        score2.correct(rules, p_thresh=0.5, name="cache_c")
+        self.assertNotEqual(mtimes, [p.stat().st_mtime_ns for p in cache])
+
     def test_score_correct_defaults_to_ensemble(self):
         score = self.fit.score_bridge(
             candidate_k=5, crossing_k=5, min_type_pair_contacts=1,

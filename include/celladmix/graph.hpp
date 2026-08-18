@@ -29,6 +29,29 @@ std::vector<int> smooth_labels_icm(
     int max_iterations = 20);
 
 // Apply per-cell smoothing to dense transcript factor scores across a table.
+// Per-cell membership lists and smoothing graphs, prebuilt once so that
+// several score matrices over the same molecule table (e.g. ensemble
+// members) can be smoothed without rebuilding the graphs.
+struct CellGraphs {
+  std::vector<std::vector<int>> by_cell;
+  std::vector<KnnGraph> graphs;
+};
+
+CellGraphs build_cell_graphs(
+    const TranscriptTable& table,
+    int k_neighbors,
+    int num_threads = 1);
+
+// Assign factors using prebuilt per-cell graphs; identical output to the
+// graph-building overload below.
+std::vector<int> assign_factors_per_cell(
+    const TranscriptTable& table,
+    const DenseMatrix& node_scores,
+    const CellGraphs& cell_graphs,
+    double same_label_ratio = 5.0,
+    int max_iterations = 20,
+    int num_threads = 1);
+
 std::vector<int> assign_factors_per_cell(
     const TranscriptTable& table,
     const DenseMatrix& node_scores,
