@@ -9,6 +9,7 @@
 #include <iomanip>
 #include <limits>
 #include <map>
+#include <atomic>
 #include <memory>
 #include <mutex>
 #include <numeric>
@@ -514,6 +515,15 @@ class TiffStainImage {
       tile_width_ = width_;
       tile_height_ = height_;
     }
+    tiles_across_ = (width_ + tile_width_ - 1U) / tile_width_;
+    const std::size_t n_tiles = tiled_
+        ? static_cast<std::size_t>(TIFFNumberOfTiles(tif_))
+        : 1U;
+    tile_store_.resize(n_tiles);
+    tile_ready_ = std::vector<std::atomic<TilePixels*>>(n_tiles);
+    for (auto& slot : tile_ready_) {
+      slot.store(nullptr, std::memory_order_relaxed);
+    }
   }
 
   ~TiffStainImage() {
@@ -618,19 +628,66 @@ class TiffStainImage {
     return out;
   }
 
+  // Warm reads are lock-free, and JPEG2000 tiles are decompressed outside
+  // the lock (only the raw-byte read needs the shared TIFF handle), so both
+  // pixel sampling and tile decoding scale with the worker count.
   const TilePixels& get_tile(std::uint32_t tile) const {
-    std::lock_guard<std::mutex> lock(mutex_);
-    auto it = tile_cache_.find(tile);
-    if (it == tile_cache_.end()) {
-      it = tile_cache_.emplace(tile, decode_tile(tile)).first;
+    TilePixels* ready = tile_ready_[tile].load(std::memory_order_acquire);
+    if (ready != nullptr) {
+      return *ready;
     }
-    return it->second;
+
+    if (tiled_ && compression_ == COMPRESSION_JP2000) {
+      std::vector<unsigned char> raw;
+      {
+        std::lock_guard<std::mutex> lock(mutex_);
+        ready = tile_ready_[tile].load(std::memory_order_relaxed);
+        if (ready != nullptr) {
+          return *ready;
+        }
+        raw = read_raw_tile(tile);
+      }
+      auto decoded = std::make_unique<TilePixels>(decode_jpeg2000_tile(raw));
+      std::lock_guard<std::mutex> lock(mutex_);
+      ready = tile_ready_[tile].load(std::memory_order_relaxed);
+      if (ready == nullptr) {
+        tile_store_[tile] = std::move(decoded);
+        ready = tile_store_[tile].get();
+        tile_ready_[tile].store(ready, std::memory_order_release);
+      }
+      return *ready;
+    }
+
+    std::lock_guard<std::mutex> lock(mutex_);
+    ready = tile_ready_[tile].load(std::memory_order_relaxed);
+    if (ready == nullptr) {
+      tile_store_[tile] = std::make_unique<TilePixels>(decode_tile(tile));
+      ready = tile_store_[tile].get();
+      tile_ready_[tile].store(ready, std::memory_order_release);
+    }
+    return *ready;
+  }
+
+  std::vector<unsigned char> read_raw_tile(std::uint32_t tile) const {
+    const auto n_bytes = static_cast<tmsize_t>(tile_byte_counts_[tile]);
+    if (n_bytes <= 0) {
+      throw std::runtime_error("Invalid TIFF raw tile byte count");
+    }
+    std::vector<unsigned char> raw(static_cast<std::size_t>(n_bytes));
+    const auto got = TIFFReadRawTile(tif_, tile, raw.data(), n_bytes);
+    if (got <= 0) {
+      throw std::runtime_error("Failed to read raw JPEG2000 TIFF tile");
+    }
+    raw.resize(static_cast<std::size_t>(got));
+    return raw;
   }
 
   double value_at_pixel(int x, int y) const {
     const std::uint32_t px = static_cast<std::uint32_t>(std::clamp(x, 0, static_cast<int>(width_ - 1U)));
     const std::uint32_t py = static_cast<std::uint32_t>(std::clamp(y, 0, static_cast<int>(height_ - 1U)));
-    const std::uint32_t tile = tiled_ ? TIFFComputeTile(tif_, px, py, 0, 0) : 0;
+    const std::uint32_t tile = tiled_
+        ? (py / tile_height_) * tiles_across_ + (px / tile_width_)
+        : 0;
     const auto& pixels = get_tile(tile);
     const std::uint32_t tile_x = tiled_ ? (px / tile_width_) * tile_width_ : 0;
     const std::uint32_t tile_y = tiled_ ? (py / tile_height_) * tile_height_ : 0;
@@ -652,8 +709,10 @@ class TiffStainImage {
   std::uint16_t sample_format_ = SAMPLEFORMAT_UINT;
   std::uint64_t* tile_byte_counts_ = nullptr;
   bool tiled_ = false;
+  std::uint32_t tiles_across_ = 1;
   mutable std::mutex mutex_;
-  mutable std::unordered_map<std::uint32_t, TilePixels> tile_cache_;
+  mutable std::vector<std::unique_ptr<TilePixels>> tile_store_;
+  mutable std::vector<std::atomic<TilePixels*>> tile_ready_;
 };
 
 std::vector<BridgeCandidatePair> discover_membrane_candidates(
