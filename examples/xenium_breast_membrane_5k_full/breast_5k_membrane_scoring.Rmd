@@ -23,8 +23,8 @@ par(mar = c(3.5, 3.5, 2.0, 0.5), mgp = c(2, 0.65, 0), cex = 2/3)
 
 ## Overview
 
-This notebook starts from the curated breast 5K annotations produced by the
-companion annotation notebook, then runs the main cellAdmix workflow on the full
+This notebook starts from the curated breast 5K annotations shipped with the
+example, then runs the main cellAdmix workflow on the full
 Xenium bundle: fit molecule-level factors, infer membrane-supported admixture
 patterns, remove molecules matching those correction rules, and inspect the
 effect of cleanup.
@@ -42,12 +42,11 @@ membrane_correction <- membrane_score$correct(rules = membrane_rules)
 
 ## Inputs
 
-Place the Xenium output bundle in a local folder named `data`. The annotation
-notebook writes two compressed files under `annotations`: cell-type labels in
-`annotation.csv.gz` and coarse tissue-domain labels in
-`domain_annotation.csv.gz`. The output directory `out` is shared with the
-annotation notebook so the count-only store can be reused and upgraded to a
-full molecule store only when the fit requires it.
+Place the Xenium output bundle in a local folder named `data` (this example
+uses a Xenium Prime 5K breast cancer run). The curated annotations ship with
+this example under `annotations`: cell-type labels in `annotation.csv.gz`
+and coarse tissue-domain labels in `domain_annotation.csv.gz`, produced by a
+clustering/marker annotation workflow on the same bundle.
 
 This 5K panel uses higher cell-complexity QC thresholds in the annotation and
 cell-state diagnostic steps than the smaller pancreas 377-gene example:

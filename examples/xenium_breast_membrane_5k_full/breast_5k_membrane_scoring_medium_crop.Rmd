@@ -30,9 +30,10 @@ tumor-epithelial domains, but much smaller than the full 82M-molecule dataset.
 
 ## Inputs and Crop
 
-The annotation notebook writes `annotations/annotation.csv.gz` and
-`annotations/domain_annotation.csv.gz`. We keep the same annotations here but
-construct a cropped cellAdmix dataset using `analysis_bbox`.
+The curated annotations ship with this example as
+`annotations/annotation.csv.gz` and `annotations/domain_annotation.csv.gz`.
+We keep the same annotations here but construct a cropped cellAdmix dataset
+using `analysis_bbox`.
 
 For this 5K panel we use stricter cell-complexity thresholds in the annotation
 and cell-state UMAP diagnostics: `min_molecules = 30` and `min_genes = 15`.
