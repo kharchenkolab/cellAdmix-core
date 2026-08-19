@@ -180,6 +180,35 @@ The two gene sets bracket the unmeasurable middle (shared and
 non-distinctive genes), and all headline results below are reported in
 these terms.
 
+## Running the audit
+
+The measurement ships in the package as the admixture audit (the harness
+in `analysis/cleanup_benchmark/` is a sweep driver around it). In R, each
+panel of Figure 1 corresponds to one call:
+
+```r
+ds <- cellAdmix(bundle_dir, output_dir = "out", annotation = annotation)
+fit <- ds$fit()
+
+audit <- fit$audit_admixture()        # measure the exposure dose-response
+audit$plot_map()                      # per-pair admixture-rate map (Figure 1b)
+
+correction <- fit$correct(fit$score_membrane())  # molecule-vote ensemble cleanup
+
+report <- audit$evaluate(correction)  # per-pair sensitivity, own-marker false removal
+report$summary()
+report$plot_cleanup()                 # sensitivity bars, molecule counts (Figure 1c)
+
+audit$plot_exposure("Exocrine epithelial", "Endothelial",
+  correction = correction)            # one pair's dose-response curves (Figure 1a)
+audit$plot_remaining(list(membrane = correction))  # estimated admixture left
+```
+
+The Python bindings expose the same objects and methods —
+`fit.audit_admixture()`, `audit.plot_map()`, `audit.evaluate(correction)`,
+and so on; see [python-bindings.md](python-bindings.md) and the example
+notebooks for both languages.
+
 ## Stochasticity of factorization and scoring
 
 Rerunning the identical pipeline with a different random seed changes the
