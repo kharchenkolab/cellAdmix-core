@@ -99,7 +99,8 @@ factor fractions at cell level.
 The default rank is derived from the active annotation. The default NMF method
 is `ls_nmf`, the weighted least-squares formulation of the original cellAdmix:
 across datasets it recovers cell-type-native factors far more reproducibly
-than the KL variants (see [nmf_stability.md](nmf_stability.md)), and the
+than the KL variants (gene-ownership correlation 0.92 versus 0.48 between
+restarts; see [benchmarks.md](benchmarks.md), Figure 2a), and the
 factor decomposition it aims for — native factors per cell type or state,
 with admixture read from their minor contributions in non-native cells —
 matches the scoring model directly. In cleanup benchmarks
@@ -148,11 +149,12 @@ fit$plot_stability()
 fit$cell_factors()
 ```
 
-With `nmf_n_runs > 1` (default: one restart per thread), the fit records a
-per-factor restart stability diagnostic. Factors below the stability
-threshold (0.3) are seed artifacts rather than reproducible structure and
-should not drive factor interpretation or correction rules; the number of
-stable factors is also the primary rank signal. See
+With `nmf_n_runs > 1` (default: at least 10 restarts, one per thread above
+that), the fit records a per-factor restart stability diagnostic. Factors
+below the stability threshold (0.3) are seed-dependent rather than
+reproducible structure and should be interpreted with caution — the default
+ensemble correction votes across the restarts rather than trusting any
+single one; the number of stable factors is also the primary rank signal. See
 [NMF restart stability](nmf_stability.md) for the definition, the restart
 initialization recipe, and interpretation guidance.
 
@@ -203,8 +205,9 @@ audit$plot_remaining(list(membrane = correction))  # admixture left per correcti
 
 `audit$evaluate(correction)` verifies a correction against the same
 measurements: per-pair cleanup sensitivity, the own-marker false-removal
-rate per cell type (removal of near-surely-genuine molecules), and a
-warning for any detected pair that no removal rule covers.
+rate per cell type (removal of near-surely-genuine molecules), a warning
+for any detected pair that no removal rule covers, and a severe-over-removal
+warning when a type loses more than 25% of its own-marker molecules.
 
 ```r
 report <- audit$evaluate(correction)
@@ -251,9 +254,10 @@ restarts: each restart's factorization labels every molecule, is scored with
 the same method and parameters, and is vetted by its own native-factor
 check; a molecule is removed when at least `vote` (default 0.3) of the
 members remove it. Single-fit corrections are highly seed-dependent, and the
-vote both stabilizes them and outperforms every individual restart on the
-cleanup benchmark (see [benchmarks.md](benchmarks.md)), with the threshold
-acting as a sensitivity/specificity dial:
+vote both stabilizes them and consistently reaches the upper range of the
+individual restarts on the cleanup benchmark (see
+[benchmarks.md](benchmarks.md)), with the threshold acting as a
+sensitivity/specificity dial:
 
 ```r
 score$correct()               # ensemble over up to 10 restarts, vote = 0.3
@@ -268,8 +272,13 @@ When `rules` is passed explicitly, its source→target pairs restrict every
 member, so vetoed pairs stay vetoed across the ensemble; the returned
 correction's `rules` carry a `support` column giving the fraction of members
 that independently kept each pair. Runs fitted with `nmf_n_runs = 1` (or
-cached runs from fits that predate member pools) fall back to the single-fit
-correction with a message.
+cached runs whose stores lack a restart member pool) fall back to the
+single-fit correction with a message.
+
+`correct()` warns when a rule set removes more than 60% of a cell type's
+molecules — usually a sign that the factorization has no native factor for
+that type; the minimum-molecule gate for the warning is
+`options(celladmix.overremoval_min_molecules = )`.
 
 ## Clustering and Annotation
 
@@ -312,7 +321,7 @@ for the full option list.
 
 ## Example Notebooks
 
-- [Pancreas quickstart](../examples/xenium_pancreas_membrane_377_full/pancreas_quickstart.ipynb): the recommended workflow in its shortest form - audit, fit, correct, verify.
+- [Pancreas quickstart](../examples/xenium_pancreas_membrane_377_full/pancreas_quickstart.ipynb): the recommended workflow in its shortest form - fit, audit, correct, verify.
 - [Minimal CosMx NSCLC tutorial](../examples/cosmx_nsclc_giotto/celladmix_cosmx_minimal.ipynb): a compact tabular example mirroring the original cellAdmix [NSCLC tutorial](https://github.com/kharchenkolab/cellAdmix/blob/main/vignettes/NSCLC_tutorial_fulldata.ipynb).
 - [Detailed Xenium pancreas tutorial](../examples/xenium_pancreas_membrane_377_full/pancreas_membrane_scoring_clean.ipynb): the full walkthrough on a membrane-stained Xenium bundle - audit, membrane and bridge scoring on their recommended factorizations, and the variant comparison behind that pairing.
 - [Seurat Xenium integration tutorial](../examples/xenium_pancreas_membrane_377_full/pancreas_seurat_integration.ipynb): the same pancreas dataset, using Seurat for cell-level state and cellAdmix for molecule-complete fitting, scoring, and correction.

@@ -343,38 +343,23 @@ loading profile of a factor resembles marker expression for a particular
 annotated cell type. It is useful as a source prior for bridge and membrane
 scoring.
 
-For source cell type $S$ and factor $f$, let $A_{Sf}$ be the total loading mass
-assigned to marker genes for $S$ in factor $f$. Let $A_{\cdot f}$ be the total
-loading mass in factor $f$, $A_{S\cdot}$ the marker loading mass for $S$ across
-factors, and $A_{\cdot\cdot}$ the total loading mass. With pseudocount
-$\epsilon$, define:
+For each annotated cell type $S$, a marker weight vector $w_S$ is built from
+the annotated cells' expression profiles: per gene, the one-vs-rest margin
+(the type's mean expression minus the best other type's, floored at zero and
+at `min_marker_logfc`, optionally restricted to the top
+`top_markers_per_type` genes), raised to `specificity_power`. The factor's
+non-negative loading vector $a_f$ (raised to `factor_power`) is then compared
+to each type's weight vector by cosine similarity:
 
 $$
-u_{Sf} =
-\frac{A_{Sf}+\epsilon}{A_{\cdot f}+\epsilon C},
+\mathrm{score}_{Sf} =
+\frac{a_f \cdot w_S}{\lVert a_f \rVert \, \lVert w_S \rVert}.
 $$
 
-$$
-v_{Sf} =
-\frac{A_{S\cdot}-A_{Sf}+\epsilon}
-{A_{\cdot\cdot}-A_{\cdot f}+\epsilon C},
-$$
-
-$$
-e_{Sf} = \log\left(\frac{u_{Sf}}{v_{Sf}}\right),
-$$
-
-$$
-\pi_{Sf} =
-\frac{A_{Sf}+\epsilon}
-{A_{\cdot f}+\epsilon C}.
-$$
-
-Here, $C$ is the number of annotated cell types. The implementation reports
-these quantities as `type_fraction`, `other_fraction`,
-`source_log_enrichment`, and `source_probability`. The source prior usually
-uses $\pi_{Sf}$ or $e_{Sf}$ to call the most likely source cell type for each
-factor.
+The implementation reports, per factor × cell type, the `score`, its `rank`
+among types, the factor's `best_score` and `second_score`, their difference
+as `margin`, and an `is_best` flag. The source prior uses the best-scoring
+cell type per factor, with `margin` measuring how decisive the call is.
 
 ## Coherence Score
 
@@ -678,7 +663,8 @@ the following holds:
   factor persists in target cells with no source contact.
 - **Cross-type outlier:** the fraction of source-distant $T$ cells with
   $x_{af} > 0.05$ exceeds $Q_3 + 1.5\,\mathrm{IQR}$ of the same rate computed
-  over all other cell types, and exceeds $0.1$ — the target expresses the
+  over all cell types except the source (the target's own rate is included
+  in the reference), and exceeds $0.1$ — the target expresses the
   factor distinctly even in isolation.
 - **No exposure gradient:**
   $\mathrm{mean}_{a \in E}(x_{af}) - \mathrm{mean}_{a \in D}(x_{af}) < 0$ —

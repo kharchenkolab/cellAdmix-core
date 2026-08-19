@@ -55,18 +55,24 @@ Native-Factor Check section in
 [docs/scoring_methods.md](scoring_methods.md).
 
 `score.correct()` applies the correction as a molecule-vote ensemble by
-default: every NMF restart retained by the fit is scored and vetted
-independently (each with its own native-factor check), and a molecule is
-removed when at least `vote` (default 0.3) of the members remove it. The
+default: up to `ensemble` (default 10) of the fit's NMF restarts are scored
+and vetted independently (each with its own native-factor check), and a
+molecule is removed when at least `vote` (default 0.3) of the members remove
+it. The
 vote stabilizes the seed-dependence of single-fit corrections and acts as a
 sensitivity/specificity dial (see [benchmarks.md](benchmarks.md)). Pass
 `ensemble=1` for a single-fit correction from the selected restart;
-`correction.ensemble()` reports the member count, vote threshold, and vote
+`correction.ensemble()` reports the member count, minimum votes, and vote
 histogram, and the returned `correction.rules` carry a `support` column with
 the fraction of members keeping each source→target pair. The first ensemble
 correction computes and caches per-member molecule labelings in the run
-directory; runs fitted with `nmf_n_runs=1` (or cached runs from fits that
-predate member pools) fall back to the single-fit correction with a message.
+directory; runs fitted with `nmf_n_runs=1` (or cached runs whose stores lack
+a restart member pool) fall back to the single-fit correction with a message.
+
+`correct()` warns when a rule set removes more than 60% of a cell type's
+molecules — usually a sign that the factorization has no native factor for
+that type; the minimum-molecule gate for the warning is
+`celladmix.fit.OVERREMOVAL_MIN_MOLECULES`.
 
 Default behavior mirrors the R API:
 
@@ -168,8 +174,8 @@ audit.plot_exposure()               # pooled excess-exposure profile, 95% interv
 audit.plot_remaining({"membrane": correction})
 
 report = audit.evaluate(correction) # per-pair sensitivity, false removal,
-report.summary()                    # and warnings for uncovered pairs
-report.plot_cleanup()
+report.summary()                    # warnings for uncovered pairs and for
+report.plot_cleanup()               # severe own-marker over-removal (>25%)
 ```
 
 The audit's directly measured marker excess is a conservative lower bound
@@ -221,8 +227,8 @@ streaming reads and membrane-image discovery.
   corrected counts back into the SpatialData table, and illustrates Scanpy /
   SpatialData plotting on the outputs.
 - [Standalone Xenium breast 5K workflow](../examples/xenium_breast_membrane_5k_full/breast_5k_python_standalone.ipynb) -
-  the same core workflow on a full 5K-panel dataset (96.6M molecules,
-  694K cells).
+  the same core workflow on a full 5K-panel dataset (82.1M molecules,
+  688K cells after QC).
 
 These notebooks are intended as starting templates. The SpatialData notebook
 needs a Python 3.11+ environment with `spatialdata`, `spatialdata-io`, and

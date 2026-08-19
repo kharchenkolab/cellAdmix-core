@@ -82,7 +82,7 @@ $$\hat A_{S \to T} = \frac{L}{s}, \qquad
 \hat r_{S \to T} = \frac{L}{s \cdot M_T}.$$
 
 On pancreas the pools carry roughly half of their sources' transcript
-output, so the extrapolation raises totals about 1.7× above the
+output, so the extrapolation raises totals about 2× above the
 demonstrable floor $L$; Figure 1b maps the resulting per-pair rates
 $\hat r_{S \to T}$.
 
@@ -183,8 +183,8 @@ these terms.
 ## Running the audit
 
 The measurement ships in the package as the admixture audit (the harness
-in `analysis/cleanup_benchmark/` is a sweep driver around it). In R, each
-panel of Figure 1 corresponds to one call:
+in `analysis/cleanup_benchmark/` re-implements the same estimator for its
+sweep runs). In R, each panel of Figure 1 corresponds to one call:
 
 ```r
 ds <- cellAdmix(bundle_dir, output_dir = "out", annotation = annotation)
@@ -296,8 +296,9 @@ across restarts.
 
 Figure 4 and Table 1 summarize the strict-tier sensitivity of the main
 correction strategies across all dataset × scoring-method × variant
-combinations. Three regularities emerge. The 3-of-10 molecule vote matches
-or exceeds the *best* individual seed in every combination while removing
+combinations. Three regularities emerge. The 3-of-10 molecule vote lands in
+the upper half of the single-seed range in every combination — and above the
+best individual seed in most — while removing
 the seed dependence entirely, at own-marker false-removal rates of 0.03-3.2%. The
 rule-level consensus captures much of the same benefit where failures
 occur at the decision stage (it rescues ls-NMF bridge scoring on breast
@@ -305,7 +306,7 @@ from 0.34 to 0.78-0.84), but it cannot help when the failing fit never
 labels the relevant molecules correctly in the first place. And no
 correction strategy rescues a regime where the factorization family never
 produces the needed structure: pancreas bridge scoring under invsqrt KL-NMF
-stays below 0.2 at every threshold — an argument for factorization-level
+stays at or below ~0.22 at every threshold — an argument for factorization-level
 work (anchor-based recovery reached 0.52-0.67 there) rather than better
 ensembling.
 
@@ -320,8 +321,8 @@ ensembling.
 **Table 1. Strict-tier estimated sensitivity across the benchmark matrix.**
 Single-fit columns give the min-max range over individually evaluated seed
 refits; vote columns give the 3-of-10 molecule-vote ensemble (votes pooled
-over ten seeds) with its own-marker false-removal rate in parentheses. Bold marks the strategy reaching the
-best (or tied) sensitivity in each row.
+over ten seeds) with its own-marker false-removal rate in parentheses. Bold
+marks the stronger vote-ensemble arm in each row.
 
 ![Figure 4](figures/benchmark_fig4.png)
 
@@ -330,8 +331,8 @@ correction strategies.** Each group shows, for one dataset × scoring
 method, the two factorization variants (ls = ls-NMF, inv = invsqrt
 KL-NMF): individual seed fits (grey), rule-level consensus applied per seed
 (orange squares), and the 3-of-10 molecule-vote ensemble (red star).
-Take-home: the molecule vote is the only strategy that is uniformly at or
-above the best single fit while being deterministic given the restart pool;
+Take-home: the molecule vote is the only strategy that is uniformly in the
+upper range of the single fits while being deterministic given the restart pool;
 under the vote, invsqrt KL-NMF is at least as good as ls-NMF for membrane
 scoring in every case measured, and ls-NMF at least as good as invsqrt for
 bridge scoring — the variant choice should follow the scoring method.
@@ -370,14 +371,15 @@ cellAdmix it yields three conclusions:
    least ~30% of restarts remove it, with each restart's native-factor
    check retained as its own false-positive filter. This is what `correct()` does by
    default, voting over the fit's restart pool at `vote = 0.3`. Voting over
-   raw single-init restarts matches or exceeds voting over independent
-   best-of-restart fits at this threshold (pancreas membrane under invsqrt
+   raw single-init restarts matches voting over independent
+   best-of-restart fits on membrane scoring and clearly exceeds it on
+   bridge scoring (pancreas membrane under invsqrt
    KL-NMF: 0.848 vs 0.857 strict-tier sensitivity at equal false removal;
-   ls-NMF bridge improves to 0.67 at 0.5% false removal;
+   ls-NMF bridge improves from 0.55 to 0.67 at 0.5% false removal;
    `results/pancreas_restart_vs_seed_members.csv`). On the
    benchmark this default achieves
    0.45-0.86 strict-tier sensitivity at 0.03-3.2% own-marker false removal,
-   always at or above the best individual restart, with the threshold
+   consistently in the upper range of the individual restarts, with the threshold
    exposed as the user's sensitivity/specificity dial — calibrable per
    dataset by exactly the sweep shown in Figure 3. Two known limits bound
    the approach: leakage carried on genes shared between source and target

@@ -17,7 +17,7 @@ python scripts/celladmix_batch.py --input data --output out \
 This performs:
 
 - dataset construction and on-disk input-store reuse/building;
-- NMF factor fitting with the default `invsqrt_kl` variant;
+- NMF factor fitting with the default `ls_nmf` variant;
 - membrane scoring when a membrane image is discoverable, otherwise bridge
   scoring;
 - score-rule generation at `--p-thresh`;
@@ -59,6 +59,10 @@ For `--auto-annotate`, the output directory also receives:
 - `annotation_report.html`: UMAP/spatial cluster overview when `--report` or
   `--annotation-report` is supplied.
 
+With a supplied annotation and `--annotation-report`, the output directory
+receives `annotation_markers.csv` with one-vs-rest marker summaries for the
+annotated types.
+
 The fit, molecule labels, corrected run, and input-store caches are written
 under the same `output_dir` run-store layout used by the notebook API.
 
@@ -72,7 +76,9 @@ Important options:
 
 - `--threads N`: default worker count for fit, scoring, and NMF restarts.
 - `--rank auto|N`: factor rank; `auto` uses the annotation-based default.
-- `--nmf-variant invsqrt_kl|kl|sqrt_kl|ls_nmf`: NMF formulation.
+- `--nmf-variant ls_nmf|invsqrt_kl|kl|sqrt_kl`: NMF formulation (the first
+  is the default; `invsqrt_kl` is the recommended pairing for membrane
+  scoring).
 - `--nmf-runs auto|N`: multiseed NMF restarts; `auto` uses
   `max(10, --threads)`.
 - `--score auto|membrane|bridge`: scoring method.
@@ -87,12 +93,11 @@ Important options:
 
 ## Current Python Limitations
 
-Python v1 focuses on Xenium bundle processing. The CLI exposes tabular and
-related schema options for parity with the R script, but generic tabular input
-currently fails with an explicit message:
+The Python bindings implement Xenium bundle processing. The CLI exposes
+tabular and related schema options for parity with the R script, but generic
+tabular input fails with an explicit message:
 
-- Use `scripts/celladmix_batch.R` for generic tabular inputs until the Python
-  tabular-store constructor is exposed.
+- Use `scripts/celladmix_batch.R` for generic tabular inputs.
 - Coherence scoring is not exposed in the Python batch script yet.
 
 The Python standalone and SpatialData notebooks cover interactive workflows:

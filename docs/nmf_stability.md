@@ -6,8 +6,10 @@ factorization. Stability answers two questions:
 
 - **Which factors can be trusted?** A factor that is re-found by independent
   random restarts reflects structure in the data; a factor that appears in
-  only one restart is a seed artifact and should not drive scoring or
-  correction decisions.
+  only one restart is seed-dependent and should be interpreted with caution.
+  Stability is a diagnostic only — it does not gate scoring or correction,
+  whose default molecule-vote ensemble absorbs seed dependence by voting
+  across the restarts.
 - **Is the rank appropriate?** The number of stable factors levels off at the
   number of factors the data can resolve. Raising the rank past that point
   adds unstable factors rather than new structure.
@@ -67,13 +69,12 @@ The run manifest's `nmf_diagnostics` block records:
 | `stability_threshold` | threshold used for the count (default 0.3) |
 | `stability_comparison_runs` | how many independent restarts the average uses |
 | `candidate_best_match_correlations` | per-restart mean matched correlation against the selected run |
-| `stability_metric` | `"ownership_matched"`; manifests written by older versions load as `"best_match_legacy"` |
+| `stability_metric` | `"ownership_matched"`; manifests lacking the field load as `"best_match_legacy"` |
 
 Values recorded under the legacy metric (best-match Pearson on raw loadings,
-without one-to-one matching) are not comparable to ownership-matched values:
-the legacy kernel scores unrelated factors well above zero for
-abundance-dominated variants, and inflates comparisons between `nmf_variant`
-settings. Refit with the current version when stability matters.
+without one-to-one matching) are not comparable to ownership-matched values
+and should not be used for cross-variant comparisons; refit to obtain
+ownership-matched stability.
 
 ## Usage
 

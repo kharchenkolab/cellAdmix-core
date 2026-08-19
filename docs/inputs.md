@@ -1,10 +1,13 @@
 # Inputs
 
-`cellAdmix-core` currently supports two input families through the public
+`cellAdmix-core` supports two file-level input families through the public
 `cellAdmix()` constructor:
 
 - Xenium bundles
 - generic tabular molecule tables
+
+The constructor also accepts Seurat objects and prepared-project/store
+directories directly (see [r-bindings.md](r-bindings.md)).
 
 The normal workflow is object-oriented:
 
@@ -15,9 +18,8 @@ score <- fit$score("membrane", ...)
 clean <- score$correct(...)
 ```
 
-The older `celladmix_prepare_*()`, `celladmix_fit()`, and
-`celladmix_score_*()` functions are internal backend helpers in the initial
-package API.
+The `celladmix_prepare_*()`, `celladmix_fit()`, and
+`celladmix_score_*()` functions are internal backend helpers.
 
 ## Xenium
 
@@ -64,8 +66,9 @@ Image selection is intentionally soft:
 - If `image_path` is omitted, the internal image-discovery helper reads the
   Xenium manifest and tries the morphology-focus sibling selected by
   `focus_index`.
-- If the requested focus sibling is absent, discovery falls back to the manifest
-  focus image, then to the manifest morphology image.
+- If the requested focus sibling is absent, discovery falls back to the
+  manifest focus image for the DAPI stain, and otherwise to the manifest
+  morphology image.
 
 For the current Xenium pancreas membrane example, `focus_index = 1` resolves to:
 
@@ -115,6 +118,10 @@ Optional schema fields:
 - `sample_id`
 - `fov_id`
 - `cell`
+- `segmentation_mask`
+- `cell_metadata`
+- `cell_metadata_cell`
+- `cell_metadata_cell_type`
 
 Tabular input requires one of:
 
@@ -158,7 +165,7 @@ Current TIFF assumptions:
 
 Implementation detail:
 
-- connected components are currently 4-connected, matching the Baysor-style binary-mask path we adopted for ISS/DAPI masks
+- connected components are 4-connected, matching the Baysor-style binary-mask convention for ISS/DAPI masks
 
 ### Unassigned Molecules
 
@@ -176,11 +183,11 @@ Both Xenium and tabular input support restricting the analysis scope.
 Common filtering options:
 
 - `analysis_bbox`
+- `min_qv`
 
 Tabular-only filtering options:
 
 - `qv_col`
-- `min_qv`
 
 Behavior:
 
@@ -195,7 +202,7 @@ Not currently supported:
 - multi-channel segmentation masks
 - polygon or boundary segmentation files in the `cellAdmix` prep path
 
-If a dataset comes with a binary nucleus mask, use `segmentation_mask_path`; the loader now converts connected components into cell ids automatically.
+If a dataset comes with a binary nucleus mask, use `celladmix_schema(segmentation_mask = ...)`; connected components become cell ids automatically.
 
 ## Minimal Examples
 

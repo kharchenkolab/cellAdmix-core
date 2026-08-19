@@ -65,10 +65,9 @@ Verify the R installation:
 Rscript -e 'library(cellAdmixCore); packageVersion("cellAdmixCore")'
 ```
 
-Direct GitHub installation of the R package is still being validated because
-the R package currently compiles C++ sources from the repository root. Until CI
-confirms the direct path, the supported R install route is cloning the
-repository and running `R CMD INSTALL r` from the checkout.
+Because the R package compiles C++ sources from the repository root, the
+supported R install route is cloning the repository and running
+`R CMD INSTALL r` from the checkout.
 
 ## Python Bindings
 
@@ -162,6 +161,6 @@ cmake --preset user-vcpkg
 cmake --build --preset user-vcpkg -j8
 ```
 
-The initial GitHub Actions workflow builds the C++ core on Ubuntu, macOS, and
+The GitHub Actions workflow builds the C++ core on Ubuntu, macOS, and
 Windows, and runs Ubuntu smoke jobs for C++ tests, R install/load, and Python
 install/import.
