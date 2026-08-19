@@ -1,15 +1,15 @@
 ---
 title: "cellAdmix with a Seurat Xenium Object"
 output:
-  html_document:
+  github_document:
     toc: true
     toc_depth: 2
-    df_print: paged
+    html_preview: false
 ---
 
 ```{r setup, message=FALSE}
 knitr::opts_chunk$set(echo = TRUE, message = TRUE, warning = TRUE,
-  fig.width = 8, fig.height = 6, dpi = 192)
+  fig.width = 8, fig.height = 6, dpi = 96, fig.retina = 2)
 
 library(Seurat)
 library(cellAdmixCore)

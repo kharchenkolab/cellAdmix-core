@@ -1,9 +1,10 @@
 ---
 title: "cellAdmix Xenium Example: Pancreas Membrane and Bridge Scoring"
 output:
-  html_document:
+  github_document:
     toc: true
     toc_depth: 2
+    html_preview: false
 ---
 
 ```{r setup, include=FALSE}
@@ -12,7 +13,7 @@ library(ggplot2)
 library(cowplot)
 
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = TRUE,
-  fig.align = "center", dpi = 192)
+  fig.align = "center", dpi = 96, fig.retina = 2)
 par(mar = c(3.5, 3.5, 2.0, 0.5), mgp = c(2, 0.65, 0), cex = 2/3)
 ```
 

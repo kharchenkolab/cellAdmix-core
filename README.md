@@ -23,7 +23,7 @@ stricter cell QC, which keeps 82.1M molecules across 688K cells at
 rank 8.)
 
 The quickest way to see the workflow end to end is the
-[pancreas quickstart notebook](examples/xenium_pancreas_membrane_377_full/pancreas_quickstart.ipynb):
+[pancreas quickstart notebook](examples/xenium_pancreas_membrane_377_full/pancreas_quickstart.md):
 fit, audit the dataset's admixture, correct, and verify the cleanup in a few
 short steps.
 
@@ -133,16 +133,18 @@ Python-side limitations.
 
 ## Examples
 
-Rendered notebooks with embedded output are grouped by binding.
+Rendered tutorials with embedded output are grouped by binding: the R
+tutorials are rendered markdown pages, the Python tutorials are Jupyter
+notebooks.
 
 ### R Examples
 
-- [Pancreas quickstart](examples/xenium_pancreas_membrane_377_full/pancreas_quickstart.ipynb): the recommended workflow in its shortest form - fit, audit, correct, verify.
-- [Minimal CosMx NSCLC tutorial](examples/cosmx_nsclc_giotto/celladmix_cosmx_minimal.ipynb): a compact tabular example mirroring the original cellAdmix [NSCLC tutorial](https://github.com/kharchenkolab/cellAdmix/blob/main/vignettes/NSCLC_tutorial_fulldata.ipynb).
-- [Detailed Xenium pancreas tutorial](examples/xenium_pancreas_membrane_377_full/pancreas_membrane_scoring_clean.ipynb): the full walkthrough on a membrane-stained Xenium bundle - audit, membrane and bridge scoring on their recommended factorizations (`invsqrt_kl` and `ls_nmf`), and the variant comparison behind that pairing.
-- [Seurat Xenium integration tutorial](examples/xenium_pancreas_membrane_377_full/pancreas_seurat_integration.ipynb): the same pancreas dataset, using Seurat for cell-level state and cellAdmix for molecule-complete fitting, scoring, and correction.
-- [Xenium breast 5K membrane scoring tutorial](examples/xenium_breast_membrane_5k_full/breast_5k_membrane_scoring.ipynb): the full-scale 5K-panel workflow behind the timing benchmark above.
-- [Xenium breast 5K medium-crop tutorial](examples/xenium_breast_membrane_5k_full/breast_5k_membrane_scoring_medium_crop.ipynb): the same workflow on a cropped subset for faster iteration.
+- [Pancreas quickstart](examples/xenium_pancreas_membrane_377_full/pancreas_quickstart.md): the recommended workflow in its shortest form - fit, audit, correct, verify.
+- [Minimal CosMx NSCLC tutorial](examples/cosmx_nsclc_giotto/celladmix_cosmx_minimal.md): a compact tabular example mirroring the original cellAdmix [NSCLC tutorial](https://github.com/kharchenkolab/cellAdmix/blob/main/vignettes/NSCLC_tutorial_fulldata.ipynb).
+- [Detailed Xenium pancreas tutorial](examples/xenium_pancreas_membrane_377_full/pancreas_membrane_scoring_clean.md): the full walkthrough on a membrane-stained Xenium bundle - audit, membrane and bridge scoring on their recommended factorizations (`invsqrt_kl` and `ls_nmf`), and the variant comparison behind that pairing.
+- [Seurat Xenium integration tutorial](examples/xenium_pancreas_membrane_377_full/pancreas_seurat_integration.md): the same pancreas dataset, using Seurat for cell-level state and cellAdmix for molecule-complete fitting, scoring, and correction.
+- [Xenium breast 5K membrane scoring tutorial](examples/xenium_breast_membrane_5k_full/breast_5k_membrane_scoring.md): the full-scale 5K-panel workflow behind the timing benchmark above.
+- [Xenium breast 5K medium-crop tutorial](examples/xenium_breast_membrane_5k_full/breast_5k_membrane_scoring_medium_crop.md): the same workflow on a cropped subset for faster iteration.
 
 ### Python Examples
 

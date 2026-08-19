@@ -1,21 +1,23 @@
 ---
 title: "cellAdmix Quickstart: Admixture Correction on Xenium Pancreas"
 output:
-  html_document:
-    toc: false
+  github_document:
+    toc: true
+    toc_depth: 2
+    html_preview: false
 ---
 
 ```{r setup, include=FALSE}
 library(cellAdmixCore)
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = TRUE,
-  fig.align = "center", dpi = 192)
+  fig.align = "center", dpi = 96, fig.retina = 2)
 ```
 
 This is the compact version of the recommended cellAdmix workflow:
 estimate how much admixture the dataset carries, correct it, and verify
 the result. Inputs are the Xenium output bundle (`data/`) and a cell-type
 annotation (see the
-[full tutorial](pancreas_membrane_scoring_clean.ipynb) for download
+[full tutorial](pancreas_membrane_scoring_clean.md) for download
 instructions and a walkthrough of the intermediate diagnostics; see
 [docs/benchmarks.md](../../docs/benchmarks.md) for how the settings below
 were chosen).
