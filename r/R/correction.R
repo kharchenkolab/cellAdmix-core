@@ -1,5 +1,5 @@
 #' High-Level cellAdmix Correction
-#' @export
+#' @noRd
 .celladmix_compact_correction_summary <- function(summary) {
   if (!is.data.frame(summary) || !nrow(summary)) {
     return(data.frame())
@@ -46,6 +46,15 @@
   out
 }
 
+#' Corrected cellAdmix Run
+#'
+#' Handle for a persisted corrected run produced by `score$correct()` or
+#' `fit$correct()`. Provides access to corrected counts (`$counts()`),
+#' per-cell and per-type removal summaries (`$summary()`, `$cell_summary()`),
+#' ensemble vote details (`$ensemble()`), removal plots, and corrected
+#' cell-state diagnostics.
+#'
+#' @export
 CellAdmixCorrection <- R6::R6Class(
   "CellAdmixCorrection",
   public = list(

@@ -3,7 +3,7 @@
 #' These helpers draw molecule-level views around selected target cells. They
 #' are intended for notebook diagnostics where fitted factor labels, optional
 #' stain crops, and cell boundaries should be shown together.
-
+#' @noRd
 .celladmix_as_factor_id <- function(x) {
   if (is.null(x) || !length(x)) {
     return(integer())

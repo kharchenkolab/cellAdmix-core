@@ -107,8 +107,7 @@ celladmix_simulate_nsclc <- function(
 #' @param analysis_bbox Optional convenience bounding box for a single crop,
 #'   given as `c(xmin, xmax, ymin, ymax)`.
 #' @param analysis_crops Optional crop specification. May be a data frame, a
-#'   list, or a path to a CSV file understood by
-#'   [utils::.celladmix_normalize_crops()].
+#'   list, or a path to a CSV file with crop bounding boxes.
 #' @param cell_filter,gene_filter Optional cell and gene IDs to retain while
 #'   building native Xenium input stores.
 #' @param min_qv Optional minimum transcript QV threshold applied in later
@@ -215,8 +214,7 @@ celladmix_prepare_xenium <- function(
 #' @param analysis_bbox Optional convenience bounding box for a single crop,
 #'   given as `c(xmin, xmax, ymin, ymax)`.
 #' @param analysis_crops Optional crop specification. May be a data frame, a
-#'   list, or a path to a CSV file understood by
-#'   [utils::.celladmix_normalize_crops()].
+#'   list, or a path to a CSV file with crop bounding boxes.
 #' @param x_col,y_col,z_col Column names for spatial coordinates. `z_col` may be
 #'   `NULL` for 2D datasets.
 #' @param gene_col Column name containing the molecule gene identity.
@@ -582,14 +580,14 @@ celladmix_collect_store_counts <- function(
 #'
 #' Runs a cell-level clustering workflow on the prepared Xenium scope. The
 #' result is written under the project directory and returned as a small object
-#' suitable for plotting and for use as `training_labels` in [celladmix_fit()].
+#' suitable for plotting and for use as `training_labels` in `celladmix_fit()`.
 #'
 #' The current pipeline performs sparse cell-by-gene counting, library
 #' normalization, `log1p`, variable-gene selection, PCA, kNN graph
 #' construction, plain Louvain clustering, and UMAP embedding.
 #'
 #' @param prep A `celladmix_prep` object created by
-#'   [celladmix_prepare_xenium()] or [celladmix_prepare_tabular()].
+#'   `celladmix_prepare_xenium()` or `celladmix_prepare_tabular()`.
 #' @param cluster_id Character identifier used to name the persisted clustering
 #'   outputs under the project directory.
 #' @param min_molecules Minimum number of molecules required for a cell to be
@@ -907,7 +905,7 @@ celladmix_cluster_cells <- function(
 #' `celladmix_clusters` object, or resolved automatically from the project.
 #'
 #' @param prep A `celladmix_prep` object created by
-#'   [celladmix_prepare_xenium()].
+#'   `celladmix_prepare_xenium()`.
 #' @param training_labels Training-strata specification. Supported values are a
 #'   `celladmix_clusters` object, `"auto"`, `"cluster"`, `"cell_type"`, or
 #'   `"none"`.
@@ -964,7 +962,7 @@ celladmix_cluster_cells <- function(
 #'   outputs.
 #' @param report_ncv_umap Logical; if `TRUE`, build the developer-only NCV UMAP
 #'   report sidecar during the fit. Leave `FALSE` for lean production runs and
-#'   call [celladmix_report_data()] later when notebook/report data is needed.
+#'   call `celladmix_report_data()` later when notebook/report data is needed.
 #' @param seed Integer RNG seed.
 #' @param verbose Logical; if `TRUE`, emit `[INFO]` fit-stage progress messages
 #'   from the native backend.
@@ -1025,7 +1023,7 @@ celladmix_read_run <- function(path) {
 #'
 #' @param run A `celladmix_run` object.
 #' @param cell_factors Optional output from `fit$cell_factors()` or
-#'   [celladmix_collect_cells()]. Supplying this avoids rereading the cell table.
+#'   `celladmix_collect_cells()`. Supplying this avoids rereading the cell table.
 #' @param importance Factor importance definition. `"molecule_fraction"` uses
 #'   cell factor fractions weighted by per-cell molecule counts,
 #'   `"cell_mean_fraction"` averages cell factor fractions equally, and
@@ -1287,7 +1285,7 @@ celladmix_collect_cells <- function(run) {
 #' in NMF training. This includes per-molecule 2D UMAP coordinates, final CRF
 #' labels, and normalized NMF component weights.
 #'
-#' If the sidecar has not been built yet, call [celladmix_report_data()] with
+#' If the sidecar has not been built yet, call `celladmix_report_data()` with
 #' `what = "ncv_umap"` first, or fit with `report_ncv_umap = TRUE`.
 #'
 #' @param run A `celladmix_run` object.
@@ -1306,7 +1304,7 @@ celladmix_collect_training_molecules <- function(run) {
 #' Build and Collect Lightweight Report Data
 #'
 #' Builds developer/report-side data only when requested. This keeps
-#' [celladmix_fit()] optimized for core persisted outputs while still allowing
+#' `celladmix_fit()` optimized for core persisted outputs while still allowing
 #' notebooks to request cell-level and NCV-level UMAP views on demand.
 #'
 #' The cell UMAP view is assembled in R by merging a `celladmix_clusters`
@@ -1453,7 +1451,7 @@ celladmix_collect_counts_sparse <- function(run, analysis_crop = NULL, analysis_
 
 #' Collect a Spatial Region from a Persisted Run
 #'
-#' Convenience wrapper over [celladmix_collect_transcripts()] for a bounding-box
+#' Convenience wrapper over `celladmix_collect_transcripts()` for a bounding-box
 #' region query.
 #'
 #' @param run A `celladmix_run` object.
@@ -1614,7 +1612,7 @@ celladmix_score_bridge <- function(
 #' Converts a bridge-test summary table into a target-cell-type by factor matrix
 #' analogous to the original `plot_annot_hmap()` input.
 #'
-#' @param bridge A `celladmix_bridge_result` from [celladmix_score_bridge()] or
+#' @param bridge A `celladmix_bridge_result` from `celladmix_score_bridge()` or
 #'   a bridge summary data frame.
 #' @param p_thresh P-value threshold used to mark target cell types for removal.
 #' @param adjust_p Whether to FDR-adjust p-values before plotting and thresholding.
@@ -1708,11 +1706,11 @@ celladmix_bridge_annotation <- function(bridge, p_thresh = 0.1, adjust_p = FALSE
 #' Convert Bridge Annotations to Correction Rules
 #'
 #' Builds the `factor`/`target_cell_type` rule table consumed by
-#' [celladmix_correct()]. Sources are retained for diagnostics, but molecules
+#' `celladmix_correct()`. Sources are retained for diagnostics, but molecules
 #' are removed only from target cell types.
 #'
 #' @param bridge A `celladmix_bridge_result`, bridge summary data frame, or
-#'   object returned by [celladmix_bridge_annotation()].
+#'   object returned by `celladmix_bridge_annotation()`.
 #' @param p_thresh P-value threshold for target removal calls.
 #' @param adjust_p Whether to FDR-adjust p-values before thresholding.
 #' @param target_cell_types Optional character vector limiting returned target
@@ -1790,7 +1788,7 @@ celladmix_bridge_rules <- function(
 #' `p_thresh`.
 #'
 #' @param bridge A `celladmix_bridge_result`, bridge summary data frame, or
-#'   object returned by [celladmix_bridge_annotation()].
+#'   object returned by `celladmix_bridge_annotation()`.
 #' @param p_thresh P-value threshold used for marking target cell types.
 #' @param adjust_p Whether to FDR-adjust p-values before plotting.
 #' @param main Plot title for the base-graphics fallback.
@@ -2180,7 +2178,7 @@ celladmix_discover_membrane_image <- function(
 #' image. This is intended for diagnostics and report notebooks, not for bulk
 #' image processing.
 #'
-#' @param image A list returned by [celladmix_discover_membrane_image()], or a
+#' @param image A list returned by `celladmix_discover_membrane_image()`, or a
 #'   character image path.
 #' @param bbox Physical-coordinate bounding box `c(xmin, xmax, ymin, ymax)`.
 #' @param pixel_size Microns per image pixel. Required when `image` is a path.
@@ -2393,7 +2391,7 @@ celladmix_score_membrane <- function(
 #' Collapse Membrane Scores for Annotation Plots
 #'
 #' @param membrane A `celladmix_membrane_result` from
-#'   [celladmix_score_membrane()] or a membrane summary data frame.
+#'   `celladmix_score_membrane()` or a membrane summary data frame.
 #' @param p_thresh P-value threshold used to mark target cell types.
 #' @param adjust_p Whether to FDR-adjust p-values before plotting and
 #'   thresholding.
@@ -2443,7 +2441,7 @@ celladmix_membrane_rules <- function(
 #'
 #' @inheritParams celladmix_plot_bridge_heatmap
 #' @param membrane A `celladmix_membrane_result`, membrane summary data frame,
-#'   or object returned by [celladmix_membrane_annotation()].
+#'   or object returned by `celladmix_membrane_annotation()`.
 #'
 #' @return Invisibly returns the annotation list for base graphics, or a
 #'   `ComplexHeatmap::Heatmap` object when optional dependencies are available.
@@ -2679,7 +2677,7 @@ celladmix_score_coherence <- function(
 #' Collapse Coherence Scores for Annotation Plots
 #'
 #' @param coherence A `celladmix_coherence_result` from
-#'   [celladmix_score_coherence()] or a coherence summary data frame.
+#'   `celladmix_score_coherence()` or a coherence summary data frame.
 #' @param source_mode How to infer the source cell type for each factor.
 #'   Coherence target evidence is still based on p-values, but the default
 #'   source call uses the factor/source prior estimated from gene enrichment.
@@ -2960,7 +2958,7 @@ celladmix_coherence_rules <- function(
 #'
 #' @inheritParams celladmix_plot_bridge_heatmap
 #' @param coherence A `celladmix_coherence_result`, coherence summary data
-#'   frame, or object returned by [celladmix_coherence_annotation()].
+#'   frame, or object returned by `celladmix_coherence_annotation()`.
 #'
 #' @return Invisibly returns the annotation list for base graphics, or a
 #'   `ComplexHeatmap::Heatmap` object when optional dependencies are available.
@@ -3053,7 +3051,7 @@ celladmix_correct <- function(
 #' Collect Correction Summary
 #'
 #' Reads the per-cell molecule removal summary written by
-#' [celladmix_correct()].
+#' `celladmix_correct()`.
 #'
 #' @param run A corrected `celladmix_run` object.
 #'
@@ -3209,6 +3207,7 @@ celladmix_select_factor_by_markers <- function(run, marker_genes) {
 #' @param ... Additional arguments passed to [graphics::plot()].
 #'
 #' @return The input object, invisibly.
+#' @exportS3Method
 #' @keywords internal
 #' @noRd
 plot.celladmix_clusters <- function(x, color_by = c("cluster", "analysis_crop"), ...) {

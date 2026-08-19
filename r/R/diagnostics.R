@@ -3,7 +3,7 @@
 #' These helpers provide reusable downstream summaries that are useful in
 #' examples and notebooks, but are intentionally separate from the core C++
 #' fitting, scoring, and correction path.
-
+#' @noRd
 .celladmix_require_ggplot2 <- function() {
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
     stop("The ggplot2 package is required for this plot")
@@ -858,7 +858,7 @@ celladmix_plot_score_agreement <- function(
 #'
 #' @param counts Gene-by-cell count matrix.
 #' @param groups Named vector of group labels, or an unnamed vector in column order.
-#' @param contrast Two group labels; logFC is contrast[1] over contrast[2].
+#' @param contrast Two group labels; logFC is `contrast[1]` over `contrast[2]`.
 #' @param method Currently only `"wilcox"` is implemented.
 #' @param normalize Count normalization used before testing.
 #' @param scale_factor Library-size normalization scale factor.
@@ -1511,7 +1511,7 @@ celladmix_plot_de_shift <- function(
 
 #' Collect corrected counts and recompute a DE diagnostic.
 #'
-#' @param correction A [CellAdmixCorrection] object.
+#' @param correction A `CellAdmixCorrection` object.
 #' @param counts_before Original gene-by-cell count matrix.
 #' @param cells Cell IDs to include in the diagnostic.
 #' @param groups Named group vector for the selected cells.

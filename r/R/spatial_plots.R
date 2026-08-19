@@ -4,7 +4,7 @@
 #' not depend on a specific input backend, so the same plotting call can be used
 #' for tabular examples, Xenium stores, fitted cell-factor tables, and external
 #' annotations merged by the user.
-
+#' @noRd
 .celladmix_auto_point_size <- function(n) {
   n <- as.integer(n %||% 0L)
   if (n <= 5000L) {

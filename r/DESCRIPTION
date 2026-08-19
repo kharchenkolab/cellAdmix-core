@@ -11,7 +11,7 @@ License: MIT + file LICENSE
 Encoding: UTF-8
 SystemRequirements: Apache Arrow C++ and Parquet C++ libraries, Eigen3,
     nlohmann-json, libtiff, OpenJPEG, zlib
-Roxygen: list(markdown = TRUE)
+Roxygen: list(markdown = TRUE, r6 = FALSE)
 Imports:
     Rcpp,
     Matrix,
@@ -35,12 +35,10 @@ Suggests:
     ggplot2,
     ggrastr,
     ggrepel,
-    knitr,
     pROC,
-    rmarkdown,
     sccore,
     Seurat,
     SeuratObject,
     testthat (>= 3.0.0)
-VignetteBuilder: knitr
 Config/testthat/edition: 3
+Config/roxygen2/version: 8.1.0

@@ -277,7 +277,7 @@ celladmix_identify_domains <- function(
 #' Load Persisted Spatial Domains
 #'
 #' @param prep A `celladmix_prep` object.
-#' @param domain_id Domain identifier used in [celladmix_identify_domains()].
+#' @param domain_id Domain identifier used in `celladmix_identify_domains()`.
 #'
 #' @return A `celladmix_domains` object.
 #' @keywords internal
@@ -310,8 +310,12 @@ celladmix_load_domains <- function(prep, domain_id) {
   ), class = "celladmix_domains")
 }
 
-#' @keywords internal
-#' @noRd
+#' Domain Annotation Composition
+#'
+#' @param domains A `celladmix_domains` object.
+#'
+#' @return The per-domain annotation composition data frame.
+#' @export
 celladmix_domain_composition <- function(domains) {
   if (!inherits(domains, "celladmix_domains")) {
     stop("celladmix_domain_composition() expects a celladmix_domains object")
@@ -319,8 +323,12 @@ celladmix_domain_composition <- function(domains) {
   domains$composition
 }
 
-#' @keywords internal
-#' @noRd
+#' Domain Identification Diagnostics
+#'
+#' @param domains A `celladmix_domains` object.
+#'
+#' @return The domain-identification diagnostics list.
+#' @export
 celladmix_domain_diagnostics <- function(domains) {
   if (!inherits(domains, "celladmix_domains")) {
     stop("celladmix_domain_diagnostics() expects a celladmix_domains object")
@@ -348,8 +356,7 @@ celladmix_domain_diagnostics <- function(domains) {
 #' @param alpha Point alpha.
 #'
 #' @return A `ggplot2` object.
-#' @keywords internal
-#' @noRd
+#' @export
 celladmix_plot_domains_spatial <- function(
     domains,
     color = "domain_label",
@@ -376,8 +383,7 @@ celladmix_plot_domains_spatial <- function(
 #' @param domains A `celladmix_domains` object.
 #'
 #' @return A `ggplot2` object.
-#' @keywords internal
-#' @noRd
+#' @export
 celladmix_plot_domain_composition <- function(domains) {
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
     stop("The ggplot2 package is required for domain plotting")
@@ -401,8 +407,7 @@ celladmix_plot_domain_composition <- function(domains) {
 #' @param color Domain table column used for point color.
 #'
 #' @return A `ggplot2` object.
-#' @keywords internal
-#' @noRd
+#' @export
 celladmix_plot_domain_umap <- function(domains, clust = NULL, color = "domain_label") {
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
     stop("The ggplot2 package is required for domain plotting")
