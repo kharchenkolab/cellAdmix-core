@@ -154,8 +154,9 @@ NMF starts. Stability is the matched correlation of each factor's
 gene-ownership profile against independent restarts: unrelated factors score
 near zero, and values above 0.3 indicate a reproducibly re-found factor.
 Factor importance (the x-axis, echoed by dot size) is the share of all assigned molecules that carry the factor's label, so large dots mark factors that dominate the tissue-wide signal.
-Stable, high-importance factors are easier to interpret; factors below the
-threshold are seed artifacts and should not drive correction decisions.
+Stable, high-importance factors are easier to interpret; low-stability
+factors are seed-dependent, which is why the default correction votes
+across the restarts rather than trusting any single fit.
 
 ```{r factor-stability, fig.width=6.2, fig.height=4.2}
 fit$plot_stability()

@@ -20,10 +20,11 @@ par(mar = c(3.5, 3.5, 2.0, 0.5), mgp = c(2, 0.65, 0), cex = 2/3)
 
 This notebook illustrates a cellAdmix workflow on a Xenium pancreas dataset
 with membrane staining. The example starts from a Xenium output bundle, a simple
-cell-type annotation, and a coarse regional annotation. The core fit uses
-default cellAdmix settings: weighted least-squares (`ls_nmf`) NMF, automatic
-rank from the number of annotated cell types, an automatically resolved
-neighborhood size, multiple NMF starts, and gene-loading molecule scoring.
+cell-type annotation, and a coarse regional annotation. The core fit uses the
+`invsqrt_kl` factorization recommended for membrane scoring, with
+otherwise-default settings: automatic rank from the number of annotated cell
+types, an automatically resolved neighborhood size, multiple NMF starts, and
+gene-loading molecule scoring.
 
 At a high level, the workflow is:
 
@@ -419,11 +420,11 @@ print(membrane_score$plot_examples(
 ### Membrane Cleanup Diagnostics
 
 The correction step below applies all membrane-derived rules across all
-annotated cell types. By default it is a molecule-vote ensemble: each of the
-fit's NMF restarts is scored and vetted independently, and a molecule is
-removed when at least 30% of the restarts remove it, which stabilizes the
-strong seed-dependence of single-fit corrections (`vote` tunes the
-threshold; `ensemble = 1` reverts to a single-fit correction). This creates
+annotated cell types. By default it is a molecule-vote ensemble: up to 10 of
+the fit's NMF restarts are scored and vetted independently, and a molecule is
+removed when at least 30% of those members remove it (3 of 10 here), which
+stabilizes the strong seed-dependence of single-fit corrections (`vote` tunes
+the threshold; `ensemble = 1` reverts to a single-fit correction). This creates
 a corrected run and then collects the corrected cell-by-gene count matrix
 that will be used for downstream diagnostics.
 
@@ -457,8 +458,10 @@ membrane_correction$plot_removed_molecules()
 The audit provides the direct verification: per-pair cleanup sensitivity
 against the admixture estimates, the own-marker false-removal rate
 (removal of near-surely-genuine molecules), and a warning for any detected
-pair no removal rule covers — here it flags the largest leakage pair
-(exocrine → ductal), which membrane scoring under this fit does not call.
+pair no removal rule covers — here it flags the uncovered stromal/immune
+pairs, the largest being immune → fibroblast (~173k estimated molecules);
+the dataset's biggest leakage flow, exocrine → ductal, is covered by the
+membrane rules.
 
 ```{r membrane-audit-eval, warning=TRUE, fig.width=8.5, fig.height=7.2}
 membrane_report <- audit$evaluate(membrane_correction)

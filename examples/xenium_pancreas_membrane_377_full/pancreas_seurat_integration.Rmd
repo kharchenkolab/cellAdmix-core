@@ -61,8 +61,8 @@ mv outs data
 ```
 
 The quick cell-type annotations used here are for demonstration only. They were
-derived from a lightweight clustering/marker workflow in the companion pancreas
-annotation notebook and are intentionally not treated as a curated reference.
+derived from a lightweight clustering/marker workflow and are intentionally not
+treated as a curated reference.
 In a normal Seurat analysis, these labels would usually come from standard
 Seurat clustering, marker inspection, reference mapping, or another annotation
 workflow. Here we load predetermined labels only to keep the example focused on
@@ -215,8 +215,9 @@ head(membrane_rules[, c("factor", "source_cell_type", "target_cell_type", "p_val
 
 The correction step removes molecules assigned to significant admixture
 factors in their target cell types, by default as a molecule-vote ensemble
-across the fit's NMF restarts (a molecule is removed when at least 30% of
-the independently scored restarts remove it). The result is persisted on
+over up to 10 of the fit's NMF restarts (a molecule is removed when at
+least 30% of the independently scored members remove it — 3 of 10 by
+default). The result is persisted on
 disk and can be collected as a sparse gene-by-cell matrix.
 
 ```{r correction}

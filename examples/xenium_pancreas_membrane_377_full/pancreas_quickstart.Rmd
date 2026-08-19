@@ -46,23 +46,25 @@ audit$plot_map()
 
 ## Correct
 
-One quick check that the factorization is sound — most factors should sit
-above the 0.3 stability threshold:
+A quick look at restart reproducibility. `invsqrt_kl` trades some restart
+stability for sharper loadings, so a mix of stable and unstable factors is
+expected; the ensemble correction below absorbs the seed dependence:
 
 ```{r stability, fig.width=6.2, fig.height=4.2}
 fit$plot_stability()
 ```
 
 Scoring turns factors into removal rules, and correction removes the
-matching molecules by a vote across the fit's NMF restarts: each restart is
-scored and vetted independently (including the native-factor false-positive
-check), and a molecule is removed when at least 30% of the restarts remove
-it. The vote stabilizes the seed-dependence of single-fit corrections and
-outperforms every individual restart in our benchmarks:
+matching molecules by a vote across the fit's NMF restarts: up to 10
+restarts are scored and vetted independently (including the native-factor
+false-positive check), and a molecule is removed when at least 30% of those
+members remove it — 3 of 10 by default. The vote stabilizes the
+seed-dependence of single-fit corrections and consistently reaches the
+upper range of the individual restarts in our benchmarks:
 
 ```{r correct}
 score <- fit$score_membrane()
-correction <- score$correct(rules = score$rules())
+correction <- score$correct()
 ```
 
 ## Verify

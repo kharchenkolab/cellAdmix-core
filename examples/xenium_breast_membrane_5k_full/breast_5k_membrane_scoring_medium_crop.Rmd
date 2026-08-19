@@ -226,6 +226,10 @@ for (cell_type in diagnostic_cell_types) {
 
 ## Cleanup Diagnostics
 
+The correction applies all membrane-derived rules; with the default
+multi-restart fit it is the molecule-vote ensemble, removing a molecule only
+when at least 30% of the independently scored members agree (3 of 10 here).
+
 ```{r membrane-cleanup}
 membrane_correction <- membrane_score$correct(rules = membrane_rules,
   name = "membrane_clean_p001")
