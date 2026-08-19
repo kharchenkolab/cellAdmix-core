@@ -168,12 +168,16 @@ cowplot::plot_grid(plotlist = list(
 ## Diagnostic Setup
 
 Correction is run for all annotated cell types. To keep the follow-up plots
-readable, the diagnostic DE panels focus on stromal/vascular cells that are
-present in both coarse domains. The marker sets highlight likely source
-signatures that may appear as admixture in those target cells.
+readable, the diagnostic DE panels focus on the two large populations whose
+admixture sources membrane scoring covers well — epithelial cells (which
+receive heavy immune leakage) and myeloid cells (which receive epithelial
+leakage). The stain-weak stromal/vascular types, whose admixture the
+current corrections cannot handle safely, are examined separately in the
+bridge section below. The marker sets highlight likely source signatures
+that may appear as admixture in the target cells.
 
 ```{r diagnostic-marker-sets}
-diagnostic_cell_types <- c("Fibroblast / CAF", "Endothelial")
+diagnostic_cell_types <- c("Epithelial", "Myeloid")
 
 epithelial_tumor_markers <- c("EPCAM", "KRT8", "KRT18", "KRT19", "MUC1",
   "GATA3", "CA12", "XBP1", "ERBB2")
@@ -353,8 +357,7 @@ cowplot::plot_grid(plotlist = plots, ncol = length(plots), align = "hv", axis = 
 
 The audit warnings above flag large pairs that membrane scoring issued no
 rule for — most prominently epithelial leakage into endothelial and
-fibroblast cells, exactly the diagnostic targets whose volcano plots
-barely move. Membrane scoring depends on stain-path contrast along
+fibroblast cells. Membrane scoring depends on stain-path contrast along
 molecule-to-centroid lines, which is weak for thin, elongated cell types
 such as endothelium and fibroblasts. Bridge scoring uses molecule
 adjacency instead of the stain image and pairs best with the `ls_nmf`
@@ -367,8 +370,9 @@ fit_ls <- ds$fit()
 bridge_score <- fit_ls$score_bridge()
 bridge_rules <- bridge_score$rules(p_thresh = p_thresh)
 
+stain_weak_types <- c("Endothelial", "Fibroblast / CAF")
 head(bridge_rules[bridge_rules$keep &
-  bridge_rules$target_cell_type %in% diagnostic_cell_types,
+  bridge_rules$target_cell_type %in% stain_weak_types,
   c("factor", "source_cell_type", "target_cell_type", "p_value")])
 ```
 
