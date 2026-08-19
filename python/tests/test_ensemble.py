@@ -135,6 +135,30 @@ class EnsembleTests(unittest.TestCase):
         score2.correct(rules, p_thresh=0.5, name="cache_c")
         self.assertNotEqual(mtimes, [p.stat().st_mtime_ns for p in cache])
 
+    def test_overremoval_warnings(self):
+        from celladmix import audit as audit_mod
+        from celladmix import fit as fit_mod
+
+        rules = pd.DataFrame({
+            "factor": [1, 2], "target_cell_type": ["B", "B"],
+            "source_cell_type": ["A", "A"]})
+        old_fit = fit_mod.OVERREMOVAL_MIN_MOLECULES
+        fit_mod.OVERREMOVAL_MIN_MOLECULES = 10
+        try:
+            with self.assertWarnsRegex(UserWarning, "erasing native expression"):
+                corr = self.fit.correct(rules, name="erase_b")
+        finally:
+            fit_mod.OVERREMOVAL_MIN_MOLECULES = old_fit
+
+        audit = self.fit.audit_admixture(min_target_cells=10, min_reference_cells=5)
+        old_audit = audit_mod.OWN_MARKER_WARN_MIN
+        audit_mod.OWN_MARKER_WARN_MIN = 1
+        try:
+            with self.assertWarnsRegex(UserWarning, "own-marker molecules"):
+                audit.evaluate(corr, warn_uncovered=False)
+        finally:
+            audit_mod.OWN_MARKER_WARN_MIN = old_audit
+
     def test_score_correct_defaults_to_ensemble(self):
         score = self.fit.score_bridge(
             candidate_k=5, crossing_k=5, min_type_pair_contacts=1,

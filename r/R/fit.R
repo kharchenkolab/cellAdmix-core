@@ -269,6 +269,25 @@ CellAdmixFit <- R6::R6Class(
           ensemble = max(1L, length(members)), vote = if (length(members) > 1L) vote else NA_real_),
           list(...)),
         rules = rules)
+      # Over-removal guard: a rule set whose factors jointly cover a cell
+      # type's whole molecule content (typically because the factorization
+      # has no native factor for a small type) erases the type rather than
+      # cleaning it. Surface that immediately, not only at audit time.
+      removal <- tryCatch(correction$summary(), error = function(e) NULL)
+      if (!is.null(removal) && nrow(removal)) {
+        heavy <- removal[removal$cell_type != "all" &
+          removal$molecules_before >=
+            getOption("celladmix.overremoval_min_molecules", 10000) &
+          removal$fraction_molecules_removed > 0.6, , drop = FALSE]
+        for (i in seq_len(nrow(heavy))) {
+          warning(sprintf(paste0(
+            "Correction removed %.0f%% of all molecules from %s - this is ",
+            "likely erasing native expression (does the factorization have ",
+            "a native factor for this type?)"),
+            100 * heavy$fraction_molecules_removed[[i]],
+            heavy$cell_type[[i]]), call. = FALSE)
+        }
+      }
       self$corrections_registry[[name]] <- correction
       correction$save_metadata()
       correction

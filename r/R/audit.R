@@ -446,6 +446,14 @@ CellAdmixAudit <- R6::R6Class(
         data.frame(cell_type = t, own_marker_molecules = before,
           false_removal = 1 - after / max(before, 1), stringsAsFactors = FALSE)
       }))
+      severe <- fr[fr$false_removal > 0.25 & fr$own_marker_molecules >=
+        getOption("celladmix.own_marker_warn_min", 1000), , drop = FALSE]
+      for (i in seq_len(nrow(severe))) {
+        warning(sprintf(paste0(
+          "Correction removed %.0f%% of %s's own-marker molecules - severe ",
+          "over-removal of near-surely-genuine expression"),
+          100 * severe$false_removal[[i]], severe$cell_type[[i]]), call. = FALSE)
+      }
       if (warn_uncovered && !is.null(correction$rules)) {
         covered <- paste(correction$rules$source_cell_type,
           correction$rules$target_cell_type)

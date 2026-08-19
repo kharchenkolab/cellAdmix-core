@@ -349,7 +349,7 @@ plots <- lapply(diagnostic_cell_types, function(target_type) {
 cowplot::plot_grid(plotlist = plots, ncol = length(plots), align = "hv", axis = "tblr")
 ```
 
-## Bridge Scoring for Stain-Weak Targets
+## Bridge Scoring and Its Limits on Stain-Weak Targets
 
 The audit warnings above flag large pairs that membrane scoring issued no
 rule for — most prominently epithelial leakage into endothelial and
@@ -358,8 +358,9 @@ barely move. Membrane scoring depends on stain-path contrast along
 molecule-to-centroid lines, which is weak for thin, elongated cell types
 such as endothelium and fibroblasts. Bridge scoring uses molecule
 adjacency instead of the stain image and pairs best with the `ls_nmf`
-factorization (see [docs/benchmarks.md](../../docs/benchmarks.md)); it
-covers these pairs decisively:
+factorization (see [docs/benchmarks.md](../../docs/benchmarks.md)). It
+detects these pairs decisively — but, as shown below, it cannot correct
+them safely on this dataset, and the reason is instructive.
 
 ```{r bridge-score}
 fit_ls <- ds$fit()
@@ -371,19 +372,38 @@ head(bridge_rules[bridge_rules$keep &
   c("factor", "source_cell_type", "target_cell_type", "p_value")])
 ```
 
-```{r bridge-cleanup}
+Applying the bridge rules, however, exposes a factorization-level failure
+mode. The correction summary and the over-removal warnings show that
+endothelial and fibroblast cells lose essentially *all* of their molecules:
+
+```{r bridge-cleanup, warning=TRUE}
 bridge_correction <- bridge_score$correct(rules = bridge_rules,
   name = "bridge_clean")
-bridge_counts <- bridge_correction$counts()
-bridge_de <- celladmix_de_by_group(bridge_counts, cell_spatial,
-  subset_by = "merged_annotation", subsets = diagnostic_cell_types,
-  group_by = "domain_label", contrast = c("tumor_epithelial", "immune_rich"))
 
 bridge_correction$summary()
 ```
 
-The audit verifies the bridge correction against the same measurements,
-and the side-by-side comparison shows what each method removes:
+The mechanism is visible in the factor composition. The rank-8 `ls_nmf`
+fit collapses to a few active factors, none of them native to the small
+endothelial and fibroblast populations — their molecules are carried
+almost entirely by the epithelial- and immune-dominated factors:
+
+```{r bridge-factor-composition}
+ls_cells <- fit_ls$cell_factors()
+ls_types <- cell_annotation[as.character(ls_cells$cell_id)]
+fraction_cols <- grep("factor_\\d+_fraction", names(ls_cells), value = TRUE)
+round(as.matrix(aggregate(ls_cells[, fraction_cols],
+  by = list(cell_type = ls_types), FUN = mean)[, -1]), 2)
+```
+
+Each bridge rule is individually legitimate — endothelial cells genuinely
+carry heavy epithelial and immune leakage, and each rule passes the
+native-factor check against cells distant from *its own* source. But with
+no native factor to hold the genuinely endothelial molecules, the union
+of the rules covers the type's entire factor spectrum, and the correction
+erases the cell type instead of cleaning it. The audit's per-type checks
+flag this severe over-removal, which aggregate metrics alone would miss —
+in aggregate the bridge correction looks competitive:
 
 ```{r bridge-verify, warning=TRUE, fig.width=9.6, fig.height=4.0}
 bridge_report <- audit$evaluate(bridge_correction)
@@ -397,33 +417,23 @@ cowplot::plot_grid(
   ncol = 2, align = "hv", axis = "tblr")
 ```
 
-The diagnostic volcano and p-value shift plots now show the improvement
-membrane scoring could not deliver for these targets:
-
-```{r bridge-volcano, fig.width=11.0, fig.height=4.8}
-for (target_type in diagnostic_cell_types) {
-  p_before <- celladmix_plot_volcano(diagnostic_de_original[[target_type]],
-    markers = source_marker_sets, title = paste(target_type, "before cleanup")) +
-    theme(legend.position = "none")
-  p_after <- celladmix_plot_volcano(bridge_de[[target_type]],
-    markers = source_marker_sets, title = paste(target_type, "after bridge cleanup"))
-  print(cowplot::plot_grid(plotlist = list(p_before, p_after),
-    ncol = 2, align = "hv", axis = "tblr"))
-}
-```
-
-```{r bridge-pvalue-shift, fig.width=11.0, fig.height=5.0}
-plots <- lapply(diagnostic_cell_types, function(target_type) {
-  celladmix_plot_de_shift(diagnostic_de_original[[target_type]], bridge_de[[target_type]],
-    markers = source_marker_sets, title = paste("Bridge", target_type, "p-value shift"))
-})
-cowplot::plot_grid(plotlist = plots, ncol = length(plots), align = "hv", axis = "tblr")
-```
+The bottom line for this dataset: membrane scoring cannot see the
+epithelial leakage into these thin, stain-weak cell types, and bridge
+scoring sees it but cannot separate it, because the factorization never
+formed native endothelial or fibroblast factors. Correcting these pairs
+safely requires factorization-level remedies (a rank that resolves the
+small types, or anchor-based factor recovery — see
+[docs/benchmarks.md](../../docs/benchmarks.md)). Downstream analysis in
+this notebook therefore proceeds with the membrane correction, and the
+endothelial and fibroblast admixture flagged by the audit should be kept
+in mind when interpreting those cell types.
 
 ## Cell-State UMAP Before and After Cleanup
 
 As a compact global diagnostic, compute cell-state UMAPs from sparse cell-level
-counts before and after cleanup. The two UMAPs are independent embeddings, so
+counts before and after the membrane cleanup (the correction retained for
+downstream use here — see the bridge section above for why the bridge
+correction is not applied). The two UMAPs are independent embeddings, so
 the exact coordinates are not meant to align; the comparison asks whether the
 corrected counts produce clearer annotation separation.
 
@@ -467,6 +477,6 @@ plot_state_umap <- function(df, title, limits) {
 limits <- state_umap_limits(original_state, corrected_state)
 cowplot::plot_grid(plotlist = list(
   plot_state_umap(original_state, "Original counts", limits),
-  plot_state_umap(corrected_state, "Corrected counts", limits)
+  plot_state_umap(corrected_state, "Membrane-corrected counts", limits)
 ), ncol = 2, align = "hv", axis = "tblr")
 ```

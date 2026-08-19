@@ -180,6 +180,22 @@ test_that("member labels recompute deterministically after cache removal", {
   expect_equal(before$fractions, after$fractions)
 })
 
+test_that("erasing a cell type's whole content triggers the over-removal warning", {
+  fit <- make_ensemble_fit(seed = 19L, nmf_n_runs = 1L)
+  score <- fit$score_bridge(
+    candidate_k = 5L, crossing_k = 5L, min_type_pair_contacts = 1L,
+    min_factor_molecules = 1L, min_pairs = 1L, null_iterations = 1L,
+    null_max_iterations = 2L, compute_null = TRUE)
+  rules <- data.frame(factor = c(1L, 2L),
+    target_cell_type = "fibroblast", source_cell_type = "malignant",
+    stringsAsFactors = FALSE)
+  old <- options(celladmix.overremoval_min_molecules = 10)
+  on.exit(options(old), add = TRUE)
+  expect_warning(
+    fit$correct(score, rules = rules, ensemble = 1, name = "erase_all"),
+    "erasing native expression")
+})
+
 test_that("single-restart fits fall back to the single-fit correction", {
   fit <- make_ensemble_fit(seed = 11L, nmf_n_runs = 1L)
   expect_false(file.exists(file.path(fit$run$path, "ensemble_h.parquet")))

@@ -11,6 +11,10 @@ from . import _core
 from .io import annotation_vectors, discover_xenium_membrane_image, discover_xenium_stain_image
 from .score import CellAdmixScore
 
+# Minimum per-type molecule count before the over-removal warning applies
+# (kept module-level so tests can lower it for small fixtures).
+OVERREMOVAL_MIN_MOLECULES = 10000
+
 
 class CellAdmixFit:
     """A fitted cellAdmix run."""
@@ -346,7 +350,28 @@ class CellAdmixFit:
             rule_members=[int(m) for m in (rule_members or [])],
             min_votes=int(min_votes),
         )
-        return CellAdmixCorrection(str(out_dir), result, rules=rules)
+        correction = CellAdmixCorrection(str(out_dir), result, rules=rules)
+        # Over-removal guard: a rule set whose factors jointly cover a cell
+        # type's whole molecule content (typically because the factorization
+        # has no native factor for a small type) erases the type rather than
+        # cleaning it. Surface that immediately, not only at audit time.
+        import warnings
+
+        try:
+            removal = correction.summary()
+        except Exception:
+            removal = None
+        if removal is not None and len(removal):
+            heavy = removal[(removal["cell_type"] != "all")
+                & (removal["molecules_before"] >= OVERREMOVAL_MIN_MOLECULES)
+                & (removal["fraction_molecules_removed"] > 0.6)]
+            for _, row in heavy.iterrows():
+                warnings.warn(
+                    f"Correction removed {100 * row['fraction_molecules_removed']:.0f}% "
+                    f"of all molecules from {row['cell_type']} - this is likely "
+                    "erasing native expression (does the factorization have a "
+                    "native factor for this type?)", stacklevel=2)
+        return correction
 
     def plot_loadings(self, *, n_genes: int = 8, **kwargs):
         from .plotting import plot_loadings

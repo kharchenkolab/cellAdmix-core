@@ -18,6 +18,10 @@ import pandas as pd
 BIN_EDGES = [-0.5, 0.5, 1.5, 2.5, np.inf]
 BIN_LABELS = ["0", "1", "2", "3+"]
 
+# Minimum own-marker molecule count before the severe-over-removal warning
+# applies (module-level so tests can lower it for small fixtures).
+OWN_MARKER_WARN_MIN = 1000
+
 
 def _pseudobulk(matrix, cell_index, cells, scale=1e6):
     cols = cell_index.get_indexer(cells)
@@ -384,6 +388,13 @@ class CellAdmixAudit:
             fr_rows.append(dict(cell_type=t, own_marker_molecules=before,
                 false_removal=1 - post / max(before, 1)))
         false_removal = pd.DataFrame(fr_rows)
+        severe = false_removal[(false_removal["false_removal"] > 0.25)
+            & (false_removal["own_marker_molecules"] >= OWN_MARKER_WARN_MIN)]
+        for _, row in severe.iterrows():
+            warnings.warn(
+                f"Correction removed {100 * row['false_removal']:.0f}% of "
+                f"{row['cell_type']}'s own-marker molecules - severe "
+                "over-removal of near-surely-genuine expression", stacklevel=2)
         rules = getattr(correction, "rules", None)
         if warn_uncovered and rules is not None and len(rules):
             covered = set(zip(rules["source_cell_type"].astype(str),
