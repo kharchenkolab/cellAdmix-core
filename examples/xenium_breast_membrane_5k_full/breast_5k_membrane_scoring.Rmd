@@ -374,56 +374,64 @@ them safely on this dataset, and the reason is instructive.
 fit_ls <- ds$fit()
 bridge_score <- fit_ls$score_bridge()
 bridge_rules <- bridge_score$rules(p_thresh = p_thresh)
-
-stain_weak_types <- c("Endothelial", "Fibroblast / CAF")
-head(bridge_rules[bridge_rules$keep &
-  bridge_rules$target_cell_type %in% stain_weak_types,
-  c("factor", "source_cell_type", "target_cell_type", "p_value")])
 ```
 
 Applying the bridge rules, however, exposes a factorization-level failure
-mode. The correction summary and the over-removal warnings show that
-endothelial and fibroblast cells lose essentially *all* of their molecules:
+mode: the over-removal guardrails fire, reporting that endothelial and
+fibroblast cells lose essentially *all* of their molecules:
 
 ```{r bridge-cleanup, warning=TRUE}
 bridge_correction <- bridge_score$correct(rules = bridge_rules,
   name = "bridge_clean")
-
-bridge_correction$summary()
 ```
 
-The mechanism is visible in the factor composition. The rank-8 `ls_nmf`
-fit collapses to a few active factors, none of them native to the small
-endothelial and fibroblast populations — their molecules are carried
-almost entirely by the epithelial- and immune-dominated factors:
-
-```{r bridge-factor-composition}
-ls_cells <- fit_ls$cell_factors()
-ls_types <- cell_annotation[as.character(ls_cells$cell_id)]
-fraction_cols <- grep("factor_\\d+_fraction", names(ls_cells), value = TRUE)
-round(as.matrix(aggregate(ls_cells[, fraction_cols],
-  by = list(cell_type = ls_types), FUN = mean)[, -1]), 2)
-```
-
+The mechanism: the rank-8 `ls_nmf` fit collapses to a few active factors,
+none of them native to the small endothelial and fibroblast populations.
 Each bridge rule is individually legitimate — endothelial cells genuinely
 carry heavy epithelial and immune leakage, and each rule passes the
-native-factor check against cells distant from *its own* source. But with
-no native factor to hold the genuinely endothelial molecules, the union
-of the rules covers the type's entire factor spectrum, and the correction
-erases the cell type instead of cleaning it. The audit's per-type checks
-flag this severe over-removal, which aggregate metrics alone would miss —
-in aggregate the bridge correction looks competitive:
+native-factor check against cells distant from *its own* source — but with
+no native factor to hold the genuinely endothelial molecules, the union of
+the rules covers the type's entire factor spectrum, and the correction
+erases the cell type instead of cleaning it.
 
-```{r bridge-verify, warning=TRUE, fig.width=9.6, fig.height=4.0}
+The per-pair diagnostics make the trade-off visible. On the leakage side
+the bridge correction looks competitive — sensitivity is blind to
+over-removal by construction:
+
+```{r bridge-vs-membrane-pairs, fig.width=12.5, fig.height=5.6, warning=FALSE}
 bridge_report <- audit$evaluate(bridge_correction)
-bridge_report$summary()
 
 cowplot::plot_grid(
+  report$plot_cleanup() + ggtitle("Membrane (invsqrt_kl)"),
+  bridge_report$plot_cleanup() + ggtitle("Bridge (ls_nmf)"),
+  ncol = 2, align = "hv", axis = "tblr")
+```
+
+The difference shows in how much near-surely-genuine expression each
+correction retains per cell type (left) — the bridge correction's erasure
+of the stain-weak types — while the overall admixture burden removed
+(right) stays similar:
+
+```{r bridge-vs-membrane-retention, fig.width=11.0, fig.height=4.2}
+retention <- rbind(
+  transform(report$false_removal(), correction = "membrane (invsqrt_kl)"),
+  transform(bridge_report$false_removal(), correction = "bridge (ls_nmf)"))
+retention$correction <- factor(retention$correction,
+  levels = c("membrane (invsqrt_kl)", "bridge (ls_nmf)"))
+
+cowplot::plot_grid(
+  ggplot(retention, aes(cell_type, 1 - false_removal, fill = correction)) +
+    geom_col(position = "dodge") +
+    scale_fill_manual(values = c("#34495e", "#c0392b")) +
+    labs(x = NULL, y = "own-marker molecules retained",
+      title = "Retention of near-surely-genuine expression") +
+    theme_classic(base_size = 10) +
+    theme(axis.text.x = element_text(angle = 30, hjust = 1),
+      legend.position = "bottom", legend.title = element_blank()),
   audit$plot_remaining(list(
     `membrane\n(invsqrt_kl)` = membrane_correction,
     `bridge\n(ls_nmf)` = bridge_correction)),
-  audit$plot_exposure(correction = bridge_correction),
-  ncol = 2, align = "hv", axis = "tblr")
+  ncol = 2, rel_widths = c(1.45, 1), align = "hv", axis = "tblr")
 ```
 
 The bottom line for this dataset: membrane scoring cannot see the

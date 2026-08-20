@@ -559,24 +559,11 @@ fit_ls <- ds$fit()
 ``` r
 bridge_score <- fit_ls$score_bridge()
 bridge_rules <- bridge_score$rules(p_thresh = p_thresh)
-
-stain_weak_types <- c("Endothelial", "Fibroblast / CAF")
-head(bridge_rules[bridge_rules$keep &
-  bridge_rules$target_cell_type %in% stain_weak_types,
-  c("factor", "source_cell_type", "target_cell_type", "p_value")])
 ```
 
-    ##    factor source_cell_type target_cell_type      p_value
-    ## 2       1       Epithelial      Endothelial 4.015116e-32
-    ## 3       1       Epithelial Fibroblast / CAF 2.807049e-22
-    ## 7       2          Myeloid      Endothelial 2.366454e-10
-    ## 9       2          Myeloid Fibroblast / CAF 1.556765e-09
-    ## 12      3          Myeloid      Endothelial 2.125538e-20
-    ## 14      3          Myeloid Fibroblast / CAF 1.870167e-09
-
 Applying the bridge rules, however, exposes a factorization-level
-failure mode. The correction summary and the over-removal warnings show
-that endothelial and fibroblast cells lose essentially *all* of their
+failure mode: the over-removal guardrails fire, reporting that
+endothelial and fibroblast cells lose essentially *all* of their
 molecules:
 
 ``` r
@@ -594,157 +581,59 @@ bridge_correction <- bridge_score$correct(rules = bridge_rules,
     ## is likely erasing native expression (does the factorization have a native
     ## factor for this type?)
 
-``` r
-bridge_correction$summary()
-```
-
-    ##          cell_type n_cells n_modified_cells fraction_cells_modified
-    ## 1              all  688099           360811               0.5243591
-    ## 2       B / plasma   25711                0               0.0000000
-    ## 3      Endothelial   18016            18016               1.0000000
-    ## 4       Epithelial  166396           155825               0.9364708
-    ## 5 Fibroblast / CAF   11279            11279               1.0000000
-    ## 6          Myeloid   82470            70689               0.8571481
-    ## 7           T / NK  118803           105002               0.8838329
-    ## 8          unknown  265424                0               0.0000000
-    ##   molecules_before molecules_after molecules_removed fraction_molecules_removed
-    ## 1         82144903        71374545          10770358                 0.13111414
-    ## 2          3831465         3831465                 0                 0.00000000
-    ## 3          1275509            2550           1272959                 0.99800080
-    ## 4         50582711        46720347           3862364                 0.07635739
-    ## 5           851651             855            850796                 0.99899607
-    ## 6          9109012         7028614           2080398                 0.22838898
-    ## 7          8530598         5826757           2703841                 0.31695797
-    ## 8          7963957         7963957                 0                 0.00000000
-    ##   median_removed_per_modified_cell median_fraction_removed_per_modified_cell
-    ## 1                               15                                0.11384615
-    ## 2                                0                                0.00000000
-    ## 3                               65                                1.00000000
-    ## 4                                9                                0.02259887
-    ## 5                               71                                1.00000000
-    ## 6                               18                                0.18367347
-    ## 7                               15                                0.21428571
-    ## 8                                0                                0.00000000
-
-The mechanism is visible in the factor composition. The rank-8 `ls_nmf`
-fit collapses to a few active factors, none of them native to the small
-endothelial and fibroblast populations — their molecules are carried
-almost entirely by the epithelial- and immune-dominated factors:
-
-``` r
-ls_cells <- fit_ls$cell_factors()
-ls_types <- cell_annotation[as.character(ls_cells$cell_id)]
-fraction_cols <- grep("factor_\\d+_fraction", names(ls_cells), value = TRUE)
-round(as.matrix(aggregate(ls_cells[, fraction_cols],
-  by = list(cell_type = ls_types), FUN = mean)[, -1]), 2)
-```
-
-    ##      factor_1_fraction factor_2_fraction factor_3_fraction factor_4_fraction
-    ## [1,]              0.21              0.43              0.06              0.30
-    ## [2,]              0.52              0.36              0.07              0.03
-    ## [3,]              0.76              0.21              0.02              0.01
-    ## [4,]              0.39              0.55              0.04              0.02
-    ## [5,]              0.15              0.51              0.29              0.05
-    ## [6,]              0.17              0.77              0.04              0.02
-    ##      factor_5_fraction factor_6_fraction factor_7_fraction factor_8_fraction
-    ## [1,]                 0                 0                 0                 0
-    ## [2,]                 0                 0                 0                 0
-    ## [3,]                 0                 0                 0                 0
-    ## [4,]                 0                 0                 0                 0
-    ## [5,]                 0                 0                 0                 0
-    ## [6,]                 0                 0                 0                 0
-
-Each bridge rule is individually legitimate — endothelial cells
-genuinely carry heavy epithelial and immune leakage, and each rule
+The mechanism: the rank-8 `ls_nmf` fit collapses to a few active
+factors, none of them native to the small endothelial and fibroblast
+populations. Each bridge rule is individually legitimate — endothelial
+cells genuinely carry heavy epithelial and immune leakage, and each rule
 passes the native-factor check against cells distant from *its own*
-source. But with no native factor to hold the genuinely endothelial
+source — but with no native factor to hold the genuinely endothelial
 molecules, the union of the rules covers the type’s entire factor
 spectrum, and the correction erases the cell type instead of cleaning
-it. The audit’s per-type checks flag this severe over-removal, which
-aggregate metrics alone would miss — in aggregate the bridge correction
-looks competitive:
+it.
+
+The per-pair diagnostics make the trade-off visible. On the leakage side
+the bridge correction looks competitive — sensitivity is blind to
+over-removal by construction:
 
 ``` r
 bridge_report <- audit$evaluate(bridge_correction)
-```
 
-    ## Warning: Correction removed 97% of Endothelial's own-marker molecules - severe
-    ## over-removal of near-surely-genuine expression
-
-    ## Warning: Correction removed 100% of Fibroblast / CAF's own-marker molecules -
-    ## severe over-removal of near-surely-genuine expression
-
-    ## Warning: Detected ~888,042 admixed molecules from Endothelial into Epithelial,
-    ## but no removal rule covers this pair
-
-    ## Warning: Detected ~62,750 admixed molecules from Endothelial into Myeloid, but
-    ## no removal rule covers this pair
-
-    ## Warning: Detected ~67,365 admixed molecules from Endothelial into T / NK, but
-    ## no removal rule covers this pair
-
-    ## Warning: Detected ~96,102 admixed molecules from Epithelial into B / plasma,
-    ## but no removal rule covers this pair
-
-    ## Warning: Detected ~64,175 admixed molecules from Fibroblast / CAF into
-    ## Epithelial, but no removal rule covers this pair
-
-    ## Warning: Detected ~96,492 admixed molecules from Fibroblast / CAF into Myeloid,
-    ## but no removal rule covers this pair
-
-    ## Warning: Detected ~89,672 admixed molecules from Fibroblast / CAF into T / NK,
-    ## but no removal rule covers this pair
-
-    ## Warning: Detected ~154,151 admixed molecules from Myeloid into B / plasma, but
-    ## no removal rule covers this pair
-
-    ## Warning: Detected ~351,071 admixed molecules from T / NK into B / plasma, but
-    ## no removal rule covers this pair
-
-    ## Warning: Detected ~291,605 admixed molecules from T / NK into Endothelial, but
-    ## no removal rule covers this pair
-
-    ## Warning: Detected ~2,468,263 admixed molecules from T / NK into Epithelial, but
-    ## no removal rule covers this pair
-
-    ## Warning: Detected ~441,608 admixed molecules from T / NK into Fibroblast / CAF,
-    ## but no removal rule covers this pair
-
-    ## Warning: Detected ~1,698,800 admixed molecules from T / NK into Myeloid, but no
-    ## removal rule covers this pair
-
-``` r
-bridge_report$summary()
-```
-
-    ## $detected_pairs
-    ## [1] 29
-    ## 
-    ## $estimated_admixed_molecules
-    ## [1] 10267159
-    ## 
-    ## $leakage_removed_overall
-    ## [1] 0.6669955
-    ## 
-    ## $median_pair_sensitivity
-    ## [1] 0.9973862
-    ## 
-    ## $own_marker_false_removal
-    ## [1] 0.04557218
-    ## 
-    ## $worst_false_removal
-    ## [1] "Fibroblast / CAF"
-
-``` r
 cowplot::plot_grid(
-  audit$plot_remaining(list(
-    `membrane\n(invsqrt_kl)` = membrane_correction,
-    `bridge\n(ls_nmf)` = bridge_correction)),
-  audit$plot_exposure(correction = bridge_correction),
+  report$plot_cleanup() + ggtitle("Membrane (invsqrt_kl)"),
+  bridge_report$plot_cleanup() + ggtitle("Bridge (ls_nmf)"),
   ncol = 2, align = "hv", axis = "tblr")
 ```
 
-<img src="breast_5k_membrane_scoring_files/figure-gfm/bridge-verify-1.png" alt="" width="921.6" style="display: block; margin: auto;" />
+<img src="breast_5k_membrane_scoring_files/figure-gfm/bridge-vs-membrane-pairs-1.png" alt="" width="1200" style="display: block; margin: auto;" />
+
+The difference shows in how much near-surely-genuine expression each
+correction retains per cell type (left) — the bridge correction’s
+erasure of the stain-weak types — while the overall admixture burden
+removed (right) stays similar:
+
+``` r
+retention <- rbind(
+  transform(report$false_removal(), correction = "membrane (invsqrt_kl)"),
+  transform(bridge_report$false_removal(), correction = "bridge (ls_nmf)"))
+retention$correction <- factor(retention$correction,
+  levels = c("membrane (invsqrt_kl)", "bridge (ls_nmf)"))
+
+cowplot::plot_grid(
+  ggplot(retention, aes(cell_type, 1 - false_removal, fill = correction)) +
+    geom_col(position = "dodge") +
+    scale_fill_manual(values = c("#34495e", "#c0392b")) +
+    labs(x = NULL, y = "own-marker molecules retained",
+      title = "Retention of near-surely-genuine expression") +
+    theme_classic(base_size = 10) +
+    theme(axis.text.x = element_text(angle = 30, hjust = 1),
+      legend.position = "bottom", legend.title = element_blank()),
+  audit$plot_remaining(list(
+    `membrane\n(invsqrt_kl)` = membrane_correction,
+    `bridge\n(ls_nmf)` = bridge_correction)),
+  ncol = 2, rel_widths = c(1.45, 1), align = "hv", axis = "tblr")
+```
+
+<img src="breast_5k_membrane_scoring_files/figure-gfm/bridge-vs-membrane-retention-1.png" alt="" width="1056" style="display: block; margin: auto;" />
 
 The bottom line for this dataset: membrane scoring cannot see the
 epithelial leakage into these thin, stain-weak cell types, and bridge
@@ -773,43 +662,43 @@ original_state <- ds$cell_state_umap(cells_max = state_cells_max,
   min_molecules = 30, min_genes = 15, verbose = TRUE)
 ```
 
-    ## [INFO 16:44:39 +0.004s] Reused compatible Xenium input store (0.000s)
-    ## [INFO 16:44:39 +0.004s] Built Xenium input store: 82144903 molecules, 688099 cells (0.004s)
-    ## [INFO 16:44:42 +2.839s] Loaded input-store cell-gene counts: 688099 cells (2.839s)
-    ## [INFO 16:44:42 +2.978s] Indexed cell counts: 470549 eligible cells (min_molecules=30, min_genes=15) (0.139s)
-    ## [INFO 16:44:42 +3.212s] Selected clustering cells: 5000 cells (0.234s)
-    ## [INFO 16:44:42 +3.234s] Loaded sparse cell-gene counts: 776043 non-zero entries (0.022s)
-    ## [INFO 16:44:42 +3.258s] Selected variable genes: 1000 genes (0.024s)
-    ## [INFO 16:44:42 +3.314s] Materialized dense clustering matrix: 1000 x 5000 (0.056s)
-    ## [INFO 16:44:43 +4.122s] Computed cell PCA: 30 x 5000 (0.808s)
-    ## [INFO 16:44:43 +4.316s] Built HNSW cell KNN graph: 75000 directed edges using 10 thread(s); reusing 15 cosine-distance neighbors for UMAP (0.194s)
-    ## [INFO 16:44:43 +4.327s] Ran Louvain clustering (0.011s)
-    ## [INFO 16:44:44 +4.369s] Initialized UMAP layout (0.042s)
-    ## [INFO 16:44:47 +7.420s] Optimized UMAP layout with parallel optimization (3.051s)
-    ## [INFO 16:44:47 +7.420s] Computed cell UMAP (3.093s)
-    ## [INFO 16:44:47 +7.422s] Assembled cell clustering result (0.002s)
-    ## [INFO 16:44:47 +7.422s] Finished store-backed cell clustering (4.583s)
-    ## [INFO 16:44:47 +7.431s] Wrote cell clustering outputs (0.009s)
+    ## [INFO 21:22:08 +0.003s] Reused compatible Xenium input store (0.000s)
+    ## [INFO 21:22:08 +0.003s] Built Xenium input store: 82144903 molecules, 688099 cells (0.003s)
+    ## [INFO 21:22:11 +2.852s] Loaded input-store cell-gene counts: 688099 cells (2.852s)
+    ## [INFO 21:22:11 +2.991s] Indexed cell counts: 470549 eligible cells (min_molecules=30, min_genes=15) (0.139s)
+    ## [INFO 21:22:11 +3.222s] Selected clustering cells: 5000 cells (0.231s)
+    ## [INFO 21:22:11 +3.241s] Loaded sparse cell-gene counts: 776043 non-zero entries (0.018s)
+    ## [INFO 21:22:11 +3.263s] Selected variable genes: 1000 genes (0.022s)
+    ## [INFO 21:22:11 +3.311s] Materialized dense clustering matrix: 1000 x 5000 (0.048s)
+    ## [INFO 21:22:12 +4.107s] Computed cell PCA: 30 x 5000 (0.796s)
+    ## [INFO 21:22:12 +4.379s] Built HNSW cell KNN graph: 75000 directed edges using 10 thread(s); reusing 15 cosine-distance neighbors for UMAP (0.272s)
+    ## [INFO 21:22:12 +4.393s] Ran Louvain clustering (0.015s)
+    ## [INFO 21:22:12 +4.440s] Initialized UMAP layout (0.046s)
+    ## [INFO 21:22:17 +9.495s] Optimized UMAP layout with parallel optimization (5.055s)
+    ## [INFO 21:22:17 +9.495s] Computed cell UMAP (5.101s)
+    ## [INFO 21:22:17 +9.497s] Assembled cell clustering result (0.002s)
+    ## [INFO 21:22:17 +9.497s] Finished store-backed cell clustering (6.645s)
+    ## [INFO 21:22:17 +9.506s] Wrote cell clustering outputs (0.009s)
 
 ``` r
 corrected_state <- membrane_correction$cell_state_umap(cells_max = state_cells_max,
   min_molecules = 30, min_genes = 15, verbose = TRUE)
 ```
 
-    ## [INFO 16:45:05 +18.016s] Loaded run cell-gene counts: 688099 cells (18.016s)
-    ## [INFO 16:45:05 +18.136s] Indexed cell counts: 368117 eligible cells (min_molecules=30, min_genes=15) (0.120s)
-    ## [INFO 16:45:05 +18.322s] Selected clustering cells: 5000 cells (0.185s)
-    ## [INFO 16:45:05 +18.337s] Loaded sparse cell-gene counts: 761964 non-zero entries (0.015s)
-    ## [INFO 16:45:05 +18.359s] Selected variable genes: 1000 genes (0.022s)
-    ## [INFO 16:45:05 +18.404s] Materialized dense clustering matrix: 1000 x 5000 (0.045s)
-    ## [INFO 16:45:06 +19.177s] Computed cell PCA: 30 x 5000 (0.773s)
-    ## [INFO 16:45:06 +19.352s] Built HNSW cell KNN graph: 75000 directed edges using 10 thread(s); reusing 15 cosine-distance neighbors for UMAP (0.174s)
-    ## [INFO 16:45:06 +19.402s] Ran Louvain clustering (0.050s)
-    ## [INFO 16:45:06 +19.430s] Initialized UMAP layout (0.028s)
-    ## [INFO 16:45:09 +22.647s] Optimized UMAP layout with parallel optimization (3.216s)
-    ## [INFO 16:45:09 +22.647s] Computed cell UMAP (3.245s)
-    ## [INFO 16:45:09 +22.648s] Assembled cell clustering result (0.002s)
-    ## [INFO 16:45:09 +22.648s] Finished run-count cell-state embedding (4.632s)
+    ## [INFO 21:22:36 +18.821s] Loaded run cell-gene counts: 688099 cells (18.821s)
+    ## [INFO 21:22:36 +18.938s] Indexed cell counts: 368117 eligible cells (min_molecules=30, min_genes=15) (0.117s)
+    ## [INFO 21:22:36 +19.127s] Selected clustering cells: 5000 cells (0.189s)
+    ## [INFO 21:22:36 +19.159s] Loaded sparse cell-gene counts: 761964 non-zero entries (0.032s)
+    ## [INFO 21:22:36 +19.184s] Selected variable genes: 1000 genes (0.025s)
+    ## [INFO 21:22:37 +19.233s] Materialized dense clustering matrix: 1000 x 5000 (0.049s)
+    ## [INFO 21:22:37 +20.110s] Computed cell PCA: 30 x 5000 (0.877s)
+    ## [INFO 21:22:38 +20.354s] Built HNSW cell KNN graph: 75000 directed edges using 10 thread(s); reusing 15 cosine-distance neighbors for UMAP (0.244s)
+    ## [INFO 21:22:38 +20.421s] Ran Louvain clustering (0.067s)
+    ## [INFO 21:22:38 +20.464s] Initialized UMAP layout (0.043s)
+    ## [INFO 21:22:44 +26.577s] Optimized UMAP layout with parallel optimization (6.113s)
+    ## [INFO 21:22:44 +26.577s] Computed cell UMAP (6.156s)
+    ## [INFO 21:22:44 +26.579s] Assembled cell clustering result (0.002s)
+    ## [INFO 21:22:44 +26.579s] Finished run-count cell-state embedding (7.757s)
 
 ``` r
 cell_type_levels <- sort(unique(cell_annotation))

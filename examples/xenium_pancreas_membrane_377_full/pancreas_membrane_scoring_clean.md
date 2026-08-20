@@ -15,6 +15,9 @@ cellAdmix Xenium Example: Pancreas Membrane and Bridge Scoring
 -   <a href="#bridge-scoring" id="toc-bridge-scoring">Bridge Scoring</a>
 -   <a href="#score-comparison" id="toc-score-comparison">Score
     Comparison</a>
+-   <a href="#cell-state-umap-before-and-after-cleanup"
+    id="toc-cell-state-umap-before-and-after-cleanup">Cell-State UMAP Before
+    and After Cleanup</a>
 
 ## Overview
 
@@ -912,3 +915,64 @@ audit$plot_remaining(list(
 ```
 
 <img src="pancreas_membrane_scoring_clean_files/figure-gfm/scoring-remaining-1.png" alt="" width="518.4" style="display: block; margin: auto;" />
+
+## Cell-State UMAP Before and After Cleanup
+
+As a compact global diagnostic, compute cell-state UMAPs from sparse
+cell-level counts on the original data and after each correction. The
+embeddings are computed independently, so exact coordinates are not
+meant to align; the comparison asks whether corrected counts produce
+clearer separation between the annotated cell types.
+
+``` r
+state_cells_max <- 5000
+original_state <- ds$cell_state_umap(cells_max = state_cells_max)
+membrane_state <- membrane_correction$cell_state_umap(cells_max = state_cells_max)
+bridge_state <- bridge_correction$cell_state_umap(cells_max = state_cells_max)
+
+cell_type_levels <- sort(unique(cell_annotation))
+cell_type_palette <- setNames(
+  grDevices::hcl.colors(length(cell_type_levels), "Dark 3"), cell_type_levels)
+for (frame_name in c("original_state", "membrane_state", "bridge_state")) {
+  frame <- get(frame_name)
+  frame$cell_type <- factor(frame$cell_type, levels = cell_type_levels)
+  assign(frame_name, frame)
+}
+```
+
+``` r
+state_umap_limits <- function(...) {
+  frames <- list(...)
+  x <- unlist(lapply(frames, `[[`, "umap_1"))
+  y <- unlist(lapply(frames, `[[`, "umap_2"))
+  span <- max(diff(range(x, na.rm = TRUE)), diff(range(y, na.rm = TRUE)))
+  xmid <- mean(range(x, na.rm = TRUE))
+  ymid <- mean(range(y, na.rm = TRUE))
+  pad <- span * 0.04
+  list(xlim = xmid + c(-1, 1) * (span / 2 + pad),
+    ylim = ymid + c(-1, 1) * (span / 2 + pad))
+}
+
+plot_state_umap <- function(df, title, limits, legend = FALSE) {
+  ggplot(df, aes(umap_1, umap_2, color = cell_type)) +
+    geom_point(size = 0.55, alpha = 0.75) +
+    coord_equal(xlim = limits$xlim, ylim = limits$ylim) +
+    scale_color_manual(values = cell_type_palette, drop = FALSE) +
+    labs(title = title, x = "UMAP 1", y = "UMAP 2", color = "Cell type") +
+    theme_classic(base_size = 10) +
+    guides(color = guide_legend(override.aes = list(size = 3.2, alpha = 1))) +
+    theme(legend.position = if (legend) "right" else "none")
+}
+
+limits <- state_umap_limits(original_state, membrane_state, bridge_state)
+shared_legend <- cowplot::get_legend(
+  plot_state_umap(original_state, "", limits, legend = TRUE))
+cowplot::plot_grid(plotlist = list(
+  plot_state_umap(original_state, "Original counts", limits),
+  plot_state_umap(membrane_state, "Membrane-corrected (invsqrt_kl)", limits),
+  plot_state_umap(bridge_state, "Bridge-corrected (ls_nmf)", limits),
+  shared_legend
+), ncol = 4, rel_widths = c(1, 1, 1, 0.42), align = "hv", axis = "tblr")
+```
+
+<img src="pancreas_membrane_scoring_clean_files/figure-gfm/cell-state-umap-plot-1.png" alt="" width="1392" style="display: block; margin: auto;" />
