@@ -1,0 +1,40 @@
+"pair","source","target","excess_pool","excess_B","power_A","power_B","power_strictB","depth_B"
+"Ductal/tumor epithelial -> Endothelial","Ductal/tumor epithelial","Endothelial",2645,2125,0.999782012161245,0.998384407401246,0.998554024196191,0.998722860791826
+"Ductal/tumor epithelial -> Exocrine epithelial","Ductal/tumor epithelial","Exocrine epithelial",10181,7241,0.998349356178599,1,0.999179678522672,0.96958174904943
+"Ductal/tumor epithelial -> Fibroblast / CAF","Ductal/tumor epithelial","Fibroblast / CAF",14309,8002,0.996819828512337,0.995378393033877,0.995551750996069,0.985975847292559
+"Ductal/tumor epithelial -> Immune","Ductal/tumor epithelial","Immune",8477,3723,0.999739527733434,1,1,0.99453219927096
+"Ductal/tumor epithelial -> Mural / pericyte","Ductal/tumor epithelial","Mural / pericyte",413,198,0.99697740991985,1,1,0.964285714285714
+"Endocrine -> Ductal/tumor epithelial","Endocrine","Ductal/tumor epithelial",2113,423,0.998969063352243,0.999353060067685,0.997815710497144,0.974032501256492
+"Endocrine -> Endothelial","Endocrine","Endothelial",3678,1622,0.999680321814754,1,1,0.994305239179954
+"Endocrine -> Exocrine epithelial","Endocrine","Exocrine epithelial",5162,2084,0.999479050373323,0.999323099625928,0.998038459288864,0.970555623999014
+"Endocrine -> Fibroblast / CAF","Endocrine","Fibroblast / CAF",2359,415,0.998896604122377,0.999008413588663,0.998207651783614,0.696900982615268
+"Endocrine -> Immune","Endocrine","Immune",946,476,1,0.998118689044993,1,0.995667244367418
+"Endothelial -> Ductal/tumor epithelial","Endothelial","Ductal/tumor epithelial",4071,1976,1,0.682903912809006,1,0.82273146318978
+"Endothelial -> Endocrine","Endothelial","Endocrine",535,194,0.933433138722173,0.987601390193669,0.992465927465265,0.990476190476191
+"Endothelial -> Exocrine epithelial","Endothelial","Exocrine epithelial",6434,4267,0.995213228876747,0.989808552397501,0.989325820898656,0.981301531213192
+"Endothelial -> Fibroblast / CAF","Endothelial","Fibroblast / CAF",7187,3448,0.997682241185912,0.995938085061184,0.99460132890008,0.992019507869652
+"Endothelial -> Immune","Endothelial","Immune",2548,1385,0.999275708133381,0.998625606401493,0.999975630567716,0.994344473007712
+"Endothelial -> Mural / pericyte","Endothelial","Mural / pericyte",803,443,0.98666071422715,0.770981746324814,0.996605264094322,0.61849710982659
+"Exocrine epithelial -> Ductal/tumor epithelial","Exocrine epithelial","Ductal/tumor epithelial",362132,26197,0.546259458795478,1,NA,0.402293242254208
+"Exocrine epithelial -> Endocrine","Exocrine epithelial","Endocrine",6086,1923,0.997538984394344,0.997747278149854,0.998509553460874,0.988326848249027
+"Exocrine epithelial -> Endothelial","Exocrine epithelial","Endothelial",46048,14758,0.999981029553804,1,1,0.997356828193833
+"Exocrine epithelial -> Fibroblast / CAF","Exocrine epithelial","Fibroblast / CAF",38961,9518,1,0.997437317509087,0.999869203338887,0.537785910338518
+"Exocrine epithelial -> Immune","Exocrine epithelial","Immune",46804,17470,1,1,1,0.838724584103512
+"Exocrine epithelial -> Mural / pericyte","Exocrine epithelial","Mural / pericyte",650,169,0.999099831485139,0.994311890327399,1,0.997297297297297
+"Fibroblast / CAF -> Ductal/tumor epithelial","Fibroblast / CAF","Ductal/tumor epithelial",24080,12254,0.997161280121213,0.897496415713499,0.99429470266862,0.804932441296078
+"Fibroblast / CAF -> Endocrine","Fibroblast / CAF","Endocrine",1548,622,0.987534098060954,1,0.999373108813316,0.974051896207585
+"Fibroblast / CAF -> Endothelial","Fibroblast / CAF","Endothelial",15510,6557,0.998813311118169,0.960716409170908,NA,0.927822331893893
+"Fibroblast / CAF -> Exocrine epithelial","Fibroblast / CAF","Exocrine epithelial",12337,6644,0.997066751934102,0.998703745107393,0.99871949718698,0.982293050022134
+"Fibroblast / CAF -> Immune","Fibroblast / CAF","Immune",38636,15369,0.739224928355565,0.854528195348343,NA,0.903448275862069
+"Fibroblast / CAF -> Mural / pericyte","Fibroblast / CAF","Mural / pericyte",2446,1393,0.0130000645393277,0.00863647441140181,NA,0.0424028268551235
+"Immune -> Ductal/tumor epithelial","Immune","Ductal/tumor epithelial",5909,2230,1,1,0.998218419101876,0.966760740043901
+"Immune -> Endocrine","Immune","Endocrine",305,126,0.987492766171522,0.983101967519628,0.983101967519628,0.981927710843373
+"Immune -> Endothelial","Immune","Endothelial",3000,1361,0.995713462338887,0.994122995746707,0.985211131723768,1
+"Immune -> Exocrine epithelial","Immune","Exocrine epithelial",7844,4199,0.99655601779504,0.998636888107926,0.998019108153896,0.981834099365288
+"Immune -> Fibroblast / CAF","Immune","Fibroblast / CAF",32837,15908,0.999302046577372,0.999892959865704,NA,0.991166077738516
+"Immune -> Mural / pericyte","Immune","Mural / pericyte",1130,536,0.994945653172887,0.994406892826154,0.993551167344833,1
+"Mural / pericyte -> Ductal/tumor epithelial","Mural / pericyte","Ductal/tumor epithelial",997,337,0.808110221351976,0.997228723918842,0.997800565967361,0.976612094888072
+"Mural / pericyte -> Endothelial","Mural / pericyte","Endothelial",5012,1031,0.487354818649828,0.807931430115542,0.996116494291251,0.790808999521302
+"Mural / pericyte -> Exocrine epithelial","Mural / pericyte","Exocrine epithelial",423,266,1,0.977134925927101,0.988398382880216,0.747177069115275
+"Mural / pericyte -> Fibroblast / CAF","Mural / pericyte","Fibroblast / CAF",2270,943,0.406031788865986,0.209823832975916,NA,0.298424737456243
+"Mural / pericyte -> Immune","Mural / pericyte","Immune",2662,1436,0.931332912557991,0.949061481742115,NA,0.700847294434816
