@@ -144,7 +144,6 @@ notebooks.
 - [Detailed Xenium pancreas tutorial](examples/xenium_pancreas_membrane_377_full/pancreas_membrane_scoring_clean.md): the full walkthrough on a membrane-stained Xenium bundle - audit, membrane and bridge scoring on their recommended factorizations (`invsqrt_kl` and `ls_nmf`), and the variant comparison behind that pairing.
 - [Seurat Xenium integration tutorial](examples/xenium_pancreas_membrane_377_full/pancreas_seurat_integration.md): the same pancreas dataset, using Seurat for cell-level state and cellAdmix for molecule-complete fitting, scoring, and correction.
 - [Xenium breast 5K membrane scoring tutorial](examples/xenium_breast_membrane_5k_full/breast_5k_membrane_scoring.md): the full-scale 5K-panel workflow behind the timing benchmark above.
-- [Xenium breast 5K medium-crop tutorial](examples/xenium_breast_membrane_5k_full/breast_5k_membrane_scoring_medium_crop.md): the same workflow on a cropped subset for faster iteration.
 
 ### Python Examples
 
