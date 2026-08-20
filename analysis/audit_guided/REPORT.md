@@ -167,6 +167,33 @@ the non-saturating patch statistic enables per-gene induction flagging
 (gradient without patch enrichment) ahead of the formal proportionality
 test.
 
+## Discriminator characterization (T3/T5/T7)
+
+- **T3 (profile proportionality - the primary admixture/induction
+  discriminator).** Median correlation of per-gene exposure-linked excess
+  with the source profile: 0.82-0.84 across 38 pairs (cytoplasmic vs
+  whole-cell vs nuclear profiles do not separate on a 377-gene panel);
+  median 70% of each pair's excess is profile-proportional. 99 outlier
+  genes flagged, led by CXCL6, CFB, PPP1R1B in ductal-source pairs -
+  inflammation/activation genes with exposure-linked excess far above
+  their source-profile share: the induction signature, present in real
+  data. Patch composition corroborates: source-factor-labeled molecules in
+  target cells match the source cytoplasmic profile (cos 0.63) and not the
+  target profile (0.12).
+- **T5 (control-probe null).** Even pure noise is structured: control
+  molecules are clustered (0.37x dispersion vs random), surface-biased in
+  z (|dev| 0.27 vs 0.18 null), and nucleus-enriched - so the strict-gene
+  baseline's z behavior matches noise/surface material, and small-scale
+  clumping alone cannot certify admixture.
+- **T7 (four-class spike-in ground truth).** Fragments (in-plane and
+  out-of-plane), induction, and ambient singletons injected into real
+  exposed cells: the T3 test recovers exactly the three planted induction
+  genes as top outliers (z 21-76); the patch statistic separates
+  fragments/induction (0.34-0.44) from ambient (0.05) but NOT induction
+  from fragments - co-induced genes co-locate by cell density alone.
+  Patch absence is a corroborating clue only; profile proportionality is
+  the primary distinction.
+
 ## Recommended next steps
 
 1. Breast 5K phase 2: anchor endothelial + fibroblast (the two missing
