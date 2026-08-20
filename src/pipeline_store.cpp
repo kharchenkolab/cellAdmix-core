@@ -1439,6 +1439,11 @@ StorePipelineResult run_basic_pipeline_store(
   }
   const auto nmf_init_groups = build_training_init_groups(selection, cell_strata, options.nmf_init);
   stage_start = std::chrono::steady_clock::now();
+  // A supplied fixed H defines the factor count; it may differ from the
+  // annotation-derived rank (e.g. anchor-extended loadings).
+  const int effective_rank = options.nmf_fixed_h.empty()
+      ? options.rank
+      : static_cast<int>(options.nmf_fixed_h.size() / counts.genes.size());
   NcvFeatureTransform compact_transform;
   if (!options.nmf_fixed_h.empty()) {
     // Externally supplied loadings: no factorization. H is used as given in
@@ -1575,7 +1580,7 @@ StorePipelineResult run_basic_pipeline_store(
       store_manifest.has_nucleus_distance,
       storage_options.parquet_row_group_size);
   std::vector<int> transcript_counts(counts.cells.size(), 0);
-  std::vector<int> factor_counts(counts.cells.size() * static_cast<std::size_t>(options.rank), 0);
+  std::vector<int> factor_counts(counts.cells.size() * static_cast<std::size_t>(effective_rank), 0);
   std::unordered_map<std::int64_t, int> training_rank_by_obs;
   std::vector<int> report_labels;
   DenseMatrix report_factor_scores;
@@ -1663,8 +1668,8 @@ StorePipelineResult run_basic_pipeline_store(
       const int global_cell = block.cell_idx[row];
       const int label = labels[row];
       transcript_counts[static_cast<std::size_t>(global_cell)] += 1;
-      if (label >= 0 && label < options.rank) {
-        factor_counts[static_cast<std::size_t>(global_cell) * static_cast<std::size_t>(options.rank) +
+      if (label >= 0 && label < effective_rank) {
+        factor_counts[static_cast<std::size_t>(global_cell) * static_cast<std::size_t>(effective_rank) +
             static_cast<std::size_t>(label)] += 1;
       }
       if (report_ncv_umap) {
@@ -1704,7 +1709,7 @@ StorePipelineResult run_basic_pipeline_store(
       counts.cells,
       transcript_counts,
       factor_counts,
-      options.rank,
+      effective_rank,
       storage_options.parquet_row_group_size);
 
   if (report_ncv_umap) {
