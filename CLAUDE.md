@@ -16,3 +16,12 @@
 - Never keep a journal of updates in the docs: no "new in this version",
   "previously/now", or appended change notes - integrate changes into the
   existing narrative as if the code had always worked this way.
+
+## Communication
+
+- Use plain scientific language in explanations, reports, and
+  documentation. Describe methods and quantities by what they are or do
+  (e.g., "the estimated number of admixed molecules per cell") rather
+  than coining shorthand labels ("budget", "top-up", "far-field").
+  When a shorthand genuinely earns its place, define it at first use
+  and use it consistently thereafter.
