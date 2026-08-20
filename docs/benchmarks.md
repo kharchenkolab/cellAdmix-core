@@ -79,30 +79,36 @@ reference it is a strict floor: contamination that reaches even unexposed
 cells enters $\hat\rho_0$ and is not counted.
 
 *The reference level.* Zero observed neighbors does not mean
-contamination-free: a tissue section is a thin slab, so a cell with no
-source-type cells among its 15 nearest can sit directly above or below
-source cells and carry their material — measurably so: among
-zero-neighbor target cells, source-marker content decays severalfold with
-lateral distance to the nearest source cell, arrives as gene-diverse
-spatial patches matching the source profile, and sits toward the section
-surfaces. The audit therefore takes its reference from cells with zero
-source cells among a progressively larger set of nearest neighbors — 30,
-60, 120, 240, spanning only a ~100 um lateral radius — using the largest
-neighborhood that retains enough reference molecules. This bounds the
-hidden exposure of the reference cells by direct observation while never
-comparing against distant tissue compartments, whose same-type cells can
-be biologically different. Content of any target cell above this ambient
-reference counts as leakage, so the audit's $L$ also includes the
-structured contamination of zero-neighbor cells. On planted-contamination
-simulations with a hidden out-of-section component, the base reference
-recovers 36% of the true contamination (the contact portion only) while
-the neighborhood-ladder reference recovers 65%, remaining conservative:
-contamination present even in the strictest reference cells (below one
-source cell per 240 neighbors, or arriving from beyond the ladder's
-radius) is still not counted. Cleanup scores in this report use the
-$\hat\rho_0$ floor throughout, the most conservative and
-assumption-free scoring basis; pair detection likewise remains
-gradient-based under either reference.
+contamination-free: a section is a thin slab, so a cell with no source
+cells among its 15 nearest can sit directly above or below source cells
+and carry their material — among zero-neighbor target cells, source-marker
+content decays severalfold with lateral distance to the nearest source
+cell and arrives as gene-diverse patches matching the source profile. The
+audit therefore takes its reference from cells with zero source cells
+among a progressively larger neighborhood — 30, 60, 120, 240 nearest
+cells, a ~100 um lateral radius — using the largest one with enough
+reference molecules (Figure 5). This bounds the reference cells' hidden
+exposure by direct observation without comparing against distant tissue,
+where same-type cells can be biologically different. Content of any
+target cell above this ambient level counts as leakage. On simulations
+with planted contact, hidden out-of-section, and ambient contamination,
+the base reference recovers 36% of the truth and the ladder 65%, always
+conservatively — material arriving from beyond the ladder's radius stays
+uncounted. Cleanup scores in this report use the $\hat\rho_0$ floor,
+the most conservative scoring basis, and pair detection is gradient-based
+under either reference.
+
+![Figure 5](figures/benchmark_fig5.png)
+
+**Figure 5. The ambient reference.** **(a)** The reference ladder for the
+pancreas pair with the largest reference correction: the marker rate
+among target cells with zero source cells among their K nearest, as K
+grows; filled points have enough molecules to serve as the reference, the
+red point is the chosen neighborhood, and the dashed line is the
+resulting ambient reference. **(b)** The same pair's exposure profile:
+the dotted line is the zero-neighbor rate (the old reference), the dashed
+line the ambient reference; the gap between them is contamination carried
+by cells with no visible source neighbors, which now counts as leakage.
 
 *Step 3 — extrapolate from the pool to all genes.* Leaked molecules are
 S-cell transcripts, and the pool genes account for a measurable share
@@ -217,21 +223,17 @@ these terms.
 ## Running the audit
 
 The measurement ships in the package as the admixture audit, with the
-neighborhood-ladder reference and the induced-gene screening described
-above (the harness in `analysis/cleanup_benchmark/` re-implements the
-estimator with the $\hat\rho_0$ floor for its sweep runs). On pancreas
-the ladder deepens the reference for 36 of 39 detected pairs (22 reach
-the 240-neighborhood) and raises the total estimate to 1.53M molecules
-at a median reference correction of 1.21x, while the screening excludes
-inflammatory and shared genes (CXCL6, CFB, and the ductal genes PROX1,
-CFTR, CA4 from the exocrine panel) that had inflated pair estimates; on
-breast 5K all 29 detected pairs deepen (14 to the 240-neighborhood) and
-the estimate rises from 10.3M to 18.1M molecules — roughly 22% of the
-dataset. `evaluate()` verifies a correction against the same
-measurements and warns from the corrected counts themselves: a detected
-pair is flagged when its molecules were measurably not removed,
-regardless of what the correction's rule list claims. In R, each panel
-of Figure 1 corresponds to one call:
+ambient reference and induced-gene screening described above (the harness
+in `analysis/cleanup_benchmark/` uses the $\hat\rho_0$ floor for its
+sweeps). On pancreas the reference deepens for 36 of 39 pairs (median
+correction 1.21x, total estimate 1.53M molecules) and the screening
+removes inflammatory and shared genes (CXCL6, CFB; PROX1, CFTR, CA4 from
+the exocrine panel) that had inflated estimates; on breast 5K all 29
+pairs deepen and the estimate roughly doubles to 18.1M molecules (~22% of
+the dataset). `evaluate()` warns from the corrected counts themselves: a
+detected pair is flagged when its molecules were measurably not removed,
+whatever the rule list claims. In R, each panel of Figure 1 corresponds
+to one call:
 
 ```r
 ds <- cellAdmix(bundle_dir, output_dir = "out", annotation = annotation)

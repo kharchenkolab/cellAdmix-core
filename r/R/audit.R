@@ -265,6 +265,12 @@ celladmix_audit_admixture <- function(fit, annotation = NULL, neighbor_k = 15L,
       ref <- .celladmix_audit_reference_rate(pool_counts, totals[T_cells],
         zero_by_K)
       ref_mask <- zero_by_K[[ref$kind]]
+      ref_ladder <- data.frame(
+        K = as.integer(sub("^k", "", names(zero_by_K))),
+        rate = vapply(zero_by_K, function(z)
+          sum(pool_counts[z]) / max(sum(totals[T_cells][z]), 1), 0),
+        totals = vapply(zero_by_K, function(z) sum(totals[T_cells][z]), 0),
+        stringsAsFactors = FALSE)
       excess_ref <- .celladmix_audit_excess_vs_ref(rates, ref$rate)
       rates_strict <- if (length(strict) >= 2) .celladmix_audit_bin_rates(
         .celladmix_audit_mcount(counts, strict, T_cells), totals[T_cells], bins) else NULL
@@ -277,7 +283,7 @@ celladmix_audit_admixture <- function(fit, annotation = NULL, neighbor_k = 15L,
       } else NULL
       pair_defs[[paste(source, target, sep = " -> ")]] <- list(
         source = source, target = target, T_cells = T_cells, bins = bins,
-        ref_mask = ref_mask,
+        ref_mask = ref_mask, ref_ladder = ref_ladder,
         pool = pool, strict = strict, induced = screened$induced,
         rates = rates, rates_strict = rates_strict,
         # detection remains gradient-based (rise of exposed bins over the
@@ -429,16 +435,19 @@ CellAdmixAudit <- R6::R6Class(
             if (!d$detected) next
             n_pairs <- n_pairs + 1L
             genes <- if (strict && length(d$strict) >= 2) d$strict else d$pool
-            rates <- .celladmix_audit_bin_rates(
-              .celladmix_audit_mcount(counts_mat, genes, d$T_cells),
+            counts_g <- .celladmix_audit_mcount(counts_mat, genes, d$T_cells)
+            rates <- .celladmix_audit_bin_rates(counts_g,
               private$.totals[d$T_cells], d$bins)
-            r0 <- rates$rate[rates$bin == "0"]
-            m0 <- rates$markers[rates$bin == "0"]
-            M0 <- max(rates$totals[rates$bin == "0"], 1)
+            # each pair's excess over its own ambient reference, so the
+            # zero-neighbor bin shows its structured contamination too
+            m_ref <- sum(counts_g[d$ref_mask])
+            M_ref <- max(sum(private$.totals[d$T_cells][d$ref_mask]), 1)
+            r_ref <- m_ref / M_ref
             for (b in bins) {
               row <- rates[rates$bin == b, ]
-              excess[b] <- excess[b] + max(row$rate - r0, 0) * row$totals
-              var_tot[b] <- var_tot[b] + row$markers + (row$totals / M0)^2 * m0
+              excess[b] <- excess[b] + max(row$rate - r_ref, 0) * row$totals
+              var_tot[b] <- var_tot[b] + row$markers +
+                (row$totals / M_ref)^2 * m_ref
               totals[b] <- totals[b] + row$totals
             }
           }
@@ -468,20 +477,29 @@ CellAdmixAudit <- R6::R6Class(
       }
       df$bin <- factor(df$bin, levels = c("0", "1", "2", "3+"))
       r0 <- df$rate[df$bin == "0" & df$state == "before"]
+      r_ref <- if (!pooled) {
+        d <- private$.pair(source, target)
+        genes <- if (strict && length(d$strict) >= 2) d$strict else d$pool
+        counts_g <- .celladmix_audit_mcount(private$.counts, genes, d$T_cells)
+        sum(counts_g[d$ref_mask]) /
+          max(sum(private$.totals[d$T_cells][d$ref_mask]), 1)
+      } else NA_real_
       title <- if (pooled) {
         "Admixture exposure profile (pooled over detected pairs)"
       } else {
         sprintf("%s → %s", source, target)
       }
       ylab <- if (pooled) {
-        "excess pool-marker rate over pair reference\n(per 1,000 molecules)"
+        "excess pool-marker rate over pair ambient reference\n(per 1,000 molecules)"
       } else {
         "pool-marker rate (per 1,000 molecules)"
       }
       subtitle <- if (pooled) {
-        "each pair's excess over its own unexposed reference, pooled;\nerror bars: 95% intervals"
+        "each pair's excess over its own ambient reference, pooled;\nerror bars: 95% intervals"
       } else {
-        "error bars: 95% Poisson intervals (often narrower than the symbols);\ndotted line: unexposed reference"
+        paste0("error bars: 95% Poisson intervals (often narrower than the symbols);\n",
+          "dotted: zero-neighbor rate; dashed: ambient reference (",
+          private$.pair(source, target)$reference_kind, ")")
       }
       cols <- c("before" = "#c0392b", "after cleanup" = "#2980b9")
       p <- ggplot2::ggplot(df, ggplot2::aes(x = bin, group = state)) +
@@ -493,7 +511,9 @@ CellAdmixAudit <- R6::R6Class(
         ggplot2::geom_point(ggplot2::aes(y = rate * 1e3, color = state), size = 1.8)
       if (!pooled) {
         p <- p + ggplot2::geom_hline(yintercept = r0 * 1e3, linetype = "dotted",
-          color = "grey40")
+          color = "grey40") +
+          ggplot2::geom_hline(yintercept = r_ref * 1e3, linetype = "dashed",
+            color = "grey25")
       }
       p +
         ggplot2::scale_color_manual(values = cols, name = NULL) +
@@ -549,6 +569,33 @@ CellAdmixAudit <- R6::R6Class(
           y = "estimated admixture (% of all molecules)",
           title = "Remaining admixture by correction",
           subtitle = "estimate over detected cell-type pairs;\nerror bars: 95% intervals") +
+        ggplot2::theme_classic(base_size = 10)
+    },
+
+    plot_reference = function(source, target) {
+      .celladmix_require_ggplot2()
+      d <- private$.pair(source, target)
+      lad <- d$ref_ladder
+      lad$chosen <- paste0("k", lad$K) == d$reference_kind
+      lad$usable <- lad$totals >= 2e4
+      ggplot2::ggplot(lad, ggplot2::aes(x = K, y = rate * 1e3)) +
+        ggplot2::geom_line(color = "grey55") +
+        ggplot2::geom_point(ggplot2::aes(shape = usable, color = chosen),
+          size = 2.4) +
+        ggplot2::geom_hline(yintercept = d$reference_rate * 1e3,
+          linetype = "dashed", color = "grey25") +
+        ggplot2::scale_x_continuous(trans = "log2", breaks = lad$K) +
+        ggplot2::scale_color_manual(values = c(`TRUE` = "#c0392b",
+          `FALSE` = "#34495e"), guide = "none") +
+        ggplot2::scale_shape_manual(values = c(`TRUE` = 16, `FALSE` = 1),
+          name = "enough molecules") +
+        ggplot2::labs(
+          x = "neighborhood size K (zero source cells among K nearest)",
+          y = "pool-marker rate in reference cells\n(per 1,000 molecules)",
+          title = sprintf("%s → %s: ambient reference", source, target),
+          subtitle = paste0("rate among cells with zero source neighbors as ",
+            "the neighborhood grows;\nred: chosen reference (",
+            d$reference_kind, "), dashed line: reference level")) +
         ggplot2::theme_classic(base_size = 10)
     },
 
