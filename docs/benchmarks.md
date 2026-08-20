@@ -31,7 +31,14 @@ reference.
 For each cell-type pair we select up to 20 *source markers*: genes whose
 top expresser is S, ranked by their expression in S relative to
 zero-exposure cells of T — rank-based, since an absolute baseline cutoff
-would itself be skewed by contamination. The *strict tier* of the panel
+would itself be skewed by contamination. Candidate genes are screened for
+proximity-induced transcription: transferred material samples the source
+transcriptome, so a gene's exposure-linked excess should be proportional
+to its share of the source expression profile, and a gene whose excess far
+exceeds that share reflects the target's own transcriptional response to
+source proximity (on pancreas: CXCL6, CFB — inflammatory response genes).
+Screened-out genes are replaced by the next-ranked candidates, which are
+screened in turn, and reported separately. The *strict tier* of the panel
 holds genes essentially absent from reference cells of T (baseline under
 5% of the source level), whose excess in exposed cells can only be leaked
 material.
@@ -67,8 +74,35 @@ $$L = \sum_{B>0} \max(\hat\rho_B - \hat\rho_0, 0) \cdot M_B$$
 (the gap between the observed curve and the dotted baseline in Figure 1a,
 weighted by the bin totals). $L$ is the pool-visible portion of the
 target count $A_{S \to T}$: the part carried by the genes we can watch.
-It requires no modeling assumptions and it underestimates: contamination
-that reaches even unexposed cells enters $\hat\rho_0$ and is not counted.
+It requires no modeling assumptions, and with $\hat\rho_0$ as the
+reference it is a strict floor: contamination that reaches even unexposed
+cells enters $\hat\rho_0$ and is not counted.
+
+*The reference level.* Zero observed neighbors does not mean
+contamination-free: a tissue section is a thin slab, so a cell with no
+source-type cells among its 15 nearest can sit directly above or below
+source cells and carry their material — measurably so: among
+zero-neighbor target cells, source-marker content decays severalfold with
+lateral distance to the nearest source cell, arrives as gene-diverse
+spatial patches matching the source profile, and sits toward the section
+surfaces. The audit therefore takes its reference from cells with zero
+source cells among a progressively larger set of nearest neighbors — 30,
+60, 120, 240, spanning only a ~100 um lateral radius — using the largest
+neighborhood that retains enough reference molecules. This bounds the
+hidden exposure of the reference cells by direct observation while never
+comparing against distant tissue compartments, whose same-type cells can
+be biologically different. Content of any target cell above this ambient
+reference counts as leakage, so the audit's $L$ also includes the
+structured contamination of zero-neighbor cells. On planted-contamination
+simulations with a hidden out-of-section component, the base reference
+recovers 36% of the true contamination (the contact portion only) while
+the neighborhood-ladder reference recovers 65%, remaining conservative:
+contamination present even in the strictest reference cells (below one
+source cell per 240 neighbors, or arriving from beyond the ladder's
+radius) is still not counted. Cleanup scores in this report use the
+$\hat\rho_0$ floor throughout, the most conservative and
+assumption-free scoring basis; pair detection likewise remains
+gradient-based under either reference.
 
 *Step 3 — extrapolate from the pool to all genes.* Leaked molecules are
 S-cell transcripts, and the pool genes account for a measurable share
