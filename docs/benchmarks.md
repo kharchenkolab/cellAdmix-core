@@ -216,19 +216,22 @@ these terms.
 
 ## Running the audit
 
-The measurement ships in the package as the admixture audit (the harness
-in `analysis/cleanup_benchmark/` re-implements the same estimator for its
-sweep runs). The packaged audit refines the reference level beyond the
-construction above: because a section shows only a slab of the tissue,
-cells with zero source neighbors among their 15 nearest can still carry
-material from source cells outside the section plane, so the audit takes
-its reference from cells with zero source neighbors among a progressively
-larger neighborhood (up to 240 cells, a ~100 um radius), and counts the
-content of less-strictly-unexposed cells above that level as admixture. It also screens marker panels for genes whose exposure-linked
-excess far exceeds their share of the source expression profile — the
-signature of proximity-induced transcription rather than transferred
-material — excluding and replacing them. In R, each panel of Figure 1
-corresponds to one call:
+The measurement ships in the package as the admixture audit, with the
+neighborhood-ladder reference and the induced-gene screening described
+above (the harness in `analysis/cleanup_benchmark/` re-implements the
+estimator with the $\hat\rho_0$ floor for its sweep runs). On pancreas
+the ladder deepens the reference for 36 of 39 detected pairs (22 reach
+the 240-neighborhood) and raises the total estimate to 1.53M molecules
+at a median reference correction of 1.21x, while the screening excludes
+inflammatory and shared genes (CXCL6, CFB, and the ductal genes PROX1,
+CFTR, CA4 from the exocrine panel) that had inflated pair estimates; on
+breast 5K all 29 detected pairs deepen (14 to the 240-neighborhood) and
+the estimate rises from 10.3M to 18.1M molecules — roughly 22% of the
+dataset. `evaluate()` verifies a correction against the same
+measurements and warns from the corrected counts themselves: a detected
+pair is flagged when its molecules were measurably not removed,
+regardless of what the correction's rule list claims. In R, each panel
+of Figure 1 corresponds to one call:
 
 ```r
 ds <- cellAdmix(bundle_dir, output_dir = "out", annotation = annotation)
