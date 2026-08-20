@@ -29,7 +29,9 @@ own-marker false removal on native markers disjoint from all guide pools.
 | + mural anchor + audit-attributed rules, bridge (single) | 0.425 | 0.453 | 0.39 | 5.3% |
 | full audit-guided type anchors, bridge (single) | 0.376 | 0.519 | 0.23 | 5.3% |
 | historical SPA anchors s1-s3, bridge (single) | 0.41-0.53 | - | - | 2.1-9.6% |
-| exposure-regression corrector (E4) | 0.710 | 0.607 | **0.00** | **0.0%** |
+| exposure-regression corrector (E4 prototype) | 0.710 | 0.607 | **0.00** | **0.0%** |
+| exposure corrector v3, validation arm (A-guided) | 0.906 | - | 0.00 | 0.0% |
+| exposure corrector v3, production arm (Phase A) | **0.992** | - | - | **0.0%** |
 
 Controls: junk anchors align to no type and produce zero rules (both
 scoring methods); shuffled exposure collapses the E4 corrector to
@@ -90,6 +92,32 @@ power 0.001; E4 leaves zero-exposure cells untouched by construction.
    from the native check). Fixed in `pipeline_store.cpp` with a regression
    test; 245+4 tests pass.
 
+## Phase A: exposure corrector v3
+
+Three measured shortfalls of the E4 prototype were fixed: an isotonic
+dose-response on raw exposure counts (the coarse "3+" bin had carried
+65-95% of each pair's excess), exact stratum-level budget delivery with
+gene waterfilling (per-cell budgets had died on 0.6-2.5 pool molecules per
+cell), and an ambient tier that removes strict-gene content outright
+(near-zero native baseline means that content is contamination at any
+exposure). Results (script `08_phase_a.R`):
+
+- validation arm (budgets from A halves only, no ambient): power_B 0.906 -
+  the dose-response generalizes from guide genes to held-out genes;
+- production arm (full pools, ambient on): power_B 0.992 (median 0.998),
+  own-marker false removal 0.0%, budget delivery 98-99%, top-up residual
+  <1% after one pass;
+- coverage gate: zero pairs below 0.8 - every previously-stuck pair is
+  corrected;
+- shuffled-exposure control: 0.007;
+- downstream cell-state kNN purity: original 0.804, membrane ensemble
+  0.968, exposure v3 0.967 - identical downstream benefit while removing
+  1.16M molecules versus the ensemble's 1.99M and touching no own-marker
+  content.
+
+The regression tier meets every gate on pancreas; the full guided-NMF/EM
+tier (E5) remains unjustified here and is deferred to the breast phase.
+
 ## Verdicts against the pre-registered gates
 
 - E1 (anchors): PASS - mean B-power over the mural cluster 0.77 (gate 0.5),
@@ -98,10 +126,10 @@ power 0.001; E4 leaves zero-exposure cells untouched by construction.
   replacement strategy, superseded by the extension strategy which was not
   part of the historical comparison.
 - E3 (calibration): PASS - stable selection, honest B-side reporting.
-- E4 (exposure corrector): concept validated; 0.71 power at perfect
-  specificity qualifies it as a fallback/composite tier. The full
-  exposure-informed EM (E5) is not yet justified by the gap it would close
-  on pancreas; revisit after breast.
+- E4/Phase A (exposure corrector): PASS - v3 reaches 0.992 aggregate
+  power with full pair coverage, clean controls, zero own-marker damage,
+  and ensemble-parity downstream purity. The full exposure-informed EM
+  (E5) is not justified by any remaining pancreas gap; revisit on breast.
 
 ## Recommended next steps
 

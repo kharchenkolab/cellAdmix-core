@@ -62,7 +62,8 @@ build_split_defs <- function(fit, cell_annotation, k_neighbors = 15L,
       totals_before[T_cells], bins)
     pair_defs[[paste(S, T_type, sep = " -> ")]] <- list(
       S = S, T_type = T_type, T_cells = T_cells, bins = bins,
-      pool = pool, A = A, B = B, strictB = intersect(strict, B),
+      e = setNames(as.numeric(e), T_cells),
+      pool = pool, A = A, B = B, strict = strict, strictB = intersect(strict, B),
       excess_pool = det$excess_molecules,
       excess_B = bench_detect(rates_of(B, counts_before))$excess_molecules,
       rates_before = list(A = rates_of(A, counts_before),
