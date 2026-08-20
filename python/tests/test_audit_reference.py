@@ -18,7 +18,7 @@ class ReferenceRateTests(unittest.TestCase):
                      "k240": idx > 3000}
         rate = np.where(idx <= 1000, 0.03, np.where(idx <= 3000, 0.012, 0.005))
         markers = rng.poisson(rate * totals).astype(float)
-        ref, kind, pooled = _reference_rate(markers, totals, zero_by_K)
+        ref, kind, pooled, _ = _reference_rate(markers, totals, zero_by_K)
         self.assertEqual(kind, "k240")
         self.assertLess(ref, 0.008)
         self.assertGreater(pooled, ref)
@@ -33,7 +33,7 @@ class ReferenceRateTests(unittest.TestCase):
         zero_by_K = {"k15": np.full(n, True), "k60": idx > 1000,
                      "k240": idx > 3990}
         markers = rng.poisson(0.01 * totals).astype(float)
-        _, kind, _ = _reference_rate(markers, totals, zero_by_K)
+        _, kind, _, _ = _reference_rate(markers, totals, zero_by_K)
         self.assertEqual(kind, "k60")
 
     def test_flat_profile_keeps_base_rate(self):
@@ -46,7 +46,7 @@ class ReferenceRateTests(unittest.TestCase):
         zero_by_K = {"k15": np.full(n, True), "k60": idx > 1000,
                      "k240": idx > 3000}
         markers = rng.poisson(0.01 * totals).astype(float)
-        ref, _, pooled = _reference_rate(markers, totals, zero_by_K)
+        ref, _, pooled, _ = _reference_rate(markers, totals, zero_by_K)
         self.assertAlmostEqual(ref, pooled, delta=0.15 * pooled)
 
 

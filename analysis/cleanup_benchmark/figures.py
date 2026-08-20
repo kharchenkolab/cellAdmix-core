@@ -43,7 +43,7 @@ for i, pair in enumerate(show_pairs):
     ax.set_xlabel('source-type neighbors')
     ax.set_title(short(pair), fontsize=8.5)
     if i == 0:
-        ax.set_ylabel('pool-marker rate $\\hat{\\rho}_B$\n(per 1000 molecules)')
+        ax.set_ylabel('admixture-marker rate $\\hat{\\rho}_B$\n(per 1000 molecules)')
         ax.legend(frameon=False, fontsize=8)
 
 # panel b: extrapolated per-pair admixture rates r as a source x target map

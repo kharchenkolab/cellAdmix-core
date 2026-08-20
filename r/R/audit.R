@@ -107,21 +107,41 @@
 # different and are never used). zero_by_K is a named list of logical
 # vectors over the target cells, ascending in K, whose first entry is the
 # base exposure definition.
+# Weighted monotone-decreasing fit (pool-adjacent violators): stabilizes
+# each rung's estimate by borrowing strength from the whole ladder without
+# extrapolating beyond it.
+.celladmix_audit_pava_dec <- function(y, w) {
+  val <- y; wt <- w; idx <- as.list(seq_along(y))
+  i <- 1
+  while (i < length(val)) {
+    if (val[[i]] < val[[i + 1]] - 1e-15) {
+      mw <- wt[[i]] + wt[[i + 1]]
+      mv <- (val[[i]] * wt[[i]] + val[[i + 1]] * wt[[i + 1]]) / mw
+      val[[i]] <- mv; wt[[i]] <- mw
+      idx[[i]] <- c(idx[[i]], idx[[i + 1]])
+      val <- val[-(i + 1)]; wt <- wt[-(i + 1)]; idx[[i + 1]] <- NULL
+      i <- max(1, i - 1)
+    } else i <- i + 1
+  }
+  out <- numeric(length(y))
+  for (j in seq_along(val)) out[idx[[j]]] <- val[[j]]
+  out
+}
+
 .celladmix_audit_reference_rate <- function(marker_counts, totals, zero_by_K,
                                             min_tail_totals = 2e4) {
-  base <- zero_by_K[[1]]
-  pooled <- sum(marker_counts[base]) / max(sum(totals[base]), 1)
-  rate <- pooled
-  kind <- names(zero_by_K)[[1]]
-  for (i in rev(seq_along(zero_by_K))) {
-    z <- zero_by_K[[i]]
-    if (sum(totals[z]) >= min_tail_totals) {
-      rate <- sum(marker_counts[z]) / max(sum(totals[z]), 1)
-      kind <- names(zero_by_K)[[i]]
-      break
-    }
-  }
-  list(rate = min(rate, pooled), kind = kind, rate_unexposed = pooled)
+  m_k <- vapply(zero_by_K, function(z) sum(marker_counts[z]), 0)
+  M_k <- vapply(zero_by_K, function(z) sum(totals[z]), 0)
+  rate_k <- m_k / pmax(M_k, 1)
+  # Monotone fit across all rungs; the reference is the fitted value at the
+  # deepest well-populated rung - every rung contributes, nothing beyond
+  # the measured ladder is assumed.
+  fitted <- .celladmix_audit_pava_dec(rate_k, pmax(M_k, 1))
+  pooled <- rate_k[[1]]
+  ok <- which(M_k >= min_tail_totals)
+  pick <- if (length(ok)) max(ok) else 1L
+  list(rate = min(fitted[[pick]], pooled), kind = names(zero_by_K)[[pick]],
+    rate_unexposed = pooled, ladder_fitted = fitted)
 }
 
 # Leakage above an externally supplied reference rate: exceedance summed
@@ -269,6 +289,7 @@ celladmix_audit_admixture <- function(fit, annotation = NULL, neighbor_k = 15L,
         K = as.integer(sub("^k", "", names(zero_by_K))),
         rate = vapply(zero_by_K, function(z)
           sum(pool_counts[z]) / max(sum(totals[T_cells][z]), 1), 0),
+        rate_fitted = ref$ladder_fitted,
         totals = vapply(zero_by_K, function(z) sum(totals[T_cells][z]), 0),
         stringsAsFactors = FALSE)
       excess_ref <- .celladmix_audit_excess_vs_ref(rates, ref$rate)
@@ -369,8 +390,8 @@ CellAdmixAudit <- R6::R6Class(
             ki <- match(as.integer(sub("^k", "", d$reference_kind)),
               d$ref_ladder$K)
             if (is.na(ki) || ki < 2) NA_real_ else
-              (d$ref_ladder$rate[ki - 1] - d$ref_ladder$rate[ki]) /
-                max(d$ref_ladder$rate[ki - 1], 1e-12)
+              (d$ref_ladder$rate_fitted[ki - 1] - d$ref_ladder$rate_fitted[ki]) /
+                max(d$ref_ladder$rate_fitted[ki - 1], 1e-12)
           },
           n_exposed = length(exposed), n_reference = sum(d$bins == "0"),
           n_markers = length(d$pool), n_strict = length(d$strict),
@@ -500,9 +521,9 @@ CellAdmixAudit <- R6::R6Class(
         sprintf("%s → %s", source, target)
       }
       ylab <- if (pooled) {
-        "excess pool-marker rate over pair ambient reference\n(per 1,000 molecules)"
+        "excess admixture-marker rate over pair ambient reference\n(per 1,000 molecules)"
       } else {
-        "pool-marker rate (per 1,000 molecules)"
+        "admixture-marker rate (per 1,000 molecules)"
       }
       subtitle <- if (pooled) {
         "each pair's excess over its own ambient reference, pooled;\nerror bars: 95% intervals"
@@ -589,7 +610,7 @@ CellAdmixAudit <- R6::R6Class(
       lad$chosen <- paste0("k", lad$K) == d$reference_kind
       lad$usable <- lad$totals >= 2e4
       ggplot2::ggplot(lad, ggplot2::aes(x = K, y = rate * 1e3)) +
-        ggplot2::geom_line(color = "grey55") +
+        ggplot2::geom_line(ggplot2::aes(y = rate_fitted * 1e3), color = "grey55") +
         ggplot2::geom_point(ggplot2::aes(shape = usable, color = chosen),
           size = 2.4) +
         ggplot2::geom_hline(yintercept = d$reference_rate * 1e3,
@@ -601,10 +622,10 @@ CellAdmixAudit <- R6::R6Class(
           name = "enough molecules") +
         ggplot2::labs(
           x = "neighborhood size K (zero source cells among K nearest)",
-          y = "pool-marker rate in reference cells\n(per 1,000 molecules)",
+          y = "admixture-marker rate in reference cells\n(per 1,000 molecules)",
           title = sprintf("%s → %s: ambient reference", source, target),
-          subtitle = paste0("rate among cells with zero source neighbors as ",
-            "the neighborhood grows;\nred: chosen reference (",
+          subtitle = paste0("points: rate among cells with zero source neighbors; line: monotone fit;\n",
+            "red: chosen reference (",
             d$reference_kind, "), dashed line: reference level")) +
         ggplot2::theme_classic(base_size = 10)
     },

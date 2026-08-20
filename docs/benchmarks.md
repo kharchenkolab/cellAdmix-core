@@ -89,13 +89,15 @@ among a progressively larger neighborhood — 30, 60, 120, 240 nearest
 cells, a ~100 um lateral radius — using the largest one with enough
 reference molecules (Figure 5). This bounds the reference cells' hidden
 exposure by direct observation without comparing against distant tissue,
-where same-type cells can be biologically different. The reference is the
-deepest well-populated measurement, not a curve fit: a ladder that is
-still declining at its deepest neighborhood (as in Figure 5a) leaves the
-pair's estimate conservative, and the per-pair decline over the final
-step is reported so such pairs are visible (fitted extrapolation was
-tested and rejected - it changes the median reference by under 3% while
-failing unpredictably on sparse pairs). Content of any
+where same-type cells can be biologically different. The reference is a
+monotone fit across the whole ladder, read at its deepest well-populated
+rung - every rung contributes to the estimate's stability, and nothing
+beyond the measured ladder is assumed (free-form extrapolation past the
+deepest rung was tested and rejected: it changes the median reference by
+under 3% while failing unpredictably on sparse pairs). A ladder still
+declining at its deepest rung (as in Figure 5a) leaves the pair's
+estimate conservative, and the per-pair decline over the final step is
+reported so such pairs are visible. Content of any
 target cell above this ambient level counts as leakage. On simulations
 with planted contact, hidden out-of-section, and ambient contamination,
 the base reference recovers 36% of the truth and the ladder 65%, always
@@ -107,10 +109,10 @@ under either reference.
 ![Figure 5](figures/benchmark_fig5.png)
 
 **Figure 5. The ambient reference.** **(a)** The reference ladder for the
-pancreas pair with the largest reference correction: the marker rate
-among target cells with zero source cells among their K nearest, as K
-grows; filled points have enough molecules to serve as the reference, the
-red point is the chosen neighborhood, and the dashed line is the
+pancreas pair with the largest reference correction: points show the
+marker rate among target cells with zero source cells among their K
+nearest as K grows, the line is the monotone fit across the ladder, the
+red point marks the chosen neighborhood, and the dashed line is the
 resulting ambient reference. **(b)** The same pair's exposure profile:
 the dotted line is the zero-neighbor rate (the old reference), the dashed
 line the ambient reference; the gap between them is contamination carried
@@ -142,22 +144,23 @@ to a single target type, so no molecule is counted by two pairs.
 
 ![Figure 1](figures/benchmark_fig1.png)
 
-**Figure 1. The neighbor benchmark.** **(a)** Strict-tier pool-marker
-rates $\hat\rho_B$ in target cells, stratified by the number of source-type
+**Figure 1. The neighbor benchmark.** **(a)** Strict-tier
+admixture-marker rates $\hat\rho_B$ in target cells, stratified by the number of source-type
 neighbors, before (red, dashed) and after (blue) a standard cleanup (bare
 ls-NMF fit, membrane scoring, pancreas dataset); the dotted line marks the
-zero-exposure reference rate $\hat\rho_0$ — nonzero in general, since it
-includes residual native expression and ambient contamination; only the
-excess above it counts as leakage. The rise with exposure reflects
+zero-exposure rate $\hat\rho_0$, the benchmark's scoring floor — nonzero
+in general, since it includes residual native expression and ambient
+contamination; only the excess above it counts as leakage. The rise with exposure reflects
 contamination; cleanup quality is the degree to which the blue curve
 flattens to the reference. Compare the near-complete flattening of
 endocrine → endothelial with fibroblast → immune, where the curves
 coincide exactly: the correction issued no removal rule for that pair, so
 its molecules were untouched. **(b)** Estimated per-pair admixture rates
-$\hat r_{S \to T}$ on pancreas (percent of the target type's molecules
-leaked in from the source; blank cells: pair not detected). Over a
-quarter of ductal/tumor-cell molecules are estimated to originate in
-exocrine cells. **(c)** Estimated cleanup sensitivity for every detected
+$\hat r_{S \to T}$ on pancreas, measured against each pair's ambient
+reference (Figure 5): percent of the target type's molecules leaked in
+from the source; blank cells: pair not detected. About a fifth of the
+ductal/tumor-cell molecules are estimated to originate in exocrine
+cells. **(c)** Estimated cleanup sensitivity for every detected
 pair (bars), with each pair's estimated admixed-molecule count
 $\hat A_{S \to T}$ overlaid (orange, log scale). Take-home: cleanup effectiveness is
 measurable without molecule-level ground truth, and a standard single-fit
@@ -184,7 +187,7 @@ specificity metrics below. The coverage factor $s$ cancels in the ratio,
 so cleanup scores do not depend on the extrapolation step. Applied across
 all detected pairs of a standard single-fit cleanup (Figure 1c),
 sensitivity varies widely between pairs, and the largest pair
-(exocrine → ductal, an estimated $\hat A \approx 500{,}000$ admixed
+(exocrine → ductal, an estimated $\hat A \approx 380{,}000$ admixed
 molecules) is missed entirely — a failure that aggregate statistics would
 hide.
 
@@ -279,8 +282,8 @@ neither does adding restarts. Downstream, the *lists* of removal decisions
 (source → target rules) that survive scoring are comparatively
 reproducible (Jaccard ≈ 0.83 between runs; Figure 2b). The remaining
 disagreements, however, concentrate on a few high-leakage pairs — the
-exocrine → ductal decision flips between runs and carries half the
-dataset's leakage — and the per-molecule labels that decisions act on vary
+exocrine → ductal decision flips between runs and carries a quarter of
+the dataset's estimated leakage — and the per-molecule labels that decisions act on vary
 much more. The net effect: the final removed-molecule sets of two runs
 share only about half their members (median Jaccard 0.56 invsqrt,
 0.45 ls-NMF; Figure 2c) despite similar totals. Notably this holds for

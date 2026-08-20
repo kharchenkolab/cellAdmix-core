@@ -81,6 +81,31 @@ def _power(rates_before, rates_after):
     return np.nan if eb.sum() <= 0 else 1 - float(ea.sum()) / float(eb.sum())
 
 
+def _pava_dec(y, w):
+    """Weighted monotone-decreasing fit (pool-adjacent violators):
+    stabilizes each rung's estimate with the whole ladder, without
+    extrapolating beyond it."""
+    val = list(map(float, y))
+    wt = list(map(float, w))
+    idx = [[i] for i in range(len(val))]
+    i = 0
+    while i < len(val) - 1:
+        if val[i] < val[i + 1] - 1e-15:
+            mw = wt[i] + wt[i + 1]
+            mv = (val[i] * wt[i] + val[i + 1] * wt[i + 1]) / mw
+            val[i], wt[i] = mv, mw
+            idx[i].extend(idx[i + 1])
+            del val[i + 1], wt[i + 1], idx[i + 1]
+            i = max(0, i - 1)
+        else:
+            i += 1
+    out = np.empty(sum(len(g) for g in idx))
+    for j, group in enumerate(idx):
+        for g in group:
+            out[g] = val[j]
+    return out
+
+
 def _reference_rate(marker_counts, totals, zero_by_K, min_tail_totals=2e4):
     """Ambient reference: the pooled panel rate among target cells with zero
     source-type cells among their K nearest neighbor cells, for the largest
@@ -96,16 +121,18 @@ def _reference_rate(marker_counts, totals, zero_by_K, min_tail_totals=2e4):
     cells, ascending in K; the first entry is the base exposure definition.
     """
     labels = list(zero_by_K)
-    base = zero_by_K[labels[0]]
-    pooled = float(marker_counts[base].sum()) / max(float(totals[base].sum()), 1.0)
-    rate, kind = pooled, labels[0]
-    for label in reversed(labels):
-        z = zero_by_K[label]
-        if float(totals[z].sum()) >= min_tail_totals:
-            rate = float(marker_counts[z].sum()) / max(float(totals[z].sum()), 1.0)
-            kind = label
-            break
-    return min(rate, pooled), kind, pooled
+    m_k = np.array([float(marker_counts[z].sum()) for z in zero_by_K.values()])
+    M_k = np.array([float(totals[z].sum()) for z in zero_by_K.values()])
+    rate_k = m_k / np.maximum(M_k, 1.0)
+    # Monotone fit across all rungs; the reference is the fitted value at
+    # the deepest well-populated rung - every rung contributes, nothing
+    # beyond the measured ladder is assumed.
+    fitted = _pava_dec(rate_k, np.maximum(M_k, 1.0))
+    pooled = float(rate_k[0])
+    ok = np.flatnonzero(M_k >= min_tail_totals)
+    pick = int(ok.max()) if len(ok) else 0
+    return (min(float(fitted[pick]), pooled), labels[pick], pooled,
+            fitted)
 
 
 def _reference_trend(d):
@@ -114,8 +141,8 @@ def _reference_trend(d):
     idx = lad.index[lad["K"] == K]
     if not len(idx) or idx[0] == 0:
         return np.nan
-    prev = lad["rate"].iloc[idx[0] - 1]
-    return float((prev - lad["rate"].iloc[idx[0]]) / max(prev, 1e-12))
+    prev = lad["rate_fitted"].iloc[idx[0] - 1]
+    return float((prev - lad["rate_fitted"].iloc[idx[0]]) / max(prev, 1e-12))
 
 
 def _excess_vs_ref(rates, ref_rate):
@@ -250,19 +277,20 @@ class CellAdmixAudit:
                 # gradient-based.
                 zero_by_K = {label: df.loc[T_cells, source].to_numpy() == 0
                              for label, df in expo_ladder.items()}
-                ref_rate, ref_kind, ref_unexposed = _reference_rate(
+                ref_rate, ref_kind, ref_unexposed, ref_fitted = _reference_rate(
                     mk_by_cell, tot, zero_by_K)
                 ref_mask = zero_by_K[ref_kind]
                 ref_ladder = pd.DataFrame(dict(
                     K=[int(k[1:]) for k in zero_by_K],
                     rate=[float(mk_by_cell[z].sum()) / max(float(tot[z].sum()), 1.0)
                           for z in zero_by_K.values()],
+                    rate_fitted=ref_fitted,
                     totals=[float(tot[z].sum()) for z in zero_by_K.values()]))
                 excess = _excess_vs_ref(rates, ref_rate)
                 if len(strict) >= 2:
                     mks = np.asarray(self._matrix[strict][:, cols].sum(axis=0)).ravel()
                     rates_strict = _bin_rates(mks, tot, bins)
-                    ref_s, _, _ = _reference_rate(mks, tot, zero_by_K)
+                    ref_s, _, _, _ = _reference_rate(mks, tot, zero_by_K)
                     excess_strict = _excess_vs_ref(rates_strict, ref_s)
                 else:
                     rates_strict, excess_strict = None, np.nan
@@ -451,8 +479,8 @@ class CellAdmixAudit:
                 ax.axhline(r_ref * 1e3, ls="--", c="0.25", lw=0.9)
         ax.set_xticks(range(len(BIN_LABELS)), BIN_LABELS)
         ax.set_xlabel("source-type cells among nearest neighbors")
-        ax.set_ylabel("excess pool-marker rate over pair ambient reference\n(per 1,000 molecules)"
-            if pooled else "pool-marker rate (per 1,000 molecules)\n"
+        ax.set_ylabel("excess admixture-marker rate over pair ambient reference\n(per 1,000 molecules)"
+            if pooled else "admixture-marker rate (per 1,000 molecules)\n"
             "(dotted: zero-neighbor rate; dashed: ambient reference)")
         title = ("Admixture exposure profile (pooled over detected pairs)"
             if source is None else f"{source} → {target}")
@@ -468,7 +496,7 @@ class CellAdmixAudit:
         lad = d["ref_ladder"]
         if ax is None:
             _, ax = plt.subplots(figsize=(4.2, 3.2))
-        ax.plot(lad["K"], lad["rate"] * 1e3, "-", color="0.6", zorder=1)
+        ax.plot(lad["K"], lad["rate_fitted"] * 1e3, "-", color="0.6", zorder=1)
         chosen = [f"k{int(k)}" == d["reference_kind"] for k in lad["K"]]
         usable = lad["totals"] >= 2e4
         for i in range(len(lad)):
@@ -481,7 +509,7 @@ class CellAdmixAudit:
         ax.set_xscale("log", base=2)
         ax.set_xticks(lad["K"].tolist(), [str(int(k)) for k in lad["K"]])
         ax.set_xlabel("neighborhood size K (zero source cells among K nearest)")
-        ax.set_ylabel("pool-marker rate in reference cells\n(per 1,000 molecules)")
+        ax.set_ylabel("admixture-marker rate in reference cells\n(per 1,000 molecules)")
         ax.set_title(f"{source} → {target}: ambient reference", fontsize=10)
         return ax
 
