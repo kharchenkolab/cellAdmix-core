@@ -108,6 +108,16 @@ def _reference_rate(marker_counts, totals, zero_by_K, min_tail_totals=2e4):
     return min(rate, pooled), kind, pooled
 
 
+def _reference_trend(d):
+    lad = d["ref_ladder"]
+    K = int(d["reference_kind"][1:])
+    idx = lad.index[lad["K"] == K]
+    if not len(idx) or idx[0] == 0:
+        return np.nan
+    prev = lad["rate"].iloc[idx[0] - 1]
+    return float((prev - lad["rate"].iloc[idx[0]]) / max(prev, 1e-12))
+
+
 def _excess_vs_ref(rates, ref_rate):
     """Leakage above an external reference rate, summed over all exposure
     bins - including the unexposed bin, whose content above the ambient
@@ -307,6 +317,10 @@ class CellAdmixAudit:
                 # out-of-section neighbors present in the unexposed cells
                 reference_inflation=d["reference_rate_unexposed"]
                     / max(d["reference_rate"], 1e-12),
+                # fractional decline over the ladder's final step: values
+                # well above 0 mean the reference had not flattened at the
+                # chosen neighborhood, so the estimate stays conservative
+                reference_trend=_reference_trend(d),
                 n_exposed=len(exposed), n_reference=int((np.asarray(d["bins"]) == "0").sum()),
                 n_markers=len(d["pool"]), n_strict=len(d["strict"]),
                 n_induced=len(d["induced"])))

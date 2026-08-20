@@ -89,7 +89,13 @@ among a progressively larger neighborhood — 30, 60, 120, 240 nearest
 cells, a ~100 um lateral radius — using the largest one with enough
 reference molecules (Figure 5). This bounds the reference cells' hidden
 exposure by direct observation without comparing against distant tissue,
-where same-type cells can be biologically different. Content of any
+where same-type cells can be biologically different. The reference is the
+deepest well-populated measurement, not a curve fit: a ladder that is
+still declining at its deepest neighborhood (as in Figure 5a) leaves the
+pair's estimate conservative, and the per-pair decline over the final
+step is reported so such pairs are visible (fitted extrapolation was
+tested and rejected - it changes the median reference by under 3% while
+failing unpredictably on sparse pairs). Content of any
 target cell above this ambient level counts as leakage. On simulations
 with planted contact, hidden out-of-section, and ambient contamination,
 the base reference recovers 36% of the truth and the ladder 65%, always

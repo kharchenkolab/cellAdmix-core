@@ -362,6 +362,16 @@ CellAdmixAudit <- R6::R6Class(
           # neighbors present in the unexposed cells
           reference_inflation = d$reference_rate_unexposed /
             max(d$reference_rate, 1e-12),
+          # fractional decline over the ladder's final step: values well
+          # above 0 mean the reference had not yet flattened at the chosen
+          # neighborhood, so the pair's estimate remains conservative
+          reference_trend = {
+            ki <- match(as.integer(sub("^k", "", d$reference_kind)),
+              d$ref_ladder$K)
+            if (is.na(ki) || ki < 2) NA_real_ else
+              (d$ref_ladder$rate[ki - 1] - d$ref_ladder$rate[ki]) /
+                max(d$ref_ladder$rate[ki - 1], 1e-12)
+          },
           n_exposed = length(exposed), n_reference = sum(d$bins == "0"),
           n_markers = length(d$pool), n_strict = length(d$strict),
           n_induced = length(d$induced),

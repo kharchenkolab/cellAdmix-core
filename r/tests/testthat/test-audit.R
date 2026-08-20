@@ -197,7 +197,7 @@ test_that("evaluate warns from measured removal, not the rule list", {
   audit <- fit$audit_admixture(neighbor_k = 6L, min_target_cells = 50L,
     min_reference_cells = 20L, min_excess = 5)
   p <- audit$pairs()
-  expect_true(all(c("reference_kind", "reference_inflation", "n_induced")
+  expect_true(all(c("reference_kind", "reference_inflation", "reference_trend", "n_induced")
     %in% names(p)))
   mk <- audit$markers(p$source[[1]], p$target[[1]])
   expect_true(all(c("pool", "strict", "induced") %in% names(mk)))
