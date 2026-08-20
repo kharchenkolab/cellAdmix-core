@@ -162,9 +162,20 @@ Independently of factorization and scoring, admixture can be estimated
 from the dataset's spatial structure: source-marker content in target
 cells rises with source-type neighbor exposure, while unexposed target
 cells provide an internal negative control (see
-[benchmarks.md](benchmarks.md) for the methodology). The audit measures
-this per ordered cell-type pair and verifies corrections against the same
-measurements:
+[benchmarks.md](benchmarks.md) for the methodology). Because a section
+shows only a slab of the tissue, cells with zero observed source-type
+neighbors can still carry material from source cells above or below the
+section plane; the audit therefore takes its reference level from the
+ambient background that marker content approaches in target cells far from
+any source cell (the `reference_kind` and `reference_inflation` columns of
+`pairs()` record which reference was usable and how much contamination it
+removed from the comparison group). Marker panels are screened for likely
+induced genes — exposure-linked excess far above the gene's share of the
+source expression profile indicates a transcriptional response to
+proximity rather than transferred material; such genes are excluded,
+replaced by the next-ranked source-specific genes, and listed in
+`markers()["induced"]`. The audit measures every ordered cell-type pair
+and verifies corrections against the same measurements:
 
 ```python
 audit = fit.audit_admixture()
@@ -174,15 +185,20 @@ audit.plot_exposure()               # pooled excess-exposure profile, 95% interv
 audit.plot_remaining({"membrane": correction})
 
 report = audit.evaluate(correction) # per-pair sensitivity, false removal,
-report.summary()                    # warnings for uncovered pairs and for
-report.plot_cleanup()               # severe own-marker over-removal (>25%)
+report.summary()                    # warnings for pairs left largely
+report.plot_cleanup()               # uncorrected and for severe own-marker
+                                    # over-removal (>25%)
 ```
 
-The audit's directly measured marker excess is a conservative lower bound
-(contamination reaching even unexposed cells raises the reference level
-and is not counted); the reported rates and molecule counts extrapolate it
-by the markers' share of the source transcriptome, kept as the `coverage`
-column of `audit.pairs()`.
+`evaluate()` warns from the corrected counts themselves — a pair is
+flagged when its molecules were measurably not removed, regardless of what
+the correction's rule list claims. The reported rates and molecule counts
+include the contamination present in zero-neighbor cells above the ambient
+reference, and extrapolate the marker-panel measurement to the full
+transcriptome by the markers' share of the source expression profile, kept
+as the `coverage` column of `audit.pairs()`. Pair detection itself remains
+based on the rise of exposed cells over unexposed ones, which no reference
+choice can inflate.
 
 ## SpatialData API
 
