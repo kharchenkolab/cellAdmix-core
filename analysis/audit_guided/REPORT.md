@@ -131,6 +131,42 @@ tier (E5) remains unjustified here and is deferred to the breast phase.
   and ensemble-parity downstream purity. The full exposure-informed EM
   (E5) is not justified by any remaining pancreas gap; revisit on breast.
 
+## Molecule-level diagnostics: patchiness, out-of-plane leakage (T1/T2)
+
+Scripts `09`-`11`. Two section-geometry concerns were tested directly on
+the run's molecule table (continuous z, CRF factor labels, nucleus fields):
+
+- **The fragment (CRF) hypothesis holds at molecule level.** Source-pool
+  molecules inside target cells co-locate with molecules of *different*
+  pool genes within 1um at 1.7x the within-cell permutation null (median
+  over pairs; up to 2.9x for fibroblast sources). A radius of 2.5um
+  saturates the statistic in dense cells - the nearest-different-gene
+  formulation is the usable one.
+- **The zero-exposure baseline is not ambient.** In target cells with zero
+  observed source neighbors, strict-gene content decays 5-10x with lateral
+  distance to the nearest source cell, patch enrichment is *higher* than
+  in exposed cells (1.8x median), and strict molecules sit mildly toward
+  the slab surfaces - the signature of out-of-plane/near-field leakage
+  inside the reference level. Exocrine -> Ductal is the instructive
+  exception: its unexposed baseline shows no patch enrichment (dispersed,
+  genuinely ambient-like), so ambient and out-of-plane components separate
+  per pair.
+- **Repricing the reference is material.** Replacing the pooled
+  zero-exposure reference with the >250um far-field rate roughly halves
+  baselines (e.g. 24.2 -> 11.5 per 1k for exocrine -> ductal) and inflates
+  excess estimates by a median 1.41x on the 16 measurable pairs (+12%
+  aggregate; up to 1.9x per pair). Pairs whose targets never sit far from
+  sources need a decay-curve extrapolation instead of a far bin.
+
+Method consequences: the audit and the exposure corrector should use a
+distance-decay-extrapolated reference (they currently under-remove by the
+structured-baseline component); patch membership (CRF labels, already per
+molecule) is the right molecule-selection prior and extends ambient-tier
+removal to shared genes via patch evidence rather than gene identity; and
+the non-saturating patch statistic enables per-gene induction flagging
+(gradient without patch enrichment) ahead of the formal proportionality
+test.
+
 ## Recommended next steps
 
 1. Breast 5K phase 2: anchor endothelial + fibroblast (the two missing
