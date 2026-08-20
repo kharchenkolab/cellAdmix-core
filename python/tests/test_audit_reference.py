@@ -7,41 +7,47 @@ from scipy import sparse
 
 
 class ReferenceRateTests(unittest.TestCase):
-    def test_reference_follows_decay_to_asymptote(self):
+    def test_reference_uses_largest_populated_neighborhood(self):
         from celladmix.audit import _reference_rate
 
         rng = np.random.default_rng(5)
         n = 4000
-        dist = rng.uniform(0, 500, n)
         totals = np.full(n, 100.0)
-        rate = 0.005 + 0.025 * np.exp(-dist / 60)
+        idx = np.arange(n)
+        zero_by_K = {"k15": np.full(n, True), "k60": idx > 1000,
+                     "k240": idx > 3000}
+        rate = np.where(idx <= 1000, 0.03, np.where(idx <= 3000, 0.012, 0.005))
         markers = rng.poisson(rate * totals).astype(float)
-        ref, kind, pooled = _reference_rate(markers, totals, dist)
-        self.assertEqual(kind, "distant")
-        self.assertLess(ref, 0.010)
+        ref, kind, pooled = _reference_rate(markers, totals, zero_by_K)
+        self.assertEqual(kind, "k240")
+        self.assertLess(ref, 0.008)
         self.assertGreater(pooled, ref)
 
-    def test_flat_profile_keeps_pooled_rate(self):
+    def test_underpopulated_neighborhood_falls_back(self):
         from celladmix.audit import _reference_rate
 
         rng = np.random.default_rng(6)
         n = 4000
-        dist = rng.uniform(0, 500, n)
         totals = np.full(n, 100.0)
+        idx = np.arange(n)
+        zero_by_K = {"k15": np.full(n, True), "k60": idx > 1000,
+                     "k240": idx > 3990}
         markers = rng.poisson(0.01 * totals).astype(float)
-        ref, _, pooled = _reference_rate(markers, totals, dist)
-        self.assertAlmostEqual(ref, pooled, delta=0.15 * pooled)
+        _, kind, _ = _reference_rate(markers, totals, zero_by_K)
+        self.assertEqual(kind, "k60")
 
-    def test_few_distant_cells_fall_back(self):
+    def test_flat_profile_keeps_base_rate(self):
         from celladmix.audit import _reference_rate
 
         rng = np.random.default_rng(7)
-        n = 300
-        dist = rng.uniform(0, 80, n)
+        n = 4000
         totals = np.full(n, 100.0)
+        idx = np.arange(n)
+        zero_by_K = {"k15": np.full(n, True), "k60": idx > 1000,
+                     "k240": idx > 3000}
         markers = rng.poisson(0.01 * totals).astype(float)
-        _, kind, _ = _reference_rate(markers, totals, dist)
-        self.assertEqual(kind, "unexposed")
+        ref, _, pooled = _reference_rate(markers, totals, zero_by_K)
+        self.assertAlmostEqual(ref, pooled, delta=0.15 * pooled)
 
 
 class ScreenPanelTests(unittest.TestCase):

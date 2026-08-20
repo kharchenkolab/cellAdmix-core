@@ -195,11 +195,12 @@ unexposed target cells provide an internal negative control (see
 section shows only a slab of the tissue, cells with zero observed
 source-type neighbors can still be contaminated by source cells just above
 or below the section plane; the audit therefore takes its reference level
-from the ambient background that the marker content approaches in target
-cells far from any source cell, rather than from all zero-neighbor cells
-(the `reference_kind` and `reference_inflation` columns of `pairs()` record
-which reference was usable and how much contamination it removed from the
-comparison group). Marker panels are also screened for likely induced
+from target cells with zero source-type cells among a progressively larger
+set of nearest neighbors (up to 240, spanning only a ~100 um radius, so the
+comparison stays within the local tissue neighborhood), using the largest
+neighborhood that retains enough reference molecules. The `reference_kind`
+and `reference_inflation` columns of `pairs()` record the neighborhood used
+and how much contamination this removed from the comparison group. Marker panels are also screened for likely induced
 genes — genes whose exposure-linked excess far exceeds the level expected
 from their share of the source expression profile reflect a transcriptional
 response to proximity rather than transferred material; they are excluded

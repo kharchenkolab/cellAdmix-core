@@ -94,34 +94,34 @@
   Matrix::colSums(m[genes, cs, drop = FALSE])
 }
 
-# Reference rate for a pair: the level the panel rate approaches in
-# unexposed target cells far from any source cell. Cells with zero source
-# neighbors that still lie near source regions carry material from source
-# cells outside the section plane, so the pooled unexposed rate
-# overestimates the true ambient background. The reference is the smallest
-# tail average of the distance-ordered rates (the asymptote of a
-# monotone-decreasing fit), taken over tails with enough molecules; the
-# pooled unexposed rate is kept as a fallback and an upper bound.
-.celladmix_audit_reference_rate <- function(marker_counts, totals, dist,
-                                            min_distance = 100,
+# Reference rate for a pair: the pooled panel rate among target cells with
+# zero source-type cells among their K nearest neighbor cells, for the
+# largest K (from an ascending ladder) that retains enough reference
+# molecules. A cell with zero source neighbors among its 15 nearest can
+# still sit inside source-rich surroundings - including source cells above
+# or below the section plane - and carry their material; requiring zero
+# source cells among progressively more neighbors selects cells in
+# progressively source-free surroundings while spanning only a ~100 um
+# lateral radius, so the comparison never leaves the local tissue
+# neighborhood (target cells in distant compartments can be biologically
+# different and are never used). zero_by_K is a named list of logical
+# vectors over the target cells, ascending in K, whose first entry is the
+# base exposure definition.
+.celladmix_audit_reference_rate <- function(marker_counts, totals, zero_by_K,
                                             min_tail_totals = 2e4) {
-  ok <- is.finite(dist)
-  marker_counts <- marker_counts[ok]; totals <- totals[ok]; dist <- dist[ok]
-  pooled <- sum(marker_counts) / max(sum(totals), 1)
-  if (length(dist) < 20) {
-    return(list(rate = pooled, kind = "unexposed", rate_unexposed = pooled))
+  base <- zero_by_K[[1]]
+  pooled <- sum(marker_counts[base]) / max(sum(totals[base]), 1)
+  rate <- pooled
+  kind <- names(zero_by_K)[[1]]
+  for (i in rev(seq_along(zero_by_K))) {
+    z <- zero_by_K[[i]]
+    if (sum(totals[z]) >= min_tail_totals) {
+      rate <- sum(marker_counts[z]) / max(sum(totals[z]), 1)
+      kind <- names(zero_by_K)[[i]]
+      break
+    }
   }
-  ord <- order(dist)
-  m <- marker_counts[ord]; tt <- totals[ord]; dd <- dist[ord]
-  tail_m <- rev(cumsum(rev(m)))
-  tail_t <- rev(cumsum(rev(tt)))
-  eligible <- dd >= min_distance & tail_t >= min_tail_totals
-  if (!any(eligible)) {
-    return(list(rate = pooled, kind = "unexposed", rate_unexposed = pooled))
-  }
-  tail_rate <- tail_m[eligible] / pmax(tail_t[eligible], 1)
-  list(rate = min(min(tail_rate), pooled), kind = "distant",
-    rate_unexposed = pooled)
+  list(rate = min(rate, pooled), kind = kind, rate_unexposed = pooled)
 }
 
 # Leakage above an externally supplied reference rate: exceedance summed
@@ -213,7 +213,16 @@ celladmix_audit_admixture <- function(fit, annotation = NULL, neighbor_k = 15L,
   counts <- fit$counts()
   exposure <- .celladmix_source_exposure_counts(cells, ann, neighbor_k)
   rownames(exposure$counts) <- as.character(cells$cell_id)
-  nearest <- .celladmix_source_nearest_distance(cells, ann)
+  # Exposure at growing neighborhood sizes, used only to pick each pair's
+  # reference cells (zero source neighbors among the K nearest).
+  ladder_K <- unique(c(neighbor_k, c(30L, 60L, 120L, 240L)))
+  ladder_K <- sort(ladder_K[ladder_K >= neighbor_k])
+  expo_ladder <- lapply(ladder_K, function(K) {
+    e <- .celladmix_source_exposure_counts(cells, ann, K)
+    rownames(e$counts) <- as.character(cells$cell_id)
+    e$counts
+  })
+  names(expo_ladder) <- paste0("k", ladder_K)
   cell_types <- stats::setNames(as.character(ann[as.character(cells$cell_id)]),
     as.character(cells$cell_id))
   totals <- Matrix::colSums(counts)
@@ -249,12 +258,13 @@ celladmix_audit_admixture <- function(fit, annotation = NULL, neighbor_k = 15L,
       pool_counts <- .celladmix_audit_mcount(counts, pool, T_cells)
       rates <- .celladmix_audit_bin_rates(pool_counts, totals[T_cells], bins)
       det <- .celladmix_audit_excess(rates)
-      # Reference level: the ambient background estimated from the decay of
-      # panel content with distance to the nearest source cell among
-      # unexposed target cells (see .celladmix_audit_reference_rate).
-      e0 <- expo == 0
-      ref <- .celladmix_audit_reference_rate(pool_counts[e0],
-        totals[T_cells][e0], nearest[T_cells, source][e0])
+      # Reference level: the ambient background measured on cells with zero
+      # source neighbors among progressively larger neighborhoods (see
+      # .celladmix_audit_reference_rate).
+      zero_by_K <- lapply(expo_ladder, function(ec) ec[T_cells, source] == 0)
+      ref <- .celladmix_audit_reference_rate(pool_counts, totals[T_cells],
+        zero_by_K)
+      ref_mask <- zero_by_K[[ref$kind]]
       excess_ref <- .celladmix_audit_excess_vs_ref(rates, ref$rate)
       rates_strict <- if (length(strict) >= 2) .celladmix_audit_bin_rates(
         .celladmix_audit_mcount(counts, strict, T_cells), totals[T_cells], bins) else NULL
@@ -262,12 +272,12 @@ celladmix_audit_admixture <- function(fit, annotation = NULL, neighbor_k = 15L,
         list(excess = NA_real_, p = NA_real_)
       ref_strict <- if (!is.null(rates_strict)) {
         .celladmix_audit_reference_rate(
-          .celladmix_audit_mcount(counts, strict, T_cells)[e0],
-          totals[T_cells][e0], nearest[T_cells, source][e0])
+          .celladmix_audit_mcount(counts, strict, T_cells),
+          totals[T_cells], zero_by_K)
       } else NULL
       pair_defs[[paste(source, target, sep = " -> ")]] <- list(
         source = source, target = target, T_cells = T_cells, bins = bins,
-        dist = nearest[T_cells, source],
+        ref_mask = ref_mask,
         pool = pool, strict = strict, induced = screened$induced,
         rates = rates, rates_strict = rates_strict,
         # detection remains gradient-based (rise of exposed bins over the
@@ -547,22 +557,21 @@ CellAdmixAudit <- R6::R6Class(
       rows <- list()
       for (d in private$.pair_defs) {
         if (!d$detected) next
-        e0 <- d$bins == "0"
         totals_T <- private$.totals[d$T_cells]
+        ref_of <- function(counts_g) {
+          sum(counts_g[d$ref_mask]) / max(sum(totals_T[d$ref_mask]), 1)
+        }
         power_vs_ref <- function(genes, rates_before, ref_before) {
           counts_g <- .celladmix_audit_mcount(counts_after, genes, d$T_cells)
           rates_a <- .celladmix_audit_bin_rates(counts_g, totals_T, d$bins)
-          ref_a <- .celladmix_audit_reference_rate(counts_g[e0], totals_T[e0],
-            d$dist[e0])
           eb <- .celladmix_audit_excess_vs_ref(rates_before, ref_before)
-          ea <- .celladmix_audit_excess_vs_ref(rates_a, min(ref_a$rate, ref_before))
+          ea <- .celladmix_audit_excess_vs_ref(rates_a,
+            min(ref_of(counts_g), ref_before))
           if (eb <= 0) NA_real_ else 1 - ea / eb
         }
         sens_strict <- if (!is.null(d$rates_strict)) {
-          ref_sb <- .celladmix_audit_reference_rate(
-            .celladmix_audit_mcount(private$.counts, d$strict, d$T_cells)[e0],
-            totals_T[e0], d$dist[e0])
-          power_vs_ref(d$strict, d$rates_strict, ref_sb$rate)
+          power_vs_ref(d$strict, d$rates_strict, ref_of(
+            .celladmix_audit_mcount(private$.counts, d$strict, d$T_cells)))
         } else NA_real_
         rows[[length(rows) + 1]] <- data.frame(
           source = d$source, target = d$target,

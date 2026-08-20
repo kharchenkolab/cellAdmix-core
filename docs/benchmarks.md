@@ -186,11 +186,11 @@ The measurement ships in the package as the admixture audit (the harness
 in `analysis/cleanup_benchmark/` re-implements the same estimator for its
 sweep runs). The packaged audit refines the reference level beyond the
 construction above: because a section shows only a slab of the tissue,
-zero-exposure cells near source regions carry material from source cells
-outside the section plane, so the audit uses the ambient level that marker
-content approaches in target cells far from any source cell, and counts
-the structured content of zero-exposure cells above that level as
-admixture. It also screens marker panels for genes whose exposure-linked
+cells with zero source neighbors among their 15 nearest can still carry
+material from source cells outside the section plane, so the audit takes
+its reference from cells with zero source neighbors among a progressively
+larger neighborhood (up to 240 cells, a ~100 um radius), and counts the
+content of less-strictly-unexposed cells above that level as admixture. It also screens marker panels for genes whose exposure-linked
 excess far exceeds their share of the source expression profile — the
 signature of proximity-induced transcription rather than transferred
 material — excluding and replacing them. In R, each panel of Figure 1

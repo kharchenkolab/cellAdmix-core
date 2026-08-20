@@ -165,11 +165,13 @@ cells provide an internal negative control (see
 [benchmarks.md](benchmarks.md) for the methodology). Because a section
 shows only a slab of the tissue, cells with zero observed source-type
 neighbors can still carry material from source cells above or below the
-section plane; the audit therefore takes its reference level from the
-ambient background that marker content approaches in target cells far from
-any source cell (the `reference_kind` and `reference_inflation` columns of
-`pairs()` record which reference was usable and how much contamination it
-removed from the comparison group). Marker panels are screened for likely
+section plane; the audit therefore takes its reference level from target
+cells with zero source-type cells among a progressively larger set of
+nearest neighbors (up to 240, spanning only a ~100 um radius, so the
+comparison stays within the local tissue neighborhood), using the largest
+neighborhood that retains enough reference molecules. The `reference_kind`
+and `reference_inflation` columns of `pairs()` record the neighborhood used
+and how much contamination this removed from the comparison group. Marker panels are screened for likely
 induced genes — exposure-linked excess far above the gene's share of the
 source expression profile indicates a transcriptional response to
 proximity rather than transferred material; such genes are excluded,

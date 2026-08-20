@@ -100,29 +100,35 @@ test_that("audit end-to-end detects planted admixture on a grid dataset", {
   expect_gt(ab$excess, 0.5 * planted)
 })
 
-test_that("the reference rate follows the distance decay to its asymptote", {
+test_that("the reference rate uses the largest sufficiently populated neighborhood", {
   set.seed(5)
   n <- 4000
-  dist <- runif(n, 0, 500)
   totals <- rep(100, n)
-  # Rate decays from 0.03 near sources to an ambient floor of 0.005.
-  rate <- 0.005 + 0.025 * exp(-dist / 60)
+  # Cells that pass the base zero-neighbor definition can still sit in
+  # source-rich surroundings and carry contamination; requiring zero source
+  # cells among progressively more neighbors isolates the clean ones.
+  z15 <- rep(TRUE, n)
+  z60 <- seq_len(n) > 1000
+  z240 <- seq_len(n) > 3000
+  rate <- ifelse(seq_len(n) <= 1000, 0.03,
+    ifelse(seq_len(n) <= 3000, 0.012, 0.005))
   markers <- rpois(n, rate * totals)
-  ref <- cellAdmixCore:::.celladmix_audit_reference_rate(markers, totals, dist)
-  expect_identical(ref$kind, "distant")
-  expect_lt(ref$rate, 0.010)
+  ref <- cellAdmixCore:::.celladmix_audit_reference_rate(markers, totals,
+    list(k15 = z15, k60 = z60, k240 = z240))
+  expect_identical(ref$kind, "k240")
+  expect_lt(ref$rate, 0.008)
   expect_gt(ref$rate_unexposed, ref$rate)
 
-  # Flat profile: the reference stays near the pooled rate.
+  # Deepest neighborhood underpopulated: fall back to the next level.
+  ref2 <- cellAdmixCore:::.celladmix_audit_reference_rate(markers, totals,
+    list(k15 = z15, k60 = z60, k240 = seq_len(n) > 3990))
+  expect_identical(ref2$kind, "k60")
+
+  # Flat contamination-free profile: reference matches the base rate.
   markers_flat <- rpois(n, 0.01 * totals)
   ref_flat <- cellAdmixCore:::.celladmix_audit_reference_rate(
-    markers_flat, totals, dist)
+    markers_flat, totals, list(k15 = z15, k60 = z60, k240 = z240))
   expect_equal(ref_flat$rate, ref_flat$rate_unexposed, tolerance = 0.15)
-
-  # Too few distant cells: fall back to the pooled unexposed rate.
-  ref_near <- cellAdmixCore:::.celladmix_audit_reference_rate(
-    markers[dist < 80], totals[dist < 80], dist[dist < 80])
-  expect_identical(ref_near$kind, "unexposed")
 })
 
 test_that("panel screening excludes and replaces induced genes", {

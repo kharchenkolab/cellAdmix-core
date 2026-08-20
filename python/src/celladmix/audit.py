@@ -81,34 +81,31 @@ def _power(rates_before, rates_after):
     return np.nan if eb.sum() <= 0 else 1 - float(ea.sum()) / float(eb.sum())
 
 
-def _reference_rate(marker_counts, totals, dist, min_distance=100.0,
-                    min_tail_totals=2e4):
-    """Ambient reference: the level the panel rate approaches in unexposed
-    target cells far from any source cell.
+def _reference_rate(marker_counts, totals, zero_by_K, min_tail_totals=2e4):
+    """Ambient reference: the pooled panel rate among target cells with zero
+    source-type cells among their K nearest neighbor cells, for the largest
+    K that retains enough reference molecules.
 
-    Cells with zero source neighbors that still lie near source regions carry
-    material from source cells outside the section plane, so the pooled
-    unexposed rate overestimates the true ambient background. The reference
-    is the smallest tail average of the distance-ordered rates (the asymptote
-    of a monotone-decreasing fit), over tails with enough molecules; the
-    pooled unexposed rate is the fallback and an upper bound.
+    A cell with zero source neighbors among its 15 nearest can still sit in
+    source-rich surroundings - including source cells above or below the
+    section plane - and carry their material; requiring zero source cells
+    among progressively more neighbors selects cells in progressively
+    source-free surroundings while spanning only a ~100 um lateral radius,
+    so the comparison never leaves the local tissue neighborhood.
+    ``zero_by_K``: ordered mapping of label -> boolean mask over the target
+    cells, ascending in K; the first entry is the base exposure definition.
     """
-    ok = np.isfinite(dist)
-    marker_counts, totals, dist = marker_counts[ok], totals[ok], dist[ok]
-    pooled = float(marker_counts.sum()) / max(float(totals.sum()), 1.0)
-    if len(dist) < 20:
-        return pooled, "unexposed", pooled
-    order = np.argsort(dist)
-    m = marker_counts[order]
-    t = totals[order]
-    d = dist[order]
-    tail_m = np.cumsum(m[::-1])[::-1]
-    tail_t = np.cumsum(t[::-1])[::-1]
-    eligible = (d >= min_distance) & (tail_t >= min_tail_totals)
-    if not eligible.any():
-        return pooled, "unexposed", pooled
-    tail_rate = tail_m[eligible] / np.maximum(tail_t[eligible], 1.0)
-    return min(float(tail_rate.min()), pooled), "distant", pooled
+    labels = list(zero_by_K)
+    base = zero_by_K[labels[0]]
+    pooled = float(marker_counts[base].sum()) / max(float(totals[base].sum()), 1.0)
+    rate, kind = pooled, labels[0]
+    for label in reversed(labels):
+        z = zero_by_K[label]
+        if float(totals[z].sum()) >= min_tail_totals:
+            rate = float(marker_counts[z].sum()) / max(float(totals[z].sum()), 1.0)
+            kind = label
+            break
+    return min(rate, pooled), kind, pooled
 
 
 def _excess_vs_ref(rates, ref_rate):
@@ -180,10 +177,15 @@ class CellAdmixAudit:
             neighbor_k=neighbor_k)
         exp_df = pd.DataFrame(exp_counts, columns=types,
             index=cells["cell_id"].astype(str))
-        from ._score_utils import source_nearest_distance
-        ndist, _ = source_nearest_distance(cells, annotation)
-        ndist_df = pd.DataFrame(ndist, columns=types,
-            index=cells["cell_id"].astype(str))
+        # Exposure at growing neighborhood sizes, used only to pick each
+        # pair's reference cells (zero source neighbors among the K nearest).
+        ladder_K = sorted({int(neighbor_k), 30, 60, 120, 240})
+        ladder_K = [K for K in ladder_K if K >= int(neighbor_k)]
+        expo_ladder = {}
+        for K in ladder_K:
+            cts, _ = source_exposure_counts(cells, annotation, neighbor_k=K)
+            expo_ladder[f"k{K}"] = pd.DataFrame(cts, columns=types,
+                index=cells["cell_id"].astype(str))
         ctypes = pd.Series(
             [str(annotation.get(str(c), None)) for c in cells["cell_id"].astype(str)],
             index=cells["cell_id"].astype(str))
@@ -228,23 +230,24 @@ class CellAdmixAudit:
                     continue
                 strict = pool[np.nan_to_num(baseline)[pool] <
                     0.05 * profiles[pool, s_idx]]
-                dist = ndist_df.loc[T_cells, source].to_numpy()
-                mk_cells = np.asarray(
+                mk_by_cell = np.asarray(
                     self._matrix[pool][:, cols].sum(axis=0)).ravel()
-                mk_by_cell = mk_cells  # per-cell panel counts, aligned to cols
                 rates = _bin_rates(mk_by_cell, tot, bins)
                 excess_gradient, p = _excess(rates)
                 # The reported leakage is measured against the ambient
-                # reference (distance-decay asymptote); detection stays
+                # reference (zero source neighbors among the largest
+                # sufficiently populated neighborhood); detection stays
                 # gradient-based.
-                e0 = expo == 0
+                zero_by_K = {label: df.loc[T_cells, source].to_numpy() == 0
+                             for label, df in expo_ladder.items()}
                 ref_rate, ref_kind, ref_unexposed = _reference_rate(
-                    mk_by_cell[e0], tot[e0], dist[e0])
+                    mk_by_cell, tot, zero_by_K)
+                ref_mask = zero_by_K[ref_kind]
                 excess = _excess_vs_ref(rates, ref_rate)
                 if len(strict) >= 2:
                     mks = np.asarray(self._matrix[strict][:, cols].sum(axis=0)).ravel()
                     rates_strict = _bin_rates(mks, tot, bins)
-                    ref_s, _, _ = _reference_rate(mks[e0], tot[e0], dist[e0])
+                    ref_s, _, _ = _reference_rate(mks, tot, zero_by_K)
                     excess_strict = _excess_vs_ref(rates_strict, ref_s)
                 else:
                     rates_strict, excess_strict = None, np.nan
@@ -254,7 +257,7 @@ class CellAdmixAudit:
                     float(profiles[:, s_idx].sum()), 1e-9)
                 self._pairs[(source, target)] = dict(
                     source=source, target=target, cols=cols, bins=bins,
-                    dist=dist, pool=pool, strict=strict, induced=induced,
+                    ref_mask=ref_mask, pool=pool, strict=strict, induced=induced,
                     rates=rates, rates_strict=rates_strict,
                     excess=excess, excess_gradient=excess_gradient, p=p,
                     reference_rate=ref_rate, reference_kind=ref_kind,
@@ -483,14 +486,17 @@ class CellAdmixAudit:
                 continue
             cols = d["cols"]
             tot = self._totals[cols]
-            e0 = np.asarray(d["bins"]) == "0"
+            mask = d["ref_mask"]
+
+            def ref_of(counts_g):
+                return float(counts_g[mask].sum()) / max(
+                    float(tot[mask].sum()), 1.0)
 
             def power_vs_ref(genes, rates_before, ref_before):
                 mk = np.asarray(after[genes][:, cols].sum(axis=0)).ravel()
                 rates_a = _bin_rates(mk, tot, d["bins"])
-                ref_a, _, _ = _reference_rate(mk[e0], tot[e0], d["dist"][e0])
                 eb = _excess_vs_ref(rates_before, ref_before)
-                ea = _excess_vs_ref(rates_a, min(ref_a, ref_before))
+                ea = _excess_vs_ref(rates_a, min(ref_of(mk), ref_before))
                 return np.nan if eb <= 0 else 1 - ea / eb
 
             sens = power_vs_ref(d["pool"], d["rates"], d["reference_rate"])
@@ -498,8 +504,8 @@ class CellAdmixAudit:
             if d["rates_strict"] is not None:
                 mks_b = np.asarray(
                     self._matrix[d["strict"]][:, cols].sum(axis=0)).ravel()
-                ref_sb, _, _ = _reference_rate(mks_b[e0], tot[e0], d["dist"][e0])
-                sens_strict = power_vs_ref(d["strict"], d["rates_strict"], ref_sb)
+                sens_strict = power_vs_ref(d["strict"], d["rates_strict"],
+                    ref_of(mks_b))
             rows.append(dict(source=d["source"], target=d["target"],
                 admixed_molecules=round(d["excess"] / d["coverage"]),
                 excess=round(d["excess"]), sensitivity=sens,
