@@ -1,0 +1,29 @@
+pair,gene,excess_before,excess_after,retained_frac
+Endocrine -> Ductal/tumor epithelial,FXYD2,425,447,1.053
+Endothelial -> Ductal/tumor epithelial,GNG11,799,602,0.754
+Endothelial -> Ductal/tumor epithelial,TM4SF18,616,498,0.808
+Exocrine epithelial -> Ductal/tumor epithelial,CFTR,110867,89229,0.805
+Exocrine epithelial -> Ductal/tumor epithelial,CA4,1681,1330,0.791
+Exocrine epithelial -> Ductal/tumor epithelial,PROX1,11710,8260,0.705
+Fibroblast / CAF -> Ductal/tumor epithelial,APCDD1,2035,1445,0.71
+Fibroblast / CAF -> Ductal/tumor epithelial,SEMA3C,4181,3727,0.891
+Fibroblast / CAF -> Ductal/tumor epithelial,BASP1,2751,1842,0.67
+Immune -> Ductal/tumor epithelial,GLIPR1,1073,712,0.663
+Immune -> Ductal/tumor epithelial,KIT,352,278,0.789
+Immune -> Ductal/tumor epithelial,SPIB,673,658,0.979
+Mural / pericyte -> Ductal/tumor epithelial,TNC,476,426,0.895
+Mural / pericyte -> Ductal/tumor epithelial,CAVIN1,342,244,0.715
+Mural / pericyte -> Ductal/tumor epithelial,ACTG2,549,494,0.899
+Fibroblast / CAF -> Endothelial,APCDD1,895,779,0.871
+Fibroblast / CAF -> Endothelial,THY1,1575,1081,0.686
+Fibroblast / CAF -> Endothelial,ASPN,1636,1077,0.658
+Mural / pericyte -> Endothelial,ADAMTS1,2046,1554,0.76
+Ductal/tumor epithelial -> Fibroblast / CAF,C5orf46,515,435,0.845
+Endothelial -> Fibroblast / CAF,STEAP4,523,540,1.031
+Endothelial -> Fibroblast / CAF,EDNRB,509,478,0.94
+Exocrine epithelial -> Fibroblast / CAF,GPC3,736,597,0.812
+Immune -> Fibroblast / CAF,CTLA4,824,682,0.829
+Fibroblast / CAF -> Immune,PMP22,3183,2612,0.82
+Endothelial -> Mural / pericyte,APOLD1,354,319,0.901
+Endothelial -> Mural / pericyte,EDNRB,181,173,0.955
+Fibroblast / CAF -> Mural / pericyte,THY1,275,208,0.755

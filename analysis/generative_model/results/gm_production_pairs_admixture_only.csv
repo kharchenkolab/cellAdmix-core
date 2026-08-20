@@ -1,0 +1,40 @@
+pair,excess_Bm,power_Bm,masked
+Ductal/tumor epithelial -> Endothelial,2125.2334373594986,1.0,0
+Ductal/tumor epithelial -> Exocrine epithelial,7240.931462353498,0.9149147592771489,0
+Ductal/tumor epithelial -> Fibroblast / CAF,8002.18343780163,0.9950705546157296,0
+Ductal/tumor epithelial -> Immune,3723.3545454896193,1.0,0
+Ductal/tumor epithelial -> Mural / pericyte,198.11656332247847,0.9851035908551347,0
+Endocrine -> Ductal/tumor epithelial,423.48339477527094,1.0,0
+Endocrine -> Endothelial,1621.848517563326,1.0,0
+Endocrine -> Exocrine epithelial,2084.2926281041664,1.0,0
+Endocrine -> Fibroblast / CAF,414.6418202984721,1.0,0
+Endocrine -> Immune,476.3453274212104,0.99857634237914,0
+Endothelial -> Ductal/tumor epithelial,1176.7356592213316,1.0,1
+Endothelial -> Endocrine,194.30868469180962,0.9612777694048182,0
+Endothelial -> Exocrine epithelial,4266.568564642703,1.0,0
+Endothelial -> Fibroblast / CAF,3447.928295473473,1.0,0
+Endothelial -> Immune,1384.8967935114792,1.0,0
+Endothelial -> Mural / pericyte,443.2930246276361,1.0,0
+Exocrine epithelial -> Ductal/tumor epithelial,24516.27263976899,1.0,1
+Exocrine epithelial -> Endocrine,1923.1321402774297,1.0,0
+Exocrine epithelial -> Endothelial,14757.785094530389,0.9997796724775474,0
+Exocrine epithelial -> Fibroblast / CAF,9517.596262689887,1.0,0
+Exocrine epithelial -> Immune,17469.615208115807,1.0,0
+Exocrine epithelial -> Mural / pericyte,168.6897927430133,0.9981258095869138,0
+Fibroblast / CAF -> Ductal/tumor epithelial,12253.983873983569,0.9219633651813075,0
+Fibroblast / CAF -> Endocrine,622.4170790750921,1.0,0
+Fibroblast / CAF -> Endothelial,6556.648183977292,0.9595987810977801,0
+Fibroblast / CAF -> Exocrine epithelial,6643.532575127687,1.0,0
+Fibroblast / CAF -> Immune,15368.909207970726,0.9623004295390515,0
+Fibroblast / CAF -> Mural / pericyte,1117.6467970330411,1.0,1
+Immune -> Ductal/tumor epithelial,2230.2327823425476,1.0,0
+Immune -> Endocrine,125.6438157809427,1.0,0
+Immune -> Endothelial,1361.2377420890436,1.0,0
+Immune -> Exocrine epithelial,4198.520548467581,1.0,0
+Immune -> Fibroblast / CAF,15907.757703153036,1.0,0
+Immune -> Mural / pericyte,536.3744885898718,0.9986893685053216,0
+Mural / pericyte -> Ductal/tumor epithelial,337.2925701861395,0.9674471961827448,0
+Mural / pericyte -> Endothelial,1030.7878317630395,1.0,0
+Mural / pericyte -> Exocrine epithelial,266.0495295016822,1.0,0
+Mural / pericyte -> Fibroblast / CAF,943.0374082291814,0.9549050807512351,0
+Mural / pericyte -> Immune,1436.4907534468794,0.9720736265146477,0

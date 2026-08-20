@@ -1,0 +1,5 @@
+arm,knn_purity
+original,0.8039
+gm_production,0.9626
+ensemble_audit_reported,0.9680
+exposure_v3_audit_reported,0.9670

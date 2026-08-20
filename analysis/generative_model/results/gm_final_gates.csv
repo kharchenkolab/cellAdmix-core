@@ -1,0 +1,25 @@
+gate,metric,target,generative_model,regression_v3,membrane_ensemble
+1_validation,power_B_weighted_A_guided,>=0.90,0.9736,0.9060,0.9610
+1_validation,own_marker_false_removal,~0,0.0000,0.0000,0.0750
+2_production,power_B_weighted,>=0.99,0.9820,0.9920,0.9610
+2_production,power_B_weighted_no_induced_term,>=0.99,0.9850,,
+2_production,power_B_weighted_admixture_only_yardstick,>=0.99,0.9855,,
+2_production,pairs_below_0.8,0,1,0,
+2_production,pairs_below_0.8_no_induced_term,0,0,0,
+2_production,molecules_removed_of_6.19M,,1206425,1160000,1990000
+3_spikein_primary,induction_retention_count_level,>=0.8,0.000,0 by construction,0 by construction
+3_spikein_primary,induction_retention_molecule_level,>=0.8,0.102,,
+3_spikein_primary,inplane_removal,>=0.8,0.826,,
+3_spikein_primary,outplane_removal,>=0.8,0.846,,
+3_spikein_primary,ambient_removal,removed,0.851,,
+3_spikein_midrank,induction_retention_count_level,>=0.8,0.949,0 by construction,0 by construction
+3_spikein_midrank,induction_retention_molecule_level,>=0.8,0.942,,
+3_spikein_midrank,inplane_removal,>=0.8,0.817,,
+3_spikein_midrank,outplane_removal,>=0.8,0.836,,
+3_spikein_midrank,ambient_removal,removed,0.749,,
+3_realdata,flagged_gene_excess_retained,report,0.795,0 by construction,0 by construction
+4_shuffled,power_B_weighted,<0.05,0.0180,0.0070,
+5_own_markers,false_removal_pooled,~0,0.0000,0.0000,0.0750
+5_own_markers,false_removal_worst_type,~0,0.0000,0.0000,
+6_downstream,knn_purity,report,0.9630,0.9670,0.9680
+6_downstream,knn_purity_original,,0.8040,0.8040,0.8040
