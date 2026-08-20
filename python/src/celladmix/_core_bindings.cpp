@@ -678,6 +678,20 @@ PYBIND11_MODULE(_core, m) {
       py::arg("k") = 15);
 
   m.def(
+      "cell_nearest_type_distance",
+      [](const std::vector<double>& x,
+         const std::vector<double>& y,
+         const std::vector<int>& type_codes,
+         int n_types) {
+        return dense_matrix_to_dict(
+            celladmix::cell_nearest_type_distance(x, y, type_codes, n_types));
+      },
+      py::arg("x"),
+      py::arg("y"),
+      py::arg("type_codes"),
+      py::arg("n_types"));
+
+  m.def(
       "score_membrane",
       [](const std::string& run_path,
          const std::string& image_path,

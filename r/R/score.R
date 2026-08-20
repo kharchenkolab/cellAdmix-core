@@ -178,6 +178,18 @@ CellAdmixScore <- R6::R6Class(
   list(counts = counts, types = types)
 }
 
+# Distance from every cell to the nearest cell of each annotated type.
+.celladmix_source_nearest_distance <- function(cells, annotation) {
+  types <- sort(unique(as.character(annotation[!is.na(annotation)])))
+  codes <- match(as.character(annotation[as.character(cells$cell_id)]), types)
+  codes[is.na(codes)] <- 0L
+  dist <- .celladmix_cell_nearest_type_distance(
+    cells$x, cells$y, codes - 1L, length(types))
+  colnames(dist) <- types
+  rownames(dist) <- as.character(cells$cell_id)
+  dist
+}
+
 #' Flag likely-native factor/target rules using source-distant cells
 #'
 #' For each rule (factor f, target T, source S), target cells with zero

@@ -833,3 +833,14 @@
     PACKAGE = "cellAdmixCore"
   )
 }
+
+.celladmix_cell_nearest_type_distance <- function(x, y, type_codes, n_types) {
+  .Call(
+    "_cellAdmixCore_celladmix_cell_nearest_type_distance",
+    as.numeric(x),
+    as.numeric(y),
+    as.integer(type_codes),
+    as.integer(n_types),
+    PACKAGE = "cellAdmixCore"
+  )
+}

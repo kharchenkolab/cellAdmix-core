@@ -92,4 +92,13 @@ DenseMatrix cell_neighbor_type_counts(
     int n_types,
     int k);
 
+// Distance from every cell to the nearest cell of each type, excluding the
+// cell itself. Returns a dense cells x n_types matrix; infinity for types
+// with no cells.
+DenseMatrix cell_nearest_type_distance(
+    const std::vector<double>& x,
+    const std::vector<double>& y,
+    const std::vector<int>& type_codes,
+    int n_types);
+
 }  // namespace celladmix

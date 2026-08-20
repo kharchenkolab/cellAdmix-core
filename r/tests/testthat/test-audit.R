@@ -99,3 +99,115 @@ test_that("audit end-to-end detects planted admixture on a grid dataset", {
   planted <- sum(tx$cell_type == "B" & tx$gene %in% genes_a)
   expect_gt(ab$excess, 0.5 * planted)
 })
+
+test_that("the reference rate follows the distance decay to its asymptote", {
+  set.seed(5)
+  n <- 4000
+  dist <- runif(n, 0, 500)
+  totals <- rep(100, n)
+  # Rate decays from 0.03 near sources to an ambient floor of 0.005.
+  rate <- 0.005 + 0.025 * exp(-dist / 60)
+  markers <- rpois(n, rate * totals)
+  ref <- cellAdmixCore:::.celladmix_audit_reference_rate(markers, totals, dist)
+  expect_identical(ref$kind, "distant")
+  expect_lt(ref$rate, 0.010)
+  expect_gt(ref$rate_unexposed, ref$rate)
+
+  # Flat profile: the reference stays near the pooled rate.
+  markers_flat <- rpois(n, 0.01 * totals)
+  ref_flat <- cellAdmixCore:::.celladmix_audit_reference_rate(
+    markers_flat, totals, dist)
+  expect_equal(ref_flat$rate, ref_flat$rate_unexposed, tolerance = 0.15)
+
+  # Too few distant cells: fall back to the pooled unexposed rate.
+  ref_near <- cellAdmixCore:::.celladmix_audit_reference_rate(
+    markers[dist < 80], totals[dist < 80], dist[dist < 80])
+  expect_identical(ref_near$kind, "unexposed")
+})
+
+test_that("panel screening excludes and replaces induced genes", {
+  set.seed(7)
+  genes <- c(paste0("smk", 1:6), "induced1")
+  n_T <- 400
+  cells <- paste0("T", seq_len(n_T))
+  expo <- rep(0:3, length.out = n_T)
+  counts <- Matrix::Matrix(0, length(genes), n_T, sparse = TRUE,
+    dimnames = list(genes, cells))
+  # Transferred material: proportional to the source profile across genes.
+  psi <- setNames(c(600, 500, 400, 300, 200, 100, 30), genes)
+  for (g in paste0("smk", 1:6)) {
+    counts[g, ] <- rpois(n_T, 0.02 * psi[[g]] * expo + 1)
+  }
+  # Induced gene: large exposure-linked excess despite a tiny profile share.
+  counts["induced1", ] <- rpois(n_T, 40 * expo + 1)
+  totals <- Matrix::colSums(counts) + 500
+  screened <- cellAdmixCore:::.celladmix_audit_screen_panel(
+    counts, candidates = c("induced1", paste0("smk", 1:6)),
+    T_cells = cells, expo = expo, totals = setNames(totals, cells),
+    source_profile = psi, n_pool = 6L)
+  expect_true("induced1" %in% screened$induced)
+  expect_false("induced1" %in% screened$pool)
+  expect_setequal(screened$pool, paste0("smk", 1:6))
+})
+
+make_audit_fit <- function(seed = 11L) {
+  set.seed(seed)
+  n_side <- 18; spacing <- 30
+  cells <- expand.grid(ix = seq_len(n_side), iy = seq_len(n_side))
+  cells$cell_id <- sprintf("c%03d", seq_len(nrow(cells)))
+  cells$cell_type <- ifelse(cells$ix <= n_side / 2, "A", "B")
+  cells$x <- cells$ix * spacing; cells$y <- cells$iy * spacing
+  genes_a <- paste0("a", 1:3); genes_b <- paste0("b", 1:3)
+  tx <- list()
+  for (i in seq_len(nrow(cells))) {
+    ci <- cells[i, ]
+    own <- if (ci$cell_type == "A") genes_a else genes_b
+    g <- c(sample(own, 60L, replace = TRUE), rep("h1", 10L))
+    if (ci$cell_type == "B") {
+      n_adm <- max(0L, 12L - 6L * (as.integer(ci$ix - n_side / 2) - 1L))
+      if (n_adm > 0) g <- c(g, sample(genes_a, n_adm, replace = TRUE))
+    }
+    tx[[i]] <- data.frame(gene = g,
+      x = ci$x + stats::runif(length(g), -10, 10),
+      y = ci$y + stats::runif(length(g), -10, 10),
+      z = 0, cell_id = ci$cell_id, cell_type = ci$cell_type,
+      stringsAsFactors = FALSE)
+  }
+  tx <- do.call(rbind, tx)
+  csv_path <- tempfile("audit_fx_", fileext = ".csv")
+  utils::write.csv(tx, csv_path, row.names = FALSE)
+  ds <- cellAdmix(csv_path, output_dir = tempfile("audit_fx_out_"),
+    schema = celladmix_schema(x = "x", y = "y", z = "z", gene = "gene",
+      cell = "cell_id", cell_type = "cell_type"),
+    annotation = stats::setNames(cells$cell_type, cells$cell_id),
+    annotation_name = "manual")
+  ds$fit(rank = 2L, run_id = "audit_fx", ncv_k = 6L, graph_k = 4L,
+    nmf_iterations = 20L, nmf_n_runs = 1L, nmf_train_max_rows = 200L,
+    num_threads = 2L, seed = seed)
+}
+
+test_that("evaluate warns from measured removal, not the rule list", {
+  fit <- make_audit_fit()
+  audit <- fit$audit_admixture(neighbor_k = 6L, min_target_cells = 50L,
+    min_reference_cells = 20L, min_excess = 5)
+  p <- audit$pairs()
+  expect_true(all(c("reference_kind", "reference_inflation", "n_induced")
+    %in% names(p)))
+  mk <- audit$markers(p$source[[1]], p$target[[1]])
+  expect_true(all(c("pool", "strict", "induced") %in% names(mk)))
+  if (any(p$detected)) {
+    # A correction that removes nothing must trigger the low-removal
+    # warning for every sufficiently large detected pair, regardless of
+    # what its rule list claims.
+    identity_correction <- list(counts = function() fit$counts(),
+      rules = data.frame(source_cell_type = p$source[p$detected][[1]],
+        target_cell_type = p$target[p$detected][[1]]))
+    class(identity_correction) <- "list"
+    big <- p[p$detected & p$excess >= audit$params$min_excess * 5, ,
+      drop = FALSE]
+    if (nrow(big)) {
+      expect_warning(audit$evaluate(identity_correction),
+        "Correction removed only")
+    }
+  }
+})

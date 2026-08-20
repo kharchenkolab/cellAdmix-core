@@ -94,6 +94,90 @@
   Matrix::colSums(m[genes, cs, drop = FALSE])
 }
 
+# Reference rate for a pair: the level the panel rate approaches in
+# unexposed target cells far from any source cell. Cells with zero source
+# neighbors that still lie near source regions carry material from source
+# cells outside the section plane, so the pooled unexposed rate
+# overestimates the true ambient background. The reference is the smallest
+# tail average of the distance-ordered rates (the asymptote of a
+# monotone-decreasing fit), taken over tails with enough molecules; the
+# pooled unexposed rate is kept as a fallback and an upper bound.
+.celladmix_audit_reference_rate <- function(marker_counts, totals, dist,
+                                            min_distance = 100,
+                                            min_tail_totals = 2e4) {
+  ok <- is.finite(dist)
+  marker_counts <- marker_counts[ok]; totals <- totals[ok]; dist <- dist[ok]
+  pooled <- sum(marker_counts) / max(sum(totals), 1)
+  if (length(dist) < 20) {
+    return(list(rate = pooled, kind = "unexposed", rate_unexposed = pooled))
+  }
+  ord <- order(dist)
+  m <- marker_counts[ord]; tt <- totals[ord]; dd <- dist[ord]
+  tail_m <- rev(cumsum(rev(m)))
+  tail_t <- rev(cumsum(rev(tt)))
+  eligible <- dd >= min_distance & tail_t >= min_tail_totals
+  if (!any(eligible)) {
+    return(list(rate = pooled, kind = "unexposed", rate_unexposed = pooled))
+  }
+  tail_rate <- tail_m[eligible] / pmax(tail_t[eligible], 1)
+  list(rate = min(min(tail_rate), pooled), kind = "distant",
+    rate_unexposed = pooled)
+}
+
+# Leakage above an externally supplied reference rate: exceedance summed
+# over all exposure bins, including the unexposed bin, whose content above
+# the ambient reference is contamination from unobserved (out-of-section)
+# neighbors.
+.celladmix_audit_excess_vs_ref <- function(rates, ref_rate) {
+  sum(pmax(rates$rate - ref_rate, 0) * rates$totals)
+}
+
+# Panel screening for induced genes: a gene whose exposure-linked excess in
+# target cells is far above the level expected from its share of the source
+# expression profile is more likely induced by proximity than transferred,
+# and is excluded from the panel. Excluded genes are replaced from the next
+# ranked candidates, which are screened in turn.
+.celladmix_audit_screen_panel <- function(counts, candidates, T_cells, expo,
+                                          totals, source_profile,
+                                          n_pool = 20L, max_rounds = 5L,
+                                          z_min = 4, excess_min = 50,
+                                          ratio_factor = 4) {
+  exp_cells <- T_cells[expo > 0]
+  un_cells <- T_cells[expo == 0]
+  t_exp <- sum(totals[exp_cells]); t_un <- sum(totals[un_cells])
+  if (!length(exp_cells) || !length(un_cells) || t_un <= 0) {
+    return(list(pool = utils::head(candidates, n_pool), induced = character(0)))
+  }
+  gene_excess <- function(genes) {
+    genes <- intersect(genes, rownames(counts))
+    m_exp <- Matrix::rowSums(counts[genes, intersect(exp_cells,
+      colnames(counts)), drop = FALSE])
+    m_un <- Matrix::rowSums(counts[genes, intersect(un_cells,
+      colnames(counts)), drop = FALSE])
+    excess <- m_exp - m_un / t_un * t_exp
+    z <- excess / sqrt(m_exp + (t_exp / t_un)^2 * m_un + 1)
+    data.frame(gene = genes, excess = as.numeric(excess), z = as.numeric(z),
+      psi = pmax(source_profile[genes], 1e-9), stringsAsFactors = FALSE)
+  }
+  pool <- character(0); induced <- character(0)
+  remaining <- candidates
+  for (round in seq_len(max_rounds)) {
+    need <- n_pool - length(pool)
+    if (need <= 0 || !length(remaining)) break
+    batch <- utils::head(remaining, need)
+    remaining <- setdiff(remaining, batch)
+    stats <- gene_excess(union(pool, batch))
+    pos <- stats[stats$excess > 0, , drop = FALSE]
+    med_ratio <- stats::median(pos$excess / pos$psi)
+    flagged <- stats$gene[stats$z > z_min & stats$excess > excess_min &
+      is.finite(med_ratio) & med_ratio > 0 &
+      stats$excess / stats$psi > ratio_factor * med_ratio]
+    induced <- union(induced, flagged)
+    pool <- setdiff(stats$gene, induced)
+  }
+  list(pool = utils::head(pool, n_pool), induced = induced)
+}
+
 #' Audit Admixture by Spatial Exposure
 #'
 #' Estimates, for every ordered cell-type pair, the number of molecules
@@ -129,6 +213,7 @@ celladmix_audit_admixture <- function(fit, annotation = NULL, neighbor_k = 15L,
   counts <- fit$counts()
   exposure <- .celladmix_source_exposure_counts(cells, ann, neighbor_k)
   rownames(exposure$counts) <- as.character(cells$cell_id)
+  nearest <- .celladmix_source_nearest_distance(cells, ann)
   cell_types <- stats::setNames(as.character(ann[as.character(cells$cell_id)]),
     as.character(cells$cell_id))
   totals <- Matrix::colSums(counts)
@@ -153,21 +238,48 @@ celladmix_audit_admixture <- function(fit, annotation = NULL, neighbor_k = 15L,
       expo <- exposure$counts[T_cells, source]
       if (sum(expo == 0) < min_reference_cells) next
       baseline <- .celladmix_audit_pseudobulk(counts, T_cells[expo == 0])
-      pool <- .celladmix_audit_marker_pool(profiles, source, baseline, n_pool = n_pool)
+      candidates <- .celladmix_audit_marker_pool(profiles, source, baseline,
+        n_pool = 10L * n_pool)
+      screened <- .celladmix_audit_screen_panel(counts, candidates, T_cells,
+        expo, totals, profiles[, source], n_pool = n_pool)
+      pool <- screened$pool
       if (length(pool) < 3) next
       strict <- .celladmix_audit_pool_strict(pool, profiles, source, baseline)
       bins <- .celladmix_audit_bins(expo)
-      rates <- .celladmix_audit_bin_rates(
-        .celladmix_audit_mcount(counts, pool, T_cells), totals[T_cells], bins)
+      pool_counts <- .celladmix_audit_mcount(counts, pool, T_cells)
+      rates <- .celladmix_audit_bin_rates(pool_counts, totals[T_cells], bins)
       det <- .celladmix_audit_excess(rates)
+      # Reference level: the ambient background estimated from the decay of
+      # panel content with distance to the nearest source cell among
+      # unexposed target cells (see .celladmix_audit_reference_rate).
+      e0 <- expo == 0
+      ref <- .celladmix_audit_reference_rate(pool_counts[e0],
+        totals[T_cells][e0], nearest[T_cells, source][e0])
+      excess_ref <- .celladmix_audit_excess_vs_ref(rates, ref$rate)
       rates_strict <- if (length(strict) >= 2) .celladmix_audit_bin_rates(
         .celladmix_audit_mcount(counts, strict, T_cells), totals[T_cells], bins) else NULL
       det_strict <- if (!is.null(rates_strict)) .celladmix_audit_excess(rates_strict) else
         list(excess = NA_real_, p = NA_real_)
+      ref_strict <- if (!is.null(rates_strict)) {
+        .celladmix_audit_reference_rate(
+          .celladmix_audit_mcount(counts, strict, T_cells)[e0],
+          totals[T_cells][e0], nearest[T_cells, source][e0])
+      } else NULL
       pair_defs[[paste(source, target, sep = " -> ")]] <- list(
         source = source, target = target, T_cells = T_cells, bins = bins,
-        pool = pool, strict = strict, rates = rates, rates_strict = rates_strict,
-        excess = det$excess, p = det$p, excess_strict = det_strict$excess,
+        dist = nearest[T_cells, source],
+        pool = pool, strict = strict, induced = screened$induced,
+        rates = rates, rates_strict = rates_strict,
+        # detection remains gradient-based (rise of exposed bins over the
+        # unexposed bin); the reported leakage is measured against the
+        # ambient reference and includes the structured content of
+        # unexposed cells (contamination from out-of-section neighbors)
+        excess = excess_ref, excess_gradient = det$excess, p = det$p,
+        reference_rate = ref$rate, reference_kind = ref$kind,
+        reference_rate_unexposed = ref$rate_unexposed,
+        excess_strict = if (!is.null(ref_strict))
+          .celladmix_audit_excess_vs_ref(rates_strict, ref_strict$rate) else
+          det_strict$excess,
         # marker-pool share of the source transcriptome: the extrapolation
         # factor from pool-demonstrated leakage to total admixture
         coverage = sum(profiles[pool, source]) / max(sum(profiles[, source]), 1),
@@ -177,7 +289,16 @@ celladmix_audit_admixture <- function(fit, annotation = NULL, neighbor_k = 15L,
   qvals <- stats::p.adjust(vapply(pair_defs, function(d) d$p, 0), "BH")
   for (i in seq_along(pair_defs)) {
     pair_defs[[i]]$q <- qvals[[i]]
-    pair_defs[[i]]$detected <- qvals[[i]] < q_thresh && pair_defs[[i]]$excess >= min_excess
+    pair_defs[[i]]$detected <- qvals[[i]] < q_thresh &&
+      pair_defs[[i]]$excess_gradient >= min_excess
+  }
+  induced_all <- unique(unlist(lapply(pair_defs, `[[`, "induced")))
+  if (length(induced_all)) {
+    message(sprintf(paste0(
+      "Excluded %d likely induced gene%s from marker panels (exposure-linked ",
+      "excess far above the source-profile expectation): %s"),
+      length(induced_all), if (length(induced_all) > 1) "s" else "",
+      paste(utils::head(sort(induced_all), 8), collapse = ", ")))
   }
   CellAdmixAudit$new(fit = fit, pair_defs = pair_defs, counts = counts,
     totals = totals, cell_types = cell_types, native_markers = native_markers,
@@ -219,8 +340,15 @@ CellAdmixAudit <- R6::R6Class(
           excess = round(d$excess), excess_strict = round(d$excess_strict),
           coverage = d$coverage,
           q_value = d$q, detected = d$detected,
+          reference_kind = d$reference_kind,
+          # ratio of the pooled unexposed rate to the ambient reference:
+          # values above 1 quantify contamination from out-of-section
+          # neighbors present in the unexposed cells
+          reference_inflation = d$reference_rate_unexposed /
+            max(d$reference_rate, 1e-12),
           n_exposed = length(exposed), n_reference = sum(d$bins == "0"),
           n_markers = length(d$pool), n_strict = length(d$strict),
+          n_induced = length(d$induced),
           stringsAsFactors = FALSE)
       }))
       rownames(out) <- NULL
@@ -229,7 +357,7 @@ CellAdmixAudit <- R6::R6Class(
 
     markers = function(source, target) {
       d <- private$.pair(source, target)
-      list(pool = d$pool, strict = d$strict)
+      list(pool = d$pool, strict = d$strict, induced = d$induced)
     },
 
     plot_map = function(value = c("rate", "molecules"), detected_only = TRUE) {
@@ -419,19 +547,28 @@ CellAdmixAudit <- R6::R6Class(
       rows <- list()
       for (d in private$.pair_defs) {
         if (!d$detected) next
-        rates_after <- .celladmix_audit_bin_rates(
-          .celladmix_audit_mcount(counts_after, d$pool, d$T_cells),
-          private$.totals[d$T_cells], d$bins)
+        e0 <- d$bins == "0"
+        totals_T <- private$.totals[d$T_cells]
+        power_vs_ref <- function(genes, rates_before, ref_before) {
+          counts_g <- .celladmix_audit_mcount(counts_after, genes, d$T_cells)
+          rates_a <- .celladmix_audit_bin_rates(counts_g, totals_T, d$bins)
+          ref_a <- .celladmix_audit_reference_rate(counts_g[e0], totals_T[e0],
+            d$dist[e0])
+          eb <- .celladmix_audit_excess_vs_ref(rates_before, ref_before)
+          ea <- .celladmix_audit_excess_vs_ref(rates_a, min(ref_a$rate, ref_before))
+          if (eb <= 0) NA_real_ else 1 - ea / eb
+        }
         sens_strict <- if (!is.null(d$rates_strict)) {
-          .celladmix_audit_power(d$rates_strict, .celladmix_audit_bin_rates(
-            .celladmix_audit_mcount(counts_after, d$strict, d$T_cells),
-            private$.totals[d$T_cells], d$bins))
+          ref_sb <- .celladmix_audit_reference_rate(
+            .celladmix_audit_mcount(private$.counts, d$strict, d$T_cells)[e0],
+            totals_T[e0], d$dist[e0])
+          power_vs_ref(d$strict, d$rates_strict, ref_sb$rate)
         } else NA_real_
         rows[[length(rows) + 1]] <- data.frame(
           source = d$source, target = d$target,
           admixed_molecules = round(d$excess / d$coverage),
           excess = round(d$excess), excess_strict = round(d$excess_strict),
-          sensitivity = .celladmix_audit_power(d$rates, rates_after),
+          sensitivity = power_vs_ref(d$pool, d$rates, d$reference_rate),
           sensitivity_strict = sens_strict,
           stringsAsFactors = FALSE)
       }
@@ -454,15 +591,17 @@ CellAdmixAudit <- R6::R6Class(
           "over-removal of near-surely-genuine expression"),
           100 * severe$false_removal[[i]], severe$cell_type[[i]]), call. = FALSE)
       }
-      if (warn_uncovered && !is.null(correction$rules)) {
-        covered <- paste(correction$rules$source_cell_type,
-          correction$rules$target_cell_type)
-        missed <- pairs[!(paste(pairs$source, pairs$target) %in% covered) &
+      if (warn_uncovered) {
+        # Warn from the measured removal, not from the rule list: ensemble
+        # members can remove molecules for pairs absent from the primary
+        # rules, and rules can exist yet remove nothing.
+        missed <- pairs[!is.na(pairs$sensitivity) & pairs$sensitivity < 0.2 &
           pairs$excess >= self$params$min_excess * 5, , drop = FALSE]
         for (i in seq_len(nrow(missed))) {
           warning(sprintf(paste0(
-            "Detected ~%s admixed molecules from %s into %s, but no removal ",
-            "rule covers this pair"),
+            "Correction removed only %.0f%% of the estimated ~%s admixed ",
+            "molecules from %s into %s"),
+            100 * max(missed$sensitivity[[i]], 0),
             format(missed$admixed_molecules[[i]], big.mark = ","),
             missed$source[[i]], missed$target[[i]]), call. = FALSE)
         }

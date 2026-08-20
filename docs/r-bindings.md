@@ -191,8 +191,21 @@ Independently of factorization and scoring, the amount of admixture in a
 dataset can be estimated from its spatial structure: source-marker content
 in target cells rises with the number of source-type neighbor cells, while
 unexposed target cells provide an internal negative control (see
-[benchmarks.md](benchmarks.md) for the methodology). The audit measures
-this for every ordered cell-type pair:
+[benchmarks.md](benchmarks.md) for the methodology). Because a tissue
+section shows only a slab of the tissue, cells with zero observed
+source-type neighbors can still be contaminated by source cells just above
+or below the section plane; the audit therefore takes its reference level
+from the ambient background that the marker content approaches in target
+cells far from any source cell, rather than from all zero-neighbor cells
+(the `reference_kind` and `reference_inflation` columns of `pairs()` record
+which reference was usable and how much contamination it removed from the
+comparison group). Marker panels are also screened for likely induced
+genes — genes whose exposure-linked excess far exceeds the level expected
+from their share of the source expression profile reflect a transcriptional
+response to proximity rather than transferred material; they are excluded
+from the panels, replaced by the next-ranked source-specific genes, and
+listed in `markers()$induced`. The audit measures every ordered cell-type
+pair:
 
 ```r
 audit <- fit$audit_admixture()
@@ -206,8 +219,11 @@ audit$plot_remaining(list(membrane = correction))  # admixture left per correcti
 `audit$evaluate(correction)` verifies a correction against the same
 measurements: per-pair cleanup sensitivity, the own-marker false-removal
 rate per cell type (removal of near-surely-genuine molecules), a warning
-for any detected pair that no removal rule covers, and a severe-over-removal
-warning when a type loses more than 25% of its own-marker molecules.
+for any detected pair whose molecules the correction measurably failed to
+remove (based on the corrected counts themselves, since ensemble members
+can remove molecules for pairs absent from the primary rule list and rules
+can exist yet remove nothing), and a severe-over-removal warning when a
+type loses more than 25% of its own-marker molecules.
 
 ```r
 report <- audit$evaluate(correction)
@@ -215,11 +231,12 @@ report$summary()
 report$plot_cleanup()
 ```
 
-The audit's directly measured marker excess is a conservative lower bound
-(contamination that reaches even unexposed cells raises the reference
-level and is not counted); the reported rates and molecule counts
-extrapolate it by the markers' share of the source transcriptome, kept as
-the `coverage` column of `audit$pairs()`.
+The reported rates and molecule counts include the contamination present
+in zero-neighbor cells above the ambient reference, and extrapolate the
+marker-panel measurement to the full transcriptome by the markers' share
+of the source expression profile, kept as the `coverage` column of
+`audit$pairs()`. Pair detection itself remains based on the rise of
+exposed cells over unexposed ones, which no reference choice can inflate.
 
 Example-cell overlays show molecule-level evidence around selected target
 cells. For Xenium-backed fits, the DAPI/membrane stain background, cell

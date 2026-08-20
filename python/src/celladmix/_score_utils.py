@@ -167,6 +167,30 @@ def source_exposure_counts(cells: pd.DataFrame, annotation, *, neighbor_k: int =
     return counts, types
 
 
+def source_nearest_distance(cells: pd.DataFrame, annotation):
+    """Distance from every cell to the nearest cell of each annotated type.
+
+    Returns ``(dist, types)`` with dist aligned to the rows of ``cells``;
+    infinity for types with no cells.
+    """
+    from . import _core
+
+    types = sorted(map(str, pd.Series(annotation).dropna().unique()))
+    type_index = {t: i for i, t in enumerate(types)}
+    codes = [
+        type_index.get(str(annotation.get(str(c), None)), -1)
+        for c in cells["cell_id"].astype(str)
+    ]
+    raw = _core.cell_nearest_type_distance(
+        cells["x"].astype(float).tolist(),
+        cells["y"].astype(float).tolist(),
+        codes,
+        len(types),
+    )
+    dist = np.asarray(raw["data"], dtype=float).reshape(raw["rows"], raw["cols"])
+    return dist, types
+
+
 def apply_native_check(
     rules: pd.DataFrame,
     fit,

@@ -1386,4 +1386,57 @@ DenseMatrix cell_neighbor_type_counts(
   return counts;
 }
 
+DenseMatrix cell_nearest_type_distance(
+    const std::vector<double>& x,
+    const std::vector<double>& y,
+    const std::vector<int>& type_codes,
+    int n_types) {
+  const std::size_t n = x.size();
+  if (y.size() != n || type_codes.size() != n) {
+    throw std::runtime_error("cell_nearest_type_distance inputs must have equal length");
+  }
+  if (n_types <= 0) {
+    throw std::runtime_error("cell_nearest_type_distance requires positive n_types");
+  }
+  const double none = std::numeric_limits<double>::infinity();
+  DenseMatrix dist(static_cast<int>(n), n_types, none);
+
+  for (int t = 0; t < n_types; ++t) {
+    std::vector<double> tx;
+    std::vector<double> ty;
+    std::vector<std::size_t> torig;
+    for (std::size_t i = 0; i < n; ++i) {
+      if (type_codes[i] == t) {
+        tx.push_back(x[i]);
+        ty.push_back(y[i]);
+        torig.push_back(i);
+      }
+    }
+    if (tx.empty()) {
+      continue;
+    }
+    CellPointAdaptor adaptor;
+    adaptor.x = &tx;
+    adaptor.y = &ty;
+    CellKdTree tree(2, adaptor, nanoflann::KDTreeSingleIndexAdaptorParams(10));
+    tree.buildIndex();
+    const std::size_t request = std::min(tx.size(), static_cast<std::size_t>(2));
+    std::vector<int> hit_indices(request);
+    std::vector<double> hit_distances(request);
+    for (std::size_t i = 0; i < n; ++i) {
+      const double query[2] = {x[i], y[i]};
+      const std::size_t found =
+          tree.knnSearch(query, request, hit_indices.data(), hit_distances.data());
+      for (std::size_t h = 0; h < found; ++h) {
+        if (torig[static_cast<std::size_t>(hit_indices[h])] == i) {
+          continue;  // a cell is not its own neighbor
+        }
+        dist(static_cast<int>(i), t) = std::sqrt(hit_distances[h]);
+        break;
+      }
+    }
+  }
+  return dist;
+}
+
 }  // namespace celladmix

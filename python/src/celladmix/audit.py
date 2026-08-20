@@ -81,6 +81,82 @@ def _power(rates_before, rates_after):
     return np.nan if eb.sum() <= 0 else 1 - float(ea.sum()) / float(eb.sum())
 
 
+def _reference_rate(marker_counts, totals, dist, min_distance=100.0,
+                    min_tail_totals=2e4):
+    """Ambient reference: the level the panel rate approaches in unexposed
+    target cells far from any source cell.
+
+    Cells with zero source neighbors that still lie near source regions carry
+    material from source cells outside the section plane, so the pooled
+    unexposed rate overestimates the true ambient background. The reference
+    is the smallest tail average of the distance-ordered rates (the asymptote
+    of a monotone-decreasing fit), over tails with enough molecules; the
+    pooled unexposed rate is the fallback and an upper bound.
+    """
+    ok = np.isfinite(dist)
+    marker_counts, totals, dist = marker_counts[ok], totals[ok], dist[ok]
+    pooled = float(marker_counts.sum()) / max(float(totals.sum()), 1.0)
+    if len(dist) < 20:
+        return pooled, "unexposed", pooled
+    order = np.argsort(dist)
+    m = marker_counts[order]
+    t = totals[order]
+    d = dist[order]
+    tail_m = np.cumsum(m[::-1])[::-1]
+    tail_t = np.cumsum(t[::-1])[::-1]
+    eligible = (d >= min_distance) & (tail_t >= min_tail_totals)
+    if not eligible.any():
+        return pooled, "unexposed", pooled
+    tail_rate = tail_m[eligible] / np.maximum(tail_t[eligible], 1.0)
+    return min(float(tail_rate.min()), pooled), "distant", pooled
+
+
+def _excess_vs_ref(rates, ref_rate):
+    """Leakage above an external reference rate, summed over all exposure
+    bins - including the unexposed bin, whose content above the ambient
+    reference is contamination from unobserved (out-of-section) neighbors."""
+    return float((np.maximum(rates["rate"] - ref_rate, 0) * rates["totals"]).sum())
+
+
+def _screen_panel(matrix, candidates, cols_exposed, cols_unexposed,
+                  source_profile, n_pool=20, max_rounds=5, z_min=4.0,
+                  excess_min=50.0, ratio_factor=4.0):
+    """Exclude likely induced genes from the marker panel and replace them.
+
+    A gene whose exposure-linked excess in target cells is far above the
+    level expected from its share of the source expression profile is more
+    likely induced by proximity than transferred; it is removed from the
+    panel and replaced by the next ranked candidate, which is screened in
+    turn.
+    """
+    t_exp = float(matrix[:, cols_exposed].sum())
+    t_un = float(matrix[:, cols_unexposed].sum())
+    if t_exp <= 0 or t_un <= 0:
+        return np.asarray(candidates[:n_pool]), np.array([], dtype=int)
+    pool: list[int] = []
+    induced: list[int] = []
+    remaining = list(candidates)
+    for _ in range(max_rounds):
+        need = n_pool - len(pool)
+        if need <= 0 or not remaining:
+            break
+        batch = remaining[:need]
+        remaining = remaining[need:]
+        gset = np.asarray(sorted(set(pool) | set(batch)))
+        m_exp = np.asarray(matrix[gset][:, cols_exposed].sum(axis=1)).ravel()
+        m_un = np.asarray(matrix[gset][:, cols_unexposed].sum(axis=1)).ravel()
+        excess = m_exp - m_un / t_un * t_exp
+        z = excess / np.sqrt(m_exp + (t_exp / t_un) ** 2 * m_un + 1)
+        psi = np.maximum(source_profile[gset], 1e-9)
+        pos = excess > 0
+        med_ratio = float(np.median(excess[pos] / psi[pos])) if pos.any() else 0.0
+        flagged = gset[(z > z_min) & (excess > excess_min) & (med_ratio > 0)
+                       & (excess / psi > ratio_factor * med_ratio)]
+        induced = sorted(set(induced) | set(flagged.tolist()))
+        pool = [g for g in gset.tolist() if g not in induced]
+    return np.asarray(pool[:n_pool]), np.asarray(induced, dtype=int)
+
+
 class CellAdmixAudit:
     """Per-cell-type-pair admixture estimates and cleanup verification."""
 
@@ -103,6 +179,10 @@ class CellAdmixAudit:
         exp_counts, types = source_exposure_counts(cells, annotation,
             neighbor_k=neighbor_k)
         exp_df = pd.DataFrame(exp_counts, columns=types,
+            index=cells["cell_id"].astype(str))
+        from ._score_utils import source_nearest_distance
+        ndist, _ = source_nearest_distance(cells, annotation)
+        ndist_df = pd.DataFrame(ndist, columns=types,
             index=cells["cell_id"].astype(str))
         ctypes = pd.Series(
             [str(annotation.get(str(c), None)) for c in cells["cell_id"].astype(str)],
@@ -136,22 +216,36 @@ class CellAdmixAudit:
                 if (expo == 0).sum() < min_reference_cells:
                     continue
                 baseline = _pseudobulk(self._matrix, self._cells, T_cells[expo == 0])
-                pool = _marker_pool(profiles, self._types, source,
-                    np.nan_to_num(baseline), n_pool=n_pool)
+                bins = pd.cut(expo, BIN_EDGES, labels=BIN_LABELS).astype(str)
+                cols = self._cells.get_indexer(T_cells)
+                tot = self._totals[cols]
+                candidates = _marker_pool(profiles, self._types, source,
+                    np.nan_to_num(baseline), n_pool=10 * n_pool)
+                pool, induced = _screen_panel(self._matrix, list(candidates),
+                    cols[expo > 0], cols[expo == 0], profiles[:, s_idx],
+                    n_pool=n_pool)
                 if len(pool) < 3:
                     continue
                 strict = pool[np.nan_to_num(baseline)[pool] <
                     0.05 * profiles[pool, s_idx]]
-                bins = pd.cut(expo, BIN_EDGES, labels=BIN_LABELS).astype(str)
-                cols = self._cells.get_indexer(T_cells)
-                tot = self._totals[cols]
-                mk = np.asarray(self._matrix[pool][:, cols].sum(axis=0)).ravel()
-                rates = _bin_rates(mk, tot, bins)
-                excess, p = _excess(rates)
+                dist = ndist_df.loc[T_cells, source].to_numpy()
+                mk_cells = np.asarray(
+                    self._matrix[pool][:, cols].sum(axis=0)).ravel()
+                mk_by_cell = mk_cells  # per-cell panel counts, aligned to cols
+                rates = _bin_rates(mk_by_cell, tot, bins)
+                excess_gradient, p = _excess(rates)
+                # The reported leakage is measured against the ambient
+                # reference (distance-decay asymptote); detection stays
+                # gradient-based.
+                e0 = expo == 0
+                ref_rate, ref_kind, ref_unexposed = _reference_rate(
+                    mk_by_cell[e0], tot[e0], dist[e0])
+                excess = _excess_vs_ref(rates, ref_rate)
                 if len(strict) >= 2:
                     mks = np.asarray(self._matrix[strict][:, cols].sum(axis=0)).ravel()
                     rates_strict = _bin_rates(mks, tot, bins)
-                    excess_strict, _ = _excess(rates_strict)
+                    ref_s, _, _ = _reference_rate(mks[e0], tot[e0], dist[e0])
+                    excess_strict = _excess_vs_ref(rates_strict, ref_s)
                 else:
                     rates_strict, excess_strict = None, np.nan
                 # marker-pool share of the source transcriptome: the
@@ -160,8 +254,11 @@ class CellAdmixAudit:
                     float(profiles[:, s_idx].sum()), 1e-9)
                 self._pairs[(source, target)] = dict(
                     source=source, target=target, cols=cols, bins=bins,
-                    pool=pool, strict=strict, rates=rates,
-                    rates_strict=rates_strict, excess=excess, p=p,
+                    dist=dist, pool=pool, strict=strict, induced=induced,
+                    rates=rates, rates_strict=rates_strict,
+                    excess=excess, excess_gradient=excess_gradient, p=p,
+                    reference_rate=ref_rate, reference_kind=ref_kind,
+                    reference_rate_unexposed=ref_unexposed,
                     excess_strict=excess_strict, coverage=coverage,
                     target_molecules=float(tot.sum()))
         pvals = np.array([d["p"] for d in self._pairs.values()])
@@ -172,7 +269,16 @@ class CellAdmixAudit:
             q[order] = np.minimum.accumulate(ranked[::-1])[::-1]
             for d, qv in zip(self._pairs.values(), q):
                 d["q"] = float(qv)
-                d["detected"] = qv < q_thresh and d["excess"] >= min_excess
+                d["detected"] = (qv < q_thresh
+                    and d["excess_gradient"] >= min_excess)
+        induced_all = sorted({int(g) for d in self._pairs.values()
+                              for g in d["induced"]})
+        if induced_all:
+            names = [str(self._genes[g]) for g in induced_all[:8]]
+            print(f"Excluded {len(induced_all)} likely induced gene"
+                  f"{'s' if len(induced_all) > 1 else ''} from marker panels "
+                  "(exposure-linked excess far above the source-profile "
+                  f"expectation): {', '.join(names)}")
 
     # ---- tables ----
     def pairs(self, detected_only=False):
@@ -186,15 +292,23 @@ class CellAdmixAudit:
                 excess_strict=None if np.isnan(d["excess_strict"]) else round(d["excess_strict"]),
                 coverage=d["coverage"],
                 q_value=d["q"], detected=d["detected"],
+                reference_kind=d["reference_kind"],
+                # ratio of the pooled unexposed rate to the ambient
+                # reference: values above 1 quantify contamination from
+                # out-of-section neighbors present in the unexposed cells
+                reference_inflation=d["reference_rate_unexposed"]
+                    / max(d["reference_rate"], 1e-12),
                 n_exposed=len(exposed), n_reference=int((np.asarray(d["bins"]) == "0").sum()),
-                n_markers=len(d["pool"]), n_strict=len(d["strict"])))
+                n_markers=len(d["pool"]), n_strict=len(d["strict"]),
+                n_induced=len(d["induced"])))
         df = pd.DataFrame(rows)
         return df[df["detected"]] if detected_only else df
 
     def markers(self, source, target):
         d = self._pair(source, target)
         return dict(pool=list(self._genes[d["pool"]]),
-            strict=list(self._genes[d["strict"]]))
+            strict=list(self._genes[d["strict"]]),
+            induced=list(self._genes[d["induced"]]))
 
     def _pair(self, source, target):
         d = self._pairs.get((source, target))
@@ -367,12 +481,25 @@ class CellAdmixAudit:
         for d in self._pairs.values():
             if not d["detected"]:
                 continue
-            ra = self._state_rates(after, d["source"], d["target"], strict=False)
-            sens = _power(d["rates"], ra)
+            cols = d["cols"]
+            tot = self._totals[cols]
+            e0 = np.asarray(d["bins"]) == "0"
+
+            def power_vs_ref(genes, rates_before, ref_before):
+                mk = np.asarray(after[genes][:, cols].sum(axis=0)).ravel()
+                rates_a = _bin_rates(mk, tot, d["bins"])
+                ref_a, _, _ = _reference_rate(mk[e0], tot[e0], d["dist"][e0])
+                eb = _excess_vs_ref(rates_before, ref_before)
+                ea = _excess_vs_ref(rates_a, min(ref_a, ref_before))
+                return np.nan if eb <= 0 else 1 - ea / eb
+
+            sens = power_vs_ref(d["pool"], d["rates"], d["reference_rate"])
             sens_strict = np.nan
             if d["rates_strict"] is not None:
-                ras = self._state_rates(after, d["source"], d["target"], strict=True)
-                sens_strict = _power(d["rates_strict"], ras)
+                mks_b = np.asarray(
+                    self._matrix[d["strict"]][:, cols].sum(axis=0)).ravel()
+                ref_sb, _, _ = _reference_rate(mks_b[e0], tot[e0], d["dist"][e0])
+                sens_strict = power_vs_ref(d["strict"], d["rates_strict"], ref_sb)
             rows.append(dict(source=d["source"], target=d["target"],
                 admixed_molecules=round(d["excess"] / d["coverage"]),
                 excess=round(d["excess"]), sensitivity=sens,
@@ -395,17 +522,18 @@ class CellAdmixAudit:
                 f"Correction removed {100 * row['false_removal']:.0f}% of "
                 f"{row['cell_type']}'s own-marker molecules - severe "
                 "over-removal of near-surely-genuine expression", stacklevel=2)
-        rules = getattr(correction, "rules", None)
-        if warn_uncovered and rules is not None and len(rules):
-            covered = set(zip(rules["source_cell_type"].astype(str),
-                rules["target_cell_type"].astype(str)))
+        if warn_uncovered and len(pairs):
+            # Warn from the measured removal, not from the rule list:
+            # ensemble members can remove molecules for pairs absent from
+            # the primary rules, and rules can exist yet remove nothing.
             for _, r in pairs.iterrows():
-                if (r["source"], r["target"]) not in covered and \
-                        r["excess"] >= self.params["min_excess"] * 5:
+                if (np.isfinite(r["sensitivity"]) and r["sensitivity"] < 0.2
+                        and r["excess"] >= self.params["min_excess"] * 5):
                     warnings.warn(
-                        f"Detected ~{r['admixed_molecules']:,} admixed molecules from "
-                        f"{r['source']} into {r['target']}, but no removal rule "
-                        f"covers this pair", stacklevel=2)
+                        f"Correction removed only {100 * max(r['sensitivity'], 0):.0f}% "
+                        f"of the estimated ~{r['admixed_molecules']:,} admixed "
+                        f"molecules from {r['source']} into {r['target']}",
+                        stacklevel=2)
         return CellAdmixCleanupReport(self, correction, pairs, false_removal)
 
 

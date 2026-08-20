@@ -4871,6 +4871,26 @@ extern "C" SEXP _cellAdmixCore_celladmix_cell_neighbor_type_counts(
   return R_NilValue;
 }
 
+extern "C" SEXP _cellAdmixCore_celladmix_cell_nearest_type_distance(
+    SEXP x_sexp,
+    SEXP y_sexp,
+    SEXP type_codes_sexp,
+    SEXP n_types_sexp) {
+  try {
+    const std::vector<double> x = as<std::vector<double>>(x_sexp);
+    const std::vector<double> y = as<std::vector<double>>(y_sexp);
+    const std::vector<int> type_codes = as<std::vector<int>>(type_codes_sexp);
+    const auto dist = celladmix::cell_nearest_type_distance(
+        x, y, type_codes, as<int>(n_types_sexp));
+    return matrix_to_r(dist);
+  } catch (std::exception& ex) {
+    forward_exception_to_r(ex);
+  } catch (...) {
+    ::Rf_error("celladmix_cell_nearest_type_distance: unknown C++ exception");
+  }
+  return R_NilValue;
+}
+
 extern "C" SEXP _cellAdmixCore_celladmix_write_cell_labels(
     SEXP path_sexp,
     SEXP labels_sexp,
