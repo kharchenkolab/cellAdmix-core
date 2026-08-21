@@ -151,6 +151,17 @@ two pairs below 0.8 on the standard yardstick (Endothelial -> Ductal
 0.67, Fibroblast -> Mural 0.73) are precisely the pairs whose B halves
 carry retained flagged genes - deliberate retention, not missed removal.
 
+The same script run on the CosMx NSCLC dataset (`COMPOSITE_DATASET=nsclc`;
+88 flagged pair-gene combinations across 18 of 27 detected pairs,
+dominated by stress and chemokine programs - FOS, JUNB, HSPA1A/B,
+CCL3/4, CXCL2/3) reproduces every gate: production power_B 0.982
+(median 1.000), admixture-only yardstick 0.998 with a per-pair minimum
+of 0.966, retention 80.1%, shuffled control 0.013, own-marker false
+removal 0.0%, purity 0.811 -> 0.885. The retention ablation is milder
+there (73.9% kept even without the filter): NSCLC's flagged genes are
+channels the corrector's delivery weighting touches lightly anyway,
+where on pancreas the filter is what saves CFTR's 111k-molecule excess.
+
 The composite's remaining gap to the generative model is generalization
 of the dose: the A-guided validation arm scores 0.903 versus the model's
 0.974, because a fixed stratum budget generalizes to held-out genes worse

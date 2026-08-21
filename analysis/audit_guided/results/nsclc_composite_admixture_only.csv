@@ -1,0 +1,28 @@
+"pair","excess_Bx","power_Bx"
+"endothelial -> epithelial",1879.34962276955,0.996326353992478
+"endothelial -> fibroblast",2083.11221759104,1
+"endothelial -> immune other",5190.4402653173,1
+"endothelial -> macrophage",1006.66940256029,0.993339287740958
+"endothelial -> malignant",1398.9535326447,0.965547441768106
+"epithelial -> endothelial",1637.92145948279,0.971631750908001
+"epithelial -> fibroblast",1810.18040346573,0.999463678566998
+"epithelial -> immune other",7163.92518416226,1
+"epithelial -> macrophage",925.831291443155,0.997517716229451
+"epithelial -> malignant",729.744379111712,1
+"fibroblast -> endothelial",6102.96473286997,1
+"fibroblast -> epithelial",5250.53589031933,1
+"fibroblast -> immune other",71951.5952854752,1
+"fibroblast -> macrophage",4993.75049953715,1
+"fibroblast -> malignant",4890.24958246205,0.968189660015938
+"immune other -> endothelial",13009.9471873093,1
+"immune other -> fibroblast",28410.3151480434,1
+"immune other -> malignant",2929.91461176374,0.990224076178722
+"macrophage -> endothelial",1331.69482344462,1
+"macrophage -> fibroblast",3842.59439291519,1
+"macrophage -> immune other",13713.4080332651,1
+"macrophage -> malignant",1069.92443306881,1
+"malignant -> endothelial",755.599706141609,1
+"malignant -> epithelial",1833.71567352605,1
+"malignant -> fibroblast",4512.99429856559,0.99760521095159
+"malignant -> immune other",6744.62370563085,1
+"malignant -> macrophage",461.95043457487,1
