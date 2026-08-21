@@ -32,6 +32,7 @@ own-marker false removal on native markers disjoint from all guide pools.
 | exposure-regression corrector (E4 prototype) | 0.710 | 0.607 | **0.00** | **0.0%** |
 | exposure corrector v3, validation arm (A-guided) | 0.906 | - | 0.00 | 0.0% |
 | exposure corrector v3, production arm (Phase A) | **0.992** | - | - | **0.0%** |
+| composite: regression + induced-gene retention (17) | 0.988 | 1.000 | 0.43 | **0.0%** |
 
 Controls: junk anchors align to no type and produce zero rules (both
 scoring methods); shuffled exposure collapses the E4 corrector to
@@ -117,6 +118,45 @@ exposure). Results (script `08_phase_a.R`):
 
 The regression tier meets every gate on pancreas; the full guided-NMF/EM
 tier (E5) remains unjustified here and is deferred to the breast phase.
+
+## Composite corrector: regression removal with induced-gene retention
+
+The generative-model evaluation (`analysis/generative_model/FINDINGS.md`)
+predicted that its two transferable ideas - the interface-local
+overdispersed proportionality screen and per-gene retention of the
+disproportionate (induced) excess share - could be grafted onto the
+regression corrector to dominate both parents. Script `17_composite.R`
+implements exactly that: the screen (now the package's audit screen,
+applied to every source-owned gene per pair) yields flagged (pair, gene)
+combinations with an induced share f = (excess - expected) / excess; the
+corrector measures its dose on unflagged guide genes only, caps each
+flagged gene's removable content at the proportional share 1 - f
+(waterfilling the remainder to other source-owned genes), and the ambient
+tier retains the f share of flagged strict genes. On pancreas, 26
+pair-gene combinations are flagged across 14 pairs.
+
+Production configuration (pool-guided, ambient on): weighted power_B
+0.988 (strict tier 1.000); on the admixture-only yardstick (B halves
+excluding flagged genes) 0.992 weighted with every pair at or above 0.836
+- matching the plain regression corrector on transferred content. The
+flagged genes retain 79.6% of their exposure-linked excess in aggregate
+(CFTR 0.81, PROX1 0.74, SEMA3C 0.86), versus 8.4% when the retention
+filter is ablated with the same machinery - the filter, not the
+corrector, is what preserves the biology. The generative model's own
+retention figure is 79.5%, so the count-level cap reproduces its
+entry-level split almost exactly. Own-marker false removal 0.0% (pooled
+and worst type), shuffled-exposure control 0.008, downstream kNN purity
+0.964 (ensemble 0.968, regression 0.967, generative model 0.963). The
+two pairs below 0.8 on the standard yardstick (Endothelial -> Ductal
+0.67, Fibroblast -> Mural 0.73) are precisely the pairs whose B halves
+carry retained flagged genes - deliberate retention, not missed removal.
+
+The composite's remaining gap to the generative model is generalization
+of the dose: the A-guided validation arm scores 0.903 versus the model's
+0.974, because a fixed stratum budget generalizes to held-out genes worse
+than the model's per-cell posterior delivery. For product purposes the
+composite offers the model's retention behavior at the regression
+corrector's complexity and runtime.
 
 ## Verdicts against the pre-registered gates
 
