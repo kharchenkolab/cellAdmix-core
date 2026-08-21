@@ -39,6 +39,7 @@ for i, pair in enumerate(show_pairs):
     ax.plot(x, d['rate_before'] * 1e3, 's--', color='#c0392b', mfc='none',
         label='before cleanup')
     ax.axhline(d['rate_before'].iloc[0] * 1e3, color='grey', lw=0.7, ls=':')
+    ax.axhline(d['reference_rate'].iloc[0] * 1e3, color='black', lw=0.8, ls='--')
     ax.set_xticks(x, BIN_ORDER)
     ax.set_xlabel('source-type neighbors')
     ax.set_title(short(pair), fontsize=8.5)

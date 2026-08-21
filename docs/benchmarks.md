@@ -102,9 +102,12 @@ target cell above this ambient level counts as leakage. On simulations
 with planted contact, hidden out-of-section, and ambient contamination,
 the base reference recovers 36% of the truth and the ladder 65%, always
 conservatively — material arriving from beyond the ladder's radius stays
-uncounted. Cleanup scores in this report use the $\hat\rho_0$ floor,
-the most conservative scoring basis, and pair detection is gradient-based
-under either reference.
+uncounted. Cleanup scores in this report read the exposure dependence
+rather than the absolute level: a correction is credited for flattening
+the curve toward $\hat\rho_0$, because removal of the
+exposure-independent component below it cannot be verified against the
+exposure contrast. Pair detection is likewise gradient-based under
+either reference.
 
 ![Figure 5](figures/benchmark_fig5.png)
 
@@ -146,13 +149,17 @@ to a single target type, so no molecule is counted by two pairs.
 
 **Figure 1. The neighbor benchmark.** **(a)** Strict-tier
 admixture-marker rates $\hat\rho_B$ in target cells, stratified by the number of source-type
-neighbors, before (red, dashed) and after (blue) a standard cleanup (bare
-ls-NMF fit, membrane scoring, pancreas dataset); the dotted line marks the
-zero-exposure rate $\hat\rho_0$, the benchmark's scoring floor — nonzero
-in general, since it includes residual native expression and ambient
-contamination; only the excess above it counts as leakage. The rise with exposure reflects
-contamination; cleanup quality is the degree to which the blue curve
-flattens to the reference. Compare the near-complete flattening of
+neighbors, before (red) and after (blue) a standard cleanup (bare
+ls-NMF fit, membrane scoring, pancreas dataset). The dotted line is the
+zero-exposure rate $\hat\rho_0$; the black dashed line is the pair's
+ambient reference (the deep end of the same ladder shown in Figure 5),
+and the gap between the two is contamination carried even by cells with
+no visible source neighbors. The rise with exposure reflects
+contamination; cleanup quality is scored by how completely the blue
+curve flattens — the excess of exposed bins above $\hat\rho_0$ — because
+only that exposure-linked excess is verifiable within the benchmark,
+while the absolute estimates in (b) measure all content above the
+ambient reference. Compare the near-complete flattening of
 endocrine → endothelial with fibroblast → immune, where the curves
 coincide exactly: the correction issued no removal rule for that pair, so
 its molecules were untouched. **(b)** Estimated per-pair admixture rates

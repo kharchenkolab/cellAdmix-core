@@ -24,6 +24,15 @@ cells <- fit$cell_factors()
 exp15 <- cellAdmixCore:::.celladmix_source_exposure_counts(cells, cell_annotation, 15L)
 rownames(exp15$counts) <- as.character(cells$cell_id)
 types <- exp15$types
+# Exposure at each neighborhood size of the reference ladder, for the
+# ambient reference computed on the same gene pool as the plotted rates.
+ladder_K <- c(15L, 30L, 60L, 120L, 240L)
+exp_ladder <- lapply(ladder_K, function(K) {
+  e <- cellAdmixCore:::.celladmix_source_exposure_counts(cells, cell_annotation, K)
+  rownames(e$counts) <- as.character(cells$cell_id)
+  e$counts
+})
+names(exp_ladder) <- paste0("k", ladder_K)
 cell_types <- setNames(as.character(cell_annotation[as.character(cells$cell_id)]),
   as.character(cells$cell_id))
 totals_before <- Matrix::colSums(counts_before)
@@ -49,11 +58,15 @@ for (S in types) for (T_type in setdiff(types, S)) {
   rb <- bench_bin_rates(mcount(counts_before, strict, T_cells), totals_before[T_cells], bins)
   ra <- bench_bin_rates(mcount(counts_after, strict, T_cells), totals_before[T_cells], bins)
   det <- bench_detect(rb)
+  zero_by_K <- lapply(exp_ladder, function(ec) ec[T_cells, S] == 0)
+  ref <- cellAdmixCore:::.celladmix_audit_reference_rate(
+    mcount(counts_before, strict, T_cells), totals_before[T_cells], zero_by_K)
   for (i in seq_len(nrow(rb))) {
     rows[[length(rows) + 1]] <- data.frame(
       source = S, target = T_type, bin = rb$bin[[i]], n_cells = rb$n_cells[[i]],
       rate_before = rb$rate[[i]], rate_after = ra$rate[[i]],
       excess_strict = det$excess_molecules, p_detect = det$p,
+      reference_rate = ref$rate, reference_kind = ref$kind,
       stringsAsFactors = FALSE)
   }
 }
