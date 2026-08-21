@@ -171,6 +171,11 @@ audit object verifies the correction afterwards.
 
 ``` r
 audit <- fit$audit_admixture()
+```
+
+    ## Excluded 53 likely induced genes from marker panels (exposure-linked excess far above the source-profile expectation): ADAMTS4, ADIPOQ, AGTR1, AKT3, ALPL, AVPR1A, BIRC3, C1QTNF1
+
+``` r
 audit$plot_map()
 ```
 
@@ -424,41 +429,32 @@ report <- audit$evaluate(membrane_correction)
     ## Warning: Correction removed 52% of Fibroblast / CAF's own-marker molecules -
     ## severe over-removal of near-surely-genuine expression
 
-    ## Warning: Detected ~27,107 admixed molecules from B / plasma into Fibroblast /
-    ## CAF, but no removal rule covers this pair
+    ## Warning: Correction removed only 8% of the estimated ~246,255 admixed molecules
+    ## from B / plasma into Myeloid
 
-    ## Warning: Detected ~224,819 admixed molecules from B / plasma into Myeloid, but
-    ## no removal rule covers this pair
+    ## Warning: Correction removed only 0% of the estimated ~79,398 admixed molecules
+    ## from Endothelial into B / plasma
 
-    ## Warning: Detected ~888,042 admixed molecules from Endothelial into Epithelial,
-    ## but no removal rule covers this pair
+    ## Warning: Correction removed only 0% of the estimated ~3,874,529 admixed
+    ## molecules from Endothelial into Epithelial
 
-    ## Warning: Detected ~62,750 admixed molecules from Endothelial into Myeloid, but
-    ## no removal rule covers this pair
+    ## Warning: Correction removed only 0% of the estimated ~102,150 admixed molecules
+    ## from Epithelial into B / plasma
 
-    ## Warning: Detected ~67,365 admixed molecules from Endothelial into T / NK, but
-    ## no removal rule covers this pair
+    ## Warning: Correction removed only 2% of the estimated ~386,562 admixed molecules
+    ## from Epithelial into Endothelial
 
-    ## Warning: Detected ~96,102 admixed molecules from Epithelial into B / plasma,
-    ## but no removal rule covers this pair
+    ## Warning: Correction removed only 0% of the estimated ~201,107 admixed molecules
+    ## from Epithelial into Fibroblast / CAF
 
-    ## Warning: Detected ~372,852 admixed molecules from Epithelial into Endothelial,
-    ## but no removal rule covers this pair
+    ## Warning: Correction removed only 1% of the estimated ~600,305 admixed molecules
+    ## from Epithelial into T / NK
 
-    ## Warning: Detected ~197,536 admixed molecules from Epithelial into Fibroblast /
-    ## CAF, but no removal rule covers this pair
+    ## Warning: Correction removed only 0% of the estimated ~1,426,783 admixed
+    ## molecules from Fibroblast / CAF into T / NK
 
-    ## Warning: Detected ~64,175 admixed molecules from Fibroblast / CAF into
-    ## Epithelial, but no removal rule covers this pair
-
-    ## Warning: Detected ~96,492 admixed molecules from Fibroblast / CAF into Myeloid,
-    ## but no removal rule covers this pair
-
-    ## Warning: Detected ~89,672 admixed molecules from Fibroblast / CAF into T / NK,
-    ## but no removal rule covers this pair
-
-    ## Warning: Detected ~154,151 admixed molecules from Myeloid into B / plasma, but
-    ## no removal rule covers this pair
+    ## Warning: Correction removed only 2% of the estimated ~187,128 admixed molecules
+    ## from Myeloid into B / plasma
 
 ``` r
 report$summary()
@@ -468,13 +464,13 @@ report$summary()
     ## [1] 29
     ## 
     ## $estimated_admixed_molecules
-    ## [1] 10267159
+    ## [1] 18430537
     ## 
     ## $leakage_removed_overall
-    ## [1] 0.7312333
+    ## [1] 0.5551028
     ## 
     ## $median_pair_sensitivity
-    ## [1] 0.9830171
+    ## [1] 0.6976384
     ## 
     ## $own_marker_false_removal
     ## [1] 0.01857293
@@ -662,43 +658,43 @@ original_state <- ds$cell_state_umap(cells_max = state_cells_max,
   min_molecules = 30, min_genes = 15, verbose = TRUE)
 ```
 
-    ## [INFO 21:22:08 +0.003s] Reused compatible Xenium input store (0.000s)
-    ## [INFO 21:22:08 +0.003s] Built Xenium input store: 82144903 molecules, 688099 cells (0.003s)
-    ## [INFO 21:22:11 +2.852s] Loaded input-store cell-gene counts: 688099 cells (2.852s)
-    ## [INFO 21:22:11 +2.991s] Indexed cell counts: 470549 eligible cells (min_molecules=30, min_genes=15) (0.139s)
-    ## [INFO 21:22:11 +3.222s] Selected clustering cells: 5000 cells (0.231s)
-    ## [INFO 21:22:11 +3.241s] Loaded sparse cell-gene counts: 776043 non-zero entries (0.018s)
-    ## [INFO 21:22:11 +3.263s] Selected variable genes: 1000 genes (0.022s)
-    ## [INFO 21:22:11 +3.311s] Materialized dense clustering matrix: 1000 x 5000 (0.048s)
-    ## [INFO 21:22:12 +4.107s] Computed cell PCA: 30 x 5000 (0.796s)
-    ## [INFO 21:22:12 +4.379s] Built HNSW cell KNN graph: 75000 directed edges using 10 thread(s); reusing 15 cosine-distance neighbors for UMAP (0.272s)
-    ## [INFO 21:22:12 +4.393s] Ran Louvain clustering (0.015s)
-    ## [INFO 21:22:12 +4.440s] Initialized UMAP layout (0.046s)
-    ## [INFO 21:22:17 +9.495s] Optimized UMAP layout with parallel optimization (5.055s)
-    ## [INFO 21:22:17 +9.495s] Computed cell UMAP (5.101s)
-    ## [INFO 21:22:17 +9.497s] Assembled cell clustering result (0.002s)
-    ## [INFO 21:22:17 +9.497s] Finished store-backed cell clustering (6.645s)
-    ## [INFO 21:22:17 +9.506s] Wrote cell clustering outputs (0.009s)
+    ## [INFO 02:21:10 +0.031s] Reused compatible Xenium input store (0.000s)
+    ## [INFO 02:21:10 +0.031s] Built Xenium input store: 82144903 molecules, 688099 cells (0.031s)
+    ## [INFO 02:21:16 +5.586s] Loaded input-store cell-gene counts: 688099 cells (5.586s)
+    ## [INFO 02:21:16 +5.781s] Indexed cell counts: 470549 eligible cells (min_molecules=30, min_genes=15) (0.195s)
+    ## [INFO 02:21:16 +6.310s] Selected clustering cells: 5000 cells (0.529s)
+    ## [INFO 02:21:16 +6.380s] Loaded sparse cell-gene counts: 776043 non-zero entries (0.069s)
+    ## [INFO 02:21:16 +6.446s] Selected variable genes: 1000 genes (0.066s)
+    ## [INFO 02:21:17 +6.554s] Materialized dense clustering matrix: 1000 x 5000 (0.108s)
+    ## [INFO 02:21:19 +8.694s] Computed cell PCA: 30 x 5000 (2.140s)
+    ## [INFO 02:21:19 +9.323s] Built HNSW cell KNN graph: 75000 directed edges using 10 thread(s); reusing 15 cosine-distance neighbors for UMAP (0.629s)
+    ## [INFO 02:21:19 +9.335s] Ran Louvain clustering (0.012s)
+    ## [INFO 02:21:19 +9.378s] Initialized UMAP layout (0.043s)
+    ## [INFO 02:23:39 +149.466s] Optimized UMAP layout with parallel optimization (140.088s)
+    ## [INFO 02:23:39 +149.466s] Computed cell UMAP (140.131s)
+    ## [INFO 02:23:39 +149.468s] Assembled cell clustering result (0.002s)
+    ## [INFO 02:23:39 +149.468s] Finished store-backed cell clustering (143.882s)
+    ## [INFO 02:23:39 +149.522s] Wrote cell clustering outputs (0.055s)
 
 ``` r
 corrected_state <- membrane_correction$cell_state_umap(cells_max = state_cells_max,
   min_molecules = 30, min_genes = 15, verbose = TRUE)
 ```
 
-    ## [INFO 21:22:36 +18.821s] Loaded run cell-gene counts: 688099 cells (18.821s)
-    ## [INFO 21:22:36 +18.938s] Indexed cell counts: 368117 eligible cells (min_molecules=30, min_genes=15) (0.117s)
-    ## [INFO 21:22:36 +19.127s] Selected clustering cells: 5000 cells (0.189s)
-    ## [INFO 21:22:36 +19.159s] Loaded sparse cell-gene counts: 761964 non-zero entries (0.032s)
-    ## [INFO 21:22:36 +19.184s] Selected variable genes: 1000 genes (0.025s)
-    ## [INFO 21:22:37 +19.233s] Materialized dense clustering matrix: 1000 x 5000 (0.049s)
-    ## [INFO 21:22:37 +20.110s] Computed cell PCA: 30 x 5000 (0.877s)
-    ## [INFO 21:22:38 +20.354s] Built HNSW cell KNN graph: 75000 directed edges using 10 thread(s); reusing 15 cosine-distance neighbors for UMAP (0.244s)
-    ## [INFO 21:22:38 +20.421s] Ran Louvain clustering (0.067s)
-    ## [INFO 21:22:38 +20.464s] Initialized UMAP layout (0.043s)
-    ## [INFO 21:22:44 +26.577s] Optimized UMAP layout with parallel optimization (6.113s)
-    ## [INFO 21:22:44 +26.577s] Computed cell UMAP (6.156s)
-    ## [INFO 21:22:44 +26.579s] Assembled cell clustering result (0.002s)
-    ## [INFO 21:22:44 +26.579s] Finished run-count cell-state embedding (7.757s)
+    ## [INFO 02:24:10 +29.846s] Loaded run cell-gene counts: 688099 cells (29.846s)
+    ## [INFO 02:24:10 +30.130s] Indexed cell counts: 368117 eligible cells (min_molecules=30, min_genes=15) (0.284s)
+    ## [INFO 02:24:10 +30.555s] Selected clustering cells: 5000 cells (0.425s)
+    ## [INFO 02:24:10 +30.619s] Loaded sparse cell-gene counts: 761964 non-zero entries (0.064s)
+    ## [INFO 02:24:10 +30.657s] Selected variable genes: 1000 genes (0.037s)
+    ## [INFO 02:24:10 +30.746s] Materialized dense clustering matrix: 1000 x 5000 (0.089s)
+    ## [INFO 02:24:12 +32.501s] Computed cell PCA: 30 x 5000 (1.755s)
+    ## [INFO 02:24:13 +32.980s] Built HNSW cell KNN graph: 75000 directed edges using 10 thread(s); reusing 15 cosine-distance neighbors for UMAP (0.479s)
+    ## [INFO 02:24:13 +33.104s] Ran Louvain clustering (0.124s)
+    ## [INFO 02:24:13 +33.180s] Initialized UMAP layout (0.076s)
+    ## [INFO 02:24:38 +57.808s] Optimized UMAP layout with parallel optimization (24.628s)
+    ## [INFO 02:24:38 +57.809s] Computed cell UMAP (24.705s)
+    ## [INFO 02:24:38 +57.812s] Assembled cell clustering result (0.003s)
+    ## [INFO 02:24:38 +57.812s] Finished run-count cell-state embedding (27.965s)
 
 ``` r
 cell_type_levels <- sort(unique(cell_annotation))

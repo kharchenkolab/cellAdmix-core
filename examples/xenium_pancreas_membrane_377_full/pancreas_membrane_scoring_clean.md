@@ -218,37 +218,51 @@ and molecule counts by the markers’ share of the source transcriptome
 
 ``` r
 audit <- fit$audit_admixture()
+```
+
+    ## Excluded 23 likely induced genes from marker panels (exposure-linked excess far above the source-profile expectation): ACTG2, ADAMTS1, APCDD1, APOLD1, BASP1, C5orf46, CA4, CAVIN1
+
+``` r
 audit_pairs <- audit$pairs(detected_only = TRUE)
 head(audit_pairs[order(-audit_pairs$admixed_molecules), ], 8)
 ```
 
     ##                     source                  target       rate admixed_molecules
-    ## 19     Exocrine epithelial Ductal/tumor epithelial 0.26415754            506753
-    ## 35                  Immune        Fibroblast / CAF 0.15860496            173342
-    ## 29        Fibroblast / CAF                  Immune 0.17848477             90518
-    ## 25        Fibroblast / CAF Ductal/tumor epithelial 0.03573816             68559
-    ## 23     Exocrine epithelial                  Immune 0.12692013             64367
-    ## 21     Exocrine epithelial             Endothelial 0.20206447             64313
-    ## 22     Exocrine epithelial        Fibroblast / CAF 0.04917126             53740
-    ## 4  Ductal/tumor epithelial        Fibroblast / CAF 0.04714327             51524
-    ##    excess excess_strict  coverage q_value detected n_exposed n_reference
-    ## 19 362132        221588 0.7146118       0     TRUE     13207       16779
-    ## 35  32837            NA 0.1894326       0     TRUE     24683        3683
-    ## 29  38636          5717 0.4268330       0     TRUE     16195        3056
-    ## 25  24080         14554 0.3512234       0     TRUE     15882       14104
-    ## 23  46804         44130 0.7271387       0     TRUE      6409       12842
-    ## 21  46048         44347 0.7159979       0     TRUE      3668        3358
-    ## 22  38961         38044 0.7249958       0     TRUE      5312       23054
-    ## 4   14309         11566 0.2777262       0     TRUE     12056       16310
-    ##    n_markers n_strict
-    ## 19        20        3
-    ## 35        20        0
-    ## 29        20        2
-    ## 25        20        9
-    ## 23        20        5
-    ## 21        20        6
-    ## 22        20        8
-    ## 4         20       15
+    ## 19     Exocrine epithelial Ductal/tumor epithelial 0.19957962            382869
+    ## 35                  Immune        Fibroblast / CAF 0.18865035            206179
+    ## 29        Fibroblast / CAF                  Immune 0.19283307             97795
+    ## 25        Fibroblast / CAF Ductal/tumor epithelial 0.04553180             87347
+    ## 23     Exocrine epithelial                  Immune 0.13800712             69990
+    ## 21     Exocrine epithelial             Endothelial 0.21071784             67068
+    ## 4  Ductal/tumor epithelial        Fibroblast / CAF 0.06009530             65679
+    ## 34                  Immune     Exocrine epithelial 0.03057726             63755
+    ##    excess excess_strict  coverage q_value detected reference_kind
+    ## 19 244457        223516 0.6384891       0     TRUE           k240
+    ## 35  39057            NA 0.1894326       0     TRUE            k30
+    ## 29  41742          6028 0.4268330       0     TRUE            k60
+    ## 25  30678         18262 0.3512234       0     TRUE           k120
+    ## 23  50892         48244 0.7271387       0     TRUE           k240
+    ## 21  48020         46181 0.7159979       0     TRUE           k240
+    ## 4   18241         14605 0.2777262       0     TRUE           k240
+    ## 34  13950         10935 0.2188048       0     TRUE           k120
+    ##    reference_inflation reference_trend n_exposed n_reference n_markers n_strict
+    ## 19            1.198743     0.032123506     13207       16779        20        3
+    ## 35            1.284753     0.221640565     24683        3683        20        0
+    ## 29            1.151901     0.002626732     16195        3056        20        2
+    ## 25            1.296417     0.046199146     15882       14104        20        9
+    ## 23            1.464352     0.044711537      6409       12842        20        5
+    ## 21            1.745653     0.069819391      3668        3358        20        6
+    ## 4             1.718689     0.092845788     12056       16310        20       15
+    ## 34            1.579873     0.206715619     17891       18438        20       17
+    ##    n_induced
+    ## 19         3
+    ## 35         0
+    ## 29         1
+    ## 25         3
+    ## 23         0
+    ## 21         0
+    ## 4          1
+    ## 34         0
 
 The admixture map summarizes every detected source → target pair; each
 cell shows the estimated admixture rate — the percent of the target
@@ -642,29 +656,29 @@ ductal, is covered by the membrane rules.
 membrane_report <- audit$evaluate(membrane_correction)
 ```
 
-    ## Warning: Detected ~64,367 admixed molecules from Exocrine epithelial into
-    ## Immune, but no removal rule covers this pair
+    ## Warning: Correction removed only 15% of the estimated ~69,990 admixed molecules
+    ## from Exocrine epithelial into Immune
 
-    ## Warning: Detected ~36,376 admixed molecules from Fibroblast / CAF into
-    ## Endothelial, but no removal rule covers this pair
+    ## Warning: Correction removed only 2% of the estimated ~44,954 admixed molecules
+    ## from Fibroblast / CAF into Endothelial
 
-    ## Warning: Detected ~90,518 admixed molecules from Fibroblast / CAF into Immune,
-    ## but no removal rule covers this pair
+    ## Warning: Correction removed only 0% of the estimated ~97,795 admixed molecules
+    ## from Fibroblast / CAF into Immune
 
-    ## Warning: Detected ~6,458 admixed molecules from Fibroblast / CAF into Mural /
-    ## pericyte, but no removal rule covers this pair
+    ## Warning: Correction removed only 1% of the estimated ~5,979 admixed molecules
+    ## from Fibroblast / CAF into Mural / pericyte
 
-    ## Warning: Detected ~173,342 admixed molecules from Immune into Fibroblast / CAF,
-    ## but no removal rule covers this pair
+    ## Warning: Correction removed only 1% of the estimated ~206,179 admixed molecules
+    ## from Immune into Fibroblast / CAF
 
-    ## Warning: Detected ~12,962 admixed molecules from Mural / pericyte into
-    ## Endothelial, but no removal rule covers this pair
+    ## Warning: Correction removed only 1% of the estimated ~18,076 admixed molecules
+    ## from Mural / pericyte into Endothelial
 
-    ## Warning: Detected ~11,396 admixed molecules from Mural / pericyte into
-    ## Fibroblast / CAF, but no removal rule covers this pair
+    ## Warning: Correction removed only 8% of the estimated ~29,266 admixed molecules
+    ## from Mural / pericyte into Fibroblast / CAF
 
-    ## Warning: Detected ~5,936 admixed molecules from Mural / pericyte into Immune,
-    ## but no removal rule covers this pair
+    ## Warning: Correction removed only 12% of the estimated ~20,327 admixed molecules
+    ## from Mural / pericyte into Immune
 
 ``` r
 membrane_report$summary()
@@ -674,13 +688,13 @@ membrane_report$summary()
     ## [1] 39
     ## 
     ## $estimated_admixed_molecules
-    ## [1] 1454078
+    ## [1] 1574854
     ## 
     ## $leakage_removed_overall
-    ## [1] 0.5824762
+    ## [1] 0.6306097
     ## 
     ## $median_pair_sensitivity
-    ## [1] 0.9923732
+    ## [1] 0.9925064
     ## 
     ## $own_marker_false_removal
     ## [1] 0.03254766
@@ -848,13 +862,13 @@ bridge_report$summary()
     ## [1] 39
     ## 
     ## $estimated_admixed_molecules
-    ## [1] 1454078
+    ## [1] 1574854
     ## 
     ## $leakage_removed_overall
-    ## [1] 0.4251015
+    ## [1] 0.4576564
     ## 
     ## $median_pair_sensitivity
-    ## [1] 0.5392955
+    ## [1] 0.5467548
     ## 
     ## $own_marker_false_removal
     ## [1] 0.00416416

@@ -41,6 +41,11 @@ correction:
 
 ``` r
 audit <- fit$audit_admixture()
+```
+
+    ## Excluded 23 likely induced genes from marker panels (exposure-linked excess far above the source-profile expectation): ACTG2, ADAMTS1, APCDD1, APOLD1, BASP1, C5orf46, CA4, CAVIN1
+
+``` r
 audit$plot_map()
 ```
 
@@ -86,29 +91,11 @@ and warns about any detected pair the rules did not cover:
 report <- audit$evaluate(correction)
 ```
 
-    ## Warning: Detected ~64,367 admixed molecules from Exocrine epithelial into
-    ## Immune, but no removal rule covers this pair
+    ## Warning: Correction removed only 1% of the estimated ~5,979 admixed molecules
+    ## from Fibroblast / CAF into Mural / pericyte
 
-    ## Warning: Detected ~36,376 admixed molecules from Fibroblast / CAF into
-    ## Endothelial, but no removal rule covers this pair
-
-    ## Warning: Detected ~90,518 admixed molecules from Fibroblast / CAF into Immune,
-    ## but no removal rule covers this pair
-
-    ## Warning: Detected ~6,458 admixed molecules from Fibroblast / CAF into Mural /
-    ## pericyte, but no removal rule covers this pair
-
-    ## Warning: Detected ~173,342 admixed molecules from Immune into Fibroblast / CAF,
-    ## but no removal rule covers this pair
-
-    ## Warning: Detected ~12,962 admixed molecules from Mural / pericyte into
-    ## Endothelial, but no removal rule covers this pair
-
-    ## Warning: Detected ~11,396 admixed molecules from Mural / pericyte into
-    ## Fibroblast / CAF, but no removal rule covers this pair
-
-    ## Warning: Detected ~5,936 admixed molecules from Mural / pericyte into Immune,
-    ## but no removal rule covers this pair
+    ## Warning: Correction removed only 8% of the estimated ~29,266 admixed molecules
+    ## from Mural / pericyte into Fibroblast / CAF
 
 ``` r
 report$summary()
@@ -118,13 +105,13 @@ report$summary()
     ## [1] 39
     ## 
     ## $estimated_admixed_molecules
-    ## [1] 1454078
+    ## [1] 1574854
     ## 
     ## $leakage_removed_overall
-    ## [1] 0.823401
+    ## [1] 0.8980401
     ## 
     ## $median_pair_sensitivity
-    ## [1] 0.9976617
+    ## [1] 0.9954063
     ## 
     ## $own_marker_false_removal
     ## [1] 0.03695972
