@@ -313,3 +313,24 @@ remaining gap to the 0.99 bar is, on inspection, mostly that biology.
   2-fold, 0.6-0.87 at 3-4-fold, 0.95+ beyond 10-fold; fragment and
   ambient removal stay at 0.75-0.85 across all settings. Real flagged
   genes fall on the same curve.
+
+- Breast 5K (688,099 cells, 5,101 genes, 29 detected pairs): validation
+  0.863, production 0.943 (production_noind 0.968), shuffled 0.008,
+  own-marker 0.000, 8.1% of molecules removed. Strict-tier removal is
+  complete where measurable (power_strictB 0.9996); the sub-0.8 pairs
+  are immune/stromal pairs with no strict tier in their held-out halves
+  (shared-gene content the model attributes to the target). Results:
+  results/breast_gm_*.csv.
+
+## Implementation
+
+The EM in 01_model.py operates on the nonzero count pattern: the
+posterior weight is zero wherever the observed count is zero, so every
+update is a sparse product over observed entries and the expected-count
+totals are computed in closed form; types within an outer round fit in
+parallel forked processes (GM_WORKERS, default 8). This reproduces the
+dense computation exactly (maximum per-entry difference 6e-14 on the
+pancreas validation arm) and changes the cost from (cells x genes) to
+the number of observed molecules: the pancreas arm runs in under a
+minute, and a breast 5K arm in 5-16 minutes where the dense version
+needed about ten hours.

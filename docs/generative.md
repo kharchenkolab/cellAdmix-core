@@ -157,7 +157,16 @@ exposure-linked excess removed on the held-out half, weighted across the
   flags the same kind of interface biology: heat-shock and
   immediate-early programs (HSPA1A/B, DUSP5, RGS2), macrophage
   activation (GLUL, SRGN), and collagen programs at
-  endothelial–fibroblast borders.
+  endothelial–fibroblast borders. On the breast 5K dataset (688,099
+  cells, 5,101-gene panel, 29 detected pairs) held-out accuracy is
+  0.863 with 8.1% of molecules removed, the permutation control at
+  0.008 and own-marker removal at zero. The lower figure has a specific
+  anatomy: wherever a pair has strict-tier genes (essentially absent
+  from the target), their leakage is removed completely (0.9996), and
+  the shortfall concentrates in immune and stromal pairs whose held-out
+  markers are shared between source and target on a panel this large —
+  content the model deliberately attributes to the target's own
+  expression rather than remove.
 - **Controls**: permuting each pair's exposure values collapses removal
   to 0.018 (the dose prior, not a downstream threshold, carries the
   control); own-marker false removal is 0.000 pooled and for the worst

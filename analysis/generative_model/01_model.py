@@ -313,7 +313,7 @@ def dose_response(Y_t, tot_t, cell_pos, pinfo, guide_idx, share_guide,
 
     Y_t: dense counts (cells_of_type x genes); cell_pos: positions of the
     pair's target cells within Y_t; returns lambda per stratum dict."""
-    g = Y_t[cell_pos][:, guide_idx].sum(axis=1)
+    g = np.asarray(Y_t[cell_pos][:, guide_idx].sum(axis=1)).ravel()
     t = tot_t[cell_pos]
     strata = np.unique(exposure)
     m_s = np.array([g[exposure == s].sum() for s in strata])
@@ -349,9 +349,9 @@ def induced_screen(Y_t, tot_t, pinfo_list, inp, psi, allowed_mask):
         if len(exp_pos) < 50 or len(un_pos) < 50:
             out[pinfo["pair"]] = (np.array([], int), np.array([]))
             continue
-        c_exp = Y_t[exp_pos].sum(axis=0)
+        c_exp = np.asarray(Y_t[exp_pos].sum(axis=0)).ravel()
         t_exp = tot_t[exp_pos].sum()
-        c_un = Y_t[un_pos].sum(axis=0)
+        c_un = np.asarray(Y_t[un_pos].sum(axis=0)).ravel()
         t_un = tot_t[un_pos].sum()
         r0 = c_un / max(t_un, 1.0)
         excess = c_exp - r0 * t_exp
@@ -386,13 +386,24 @@ def fit_target(inp, T, own_frac_by_type, arm, rng, diag, return_rates=False):
     global gene x cell coordinates, own-fraction per gene for profile
     decontamination, diagnostics). own_frac_by_type carries the previous
     outer round's per-gene own-expression fractions of each type (None on
-    the first round) used to decontaminate the source profiles."""
+    the first round) used to decontaminate the source profiles.
+
+    The EM operates on the nonzero count pattern: the posterior weight W is
+    zero wherever the observed count is zero, so every update is a sparse
+    matrix product over the nonzero entries, and the expected-count totals
+    needed for the likelihood are computed in closed form. This changes
+    nothing about the model - only the cost, from (cells x genes) dense to
+    the number of observed molecules."""
     cols = inp.type_cols[T]
     if len(cols) == 0:
         return None, None
-    Y = np.asarray(inp.counts[:, cols].todense(), dtype=np.float64).T  # n x G
-    t = Y.sum(axis=1)
-    n, G = Y.shape
+    Ys = sp.csr_matrix(inp.counts[:, cols].T)
+    t = np.asarray(Ys.sum(axis=1)).ravel()
+    n, G = Ys.shape
+    y_nz = Ys.data.astype(np.float64)
+    gcols = Ys.indices
+    rows_nz = np.repeat(np.arange(n), np.diff(Ys.indptr))
+    t_nz = t[rows_nz]
     pos_of_col = {c: i for i, c in enumerate(cols)}
 
     plist = []
@@ -442,7 +453,7 @@ def fit_target(inp, T, own_frac_by_type, arm, rng, diag, return_rates=False):
         e = d["exposure"].copy()
         if arm == "shuffled":
             e = rng.permutation(e)
-        lam_of = dose_response(Y, t, d["pos"], d, gidx, share_guide, e,
+        lam_of = dose_response(Ys, t, d["pos"], d, gidx, share_guide, e,
                                verbose_rows=dose_rows, pair=d["pair"])
         lam_cell = np.array([lam_of.get(int(s), 0.0) for s in e])
         Lam[d["pos"], j] = lam_cell
@@ -471,7 +482,7 @@ def fit_target(inp, T, own_frac_by_type, arm, rng, diag, return_rates=False):
         far_mol = t[far].sum()
         src_est = "far_target_cells"
         if far_mol >= MIN_FAR_MOL:
-            rates = Y[far].sum(axis=0) / far_mol
+            rates = np.asarray(Ys[far].sum(axis=0)).ravel() / far_mol
         else:
             # fallback: half of the pooled exposure-0 strict rate (the audit
             # measured the far-field level at roughly 0.5-0.7 of the pooled
@@ -480,7 +491,8 @@ def fit_target(inp, T, own_frac_by_type, arm, rng, diag, return_rates=False):
             e0 = np.zeros(n, bool)
             for d in plist:
                 e0[d["pos"][d["exposure"] == 0]] = True
-            rates = 0.5 * Y[e0].sum(axis=0) / max(t[e0].sum(), 1.0)
+            rates = 0.5 * np.asarray(Ys[e0].sum(axis=0)).ravel() \
+                / max(t[e0].sum(), 1.0)
         lam_a = float(rates[strictU].sum())
         if lam_a > 0:
             a_prof[strictU] = rates[strictU] / lam_a
@@ -502,7 +514,7 @@ def fit_target(inp, T, own_frac_by_type, arm, rng, diag, return_rates=False):
     ind_rows = []
     if use_induced:
         for j, d in enumerate(plist):
-            sc, rows = induced_screen(Y, t, [d], inp, Psi[j], allowed)
+            sc, rows = induced_screen(Ys, t, [d], inp, Psi[j], allowed)
             sup, m0 = sc[d["pair"]]
             M[j, sup] = m0
             ind_rows.extend(rows)
@@ -513,7 +525,8 @@ def fit_target(inp, T, own_frac_by_type, arm, rng, diag, return_rates=False):
     beta = np.full(n, lam_a)
     lam_tot = Lam.sum(axis=1)
     own0 = np.maximum(1.0 - lam_tot - lam_a, 0.2)
-    prog_share = np.maximum(F @ (Y.sum(axis=0) / max(Y.sum(), 1.0)), 1e-3)
+    colsum = np.asarray(Ys.sum(axis=0)).ravel()
+    prog_share = np.maximum(F @ (colsum / max(colsum.sum(), 1.0)), 1e-3)
     prog_share /= prog_share.sum()
     Theta = own0[:, None] * prog_share[None, :]
     eps_g = EPS_TOTAL / G
@@ -530,19 +543,51 @@ def fit_target(inp, T, own_frac_by_type, arm, rng, diag, return_rates=False):
     # rate is defined per unit of the measured dose); the contamination
     # prior Lam itself grows through the top-up passes below.
     U = Lam.copy()
-    Ymask = Y > 0
     ll_state = [-np.inf]
+
+    def nz_rates():
+        """Component rates at the nonzero count entries."""
+        r_own = np.zeros(y_nz.shape[0])
+        for k in range(K):
+            r_own += Theta[rows_nz, k] * F[k, gcols]
+        r_bg = np.zeros(y_nz.shape[0])
+        for j in range(S_n):
+            r_bg += Alpha[rows_nz, j] * Psi[j, gcols]
+        if lam_a > 0:
+            r_bg += beta[rows_nz] * a_prof[gcols]
+        r_ind = np.zeros(y_nz.shape[0])
+        if use_induced and M.any():
+            UR = U * Rho
+            for j in range(S_n):
+                if M[j].any():
+                    r_ind += UR[rows_nz, j] * M[j, gcols]
+        return r_own, r_bg, r_ind
+
+    def expected_total():
+        """Sum of expected counts over every (cell, gene) entry, in closed
+        form: each component factorizes into a cell-side and gene-side sum."""
+        tot = float((t[:, None] * Theta).sum(axis=0) @ F.sum(axis=1))
+        tot += float((t[:, None] * Alpha).sum(axis=0) @ Psi.sum(axis=1))
+        if lam_a > 0:
+            tot += float((t * beta).sum() * a_prof.sum())
+        if use_induced and M.any():
+            tot += float((t[:, None] * (U * Rho)).sum(axis=0) @ M.sum(axis=1))
+        return tot + float(t.sum()) * G * eps_g
 
     def em_pass(n_iter, update_F=True):
         nonlocal Theta, Alpha, beta, Rho, M, F
         for it in range(n_iter):
-            Rate = Theta @ F + Alpha @ Psi + beta[:, None] * a_prof[None, :] \
-                + (U * Rho) @ M + eps_g
-            R = t[:, None] * Rate
-            W = np.where(Ymask, Y / np.maximum(R, 1e-300), 0.0)
+            r_own, r_bg, r_ind = nz_rates()
+            rate_nz = r_own + r_bg + r_ind + eps_g
+            R_nz = t_nz * rate_nz
+            check_ll = (it + 1) % 10 == 0 or it == n_iter - 1
+            exp_tot = expected_total() if check_ll else None
+            W = sp.csr_matrix((y_nz / np.maximum(R_nz, 1e-300),
+                               gcols, Ys.indptr), shape=(n, G))
+            Wt = W.T
 
             # own programs
-            Theta *= W @ F.T
+            Theta = Theta * (W @ F.T)
             # contamination fractions: Gamma-posterior update on allowed
             # genes, scaled by the source-profile share of allowed genes,
             # bounded to ALPHA_CAP-fold above the prior mean.
@@ -561,33 +606,30 @@ def fit_target(inp, T, own_frac_by_type, arm, rng, diag, return_rates=False):
                 denom = t[:, None] * U * M.sum(axis=1)[None, :]
                 Rho = np.minimum((RHO_SHAPE + zind) / (RHO_SHAPE + denom),
                                  RHO_CAP)
-                wsum = ((t[:, None] * U * Rho).T @ W)    # S_n x G
+                wsum = (Wt @ (t[:, None] * U * Rho)).T       # S_n x G
                 dsum = (t[:, None] * U * Rho).sum(axis=0)
                 M *= wsum / np.maximum(dsum[:, None], 1e-9)
             # own program profiles (dose-downweighted cells)
             if update_F:
-                Fnum = F * ((Theta * (t * w_dose)[:, None]).T @ W)
+                Fnum = F * (Wt @ (Theta * (t * w_dose)[:, None])).T
                 if arm in ("production", "production_noind") and strictU.any():
                     Fnum[:, strictU] = 0.0
                 F = Fnum + 1e-8
                 F /= np.maximum(F.sum(axis=1, keepdims=True), 1e-12)
 
-            if (it + 1) % 10 == 0 or it == n_iter - 1:
-                ll = float((Y[Ymask]
-                            * np.log(np.maximum(R[Ymask], 1e-300))).sum()
-                           - R.sum())
+            if check_ll:
+                ll = float((y_nz * np.log(np.maximum(R_nz, 1e-300))).sum()
+                           - exp_tot)
                 gain = ll - ll_state[0]
                 ll_state[0] = ll
                 if it > 10 and abs(gain) < 1e-7 * abs(ll):
                     break
 
-    def current_keep():
-        Rate_own = Theta @ F
-        Rate_ind = (U * Rho) @ M
-        Rate = Rate_own + Alpha @ Psi + beta[:, None] * a_prof[None, :] \
-            + Rate_ind + eps_g
-        keep = (Rate_own + Rate_ind + eps_g) / np.maximum(Rate, 1e-300)
-        return keep, Rate_own, Rate
+    def keep_at_nz():
+        r_own, r_bg, r_ind = nz_rates()
+        tot = r_own + r_bg + r_ind + eps_g
+        keep = (r_own + r_ind + eps_g) / np.maximum(tot, 1e-300)
+        return keep, r_own, tot
 
     em_pass(N_EM)
 
@@ -596,8 +638,9 @@ def fit_target(inp, T, own_frac_by_type, arm, rng, diag, return_rates=False):
     # (excluding induced-support genes, whose gradient is retained by
     # design), add it to the prior dose, and continue the EM.
     for topup in range(TOPUP_PASSES):
-        keep, _, _ = current_keep()
-        Ycorr = Y * keep
+        keep_nz, _, _ = keep_at_nz()
+        Ycorr = sp.csr_matrix((y_nz * keep_nz, gcols, Ys.indptr),
+                              shape=(n, G))
         added = 0.0
         for j, d in enumerate(plist):
             gidx2 = np.array([g for g in d["guide_idx"] if M[j, g] <= 0],
@@ -623,13 +666,16 @@ def fit_target(inp, T, own_frac_by_type, arm, rng, diag, return_rates=False):
         em_pass(15, update_F=False)
 
     # Final rates and the retained (kept) share of each observed count.
-    keep_frac, Rate_own, Rate = current_keep()
-    removed = Y * (1.0 - keep_frac)
-    removed[~Ymask] = 0.0
+    keep_nz, r_own_nz, tot_nz = keep_at_nz()
+    rem = sp.csr_matrix((y_nz * (1.0 - keep_nz), gcols, Ys.indptr),
+                        shape=(n, G)).T.tocsc()  # G x n block
 
     # own fraction per gene (for source-profile decontamination)
-    own_frac_g = (Y * (Rate_own / np.maximum(Rate, 1e-300))).sum(axis=0) \
-        / np.maximum(Y.sum(axis=0), 1.0)
+    own_num = np.bincount(gcols, weights=y_nz
+                          * (r_own_nz / np.maximum(tot_nz, 1e-300)),
+                          minlength=G)
+    own_den = np.bincount(gcols, weights=y_nz, minlength=G)
+    own_frac_g = own_num / np.maximum(own_den, 1.0)
 
     # per-pair diagnostics: prior vs posterior contamination molecules
     for j, d in enumerate(plist):
@@ -642,11 +688,11 @@ def fit_target(inp, T, own_frac_by_type, arm, rng, diag, return_rates=False):
             mean_lambda_exposed=float(Lam[pos, j][d["e_used"] > 0].mean()
                                       if (d["e_used"] > 0).any() else 0)))
 
-    rem = sp.csc_matrix(removed.T)  # G x n block
     if return_rates:
         # Expected molecule counts per entry, by component (for the
         # molecule-level realization): own expression, contamination,
-        # ambient, induced, floor.
+        # ambient, induced, floor. Dense, but only requested for the one
+        # spike-in target type.
         rates = dict(
             own=t[:, None] * (Theta @ F),
             cont=t[:, None] * (Alpha @ Psi),
@@ -660,10 +706,25 @@ def fit_target(inp, T, own_frac_by_type, arm, rng, diag, return_rates=False):
     return (cols, rem), own_frac_g
 
 
+_PAR_INP = None
+
+
+def _fit_one(args):
+    """Worker for the per-type parallel fit: types within an outer round are
+    independent, so they run as forked processes sharing the loaded inputs."""
+    T, own_frac, arm, seed = args
+    rng = np.random.default_rng(seed)
+    d = {}
+    out = fit_target(_PAR_INP, T, own_frac, arm, rng, d)
+    return T, out, d
+
+
 def run_arm(arm, seed=1):
+    global _PAR_INP
     os.makedirs(RESULTS, exist_ok=True)
     inp = Inputs()
-    rng = np.random.default_rng(seed)
+    n_workers = min(int(os.environ.get("GM_WORKERS", "8")),
+                    len(inp.type_names))
     own_frac = None
     n_outer = 1 if arm == "shuffled" else N_OUTER
     diag = {}
@@ -672,8 +733,20 @@ def run_arm(arm, seed=1):
         diag = {}
         removed_blocks = {}
         own_frac_new = {}
-        for T in inp.type_names:
-            res, of = fit_target(inp, T, own_frac, arm, rng, diag)
+        args = [(T, own_frac, arm, seed * 100003 + ti)
+                for ti, T in enumerate(inp.type_names)]
+        if n_workers > 1:
+            import multiprocessing as mp
+            _PAR_INP = inp
+            with mp.get_context("fork").Pool(n_workers) as pool:
+                results = pool.map(_fit_one, args)
+        else:
+            _PAR_INP = inp
+            results = [_fit_one(a) for a in args]
+        for T, out, dlocal in results:
+            res, of = out
+            for k, v in dlocal.items():
+                diag.setdefault(k, []).extend(v)
             if res is None:
                 continue
             removed_blocks[T] = res
