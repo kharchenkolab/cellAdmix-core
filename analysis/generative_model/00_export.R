@@ -10,17 +10,37 @@ ag_dir <- "/home/pkharchenko/cellAdmix/cellAdmix-core/analysis/audit_guided"
 gm_dir <- "/home/pkharchenko/cellAdmix/cellAdmix-core/analysis/generative_model"
 source(file.path(ag_dir, "01_split_eval.R"))
 
-setwd("/home/pkharchenko/cellAdmix/cellAdmix-core/examples/xenium_pancreas_membrane_377_full")
-annotation <- read.csv("annotations/annotation.csv.gz", stringsAsFactors = FALSE)
-cell_annotation <- setNames(annotation$merged_annotation, annotation$cell_id)
-ds <- cellAdmix("data", output_dir = "out", annotation = cell_annotation)
-fit <- ds$fit(nmf_variant = "invsqrt_kl", verbose = FALSE)
+dataset <- Sys.getenv("GM_DATASET", "pancreas")
+root <- "/home/pkharchenko/cellAdmix/cellAdmix-core"
+if (dataset == "pancreas") {
+  setwd(file.path(root, "examples/xenium_pancreas_membrane_377_full"))
+  annotation <- read.csv("annotations/annotation.csv.gz", stringsAsFactors = FALSE)
+  cell_annotation <- setNames(annotation$merged_annotation, annotation$cell_id)
+  ds <- cellAdmix("data", output_dir = "out", annotation = cell_annotation)
+  fit <- ds$fit(nmf_variant = "invsqrt_kl", verbose = FALSE)
+} else if (dataset == "nsclc") {
+  setwd(file.path(root, "examples/cosmx_nsclc_giotto"))
+  meta_ann <- read.csv("prepared/cell_metadata_all.csv.gz", stringsAsFactors = FALSE)
+  cell_annotation <- setNames(meta_ann$cell_type_coarse, meta_ann$cell)
+  ds <- cellAdmix("prepared/molecules_all.csv.gz", output_dir = "out",
+    annotation = cell_annotation)
+  fit <- ds$fit(verbose = FALSE)
+} else if (dataset == "breast") {
+  setwd(file.path(root, "examples/xenium_breast_membrane_5k_full"))
+  annotation <- read.csv("annotations/annotation.csv.gz", stringsAsFactors = FALSE)
+  cell_annotation <- setNames(annotation$merged_annotation, annotation$cell_id)
+  cell_annotation <- cell_annotation[cell_annotation != "Ambiguous / low-quality"]
+  ds <- cellAdmix("data", output_dir = "out", annotation = cell_annotation,
+    num_threads = 10)
+  fit <- ds$fit(verbose = FALSE)
+} else stop("unknown dataset")
 
 defs <- build_split_defs(fit, cell_annotation)
 message("pairs: ", length(defs$pairs))
 check_disjoint(defs)
 
-data_dir <- file.path(gm_dir, "data")
+data_dir <- file.path(gm_dir,
+  if (dataset == "pancreas") "data" else paste0("data_", dataset))
 dir.create(data_dir, showWarnings = FALSE, recursive = TRUE)
 
 # Full defs for the R-side evaluation script (03) - avoids a rebuild.

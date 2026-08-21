@@ -61,10 +61,19 @@ import scipy.sparse as sp
 from scipy.spatial import cKDTree
 
 GM = "/home/pkharchenko/cellAdmix/cellAdmix-core/analysis/generative_model"
-DATA = os.path.join(GM, "data")
+DATASET = os.environ.get("GM_DATASET", "pancreas")
+_SUF = "" if DATASET == "pancreas" else f"_{DATASET}"
+PREFIX = "" if DATASET == "pancreas" else f"{DATASET}_"
+DATA = os.path.join(GM, "data" + _SUF)
 RESULTS = os.path.join(GM, "results")
-RUN = ("/home/pkharchenko/cellAdmix/cellAdmix-core/examples/"
-       "xenium_pancreas_membrane_377_full/out/runs/fit_manual_rank9_invsqrt_kl")
+_EX = "/home/pkharchenko/cellAdmix/cellAdmix-core/examples"
+RUN = {
+    "pancreas": f"{_EX}/xenium_pancreas_membrane_377_full/out/runs/"
+                "fit_manual_rank9_invsqrt_kl",
+    "nsclc": f"{_EX}/cosmx_nsclc_giotto/out/runs/fit_manual_rank8_ls_nmf",
+    "breast": f"{_EX}/xenium_breast_membrane_5k_full/out/runs/"
+              "fit_manual_rank8_invsqrt_kl",
+}[DATASET]
 
 # ---- model hyperparameters (fixed before evaluation; see REPORT.md) ----
 C0_ALPHA = 300.0      # prior strength for alpha (pseudo-molecules)
@@ -148,9 +157,12 @@ class Inputs:
         self.idx_of_run_cell = dict(zip(cells_tbl.cell_idx, cells_tbl.cell_id))
 
         print("reading molecules ...", flush=True)
-        mol = pq.read_table(os.path.join(RUN, "molecules.parquet"),
-            columns=["gene_idx", "cell_idx", "factor_label",
-                     "overlaps_nucleus"]).to_pandas()
+        mol_path = os.path.join(RUN, "molecules.parquet")
+        mol_cols = pq.ParquetFile(mol_path).schema_arrow.names
+        has_nucleus = "overlaps_nucleus" in mol_cols
+        mol = pq.read_table(mol_path,
+            columns=["gene_idx", "cell_idx", "factor_label"]
+                    + (["overlaps_nucleus"] if has_nucleus else [])).to_pandas()
         run_cell_type = np.array([
             self.cell_type.get(self.idx_of_run_cell.get(i), None) or "NA"
             for i in range(int(cells_tbl.cell_idx.max()) + 1)])
@@ -158,8 +170,13 @@ class Inputs:
 
         # Cytoplasmic (non-nuclear) molecule counts per gene and cell, as a
         # sparse matrix: any cell subset's cytoplasmic profile is a column
-        # slice away.
-        cyto = mol[mol.overlaps_nucleus.to_numpy() == 0]
+        # slice away. Falls back to all molecules when the platform provides
+        # no nucleus-overlap flag (e.g. this CosMx export).
+        if has_nucleus:
+            cyto = mol[mol.overlaps_nucleus.to_numpy() == 0]
+        else:
+            print("no nucleus-overlap flag: whole-cell profiles used")
+            cyto = mol
         cyto_cols = np.array([self.col_of.get(self.idx_of_run_cell.get(i), -1)
                               for i in range(int(cells_tbl.cell_idx.max()) + 1)])
         cc = cyto_cols[cyto.cell_idx.to_numpy()]
@@ -181,9 +198,35 @@ class Inputs:
         # within each type, for the type's own factors (aligned factor plus
         # unaligned factors carrying >=5% of the type's content). 0-based
         # factor labels; factor_types.csv is 1-based.
-        ft = pd.read_csv("/home/pkharchenko/cellAdmix/cellAdmix-core/analysis/"
-                         "audit_guided/results/factor_types.csv")
-        aligned = {int(r.factor) - 1: r.cell_type for r in ft.itertuples()}
+        ft_path = ("/home/pkharchenko/cellAdmix/cellAdmix-core/analysis/"
+                   f"audit_guided/results/factor_types{_SUF}.csv")
+        if os.path.exists(ft_path):
+            ft = pd.read_csv(ft_path)
+            aligned = {int(r.factor) - 1: r.cell_type for r in ft.itertuples()}
+        else:
+            # Derive the factor-to-type alignment from the data: each
+            # factor's gene profile (from its labeled molecules) is compared
+            # with the type pseudobulk profiles; a factor aligns to the best
+            # match when it is clearly ahead of the second best.
+            nf = int(mol.factor_label.max()) + 1
+            aligned = {}
+            tp = np.sqrt(self.profiles_cpm
+                         / np.maximum(self.profiles_cpm.sum(0), 1.0))
+            for k in range(nf):
+                cnt = np.bincount(
+                    mol.gene_idx.to_numpy()[mol.factor_label.to_numpy() == k],
+                    minlength=self.G).astype(float)
+                if cnt.sum() < 5000:
+                    continue
+                fk = np.sqrt(cnt / cnt.sum())
+                cos = fk @ tp / max(np.linalg.norm(fk), 1e-9)                     / np.maximum(np.linalg.norm(tp, axis=0), 1e-9)
+                o = np.argsort(-cos)
+                if cos[o[0]] >= 0.3 and cos[o[0]] >= 1.15 * cos[o[1]]:
+                    aligned[k] = self.type_names[o[0]]
+            pd.DataFrame(dict(factor=[k + 1 for k in aligned],
+                cell_type=list(aligned.values()))).to_csv(ft_path, index=False)
+            print("derived factor alignment:",
+                  {k + 1: v for k, v in aligned.items()})
         own_factors = {t: [k for k, tt in aligned.items() if tt == t]
                        for t in self.type_names}
         n_fac = int(mol.factor_label.max()) + 1
@@ -655,10 +698,10 @@ def run_arm(arm, seed=1):
     scipy.io.mmwrite(out_mtx, full)
     print(f"wrote {out_mtx}: {full.sum():,.0f} molecules removed total")
 
-    for key, fname in [("dose", f"gm_{arm}_pair_dose.csv"),
-                       ("induced", f"gm_{arm}_induced.csv"),
-                       ("alpha", f"gm_{arm}_alpha.csv"),
-                       ("ambient", f"gm_{arm}_ambient.csv")]:
+    for key, fname in [("dose", f"{PREFIX}gm_{arm}_pair_dose.csv"),
+                       ("induced", f"{PREFIX}gm_{arm}_induced.csv"),
+                       ("alpha", f"{PREFIX}gm_{arm}_alpha.csv"),
+                       ("ambient", f"{PREFIX}gm_{arm}_ambient.csv")]:
         if key in diag and diag[key]:
             pd.DataFrame(diag[key]).to_csv(os.path.join(RESULTS, fname),
                                            index=False)

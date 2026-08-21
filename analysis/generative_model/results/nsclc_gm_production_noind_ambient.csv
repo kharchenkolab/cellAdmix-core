@@ -1,0 +1,7 @@
+target,lam_a,n_far,estimate
+endothelial,0.006239714328691116,0,half_exposure0_baseline
+epithelial,0.004979486034681931,0,half_exposure0_baseline
+fibroblast,0.006795831170263726,0,half_exposure0_baseline
+immune other,0.005425593783714403,0,half_exposure0_baseline
+macrophage,0.008286952265269492,0,half_exposure0_baseline
+malignant,0.008439976346371949,0,half_exposure0_baseline

@@ -1,0 +1,5 @@
+"tag","n_pairs","power_B_weighted","power_B_median","false_removal_pooled","worst_false_removal"
+"gm_validation",27,0.963976972659526,0.999049666431711,0,0
+"gm_production",27,0.970489619713961,1,0,0
+"gm_production_noind",27,0.985555879183307,1,0,0
+"gm_shuffled",27,0.0130742714709448,0.0116381131361927,0,0

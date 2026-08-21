@@ -145,11 +145,19 @@ exposure-linked excess removed on the held-out half, weighted across the
   marker content is removed at 96–99%.
 - **Spike-in test**: with four classes of molecules planted in one
   pair's exposed cells, the model removes 81–85% of in-plane fragments,
-  out-of-plane fragments, and ambient singletons. Planted induction is
-  retained at 94–95% when planted on mid-rank genes, where it is
-  disproportionate to the source profile — the regime the real flagged
-  genes occupy. Planted proportionally on the source's top three
-  channels it is removed: see the identifiability limit below.
+  out-of-plane fragments, and ambient singletons, at every setting of the
+  planted induction. The planted induction itself is retained or removed
+  depending on how far it exceeds the transfer expectation of its genes —
+  the full sweep over gene ranks and planted amounts is shown in
+  Figure 1a and discussed under the identifiability limit below.
+- **Replication**: on the CosMx NSCLC dataset (98,002 cells, 960-gene
+  panel, 27 detected pairs) the same configuration reaches 0.964 on
+  held-out genes, removes 9.0% of the molecules, keeps own-marker
+  removal at zero and the permutation control at 0.013 — and its screen
+  flags the same kind of interface biology: heat-shock and
+  immediate-early programs (HSPA1A/B, DUSP5, RGS2), macrophage
+  activation (GLUL, SRGN), and collagen programs at
+  endothelial–fibroblast borders.
 - **Controls**: permuting each pair's exposure values collapses removal
   to 0.018 (the dose prior, not a downstream threshold, carries the
   control); own-marker false removal is 0.000 pooled and for the worst
@@ -178,6 +186,35 @@ successor is therefore: induced expression is preserved when it is
 disproportionate to the local source profile; induction proportionate
 to a source's own top markers is indistinguishable from admixture at
 count level and will be removed.
+
+Figure 1a shows this boundary measured directly. Synthetic induced
+expression was planted across a range of gene ranks and amounts, and
+its retained fraction charted against the gene's total exposure-linked
+excess relative to the transfer expectation: retention turns on where
+the excess exceeds the expectation about three-fold and is essentially
+complete beyond ten-fold, while excess below two-fold is removed as
+transfer. The real flagged genes, plotted at their measured
+disproportionality and their realized retained fractions, fall on the
+same curve — the model treats real and planted induction alike.
+Figure 1b shows the model's largest single retention decision as a
+worked example: CFTR content of ductal cells rises fourteen-fold with
+exocrine exposure, and the model splits that rise into a retained share
+(native expression plus the induced duct-cell program, most of the
+signal) and a removed transferred share, rather than flattening the
+gradient wholesale as a marker-based correction would.
+
+![Figure 1](figures/generative_fig1.png)
+
+**Figure 1. The separation boundary, and a worked example.** **(a)**
+Fraction of planted induced expression retained, as a function of the
+gene's exposure-linked excess relative to the transfer expectation
+(blue: spike-in sweep over planted gene ranks and amounts, pancreas);
+red squares: the real flagged genes at their measured
+disproportionality. The dotted line marks 80% retention. **(b)** CFTR
+in ductal cells stratified by the number of exocrine cells among the 15
+nearest: observed rate (red), the model's retained share (blue), and
+the removed transferred share (shaded); the dotted line is the rate in
+unexposed ductal cells.
 
 ## A practical composite
 

@@ -101,7 +101,12 @@ groups = np.array_split(target_cells[:4 * N_CELLS_PER_CLASS], 4)
 # mid-rank pool genes, where the planted excess is large relative to the
 # proportional contamination expectation.
 IND_RANK = int(os.environ.get("GM_IND_RANK", "0"))
-SUFFIX = "" if IND_RANK == 0 else f"_rank{IND_RANK}"
+# Planted-mass multiplier for the retention sweep: scales the number of
+# induction molecules planted per cell, so retention can be charted as a
+# function of the planted amount relative to the channel's transfer excess.
+IND_MASS = float(os.environ.get("GM_IND_MASS", "1"))
+SUFFIX = ("" if IND_RANK == 0 else f"_rank{IND_RANK}") + \
+    ("" if IND_MASS == 1 else f"_m{IND_MASS:g}")
 induction_genes = pool_ids[IND_RANK:IND_RANK + 3]
 print("planted induction genes:", [inp.genes[g] for g in induction_genes])
 
@@ -134,7 +139,8 @@ for cls, cell_group in zip(["inplane", "outplane", "induction", "ambient"],
             for p, gg in zip(pos, fg):
                 records.append((cid, cls, *p, int(gg)))
         elif cls == "induction":
-            n_add = 2 + 2 * min(int(e_of.get(cid, 1)), 4)
+            n_add = max(1, int(round(
+                IND_MASS * (2 + 2 * min(int(e_of.get(cid, 1)), 4)))))
             sel = rng_spike.choice(len(c), n_add)
             jit = rng_spike.normal(0, 0.5, (n_add, 3))
             for p, gg in zip(c[sel] + jit,
@@ -151,6 +157,23 @@ spk = pd.DataFrame(records,
     columns=["cell_id", "cls", "x", "y", "z", "gene_idx"])
 print("injected:", spk.groupby("cls").size().to_dict())
 del mol  # keep xyz/garr/starts: the molecule-level scorer needs positions
+
+# Pre-existing exposure-linked excess of the planted channels, measured on
+# the unspiked counts: the transfer signal the planted induction competes
+# with, and the denominator of the sweep's disproportionality axis.
+exp_cols_pe = np.array([inp.col_of[c] for c in expo_cells])[
+    np.asarray(pinfo["exposure"]) > 0]
+un_cols_pe = np.array([inp.col_of[c] for c in expo_cells])[
+    np.asarray(pinfo["exposure"]) == 0]
+t_exp_pe = float(inp.totals[exp_cols_pe].sum())
+t_un_pe = float(inp.totals[un_cols_pe].sum())
+pre_excess = {}
+for g in induction_genes:
+    m_e = float(inp.counts[g, exp_cols_pe].sum())
+    m_u = float(inp.counts[g, un_cols_pe].sum())
+    pre_excess[int(g)] = m_e - m_u / max(t_un_pe, 1.0) * t_exp_pe
+print("pre-existing excess of planted channels:",
+      {inp.genes[g]: round(v) for g, v in pre_excess.items()})
 
 # ---- add the spikes to the count matrix ------------------------------------
 col_ids = np.array([inp.col_of[c] for c in spk.cell_id])
@@ -420,4 +443,29 @@ print("\ngate 3 (molecule level): induction retention "
       f"inplane removal {mi.loc['inplane', 'mean']:.3f}, "
       f"outplane removal {mi.loc['outplane', 'mean']:.3f} (targets >= 0.8); "
       f"ambient removal {mi.loc['ambient', 'mean']:.3f}")
+# Sweep summary: one row per planted gene, appended across runs.
+ind_rows = per_mol[per_mol.cls == "induction"]
+mol_ind = mol_df[mol_df.cls == "induction"]
+sweep_rows = []
+for g in induction_genes:
+    gname = inp.genes[g]
+    d = ind_rows[ind_rows.gene == gname]
+    dm = mol_ind[mol_ind.gene == gname]
+    planted = int(((spk.cls == "induction")
+                   & (spk.gene_idx == g)).sum())
+    sweep_rows.append(dict(
+        rank=IND_RANK, mass=IND_MASS, gene=gname, planted=planted,
+        preexisting_excess=pre_excess[int(g)],
+        planted_to_proportional=planted / max(pre_excess[int(g)], 1.0),
+        retention_count=1 - float((d.removal_prob * d.n).sum()
+                                  / max(d.n.sum(), 1)),
+        retention_molecule=1 - float(dm.removal_prob.mean())
+            if len(dm) else np.nan,
+        inplane_removal=float(ind.loc["inplane", "mean_removal"]),
+        outplane_removal=float(ind.loc["outplane", "mean_removal"]),
+        ambient_removal=float(ind.loc["ambient", "mean_removal"])))
+sweep_path = os.path.join(gm.RESULTS, "gm_spikein_sweep.csv")
+pd.DataFrame(sweep_rows).to_csv(
+    sweep_path, mode="a", header=not os.path.exists(sweep_path), index=False)
+print("sweep rows appended:", len(sweep_rows))
 print("SPIKE DONE")

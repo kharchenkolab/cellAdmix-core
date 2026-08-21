@@ -15,13 +15,17 @@ source(file.path(ag_dir, "01_split_eval.R"))
 arms <- commandArgs(trailingOnly = TRUE)
 if (!length(arms)) arms <- c("validation", "production", "production_noind",
   "shuffled")
+dataset <- Sys.getenv("GM_DATASET", "pancreas")
+data_dir <- file.path(gm_dir,
+  if (dataset == "pancreas") "data" else paste0("data_", dataset))
+prefix <- if (dataset == "pancreas") "" else paste0(dataset, "_")
 
-defs <- readRDS(file.path(gm_dir, "data", "defs.rds"))
+defs <- readRDS(file.path(data_dir, "defs.rds"))
 counts0 <- defs$counts_before
 
 summaries <- list()
 for (arm in arms) {
-  f <- file.path(gm_dir, "data", sprintf("gm_removed_%s.mtx", arm))
+  f <- file.path(data_dir, sprintf("gm_removed_%s.mtx", arm))
   if (!file.exists(f)) { message("missing: ", f, " - skipping"); next }
   message("== arm: ", arm, " ==")
   rem <- as(Matrix::readMM(f), "CsparseMatrix")
@@ -33,10 +37,10 @@ for (arm in arms) {
   res <- eval_split(defs, counts_after, paste0("gm_", arm))
   print(res$summary, row.names = FALSE)
   write.csv(res$pairs,
-    file.path(gm_dir, "results", sprintf("gm_%s_pairs.csv", arm)),
+    file.path(gm_dir, "results", sprintf("%sgm_%s_pairs.csv", prefix, arm)),
     row.names = FALSE)
   write.csv(res$types,
-    file.path(gm_dir, "results", sprintf("gm_%s_types.csv", arm)),
+    file.path(gm_dir, "results", sprintf("%sgm_%s_types.csv", prefix, arm)),
     row.names = FALSE)
   summaries[[arm]] <- res$summary
   if (arm %in% c("production", "production_noind")) {
@@ -48,6 +52,6 @@ for (arm in arms) {
 }
 if (length(summaries)) {
   write.csv(do.call(rbind, summaries),
-    file.path(gm_dir, "results", "gm_gate_summaries.csv"), row.names = FALSE)
+    file.path(gm_dir, "results", paste0(prefix, "gm_gate_summaries.csv")), row.names = FALSE)
 }
 message("EVAL DONE")

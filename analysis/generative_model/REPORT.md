@@ -295,3 +295,21 @@ If the goal is corrected counts that can still contain the biology that
 correlates with neighborhood - induced programs, interface cell states -
 the generative model is currently the only option on the table, and its
 remaining gap to the 0.99 bar is, on inspection, mostly that biology.
+
+## Replication and the retention boundary (added experiments)
+
+- NSCLC (CosMx, 98,002 cells, 960 genes, 27 detected pairs; whole-cell
+  profiles - the export carries no nucleus flag; factor alignment derived
+  from the data): validation arm 0.964 weighted power_B, production 0.970
+  (0.986 with the induced term disabled - the gap is deliberate
+  retention), shuffled control 0.013, own-marker false removal 0.000,
+  9.0% of molecules removed. Screen flags 88 pair-gene combinations
+  (HSPA1A/B, DUSP5, RGS2, GLUL, SRGN, COL4A1/2). Results:
+  results/nsclc_gm_*.csv.
+- Spike-in retention sweep (03_spikein.py, GM_IND_RANK x GM_IND_MASS;
+  results/gm_spikein_sweep.csv; figure 05_figure.py ->
+  docs/figures/generative_fig1.png): retention of planted induction as a
+  function of total excess over the transfer expectation crosses 0.35 at
+  2-fold, 0.6-0.87 at 3-4-fold, 0.95+ beyond 10-fold; fragment and
+  ambient removal stay at 0.75-0.85 across all settings. Real flagged
+  genes fall on the same curve.
