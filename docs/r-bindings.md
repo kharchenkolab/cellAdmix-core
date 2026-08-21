@@ -201,11 +201,17 @@ comparison stays within the local tissue neighborhood), using the largest
 neighborhood that retains enough reference molecules. The `reference_kind`
 and `reference_inflation` columns of `pairs()` record the neighborhood used
 and how much contamination this removed from the comparison group. Marker panels are also screened for likely induced
-genes — genes whose exposure-linked excess far exceeds the level expected
-from their share of the source expression profile reflect a transcriptional
-response to proximity rather than transferred material; they are excluded
-from the panels, replaced by the next-ranked source-specific genes, and
-listed in `markers()$induced`. The audit measures every ordered cell-type
+genes — genes whose exposure-linked excess is disproportionate to the
+source expression profile reflect a transcriptional response to proximity
+rather than transferred material. The comparison profile is measured from
+the source cells bordering the target type (source cells at an interface
+can genuinely express activation genes above the source average, and
+material transferred from them carries that share), and the test allows
+for both counting noise and profile uncertainty, so small relative
+deviations on large transfer channels are not flagged. Flagged genes are
+excluded from the panels, replaced by the next-ranked source-specific
+genes, and listed with their measured disproportionality in
+`markers()$induced` and `markers()$induced_stats`. The audit measures every ordered cell-type
 pair:
 
 ```r

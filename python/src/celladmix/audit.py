@@ -152,43 +152,69 @@ def _excess_vs_ref(rates, ref_rate):
     return float((np.maximum(rates["rate"] - ref_rate, 0) * rates["totals"]).sum())
 
 
-def _screen_panel(matrix, candidates, cols_exposed, cols_unexposed,
-                  source_profile, n_pool=20, max_rounds=5, z_min=4.0,
-                  excess_min=50.0, ratio_factor=4.0):
-    """Exclude likely induced genes from the marker panel and replace them.
+def _interface_profile(matrix, s_cols, dist_T, radii=(30.0, 100.0, np.inf),
+                       min_molecules=3e4):
+    """Expression profile of the source cells that actually border the
+    target type. Cell states are not uniform across a tissue: source cells
+    at an interface can express activation genes several-fold above the
+    source average, and material transferred from them carries that
+    elevated share. Measuring transfer proportionality against the
+    interface-local profile keeps such genes attributed to transfer;
+    against the global profile they would look induced in the target. The
+    radius widens when the near subset carries too few molecules."""
+    s_cols = np.asarray(s_cols)
+    d = np.nan_to_num(np.asarray(dist_T, dtype=float), nan=np.inf)
+    for r in radii:
+        sel = s_cols[d <= r]
+        if not len(sel):
+            continue
+        cnt = np.asarray(matrix[:, sel].sum(axis=1), dtype=float).ravel()
+        if cnt.sum() >= min_molecules or not np.isfinite(r):
+            return cnt / max(cnt.sum(), 1.0)
+    cnt = np.asarray(matrix[:, s_cols].sum(axis=1), dtype=float).ravel()
+    return cnt / max(cnt.sum(), 1.0)
 
-    A gene whose exposure-linked excess in target cells is far above the
-    level expected from its share of the source expression profile is more
-    likely induced by proximity than transferred; it is removed from the
-    panel and replaced by the next ranked candidate, which is screened in
-    turn.
+
+def _screen_panel(matrix, candidates, cols_exposed, cols_unexposed,
+                  source_profile, n_pool=20, z_min=8.0,
+                  excess_min=50.0, profile_cv=0.15):
+    """Exclude likely induced genes from the marker panel.
+
+    A gene whose exposure-linked excess in target cells is
+    disproportionate to the interface-local source profile is more likely
+    induced by proximity than transferred; it is excluded and the panel is
+    filled from the remaining candidates in rank order. The proportional
+    expectation is a weighted regression of per-gene excess on the
+    profile, and the residual is standardized by counting noise plus a
+    multiplicative profile-uncertainty term - without the latter, a small
+    relative deviation on a large transfer channel reaches an arbitrary
+    significance simply because the channel is large.
     """
+    empty_stats = pd.DataFrame(columns=["gene", "excess", "expected",
+                                        "fold", "z"])
+    gset = np.asarray(list(candidates), dtype=int)
     t_exp = float(matrix[:, cols_exposed].sum())
     t_un = float(matrix[:, cols_unexposed].sum())
-    if t_exp <= 0 or t_un <= 0:
-        return np.asarray(candidates[:n_pool]), np.array([], dtype=int)
-    pool: list[int] = []
-    induced: list[int] = []
-    remaining = list(candidates)
-    for _ in range(max_rounds):
-        need = n_pool - len(pool)
-        if need <= 0 or not remaining:
-            break
-        batch = remaining[:need]
-        remaining = remaining[need:]
-        gset = np.asarray(sorted(set(pool) | set(batch)))
-        m_exp = np.asarray(matrix[gset][:, cols_exposed].sum(axis=1)).ravel()
-        m_un = np.asarray(matrix[gset][:, cols_unexposed].sum(axis=1)).ravel()
-        excess = m_exp - m_un / t_un * t_exp
-        z = excess / np.sqrt(m_exp + (t_exp / t_un) ** 2 * m_un + 1)
-        psi = np.maximum(source_profile[gset], 1e-9)
-        pos = excess > 0
-        med_ratio = float(np.median(excess[pos] / psi[pos])) if pos.any() else 0.0
-        flagged = gset[(z > z_min) & (excess > excess_min) & (med_ratio > 0)
-                       & (excess / psi > ratio_factor * med_ratio)]
-        induced = sorted(set(induced) | set(flagged.tolist()))
-        pool = [g for g in gset.tolist() if g not in induced]
-    return np.asarray(pool[:n_pool]), np.asarray(induced, dtype=int)
+    if t_exp <= 0 or t_un <= 0 or not len(gset):
+        return (np.asarray(candidates[:n_pool]), np.array([], dtype=int),
+                empty_stats)
+    m_exp = np.asarray(matrix[gset][:, cols_exposed].sum(axis=1)).ravel()
+    m_un = np.asarray(matrix[gset][:, cols_unexposed].sum(axis=1)).ravel()
+    excess = m_exp - m_un / t_un * t_exp
+    var_count = m_exp + (t_exp / t_un) ** 2 * m_un + 1
+    psi = np.maximum(source_profile[gset], 0.0)
+    w = 1.0 / var_count
+    slope = max(float((w * excess * psi).sum())
+                / max(float((w * psi * psi).sum()), 1e-12), 0.0)
+    expected = slope * psi
+    z = (excess - expected) / np.sqrt(var_count + (profile_cv * expected) ** 2)
+    sel = (z > z_min) & (excess > excess_min)
+    flagged = gset[sel]
+    stats = pd.DataFrame(dict(gene=flagged, excess=excess[sel],
+        expected=expected[sel], fold=excess[sel] / np.maximum(expected[sel], 1e-9),
+        z=z[sel]))
+    pool = [g for g in gset.tolist() if g not in set(flagged.tolist())]
+    return np.asarray(pool[:n_pool]), flagged, stats
 
 
 class CellAdmixAudit:
@@ -196,7 +222,7 @@ class CellAdmixAudit:
 
     def __init__(self, fit, *, neighbor_k=15, n_pool=20, q_thresh=0.01,
                  min_excess=200, min_target_cells=200, min_reference_cells=100):
-        from ._score_utils import source_exposure_counts
+        from ._score_utils import source_exposure_counts, source_nearest_distance
 
         annotation = getattr(getattr(fit, "dataset", None), "annotation", None)
         if annotation is None:
@@ -227,6 +253,11 @@ class CellAdmixAudit:
             [str(annotation.get(str(c), None)) for c in cells["cell_id"].astype(str)],
             index=cells["cell_id"].astype(str))
         self._types = list(types)
+        # Distance from every cell to the nearest cell of each type, for
+        # selecting the interface-local source cells of each pair's screen.
+        near_dist, near_types = source_nearest_distance(cells, annotation)
+        near_df = pd.DataFrame(near_dist, columns=near_types,
+            index=cells["cell_id"].astype(str))
         profiles = np.column_stack([
             _pseudobulk(self._matrix, self._cells,
                 ctypes.index[ctypes == t]) for t in types])
@@ -260,9 +291,14 @@ class CellAdmixAudit:
                 tot = self._totals[cols]
                 candidates = _marker_pool(profiles, self._types, source,
                     np.nan_to_num(baseline), n_pool=10 * n_pool)
-                pool, induced = _screen_panel(self._matrix, list(candidates),
-                    cols[expo > 0], cols[expo == 0], profiles[:, s_idx],
-                    n_pool=n_pool)
+                S_cells = ctypes.index[ctypes == source]
+                S_cells = S_cells[self._cells.get_indexer(S_cells) >= 0]
+                psi_interface = _interface_profile(self._matrix,
+                    self._cells.get_indexer(S_cells),
+                    near_df.loc[S_cells, target].to_numpy())
+                pool, induced, induced_stats = _screen_panel(self._matrix,
+                    list(candidates), cols[expo > 0], cols[expo == 0],
+                    psi_interface, n_pool=n_pool)
                 if len(pool) < 3:
                     continue
                 strict = pool[np.nan_to_num(baseline)[pool] <
@@ -302,6 +338,7 @@ class CellAdmixAudit:
                     source=source, target=target, cols=cols, bins=bins,
                     ref_mask=ref_mask, ref_ladder=ref_ladder,
                     pool=pool, strict=strict, induced=induced,
+                    induced_stats=induced_stats,
                     rates=rates, rates_strict=rates_strict,
                     excess=excess, excess_gradient=excess_gradient, p=p,
                     reference_rate=ref_rate, reference_kind=ref_kind,
@@ -357,9 +394,13 @@ class CellAdmixAudit:
 
     def markers(self, source, target):
         d = self._pair(source, target)
+        stats = d["induced_stats"].copy()
+        if len(stats):
+            stats["gene"] = self._genes[stats["gene"].to_numpy(dtype=int)]
         return dict(pool=list(self._genes[d["pool"]]),
             strict=list(self._genes[d["strict"]]),
-            induced=list(self._genes[d["induced"]]))
+            induced=list(self._genes[d["induced"]]),
+            induced_stats=stats)
 
     def _pair(self, source, target):
         d = self._pairs.get((source, target))

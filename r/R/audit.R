@@ -152,50 +152,72 @@
   sum(pmax(rates$rate - ref_rate, 0) * rates$totals)
 }
 
+# Expression profile of the source cells that actually border the target
+# type. Cell states are not uniform across a tissue: source cells at an
+# interface can express activation genes several-fold above the source
+# average, and material transferred from them carries that elevated share.
+# Measuring transfer proportionality against the interface-local profile
+# keeps such genes attributed to transfer; against the global profile they
+# would look induced in the target. The radius widens when the near subset
+# carries too few molecules to give a stable profile.
+.celladmix_audit_interface_profile <- function(counts, S_cells, dist_T,
+                                               radii = c(30, 100, Inf),
+                                               min_molecules = 3e4) {
+  S_cells <- intersect(S_cells, colnames(counts))
+  d <- dist_T[S_cells]
+  d[is.na(d)] <- Inf
+  for (r in radii) {
+    sel <- S_cells[d <= r]
+    if (!length(sel)) next
+    cnt <- Matrix::rowSums(counts[, sel, drop = FALSE])
+    if (sum(cnt) >= min_molecules || !is.finite(r)) {
+      return(cnt / max(sum(cnt), 1))
+    }
+  }
+  cnt <- Matrix::rowSums(counts[, S_cells, drop = FALSE])
+  cnt / max(sum(cnt), 1)
+}
+
 # Panel screening for induced genes: a gene whose exposure-linked excess in
-# target cells is far above the level expected from its share of the source
-# expression profile is more likely induced by proximity than transferred,
-# and is excluded from the panel. Excluded genes are replaced from the next
-# ranked candidates, which are screened in turn.
+# target cells is disproportionate to the interface-local source profile is
+# more likely induced by proximity than transferred, and is excluded from
+# the panel (the panel is then filled from the remaining candidates in rank
+# order). The proportional expectation is a weighted regression of per-gene
+# excess on the profile, and the residual is standardized by counting noise
+# plus a multiplicative profile-uncertainty term - without the latter, a
+# small relative deviation on a large transfer channel reaches an arbitrary
+# significance simply because the channel is large.
 .celladmix_audit_screen_panel <- function(counts, candidates, T_cells, expo,
                                           totals, source_profile,
-                                          n_pool = 20L, max_rounds = 5L,
-                                          z_min = 4, excess_min = 50,
-                                          ratio_factor = 4) {
-  exp_cells <- T_cells[expo > 0]
-  un_cells <- T_cells[expo == 0]
+                                          n_pool = 20L, z_min = 8,
+                                          excess_min = 50, profile_cv = 0.15) {
+  empty_stats <- data.frame(gene = character(0), excess = numeric(0),
+    expected = numeric(0), fold = numeric(0), z = numeric(0),
+    stringsAsFactors = FALSE)
+  exp_cells <- intersect(T_cells[expo > 0], colnames(counts))
+  un_cells <- intersect(T_cells[expo == 0], colnames(counts))
   t_exp <- sum(totals[exp_cells]); t_un <- sum(totals[un_cells])
-  if (!length(exp_cells) || !length(un_cells) || t_un <= 0) {
-    return(list(pool = utils::head(candidates, n_pool), induced = character(0)))
+  genes <- intersect(candidates, rownames(counts))
+  if (!length(exp_cells) || !length(un_cells) || t_un <= 0 || !length(genes)) {
+    return(list(pool = utils::head(candidates, n_pool),
+      induced = character(0), induced_stats = empty_stats))
   }
-  gene_excess <- function(genes) {
-    genes <- intersect(genes, rownames(counts))
-    m_exp <- Matrix::rowSums(counts[genes, intersect(exp_cells,
-      colnames(counts)), drop = FALSE])
-    m_un <- Matrix::rowSums(counts[genes, intersect(un_cells,
-      colnames(counts)), drop = FALSE])
-    excess <- m_exp - m_un / t_un * t_exp
-    z <- excess / sqrt(m_exp + (t_exp / t_un)^2 * m_un + 1)
-    data.frame(gene = genes, excess = as.numeric(excess), z = as.numeric(z),
-      psi = pmax(source_profile[genes], 1e-9), stringsAsFactors = FALSE)
-  }
-  pool <- character(0); induced <- character(0)
-  remaining <- candidates
-  for (round in seq_len(max_rounds)) {
-    need <- n_pool - length(pool)
-    if (need <= 0 || !length(remaining)) break
-    batch <- utils::head(remaining, need)
-    remaining <- setdiff(remaining, batch)
-    stats <- gene_excess(union(pool, batch))
-    pos <- stats[stats$excess > 0, , drop = FALSE]
-    med_ratio <- stats::median(pos$excess / pos$psi)
-    flagged <- stats$gene[stats$z > z_min & stats$excess > excess_min &
-      is.finite(med_ratio) & med_ratio > 0 &
-      stats$excess / stats$psi > ratio_factor * med_ratio]
-    induced <- union(induced, flagged)
-    pool <- setdiff(stats$gene, induced)
-  }
-  list(pool = utils::head(pool, n_pool), induced = induced)
+  m_exp <- Matrix::rowSums(counts[genes, exp_cells, drop = FALSE])
+  m_un <- Matrix::rowSums(counts[genes, un_cells, drop = FALSE])
+  excess <- as.numeric(m_exp - m_un / t_un * t_exp)
+  var_count <- as.numeric(m_exp + (t_exp / t_un)^2 * m_un + 1)
+  psi <- pmax(source_profile[genes], 0)
+  w <- 1 / var_count
+  slope <- max(sum(w * excess * psi) / max(sum(w * psi^2), 1e-12), 0)
+  expected <- slope * psi
+  z <- (excess - expected) / sqrt(var_count + (profile_cv * expected)^2)
+  sel <- z > z_min & excess > excess_min
+  flagged <- genes[sel]
+  stats <- data.frame(gene = flagged, excess = excess[sel],
+    expected = expected[sel], fold = excess[sel] / pmax(expected[sel], 1e-9),
+    z = z[sel], stringsAsFactors = FALSE)
+  list(pool = utils::head(setdiff(genes, flagged), n_pool),
+    induced = flagged, induced_stats = stats)
 }
 
 #' Audit Admixture by Spatial Exposure
@@ -246,6 +268,9 @@ celladmix_audit_admixture <- function(fit, annotation = NULL, neighbor_k = 15L,
   cell_types <- stats::setNames(as.character(ann[as.character(cells$cell_id)]),
     as.character(cells$cell_id))
   totals <- Matrix::colSums(counts)
+  # Distance from every cell to the nearest cell of each type, for
+  # selecting the interface-local source cells of each pair's screen.
+  near_dist <- .celladmix_source_nearest_distance(cells, ann)
   profiles <- .celladmix_audit_profiles(counts, cell_types)
   top_type <- colnames(profiles)[max.col(profiles, ties.method = "first")]
   native_markers <- lapply(exposure$types, function(t) {
@@ -269,8 +294,11 @@ celladmix_audit_admixture <- function(fit, annotation = NULL, neighbor_k = 15L,
       baseline <- .celladmix_audit_pseudobulk(counts, T_cells[expo == 0])
       candidates <- .celladmix_audit_marker_pool(profiles, source, baseline,
         n_pool = 10L * n_pool)
+      S_cells <- names(cell_types)[!is.na(cell_types) & cell_types == source]
+      psi_interface <- .celladmix_audit_interface_profile(counts, S_cells,
+        near_dist[, target])
       screened <- .celladmix_audit_screen_panel(counts, candidates, T_cells,
-        expo, totals, profiles[, source], n_pool = n_pool)
+        expo, totals, psi_interface, n_pool = n_pool)
       pool <- screened$pool
       if (length(pool) < 3) next
       strict <- .celladmix_audit_pool_strict(pool, profiles, source, baseline)
@@ -306,6 +334,7 @@ celladmix_audit_admixture <- function(fit, annotation = NULL, neighbor_k = 15L,
         source = source, target = target, T_cells = T_cells, bins = bins,
         ref_mask = ref_mask, ref_ladder = ref_ladder,
         pool = pool, strict = strict, induced = screened$induced,
+        induced_stats = screened$induced_stats,
         rates = rates, rates_strict = rates_strict,
         # detection remains gradient-based (rise of exposed bins over the
         # unexposed bin); the reported leakage is measured against the
@@ -404,7 +433,8 @@ CellAdmixAudit <- R6::R6Class(
 
     markers = function(source, target) {
       d <- private$.pair(source, target)
-      list(pool = d$pool, strict = d$strict, induced = d$induced)
+      list(pool = d$pool, strict = d$strict, induced = d$induced,
+        induced_stats = d$induced_stats)
     },
 
     plot_map = function(value = c("rate", "molecules"), detected_only = TRUE) {

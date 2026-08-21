@@ -34,11 +34,24 @@ zero-exposure cells of T — rank-based, since an absolute baseline cutoff
 would itself be skewed by contamination. Candidate genes are screened for
 proximity-induced transcription: transferred material samples the source
 transcriptome, so a gene's exposure-linked excess should be proportional
-to its share of the source expression profile, and a gene whose excess far
-exceeds that share reflects the target's own transcriptional response to
-source proximity (on pancreas: CXCL6, CFB — inflammatory response genes).
-Screened-out genes are replaced by the next-ranked candidates, which are
-screened in turn, and reported separately. The *strict tier* of the panel
+to its share of the source expression profile, and a gene whose excess is
+disproportionate to that share reflects the target's own transcriptional
+response to source proximity. Two measured effects shape the test. First,
+the comparison profile must come from the source cells that actually
+border the target type: source cells at a tissue interface genuinely
+express activation genes above the source average (on pancreas, ductal
+cells within 30 um of their neighbors carry 1.1–1.6x the ductal-average
+share of CXCL6, CFB and PPP1R1B), and material transferred from them
+carries that elevated share — against the global profile these genes
+would be misread as induced in the target. Second, the residual is
+standardized by counting noise plus a multiplicative profile-uncertainty
+term (15%), since on a large transfer channel even a few-percent relative
+deviation is otherwise formally significant. Screened-out genes are
+replaced by the next-ranked candidates and reported with their measured
+disproportionality (on pancreas: CFTR at 3.9-fold above the proportional
+expectation of the exocrine→ductal transfer, and interface-activation
+programs of fibroblasts, immune and endothelial/mural cells at 3- to
+20-fold). The *strict tier* of the panel
 holds genes essentially absent from reference cells of T (baseline under
 5% of the source level), whose excess in exposed cells can only be leaked
 material.
@@ -242,11 +255,16 @@ The measurement ships in the package as the admixture audit, with the
 ambient reference and induced-gene screening described above (the harness
 in `analysis/cleanup_benchmark/` uses the $\hat\rho_0$ floor for its
 sweeps). On pancreas the reference deepens for 36 of 39 pairs (median
-correction 1.21x, total estimate 1.53M molecules) and the screening
-removes inflammatory and shared genes (CXCL6, CFB; PROX1, CFTR, CA4 from
-the exocrine panel) that had inflated estimates; on breast 5K all 29
-pairs deepen and the estimate roughly doubles to 18.1M molecules (~22% of
-the dataset). `evaluate()` warns from the corrected counts themselves: a
+correction 1.21x, total estimate 1.57M molecules) and the screening
+excludes 23 genes as likely induced — led by CFTR, whose excess in ductal
+cells near exocrine tissue is 3.9-fold its transfer expectation — while
+keeping transferred activation genes (CXCL6, CFB) in the panels; on
+breast 5K all 29 pairs deepen and the estimate roughly doubles to 18.4M
+molecules (~22% of the dataset), with the screening excluding
+inflammatory-response genes (CCL2, IL6, LIF) and a myoepithelial
+contractile program (MYH11, MYLK, CNN1); on NSCLC (27 detected pairs,
+4.4M molecules) it excludes the classic stress and chemokine programs
+(FOS, JUNB, HSPA1A/B, CCL3/4, CXCL2/3). `evaluate()` warns from the corrected counts themselves: a
 detected pair is flagged when its molecules were measurably not removed,
 whatever the rule list claims. In R, each panel of Figure 1 corresponds
 to one call:

@@ -131,29 +131,55 @@ test_that("the reference rate uses the largest sufficiently populated neighborho
   expect_equal(ref_flat$rate, ref_flat$rate_unexposed, tolerance = 0.15)
 })
 
-test_that("panel screening excludes and replaces induced genes", {
+test_that("panel screening excludes disproportionate induced genes", {
   set.seed(7)
-  genes <- c(paste0("smk", 1:6), "induced1")
+  smk <- paste0("smk", 1:10)
+  genes <- c(smk, "induced1", "bigch")
   n_T <- 400
   cells <- paste0("T", seq_len(n_T))
   expo <- rep(0:3, length.out = n_T)
   counts <- Matrix::Matrix(0, length(genes), n_T, sparse = TRUE,
     dimnames = list(genes, cells))
   # Transferred material: proportional to the source profile across genes.
-  psi <- setNames(c(600, 500, 400, 300, 200, 100, 30), genes)
-  for (g in paste0("smk", 1:6)) {
+  psi <- setNames(c(seq(600, 150, by = -50), 30, 5000), genes)
+  for (g in smk) {
     counts[g, ] <- rpois(n_T, 0.02 * psi[[g]] * expo + 1)
   }
   # Induced gene: large exposure-linked excess despite a tiny profile share.
   counts["induced1", ] <- rpois(n_T, 40 * expo + 1)
+  # Dominant transfer channel deviating ~15% from proportionality: within
+  # profile uncertainty, although its counting-noise significance is large.
+  counts["bigch", ] <- rpois(n_T, 0.02 * 5000 * expo * 1.15 + 5)
   totals <- Matrix::colSums(counts) + 500
-  screened <- cellAdmixCore:::.celladmix_audit_screen_panel(
-    counts, candidates = c("induced1", paste0("smk", 1:6)),
+  screen <- function(...) cellAdmixCore:::.celladmix_audit_screen_panel(
+    counts, candidates = c("bigch", "induced1", smk),
     T_cells = cells, expo = expo, totals = setNames(totals, cells),
-    source_profile = psi, n_pool = 6L)
+    source_profile = psi, n_pool = 11L, ...)
+  screened <- screen()
   expect_true("induced1" %in% screened$induced)
   expect_false("induced1" %in% screened$pool)
-  expect_setequal(screened$pool, paste0("smk", 1:6))
+  expect_false("bigch" %in% screened$induced)
+  expect_setequal(screened$pool, c("bigch", smk))
+  st <- screened$induced_stats
+  expect_gt(st$fold[st$gene == "induced1"], 4)
+  # Without the profile-uncertainty term the large channel's small relative
+  # deviation becomes formally significant; the term is what prevents that.
+  expect_true("bigch" %in% screen(profile_cv = 0)$induced)
+})
+
+test_that("the interface profile reflects the bordering source cells", {
+  counts <- Matrix::Matrix(c(30000, 10000, 0, 40000), 2, 2, sparse = TRUE,
+    dimnames = list(c("g1", "g2"), c("s_near", "s_far")))
+  dist_T <- c(s_near = 10, s_far = 500)
+  prof <- cellAdmixCore:::.celladmix_audit_interface_profile(
+    counts, c("s_near", "s_far"), dist_T)
+  expect_equal(prof[["g1"]], 0.75)
+  # A sparse near subset widens until enough molecules are available.
+  counts2 <- Matrix::Matrix(c(75, 25, 0, 40000), 2, 2, sparse = TRUE,
+    dimnames = list(c("g1", "g2"), c("s_near", "s_far")))
+  prof2 <- cellAdmixCore:::.celladmix_audit_interface_profile(
+    counts2, c("s_near", "s_far"), dist_T)
+  expect_lt(prof2[["g1"]], 0.01)
 })
 
 make_audit_fit <- function(seed = 11L) {
