@@ -17,6 +17,9 @@ This folder contains user-facing documentation for `cellAdmix-core`.
 - [Cleanup benchmarks](benchmarks.md): the neighbor-benchmark methodology
   and the factorization/scoring comparisons behind the recommended
   workflow settings.
+- [Admixture and induced expression](generative.md): the generative model
+  separating transferred material from proximity-induced transcription,
+  its validation, and the induced-gene retention it enables.
 - [Python bindings](python-bindings.md): Python API and SpatialData integration.
 - [Python batch processing](python-batch.md): CLI workflow for Xenium batch
   processing through the Python bindings.
