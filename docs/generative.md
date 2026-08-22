@@ -469,13 +469,23 @@ non-flagged content, 80.1% retention). Scripts and per-pair tables:
 
 The model ships in the package with the fit separated from the
 correction, and with no dependence on a factorization anywhere in the
-chain: `ds$audit_admixture()` measures the admixture straight from the
-dataset (the audit needs only counts, cell positions, and the
-annotation), and `audit$fit_generative()` in R — `audit.fit_generative()`
-in Python — fits the model on the detected pairs through a shared C++
-implementation (both bindings marshal the same inputs to the same code,
-so their results are identical). `fit$audit_admixture()` remains as the
-same audit computed from a fitted run's counts. The fitted model exposes the per-cell
+chain — the NMF enters at exactly one optional point, as the
+recommended initializer of the model's expression programs:
+
+```r
+ds <- cellAdmix(source, output_dir, annotation = annotation)
+audit <- ds$audit_admixture()          # measurement: counts, positions, annotation
+nmf_fit <- ds$fit()                    # used only to initialize the model
+model <- audit$fit_generative(init = nmf_fit)
+correction <- model$correct()          # or correct(retain_induced = FALSE)
+audit$evaluate(correction)
+```
+
+The Python workflow is identical (`ds.audit_admixture()`,
+`audit.fit_generative(init=nmf_fit)`, …); both bindings marshal the
+same inputs to one shared C++ implementation, so their results are
+identical. `fit$audit_admixture()` remains as the same audit computed
+from a fitted run's counts. The fitted model exposes the per-cell
 decomposition (`composition()`), the retained induced genes
 (`induced`), and per-pair summaries (`pairs`), and derives corrections
 without refitting: `model$correct()` keeps the induced expression,
@@ -511,6 +521,16 @@ from transfer. The practical guidance: use the NMF
 initialization when a fit exists (it is the validated configuration and
 preserves the most induced biology); the alternatives serve when no
 factorization is available.
+
+Worked examples with figures accompany the package: a
+[minimal pancreas example](../examples/xenium_pancreas_membrane_377_full/pancreas_generative_minimal.md)
+(the workflow above, executed), a
+[full pancreas walkthrough](../examples/xenium_pancreas_membrane_377_full/pancreas_generative.md)
+characterizing the admixture and induction patterns in depth — down to
+the decomposition of individual cells and molecule-level views of a
+contaminated cell — and the same characterization on
+[CosMx NSCLC](../examples/cosmx_nsclc_giotto/nsclc_generative.md) and
+[Xenium breast 5K](../examples/xenium_breast_membrane_5k_full/breast_5k_generative.ipynb).
 
 The three correctors order naturally by need. The exposure-regression
 corrector is the simplest and fastest way to flatten exposure-linked
