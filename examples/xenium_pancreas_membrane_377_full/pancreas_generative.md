@@ -34,20 +34,18 @@ annotation <- read.csv(file.path("annotations", "annotation.csv.gz"))
 cell_annotation <- setNames(annotation$merged_annotation, annotation$cell_id)
 
 ds <- cellAdmix("data", output_dir = "out", annotation = cell_annotation)
-nmf_fit <- ds$fit(nmf_variant = "invsqrt_kl")
 ```
-
-    ## Reusing cached run fit_manual_rank9_invsqrt_kl (parameters match)
 
 ## The admixture pattern between cell types
 
 The audit measures, for every ordered pair of cell types, how many
 molecules leaked from the source type into cells of the target type,
 using the rise of source-marker content with the number of source-type
-neighbors:
+neighbors. It is computed straight from the dataset — counts, cell
+positions, and the annotation — with no factorization involved:
 
 ``` r
-audit <- nmf_fit$audit_admixture()
+audit <- ds$audit_admixture()
 ```
 
     ## Excluded 23 likely induced genes from marker panels (exposure-linked excess far above the source-profile expectation): ACTG2, ADAMTS1, APCDD1, APOLD1, BASP1, C5orf46, CA4, CAVIN1
@@ -95,16 +93,22 @@ ggplot(by_source, aes(reorder(source, admixed_molecules),
 
 ## Correcting with the generative model
 
-The model is fitted on the audit’s detected pairs. Its expression
-programs are initialized from the NMF fit’s factor-labeled molecules —
-the default for an audit derived from a fit, and the recommended
-configuration (`init = "clusters"` fits without any NMF, with nearly
-identical removal; the factor initialization preserves the most induced
-biology on large panels). The correction then derives from the fitted
-model:
+The model is fitted on the audit’s detected pairs. The one place a
+factorization enters this workflow is the initialization of the model’s
+expression programs: the recommended configuration initializes them from
+an NMF fit’s factor-labeled molecules, which preserves the most induced
+biology (`init = "clusters"` fits without any NMF, at nearly identical
+removal but lower induced-gene retention on large panels). The
+correction then derives from the fitted model:
 
 ``` r
-model <- audit$fit_generative(num_threads = 8)
+nmf_fit <- ds$fit(nmf_variant = "invsqrt_kl")
+```
+
+    ## Reusing cached run fit_manual_rank9_invsqrt_kl (parameters match)
+
+``` r
+model <- audit$fit_generative(init = nmf_fit, num_threads = 8)
 model
 ```
 
@@ -116,7 +120,7 @@ model
 
 ``` r
 correction <- model$correct()
-before <- nmf_fit$counts()
+before <- ds$counts()
 after <- correction$counts()
 ```
 
@@ -149,7 +153,7 @@ contributions from the other bordering types and the ambient background:
 
 ``` r
 comp_all <- model$composition(target = "Ductal/tumor epithelial")
-cells_xy <- nmf_fit$cell_factors()
+cells_xy <- ds$cells()
 expo <- setNames(
   cellAdmixCore:::.celladmix_source_exposure_counts(
     cells_xy, cell_annotation, 15L)$counts[, "Exocrine epithelial"],

@@ -21,21 +21,22 @@ the [full example](pancreas_generative.md) characterizes what the model
 measures along the way, and [docs/generative.md](../../docs/generative.md)
 describes the model itself.
 
-```{r fit}
+```{r construct}
 annotation <- read.csv(file.path("annotations", "annotation.csv.gz"))
 cell_annotation <- setNames(annotation$merged_annotation, annotation$cell_id)
 
 ds <- cellAdmix("data", output_dir = "out", annotation = cell_annotation)
-nmf_fit <- ds$fit(nmf_variant = "invsqrt_kl")
 ```
 
-The audit measures the admixture; the generative model is fitted on its
-detected pairs (the NMF fit serves only to initialize the model's
-expression programs — `init = "clusters"` fits without it), and the
-correction derives from the fitted model:
+The audit measures the admixture straight from the dataset — no
+factorization is involved. The generative model is then fitted on its
+detected pairs; the NMF fit enters only to initialize the model's
+expression programs, the recommended configuration (`init = "clusters"`
+fits without it):
 
 ```{r correct}
-audit <- nmf_fit$audit_admixture()
+audit <- ds$audit_admixture()
+nmf_fit <- ds$fit(nmf_variant = "invsqrt_kl")
 model <- audit$fit_generative(init = nmf_fit, num_threads = 8)
 model
 correction <- model$correct()
