@@ -30,15 +30,15 @@ cell_annotation <- setNames(cell_meta$cell_type_coarse, cell_meta$cell)
 
 ds <- cellAdmix(file.path("prepared", "molecules_all.csv.gz"),
   output_dir = "out", annotation = cell_annotation)
-nmf_fit <- ds$fit()
 ```
-
-    ## Reusing cached run fit_manual_rank8_ls_nmf (parameters match)
 
 ## The admixture pattern between cell types
 
+The audit is computed straight from the dataset — counts, cell
+positions, and the annotation; no factorization is involved:
+
 ``` r
-audit <- nmf_fit$audit_admixture()
+audit <- ds$audit_admixture()
 ```
 
     ## Excluded 72 likely induced genes from marker panels (exposure-linked excess far above the source-profile expectation): ADIRF, B2M, C5AR2, CAV1, CCL21, CCL3, CCL3L3, CCL4
@@ -82,9 +82,15 @@ ggplot(by_source, aes(reorder(source, admixed_molecules),
 
 ## Correcting with the generative model
 
-The model is fitted on the audit’s detected pairs (the NMF fit only
-initializes its expression programs), and the correction derives from
-the fitted model:
+The model is fitted on the audit’s detected pairs. The NMF fit enters
+only to initialize the model’s expression programs — the recommended
+configuration — and the correction derives from the fitted model:
+
+``` r
+nmf_fit <- ds$fit()
+```
+
+    ## Reusing cached run fit_manual_rank8_ls_nmf (parameters match)
 
 ``` r
 model <- audit$fit_generative(init = nmf_fit, num_threads = 8)
@@ -107,7 +113,7 @@ and in space:
 ``` r
 top_pair <- pairs[order(-pairs$admixed_molecules), ][1, ]
 comp <- model$composition(top_pair$source, top_pair$target)
-cells_xy <- nmf_fit$cell_factors()
+cells_xy <- ds$cells()
 expo <- setNames(
   cellAdmixCore:::.celladmix_source_exposure_counts(
     cells_xy, cell_annotation, 15L)$counts[, top_pair$source],
@@ -170,7 +176,7 @@ its gradient:
 ind_top <- induced[order(-induced$excess), ][1, ]
 mk <- audit$markers(ind_top$source, ind_top$target)
 transfer_gene <- setdiff(mk$pool, induced$gene)[1]
-before <- nmf_fit$counts()
+before <- ds$counts()
 after <- correction$counts()
 t_cells <- model$composition(ind_top$source, ind_top$target)$cell_id
 expo_t <- setNames(

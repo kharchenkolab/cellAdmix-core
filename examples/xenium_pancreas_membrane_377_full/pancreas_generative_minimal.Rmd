@@ -30,9 +30,10 @@ ds <- cellAdmix("data", output_dir = "out", annotation = cell_annotation)
 
 The audit measures the admixture straight from the dataset — no
 factorization is involved. The generative model is then fitted on its
-detected pairs; the NMF fit enters only to initialize the model's
-expression programs, the recommended configuration (`init = "clusters"`
-fits without it):
+detected pairs. The recommended configuration initializes the model's
+expression programs from an NMF fit, which is the only role the fit
+plays here; `init = "clusters"` derives the programs from the data
+directly, without any NMF:
 
 ```{r correct}
 audit <- ds$audit_admixture()

@@ -115,39 +115,43 @@ ggplot(burden, aes(reorder(type, share), share)) +
 The model's central output is the per-cell decomposition. Averaged over
 ductal cells at each exocrine exposure, it shows where a contaminated
 cell's molecules come from: the cell's own expression share falls with
-exposure as the exocrine contamination share grows, with smaller
-contributions from the other bordering types and the ambient background:
+exposure as the contamination share grows, with the ambient background
+throughout and the induced expression appearing exactly in the exposed
+cells:
 
-```{r composition, fig.width=7, fig.height=3.8}
+```{r composition, fig.width=6, fig.height=3.8}
 comp_all <- model$composition(target = "Ductal/tumor epithelial")
 cells_xy <- ds$cells()
 expo <- setNames(
   cellAdmixCore:::.celladmix_source_exposure_counts(
     cells_xy, cell_annotation, 15L)$counts[, "Exocrine epithelial"],
   as.character(cells_xy$cell_id))
-comp_all$bin <- factor(pmin(expo[comp_all$cell_id], 3), levels = 0:3,
+cont <- tapply(comp_all$contamination, comp_all$cell_id, sum)
+indv <- tapply(comp_all$induced, comp_all$cell_id, sum)
+amb <- tapply(comp_all$ambient, comp_all$cell_id, max)
+per_cell <- data.frame(cell_id = names(cont),
+  contamination = as.numeric(cont), induced = as.numeric(indv),
+  ambient = as.numeric(amb), stringsAsFactors = FALSE)
+per_cell$own <- pmax(1 - per_cell$contamination - per_cell$induced -
+  per_cell$ambient, 0)
+per_cell$bin <- factor(pmin(expo[per_cell$cell_id], 3), levels = 0:3,
   labels = c("0", "1", "2", "3+"))
-shares <- aggregate(contamination ~ bin + source, comp_all, mean)
-ambient <- aggregate(ambient ~ bin, comp_all[!duplicated(comp_all$cell_id), ],
-  mean)
-shares <- rbind(shares,
-  data.frame(bin = ambient$bin, source = "ambient",
-    contamination = ambient$ambient))
-own <- aggregate(contamination ~ bin, shares, sum)
-shares <- rbind(shares,
-  data.frame(bin = own$bin, source = "own expression",
-    contamination = 1 - own$contamination))
-shares$source <- factor(shares$source,
-  levels = c("own expression", "ambient",
-    rev(unique(comp_all$source))))
-ggplot(shares, aes(bin, contamination, fill = source)) +
+agg <- aggregate(cbind(own, contamination, ambient, induced) ~ bin,
+  per_cell, mean)
+shares <- data.frame(bin = rep(agg$bin, 4),
+  part = rep(c("own expression", "contamination", "ambient", "induced"),
+    each = nrow(agg)),
+  share = c(agg$own, agg$contamination, agg$ambient, agg$induced))
+shares$part <- factor(shares$part,
+  levels = rev(c("own expression", "contamination", "ambient", "induced")))
+ggplot(shares, aes(bin, share, fill = part)) +
   geom_col(width = 0.72) +
-  scale_fill_manual(values = c("own expression" = "#a8c6df",
-    "ambient" = "#8a8a8a",
-    setNames(hcl.colors(length(unique(comp_all$source)), "Reds 3"),
-      rev(unique(comp_all$source))))) +
+  scale_fill_manual(values = c("own expression" = "#2980b9",
+    "contamination" = "#c0392b", "ambient" = "#8a8a8a",
+    "induced" = "#1e8449"), name = NULL,
+    breaks = c("own expression", "contamination", "ambient", "induced")) +
   labs(x = "exocrine cells among 15 nearest neighbors",
-    y = "mean share of ductal-cell content", fill = NULL) +
+    y = "mean share of ductal-cell content") +
   theme_classic(base_size = 11)
 ```
 
@@ -156,7 +160,7 @@ the tissue interfaces: ductal cells inside the acinar tissue carry up to
 half exocrine content, while the ductal/tumor mass itself is nearly
 clean:
 
-```{r composition-map, fig.width=7, fig.height=5}
+```{r composition-map, fig.width=8.5, fig.height=3.2}
 comp <- model$composition("Exocrine epithelial",
   "Ductal/tumor epithelial")
 xy <- cells_xy[match(comp$cell_id, as.character(cells_xy$cell_id)), ]
@@ -210,14 +214,15 @@ ggplot(stack, aes(which, share, fill = part)) +
   theme_classic(base_size = 11)
 ```
 
-Individual cells can be inspected at molecule level. For a fair look,
-both cells below have a strong ductal identity (many ductal-owned
-molecules); the difference is their surroundings. In the tumor mass the
-cell's content is essentially its own; at the acinar interface, the
-same kind of cell is flooded with exocrine-owned molecules (red)
-physically transferred from the acinar cells around it:
+Individual cells can be inspected with the package's standard
+molecule-level rendering — stain background, cell boundaries, cell-type
+contours, and molecules colored by their factor role, with the exocrine
+marker genes emphasized. Both cells below have a strong ductal identity;
+the difference is their surroundings. In the tumor mass the cell's
+content is its own; at the acinar interface, the same kind of cell is
+filled with molecules of the exocrine factor:
 
-```{r anatomy-molecules, fig.width=10, fig.height=4.8}
+```{r anatomy-molecules, fig.width=11, fig.height=5.4}
 profiles <- cellAdmixCore:::.celladmix_audit_profiles(before,
   cell_annotation[colnames(before)])
 top_type <- setNames(
@@ -225,42 +230,32 @@ top_type <- setNames(
   rownames(profiles))
 ductal_genes <- names(top_type)[top_type == "Ductal/tumor epithelial"]
 duct_own_count <- Matrix::colSums(before[ductal_genes, elig])
-# identity-rich picks: many ductal-owned molecules, contrasting
-# contamination levels
 rich <- elig[duct_own_count >= stats::quantile(duct_own_count, 0.6)]
 cid_clean <- rich[which.min(cc[rich] + (expo[rich] > 0))]
 cid_cont <- rich[which.max(cc[rich])]
-cell_panel <- function(cid, title) {
-  cxy <- cells_xy[match(cid, as.character(cells_xy$cell_id)), ]
-  box <- c(cxy$x - 25, cxy$x + 25, cxy$y - 25, cxy$y + 25)
-  mols <- nmf_fit$region(bbox = box)
-  mols$owner <- ifelse(top_type[mols$gene] == "Exocrine epithelial",
-    "exocrine-owned", ifelse(
-      top_type[mols$gene] == "Ductal/tumor epithelial",
-      "ductal-owned", "other"))
-  bounds <- nmf_fit$cell_boundaries(bbox = box)
-  ggplot() +
-    geom_polygon(data = bounds, aes(x, y, group = cell_id), fill = NA,
-      color = "grey70", linewidth = 0.3) +
-    geom_polygon(data = bounds[bounds$cell_id == cid, ],
-      aes(x, y, group = cell_id), fill = NA, color = "black",
-      linewidth = 0.7) +
-    geom_point(data = mols, aes(x, y, color = owner), size = 0.8) +
-    scale_color_manual(values = c("exocrine-owned" = "#c0392b",
-      "ductal-owned" = "#2980b9", "other" = "grey60")) +
-    coord_equal() +
-    labs(x = NULL, y = NULL, color = NULL, title = title) +
-    theme_void(base_size = 11)
-}
+# the exocrine-aligned NMF factor colors the admixed molecules
+fr <- nmf_fit$cell_factors()
+fcols <- grep("^factor_[0-9]+_fraction$", names(fr), value = TRUE)
+exo_cells <- cell_annotation[as.character(fr$cell_id)] == "Exocrine epithelial"
+fmeans <- colMeans(fr[which(exo_cells), fcols], na.rm = TRUE)
+exo_factor <- as.integer(sub("^factor_([0-9]+)_fraction$", "\\1",
+  names(which.max(fmeans))))
+mk_pool <- audit$markers("Exocrine epithelial",
+  "Ductal/tumor epithelial")$pool
+example_of <- function(cid) data.frame(target_cell = cid,
+  target_cell_type = "Ductal/tumor epithelial",
+  top_admix_factor = unname(exo_factor), stringsAsFactors = FALSE)
 cowplot::plot_grid(
-  cell_panel(cid_clean, sprintf("Tumor mass: %.0f%% exocrine content",
-    100 * cc[[cid_clean]])),
-  cell_panel(cid_cont, sprintf("Acinar interface: %.0f%% exocrine content",
-    100 * cc[[cid_cont]])),
+  nmf_fit$plot_cell_example(example_of(cid_clean), markers = mk_pool,
+    title = sprintf("Tumor mass: %.0f%% exocrine content",
+      100 * cc[[cid_clean]])),
+  nmf_fit$plot_cell_example(example_of(cid_cont), markers = mk_pool,
+    title = sprintf("Acinar interface: %.0f%% exocrine content",
+      100 * cc[[cid_cont]])),
   ncol = 2)
 ```
 
-The model's mechanics are visible in how the fitted contamination
+The model's mechanics are visibleThe model's mechanics are visible in how the fitted contamination
 fraction relates to the exposure-derived dose: each cell's own
 expression can move its estimate around the dose, but only within a
 bounded factor — removal stays anchored to the demonstrated spatial
@@ -312,50 +307,83 @@ head(induced[order(-induced$excess),
   c("source", "target", "gene", "excess", "fold", "z")], 8)
 ```
 
-The standard way to see what this means for downstream analysis is a
-differential-expression volcano of exposed versus unexposed ductal
-cells, before and after correction. Before, the transferred exocrine
-markers and the induced genes light up together — indistinguishable to
-a naive neighborhood analysis. After, the transferred markers collapse
-toward zero fold change while the induced program keeps its shift:
+What this means for downstream analysis is best seen the way
+[docs/generative.md](../../docs/generative.md) (Figure 4) shows it: on
+the corrected counts, every gene of the target type is tested for
+expression change with each source's proximity, jointly across all
+sources so correlated neighborhoods do not cross-attribute. Genes with
+essentially none of their content removed as transfer (filled points)
+are unambiguous expression changes — the induced interface program
+rising (green) and the ductal identity program falling (purple) — while
+genes entangled with the transfer split stay open grey:
 
-```{r volcano, fig.width=11, fig.height=4.8}
-mk <- audit$markers("Exocrine epithelial", "Ductal/tumor epithelial")
+```{r volcano, fig.width=6.8, fig.height=5}
 duct_cells <- model$composition("Exocrine epithelial",
   "Ductal/tumor epithelial")$cell_id
-groups <- setNames(ifelse(expo[duct_cells] > 0, "exposed", "unexposed"),
-  duct_cells)
-ind_pair <- induced$gene[induced$source == "Exocrine epithelial" &
-  induced$target == "Ductal/tumor epithelial"]
-marker_sets <- list(
-  "exocrine marker (transferred)" = setdiff(mk$pool, ind_pair),
-  "induced (retained)" = ind_pair)
-de_before <- celladmix_de(before[, duct_cells], groups,
-  contrast = c("exposed", "unexposed"))
-de_after <- celladmix_de(after[, duct_cells], groups,
-  contrast = c("exposed", "unexposed"))
-cowplot::plot_grid(
-  celladmix_plot_volcano(de_before, markers = marker_sets,
-    title = "Ductal cells before correction",
-    subtitle = "logFC = exposed / unexposed"),
-  celladmix_plot_volcano(de_after, markers = marker_sets,
-    title = "after correction",
-    subtitle = "transferred markers collapse toward zero fold change; the induced program stays"),
-  ncol = 2, align = "hv", axis = "tblr")
+duct_pairs <- model$pairs[model$pairs$target == "Ductal/tumor epithelial", ]
+E <- sapply(duct_pairs$source, function(src) pmin(setNames(
+  cellAdmixCore:::.celladmix_source_exposure_counts(
+    cells_xy, cell_annotation, 15L)$counts[, src],
+  as.character(cells_xy$cell_id))[duct_cells], 4))
+K <- after[, duct_cells]
+t_kept <- Matrix::colSums(K)
+X <- cbind(1, E)
+fit_gene <- function(y) {
+  beta <- c(log(max(sum(y), 0.5) / sum(t_kept)), numeric(ncol(E)))
+  for (it in 1:25) {
+    mu <- t_kept * exp(pmin(pmax(X %*% beta, -30), 5))
+    H <- crossprod(X, X * as.numeric(mu))
+    step <- tryCatch(solve(H + diag(1e-8, ncol(X)), crossprod(X, y - mu)),
+      error = function(e) NULL)
+    if (is.null(step)) return(NULL)
+    beta <- beta + step
+    if (max(abs(step)) < 1e-6) break
+  }
+  mu <- t_kept * exp(pmin(pmax(X %*% beta, -30), 5))
+  disp <- max(sum((y - mu)^2 / pmax(mu, 1e-9)) /
+    max(length(y) - ncol(X), 1), 1)
+  se <- sqrt(pmax(diag(solve(crossprod(X, X * as.numeric(mu)) +
+    diag(1e-8, ncol(X)))), 1e-300) * disp)
+  c(beta[[2]], beta[[2]] / se[[2]])  # exocrine coefficient and its z
+}
+removed_frac_g <- 1 - Matrix::rowSums(after[, duct_cells]) /
+  pmax(Matrix::rowSums(before[, duct_cells]), 1)
+res <- t(sapply(rownames(K), function(g) {
+  y <- as.numeric(K[g, ])
+  if (sum(y) < 100) return(c(NA, NA))
+  out <- fit_gene(y)
+  if (is.null(out)) c(NA, NA) else out
+}))
+vol <- data.frame(gene = rownames(K), lfc = res[, 1] / log(2),
+  z = pmin(abs(res[, 2]), 60), dir = sign(res[, 1]),
+  stringsAsFactors = FALSE)
+vol$clean <- removed_frac_g[vol$gene] < 0.10
+vol <- vol[!is.na(vol$z), ]
+vol$tier <- ifelse(!vol$clean, "transfer-entangled",
+  ifelse(vol$dir > 0, "increased near exocrine", "decreased near exocrine"))
+lab <- vol[vol$clean & vol$z > 6, ]
+lab <- lab[order(-lab$z), ][1:8, ]
+ggplot(vol, aes(lfc, z)) +
+  geom_point(data = vol[!vol$clean, ], shape = 1, size = 1.3,
+    color = "#b6b6b6") +
+  geom_point(data = vol[vol$clean, ], aes(color = tier), size = 1.5) +
+  geom_hline(yintercept = 6, color = "grey50", linetype = "13") +
+  ggrepel::geom_text_repel(data = lab, aes(label = gene), size = 3) +
+  scale_color_manual(values = c("increased near exocrine" = "#1e8449",
+    "decreased near exocrine" = "#7d3c98"), name = NULL) +
+  labs(x = "fold change per exocrine neighbor (log2)",
+    y = "significance |z| (capped at 60)") +
+  theme_classic(base_size = 11)
 ```
 
-The evidence behind these calls is a proportionality test. Transferred
+The evidence behind these calls is a proportionality test.The evidence behind these calls is a proportionality test. Transferred
 material samples the source's transcriptome, so a gene's excess in
 ductal cells should be proportional to its share of the exocrine
-profile; genes far above that expectation are the ductal cells' own
-response. Each point below is one exocrine-owned gene, with the genes
-the model flagged in this pair highlighted:
+profile; genes above the significance bound are the ductal cells' own
+response. Each point below is one exocrine-owned gene:
 
-```{r screen, fig.width=6.2, fig.height=4.6}
+```{r screen, fig.width=7, fig.height=5}
 exp_cells <- duct_cells[expo[duct_cells] > 0]
-# significance bound of the screen: the largest excess still consistent
-# with proportional transfer, allowing counting noise and a 15% profile
-# error, with the same wide safety margin the model uses
 un_cells <- duct_cells[expo[duct_cells] == 0]
 t_exp <- sum(Matrix::colSums(before[, exp_cells]))
 t_un <- sum(Matrix::colSums(before[, un_cells]))
@@ -364,14 +392,23 @@ S_cells <- names(cell_types)[!is.na(cell_types) &
   cell_types == "Exocrine epithelial"]
 dist_T <- cellAdmixCore:::.celladmix_source_nearest_distance(
   cells_xy, cell_annotation)[, "Ductal/tumor epithelial"]
-psi <- cellAdmixCore:::.celladmix_audit_interface_profile(
-  before, S_cells, dist_T)[gset]
 m_exp <- Matrix::rowSums(before[gset, exp_cells])
 m_un <- Matrix::rowSums(before[gset, un_cells])
 excess <- m_exp - m_un / t_un * t_exp
 v <- m_exp + (t_exp / t_un)^2 * m_un + 1
-slope <- max(sum(excess * psi / v) / sum(psi^2 / v), 0)
-scr <- data.frame(gene = gset, excess = excess, expected = slope * psi)
+expected_of <- function(prof) {
+  p <- prof
+  p[names(p) %in% names(top_type)[top_type == "Ductal/tumor epithelial"]] <- 0
+  p <- p[gset]
+  slope <- max(sum(excess * p / v) / sum(p^2 / v), 0)
+  slope * p
+}
+exp_int <- expected_of(cellAdmixCore:::.celladmix_audit_interface_profile(
+  before, S_cells, dist_T))
+exp_glob <- expected_of(profiles[, "Exocrine epithelial"] /
+  sum(profiles[, "Exocrine epithelial"]))
+scr <- data.frame(gene = gset, excess = excess, expected = exp_int,
+  expected_global = exp_glob, stringsAsFactors = FALSE)
 scr$flagged <- scr$gene %in%
   induced$gene[induced$source == "Exocrine epithelial" &
     induced$target == "Ductal/tumor epithelial"]
@@ -380,26 +417,38 @@ vdf <- data.frame(lx = log(scr$expected), ly = log(v[scr$gene]))
 vfit <- stats::lm(ly ~ lx, vdf)
 xg <- exp(seq(log(min(scr$expected)), log(max(scr$expected) * 1.5),
   length.out = 200))
-bound <- xg + 8 * sqrt(exp(predict(vfit, data.frame(lx = log(xg)))) +
-  (0.15 * xg)^2)
-bound_df <- data.frame(expected = xg, excess = bound)
+bound_df <- data.frame(expected = xg,
+  excess = xg + 8 * sqrt(exp(predict(vfit, data.frame(lx = log(xg)))) +
+    (0.15 * xg)^2))
+flag <- scr[scr$flagged, ]
 ggplot(scr, aes(expected, excess)) +
   geom_abline(color = "grey40", linewidth = 0.4) +
   geom_line(data = bound_df, linetype = "22", color = "grey50",
     linewidth = 0.4) +
   geom_point(data = scr[!scr$flagged, ], size = 1.3, color = "#9bb5c9") +
-  geom_point(data = scr[scr$flagged, ], size = 2.2, shape = 15,
-    color = "#c0392b") +
+  geom_segment(data = flag, aes(x = expected_global, xend = expected,
+    y = excess, yend = excess), color = "#1e8449", linewidth = 0.5) +
+  geom_point(data = flag, aes(x = expected_global), size = 3.6, shape = 1,
+    stroke = 1.1, color = "#c0392b") +
+  geom_point(data = flag, size = 2, color = "#1e8449") +
   ggrepel::geom_text_repel(
     data = scr[scr$flagged | scr$excess > 5e4, ],
     aes(label = gene), size = 3) +
   scale_x_log10() + scale_y_log10() +
-  labs(x = "excess expected from proportional exocrine transfer (molecules)",
+  labs(x = "excess expected in ductal cells from exocrine transfer (molecules)",
     y = "measured excess in ductal cells (molecules)") +
   theme_classic(base_size = 11)
 ```
 
-The consequence is visible gene by gene. AMY2A sits on the diagonal
+As in [docs/generative.md](../../docs/generative.md) (Figure 2), the
+flagged genes are drawn at both transfer expectations — the open red
+ring from the average exocrine cell, the filled green point from the
+exocrine cells bordering ductal tissue; on this pair the two coincide,
+so the markers superimpose. The dashed curve is the largest excess
+still consistent with proportional transfer, allowing counting noise
+and a 15% profile error.
+
+The consequence is visible gene by gene.The consequence is visible gene by gene. AMY2A sits on the diagonal
 above — the largest exocrine transfer channel — and the correction
 flattens its exposure gradient to the unexposed level. CFTR sits far
 above the diagonal, and the correction preserves its gradient, removing
@@ -408,13 +457,12 @@ opposite policy — `model$correct(retain_induced = FALSE)` removes the
 fitted induced share along with the contamination — which shows directly
 what retention protects, at no change on the transferred gene:
 
-```{r gene-contrast, fig.width=8.5, fig.height=3.6}
+```{r gene-contrast, fig.width=8.5, fig.height=3.8}
 correction_noind <- model$correct(name = "generative_noind",
   retain_induced = FALSE)
 after_noind <- correction_noind$counts()
 tot <- Matrix::colSums(before[, duct_cells])
 bins <- pmin(expo[duct_cells], 3)
-# per-bin rates with exact Poisson 95% intervals, as in the audit's plots
 rates_ci <- function(m, gene) {
   mm <- tapply(m[gene, duct_cells], bins, sum)
   MM <- tapply(tot, bins, sum)
@@ -426,22 +474,36 @@ rates_ci <- function(m, gene) {
 df <- do.call(rbind, lapply(c("AMY2A", "CFTR"), function(g) {
   do.call(rbind, lapply(list(
     list(m = before, lab = "observed"),
-    list(m = after, lab = "corrected"),
-    list(m = after_noind, lab = "corrected, induced share removed")), function(a) {
+    list(m = after, lab = "retained"),
+    list(m = after_noind, lab = "induced share also removed")), function(a) {
     cbind(gene = g, counts = a$lab, rates_ci(a$m, g))
   }))
 }))
 df$counts <- factor(df$counts,
-  levels = c("observed", "corrected", "corrected, induced share removed"))
-ggplot(df, aes(bin, rate, color = counts, linetype = counts)) +
-  geom_line() + geom_point(size = 1.6) +
-  geom_errorbar(aes(ymin = lo, ymax = hi), width = 0.12,
-    linetype = "solid", linewidth = 0.4) +
+  levels = c("observed", "retained", "induced share also removed"))
+band <- merge(
+  df[df$counts == "retained", c("gene", "bin", "rate")],
+  df[df$counts == "observed", c("gene", "bin", "rate")],
+  by = c("gene", "bin"), suffixes = c("_ret", "_obs"))
+base0 <- df[df$counts == "observed" & df$bin == 0, c("gene", "rate")]
+ggplot(df, aes(bin, rate)) +
+  geom_ribbon(data = band, aes(bin, ymin = rate_ret, ymax = rate_obs),
+    fill = "#c0392b", alpha = 0.12, inherit.aes = FALSE) +
+  geom_hline(data = base0, aes(yintercept = rate), color = "grey50",
+    linetype = "13", linewidth = 0.5) +
+  geom_line(aes(color = counts, linetype = counts)) +
+  geom_errorbar(aes(ymin = lo, ymax = hi, color = counts), width = 0.1,
+    linewidth = 0.4, show.legend = FALSE) +
+  geom_point(aes(color = counts, shape = counts), size = 1.9) +
   facet_wrap(~gene, scales = "free_y") +
   scale_color_manual(values = c("observed" = "#c0392b",
-    "corrected" = "#2980b9", "corrected, induced share removed" = "#7d3c98")) +
+    "retained" = "#2980b9", "induced share also removed" = "#7d3c98"),
+    name = NULL) +
+  scale_shape_manual(values = c("observed" = 15, "retained" = 16,
+    "induced share also removed" = 16), name = NULL) +
   scale_linetype_manual(values = c("observed" = "solid",
-    "corrected" = "solid", "corrected, induced share removed" = "22")) +
+    "retained" = "solid", "induced share also removed" = "22"),
+    name = NULL) +
   labs(x = "exocrine cells among 15 nearest neighbors",
     y = "rate in ductal cells (per 1,000 molecules)") +
   theme_classic(base_size = 11)
@@ -541,7 +603,7 @@ where the induced table says it should — the duct cells embedded in
 acinar tissue — a pattern a marker-based correction would have removed
 as contamination:
 
-```{r cftr-map, fig.width=7, fig.height=5}
+```{r cftr-map, fig.width=8.5, fig.height=3.2}
 cftr_rate <- after["CFTR", duct_cells] /
   pmax(Matrix::colSums(after[, duct_cells]), 1) * 1e3
 ggplot(cbind(comp, x = xy$x, y = xy$y, cftr = pmin(cftr_rate, 250)),
@@ -568,6 +630,36 @@ report$plot_cleanup()
 
 ```{r verify-exposure, fig.width=6, fig.height=4}
 audit$plot_exposure(correction = correction)
+```
+
+The downstream payoff is visible in cell state space: a UMAP of the
+corrected counts separates the annotated cell types more cleanly than
+the original counts, where contaminated interface cells blur the
+boundaries between clusters:
+
+```{r state-umap, fig.width=11, fig.height=4.8}
+original_state <- ds$cell_state_umap(cells_max = 5000)
+corrected_state <- correction$cell_state_umap(cells_max = 5000,
+  num_threads = 8)
+type_levels <- sort(unique(cell_annotation))
+palette <- setNames(grDevices::hcl.colors(length(type_levels), "Dark 3"),
+  type_levels)
+umap_panel <- function(df, title) {
+  ggplot(df, aes(umap_1, umap_2,
+      color = factor(cell_type, levels = type_levels))) +
+    geom_point(size = 0.4, alpha = 0.7) +
+    scale_color_manual(values = palette, drop = FALSE, name = NULL) +
+    labs(title = title, x = "UMAP 1", y = "UMAP 2") +
+    theme_classic(base_size = 10) +
+    guides(color = guide_legend(override.aes = list(size = 3, alpha = 1)))
+}
+p1 <- umap_panel(original_state, "Original counts")
+p2 <- umap_panel(corrected_state, "Generative correction")
+shared_legend <- cowplot::get_legend(p1)
+cowplot::plot_grid(
+  cowplot::plot_grid(p1 + theme(legend.position = "none"),
+    p2 + theme(legend.position = "none"), ncol = 2, align = "hv"),
+  shared_legend, ncol = 2, rel_widths = c(1, 0.22))
 ```
 
 Two limits are worth keeping in mind when reading the results. The model
