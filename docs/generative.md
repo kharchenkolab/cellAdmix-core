@@ -160,15 +160,16 @@ would deliver given the gene's share of the interface-local exocrine
 profile (horizontal). The diagonal means "fully accounted for by
 transfer"; the dashed curve marks the largest excess still consistent
 with proportional transfer, allowing counting noise and a 15% error in
-the profile itself, with a wide safety margin — the red squares above
-it are the genes flagged as induced. No corresponding lower bound
-exists: at this margin the allowance exceeds the expectation itself, so
-a shortfall can never be flagged and the screen acts only on excess.
-Only one expectation is drawn because for this pair the two coincide:
-exocrine cells bordering ductal tissue have the same composition as
-average exocrine cells (expectations agree within 1%), so the
-border-state effect shown in (b) is a property of the ductal cells, not
-a general feature of interfaces. **(b)** The
+the profile itself, with a wide safety margin — the genes above it
+(CFTR, PROX1, CA4) are flagged as induced. As in (b), both expectations
+are drawn for these genes — from the average exocrine cell (open red)
+and from the bordering exocrine cells (filled green) — and here the two
+coincide within 1%, so the markers superimpose: the exocrine
+composition is the same at the border, and the border-state effect of
+(b) is a property of the ductal cells rather than a general feature of
+interfaces. No lower bound is drawn: at this safety margin the
+allowance exceeds the expectation itself, so a shortfall can never be
+flagged and the screen acts only on excess. **(b)** The
 same plot for the reverse admixture direction, ductal → exocrine. Grey:
 all ductal-owned genes under the expectation from the bordering ductal
 cells — the data the proportional fit is made from; the dashed curve is

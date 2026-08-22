@@ -221,12 +221,26 @@ P_A = "Exocrine epithelial -> Ductal/tumor epithelial"
 S_A, T_A = "Exocrine epithelial", TARGET
 psi_a = zeroed_profile(inp.near_source_profile(S_A, T_A), T_A)
 gset, exc, expct, z, var_a = screen_fit(P_A, psi_a)
+psi_ga = zeroed_profile(inp.psi_raw[S_A], T_A)
+_, _, expct_ga, _, _ = screen_fit(P_A, psi_ga)
 ok = (exc > 10) & (expct > 1)
 flag = (z > gm.IND_Z) & (exc > gm.IND_MIN_EXCESS)
 axa.scatter(expct[ok & ~flag], exc[ok & ~flag], s=14, color="#9bb5c9",
-            lw=0, label="proportional (transferred)")
-axa.scatter(expct[flag], exc[flag], s=30, marker="s", facecolors="none",
-            edgecolors="#c0392b", label="flagged as induced")
+            lw=0, label="other exocrine-owned genes")
+# Both expectations for the flagged genes: from the average exocrine cell
+# and from the bordering exocrine cells. For this pair they coincide -
+# the exocrine composition is the same at the border - so the two markers
+# superimpose.
+for k in np.flatnonzero(flag):
+    axa.plot([expct_ga[k], expct[k]], [exc[k], exc[k]], color="#1e8449",
+             lw=1.1, zorder=4)
+    axa.scatter([expct_ga[k]], [exc[k]], s=36, facecolors="none",
+                edgecolors="#c0392b", zorder=5)
+    axa.scatter([expct[k]], [exc[k]], s=36, color="#1e8449", zorder=5)
+axa.scatter([], [], s=36, facecolors="none", edgecolors="#c0392b",
+            label="expectation from the average exocrine cell")
+axa.scatter([], [], s=36, color="#1e8449",
+            label="from the bordering exocrine cells")
 lim = [1, max(exc.max(), expct.max()) * 1.6]
 axa.plot(lim, lim, color="grey", lw=0.8)
 # Significance bounds of the screen: a deviation of more than 8 standard
@@ -295,15 +309,15 @@ for gname in ["CXCL6", "CFB", "PPP1R1B"]:
     axb.annotate(gname, (expct_g[k], exc_b[k]), fontsize=7.5,
                  xytext=(-6, dy), textcoords="offset points", ha="right")
 axb.scatter([], [], s=32, marker="o", facecolors="none",
-            edgecolors="#c0392b", label="global-profile expectation")
+            edgecolors="#c0392b", label="expectation from the average ductal cell")
 axb.scatter([], [], s=32, marker="o", color="#1e8449",
-            label="interface-local expectation")
+            label="from the bordering ductal cells")
 axb.set_xscale("log"); axb.set_yscale("log")
 axb.set_xlim(limb); axb.set_ylim([10, limb[1]])
 axb.set_xlabel("expected in exocrine cells from ductal transfer (molecules)")
 axb.set_ylabel("measured excess in exocrine cells (molecules)")
 axb.set_title("(b) the screen: ductal → exocrine", fontsize=10)
-axb.legend(frameon=False, fontsize=8, loc="upper left")
+axb.legend(frameon=False, fontsize=8, loc="lower right")
 
 fig2.tight_layout()
 fig2.savefig(os.path.join(OUT, "generative_fig2.png"), dpi=150,
