@@ -16,28 +16,36 @@ annotation <- read.csv(file.path("annotations", "annotation.csv.gz"))
 cell_annotation <- setNames(annotation$merged_annotation, annotation$cell_id)
 
 ds <- cellAdmix("data", output_dir = "out", annotation = cell_annotation)
-fit <- ds$fit(nmf_variant = "invsqrt_kl")
+nmf_fit <- ds$fit(nmf_variant = "invsqrt_kl")
 ```
 
     ## Reusing cached run fit_manual_rank9_invsqrt_kl (parameters match)
 
-The audit measures the admixture; the generative correction removes it:
+The audit measures the admixture; the generative model is fitted on its
+detected pairs (the NMF fit serves only to initialize the model’s
+expression programs — `init = "clusters"` fits without it), and the
+correction derives from the fitted model:
 
 ``` r
-audit <- fit$audit_admixture()
+audit <- nmf_fit$audit_admixture()
 ```
 
     ## Excluded 23 likely induced genes from marker panels (exposure-linked excess far above the source-profile expectation): ACTG2, ADAMTS1, APCDD1, APOLD1, BASP1, C5orf46, CA4, CAVIN1
 
 ``` r
-correction <- audit$correct_generative(num_threads = 8)
-correction
+model <- audit$fit_generative(init = nmf_fit, num_threads = 8)
+model
 ```
 
-    ## cellAdmix generative correction
+    ## cellAdmix generative model
     ##   pairs: 39 
-    ##   removed molecules (expected): 1,082,659 
-    ##   induced genes retained: 28
+    ##   induced genes retained: 28 
+    ##   removed molecules (expected): 1,193,699 
+    ##   initialization: nmf_factors
+
+``` r
+correction <- model$correct()
+```
 
 The corrected gene-by-cell matrix drops into any downstream analysis:
 
@@ -48,11 +56,11 @@ dim(corrected_counts)
 
     ## [1]    377 140335
 
-The correction keeps the genes whose exposure-linked excess reflects the
+The model keeps the genes whose exposure-linked excess reflects the
 cells’ own response to their neighbors rather than transferred material:
 
 ``` r
-head(correction$induced[order(-correction$induced$excess), ], 5)
+head(model$induced[order(-model$induced$excess), ], 5)
 ```
 
     ##                 source                  target   gene     excess   expected

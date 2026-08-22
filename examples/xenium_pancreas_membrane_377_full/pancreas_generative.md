@@ -34,7 +34,7 @@ annotation <- read.csv(file.path("annotations", "annotation.csv.gz"))
 cell_annotation <- setNames(annotation$merged_annotation, annotation$cell_id)
 
 ds <- cellAdmix("data", output_dir = "out", annotation = cell_annotation)
-fit <- ds$fit(nmf_variant = "invsqrt_kl")
+nmf_fit <- ds$fit(nmf_variant = "invsqrt_kl")
 ```
 
     ## Reusing cached run fit_manual_rank9_invsqrt_kl (parameters match)
@@ -47,7 +47,7 @@ using the rise of source-marker content with the number of source-type
 neighbors:
 
 ``` r
-audit <- fit$audit_admixture()
+audit <- nmf_fit$audit_admixture()
 ```
 
     ## Excluded 23 likely induced genes from marker panels (exposure-linked excess far above the source-profile expectation): ACTG2, ADAMTS1, APCDD1, APOLD1, BASP1, C5orf46, CA4, CAVIN1
@@ -95,21 +95,26 @@ ggplot(by_source, aes(reorder(source, admixed_molecules),
 
 ## Correcting with the generative model
 
-One call fits the model on all detected pairs (about twenty seconds on
-this dataset):
+The model is fitted on the audit’s detected pairs; the NMF fit is passed
+only to initialize the model’s expression programs from its
+factor-labeled molecules (`init = "clusters"` or `init = "pseudobulk"`
+fit without an NMF fit, with nearly identical results). The correction
+then derives from the fitted model:
 
 ``` r
-correction <- audit$correct_generative(num_threads = 8)
-correction
+model <- audit$fit_generative(init = nmf_fit, num_threads = 8)
+model
 ```
 
-    ## cellAdmix generative correction
+    ## cellAdmix generative model
     ##   pairs: 39 
-    ##   removed molecules (expected): 1,082,659 
-    ##   induced genes retained: 28
+    ##   induced genes retained: 28 
+    ##   removed molecules (expected): 1,193,699 
+    ##   initialization: nmf_factors
 
 ``` r
-before <- fit$counts()
+correction <- model$correct()
+before <- nmf_fit$counts()
 after <- correction$counts()
 ```
 
@@ -141,8 +146,8 @@ exposure as the exocrine contamination share grows, with smaller
 contributions from the other bordering types and the ambient background:
 
 ``` r
-comp_all <- correction$composition(target = "Ductal/tumor epithelial")
-cells_xy <- fit$cell_factors()
+comp_all <- model$composition(target = "Ductal/tumor epithelial")
+cells_xy <- nmf_fit$cell_factors()
 expo <- setNames(
   cellAdmixCore:::.celladmix_source_exposure_counts(
     cells_xy, cell_annotation, 15L)$counts[, "Exocrine epithelial"],
@@ -181,7 +186,7 @@ half exocrine content, while the ductal/tumor mass itself is nearly
 clean:
 
 ``` r
-comp <- correction$composition("Exocrine epithelial",
+comp <- model$composition("Exocrine epithelial",
   "Ductal/tumor epithelial")
 xy <- cells_xy[match(comp$cell_id, as.character(cells_xy$cell_id)), ]
 ggplot(cbind(comp, x = xy$x, y = xy$y), aes(x, y,
@@ -227,7 +232,7 @@ switched on themselves. On this tissue the retained set is led by the
 duct-cell program that ductal cells activate at acinar interfaces:
 
 ``` r
-induced <- correction$induced
+induced <- model$induced
 head(induced[order(-induced$excess),
   c("source", "target", "gene", "excess", "fold", "z")], 8)
 ```
@@ -303,18 +308,14 @@ The consequence is visible gene by gene. AMY2A sits on the diagonal
 above — the largest exocrine transfer channel — and the correction
 flattens its exposure gradient to the unexposed level. CFTR sits far
 above the diagonal, and the correction preserves its gradient, removing
-only the transferred share. Refitting with the induced term disabled
-separates the model’s two protective mechanisms: without it, CFTR keeps
-74% of its exposure-linked excess instead of 85%, because ductal cells
-also express CFTR natively and the own-expression programs reclaim much
-of the induced content on their own — the induced term protects the
-disproportionate remainder, and is the sole protection for induced genes
-the target does not express natively. AMY2A is identical in both fits:
-retention costs nothing on transferred content.
+only the transferred share. The same fitted model can also derive the
+opposite policy — `model$correct(retain_induced = FALSE)` removes the
+fitted induced share along with the contamination — which shows directly
+what retention protects, at no change on the transferred gene:
 
 ``` r
-correction_noind <- audit$correct_generative(name = "generative_noind",
-  use_induced = FALSE, num_threads = 8)
+correction_noind <- model$correct(name = "generative_noind",
+  retain_induced = FALSE)
 after_noind <- correction_noind$counts()
 tot <- Matrix::colSums(before[, duct_cells])
 bins <- pmin(expo[duct_cells], 3)
@@ -325,20 +326,20 @@ df <- do.call(rbind, lapply(c("AMY2A", "CFTR"), function(g) {
   do.call(rbind, lapply(list(
     list(m = before, lab = "observed"),
     list(m = after, lab = "corrected"),
-    list(m = after_noind, lab = "corrected, retention off")), function(a) {
+    list(m = after_noind, lab = "corrected, induced share removed")), function(a) {
     data.frame(gene = g, counts = a$lab, bin = 0:3,
       rate = as.numeric(rate_by_bin(a$m, g)))
   }))
 }))
 df$counts <- factor(df$counts,
-  levels = c("observed", "corrected", "corrected, retention off"))
+  levels = c("observed", "corrected", "corrected, induced share removed"))
 ggplot(df, aes(bin, rate, color = counts, linetype = counts)) +
   geom_line() + geom_point(size = 1.6) +
   facet_wrap(~gene, scales = "free_y") +
   scale_color_manual(values = c("observed" = "#c0392b",
-    "corrected" = "#2980b9", "corrected, retention off" = "#7d3c98")) +
+    "corrected" = "#2980b9", "corrected, induced share removed" = "#7d3c98")) +
   scale_linetype_manual(values = c("observed" = "solid",
-    "corrected" = "solid", "corrected, retention off" = "22")) +
+    "corrected" = "solid", "corrected, induced share removed" = "22")) +
   labs(x = "exocrine cells among 15 nearest neighbors",
     y = "rate in ductal cells (per 1,000 molecules)") +
   theme_classic(base_size = 11)
