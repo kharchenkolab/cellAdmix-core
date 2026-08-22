@@ -215,12 +215,19 @@ ggplot(stack, aes(which, share, fill = part)) +
 ```
 
 Individual cells can be inspected with the package's standard
-molecule-level rendering — stain background, cell boundaries, cell-type
-contours, and molecules colored by their factor role, with the exocrine
-marker genes emphasized. Both cells below have a strong ductal identity;
-the difference is their surroundings. In the tumor mass the cell's
-content is its own; at the acinar interface, the same kind of cell is
-filled with molecules of the exocrine factor:
+molecule-level rendering — stain background, cell boundaries, and
+cell-type contours. Here the molecules are colored by gene origin:
+blue for the ductal marker genes (the cell's own identity), red for
+the exocrine marker genes (the audit's admixture panel for this pair —
+material that should not be in a ductal cell), orange for the panel's
+remaining genes. Both cells below have a strong ductal identity; the
+difference is their surroundings. In the tumor mass the red class is
+nearly absent; at the acinar interface, the same kind of cell holds a
+clearly visible population of exocrine-marker molecules — the same
+material that dominates the neighboring exocrine cells. The red class
+understates the fitted contamination fraction: the marker panel covers
+only the exocrine-specific genes, while the fitted 35% also counts
+transferred molecules of genes the two types share:
 
 ```{r anatomy-molecules, fig.width=11, fig.height=5.4}
 profiles <- cellAdmixCore:::.celladmix_audit_profiles(before,
@@ -233,29 +240,32 @@ duct_own_count <- Matrix::colSums(before[ductal_genes, elig])
 rich <- elig[duct_own_count >= stats::quantile(duct_own_count, 0.6)]
 cid_clean <- rich[which.min(cc[rich] + (expo[rich] > 0))]
 cid_cont <- rich[which.max(cc[rich])]
-# the exocrine-aligned NMF factor colors the admixed molecules
-fr <- nmf_fit$cell_factors()
-fcols <- grep("^factor_[0-9]+_fraction$", names(fr), value = TRUE)
-exo_cells <- cell_annotation[as.character(fr$cell_id)] == "Exocrine epithelial"
-fmeans <- colMeans(fr[which(exo_cells), fcols], na.rm = TRUE)
-exo_factor <- as.integer(sub("^factor_([0-9]+)_fraction$", "\\1",
-  names(which.max(fmeans))))
 mk_pool <- audit$markers("Exocrine epithelial",
   "Ductal/tumor epithelial")$pool
-example_of <- function(cid) data.frame(target_cell = cid,
-  target_cell_type = "Ductal/tumor epithelial",
-  top_admix_factor = unname(exo_factor), stringsAsFactors = FALSE)
+gene_classes <- c("ductal marker genes", "exocrine marker genes",
+  "other genes")
+example_panel <- function(cid, title) {
+  prep <- celladmix_prepare_cell_example(nmf_fit,
+    data.frame(target_cell = cid,
+      target_cell_type = "Ductal/tumor epithelial",
+      top_admix_factor = NA, stringsAsFactors = FALSE),
+    markers = mk_pool)
+  g <- prep$molecules$gene
+  prep$molecules$role <- factor(ifelse(g %in% mk_pool, gene_classes[[2]],
+    ifelse(g %in% ductal_genes, gene_classes[[1]], gene_classes[[3]])),
+    levels = gene_classes)
+  prep$role_levels <- gene_classes
+  celladmix_plot_cell_example(prep, title = title)
+}
 cowplot::plot_grid(
-  nmf_fit$plot_cell_example(example_of(cid_clean), markers = mk_pool,
-    title = sprintf("Tumor mass: %.0f%% exocrine content",
-      100 * cc[[cid_clean]])),
-  nmf_fit$plot_cell_example(example_of(cid_cont), markers = mk_pool,
-    title = sprintf("Acinar interface: %.0f%% exocrine content",
-      100 * cc[[cid_cont]])),
+  example_panel(cid_clean, sprintf("Tumor mass: %.0f%% exocrine content",
+    100 * cc[[cid_clean]])),
+  example_panel(cid_cont, sprintf("Acinar interface: %.0f%% exocrine content",
+    100 * cc[[cid_cont]])),
   ncol = 2)
 ```
 
-The model's mechanics are visibleThe model's mechanics are visible in how the fitted contamination
+The model's mechanics are visible in how the fitted contamination
 fraction relates to the exposure-derived dose: each cell's own
 expression can move its estimate around the dose, but only within a
 bounded factor — removal stays anchored to the demonstrated spatial
