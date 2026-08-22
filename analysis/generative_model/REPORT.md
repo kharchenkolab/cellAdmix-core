@@ -381,3 +381,32 @@ correlation 1.000000, per-pair posteriors identical. Runtime: pancreas
 saturates around 4 threads; the serial molecule-table read dominates
 beyond). 01_model.py remains as the reference implementation for the
 evaluation arms.
+
+## Expression-program initialization comparison (09_init_comparison.py)
+
+The model's own-expression programs need starting profiles; the NMF fit
+supplies them by default. Three initializations were compared with
+everything else identical, each scored on the audit's own yardstick
+(excess-weighted sensitivity against the ambient reference, retention of
+the flagged induced genes' excess, own-marker false removal, and the
+per-entry correlation of removed amounts against the factor-initialized
+fit). Full table: results/init_comparison.csv.
+
+| dataset | init | sensitivity | flagged retention | own-marker | agreement | seconds |
+|---|---|---|---|---|---|---|
+| pancreas | nmf_factors | 0.954 | 0.834 | 0 | 1.000 | 22 |
+| pancreas | clusters | 0.939 | 0.804 | 0 | 0.995 | 25 |
+| pancreas | pseudobulk | 0.960 | 0.817 | 0 | 0.997 | 19 |
+| NSCLC | nmf_factors | 0.762 | 0.911 | 0 | 1.000 | 81 |
+| NSCLC | clusters | 0.772 | 0.910 | 0 | 0.959 | 67 |
+| NSCLC | pseudobulk | 0.813 | 0.901 | 0 | 0.933 | 34 |
+
+Conclusion: the initialization barely matters - sensitivities differ by
+1-5 points with no consistent winner, retention is stable, own-marker
+removal is exactly zero in every case, and the removals agree entry by
+entry at 0.93-1.00. The model's constraints (dose-anchored
+contamination, target-owned-gene protection, contamination-weighted
+program learning), not the starting programs, determine where the fit
+converges; the NMF factorization is the model's most convenient
+initializer, not a requirement. (Breast 5K rows are appended to the CSV
+by the same script.)
