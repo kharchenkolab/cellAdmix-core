@@ -234,10 +234,10 @@ axa.scatter(expct[ok & ~flag], exc[ok & ~flag], s=14, color="#9bb5c9",
 for k in np.flatnonzero(flag):
     axa.plot([expct_ga[k], expct[k]], [exc[k], exc[k]], color="#1e8449",
              lw=1.1, zorder=4)
-    axa.scatter([expct_ga[k]], [exc[k]], s=36, facecolors="none",
-                edgecolors="#c0392b", zorder=5)
-    axa.scatter([expct[k]], [exc[k]], s=36, color="#1e8449", zorder=5)
-axa.scatter([], [], s=36, facecolors="none", edgecolors="#c0392b",
+    axa.scatter([expct_ga[k]], [exc[k]], s=110, facecolors="none",
+                edgecolors="#c0392b", lw=1.4, zorder=5)
+    axa.scatter([expct[k]], [exc[k]], s=36, color="#1e8449", zorder=6)
+axa.scatter([], [], s=110, facecolors="none", edgecolors="#c0392b", lw=1.4,
             label="expectation from the average exocrine cell")
 axa.scatter([], [], s=36, color="#1e8449",
             label="from the bordering exocrine cells")
@@ -301,15 +301,16 @@ for gname in ["CXCL6", "CFB", "PPP1R1B"]:
     k = int(np.flatnonzero(gset_b == gi)[0])
     axb.annotate("", xy=(expct_i[k], exc_b[k]), xytext=(expct_g[k], exc_b[k]),
                  arrowprops=dict(arrowstyle="-|>", color="#1e8449", lw=1.2))
-    axb.scatter([expct_g[k]], [exc_b[k]], s=32, marker="o",
-                facecolors="none", edgecolors="#c0392b", zorder=5)
+    axb.scatter([expct_g[k]], [exc_b[k]], s=110, marker="o",
+                facecolors="none", edgecolors="#c0392b", lw=1.4, zorder=5)
     axb.scatter([expct_i[k]], [exc_b[k]], s=32, marker="o",
-                color="#1e8449", zorder=5)
+                color="#1e8449", zorder=6)
     dy = -11 if gname == "CXCL6" else 5
     axb.annotate(gname, (expct_g[k], exc_b[k]), fontsize=7.5,
                  xytext=(-6, dy), textcoords="offset points", ha="right")
-axb.scatter([], [], s=32, marker="o", facecolors="none",
-            edgecolors="#c0392b", label="expectation from the average ductal cell")
+axb.scatter([], [], s=110, marker="o", facecolors="none",
+            edgecolors="#c0392b", lw=1.4,
+            label="expectation from the average ductal cell")
 axb.scatter([], [], s=32, marker="o", color="#1e8449",
             label="from the bordering ductal cells")
 axb.set_xscale("log"); axb.set_yscale("log")
