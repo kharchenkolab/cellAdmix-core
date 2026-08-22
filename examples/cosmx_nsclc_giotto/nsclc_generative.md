@@ -30,7 +30,7 @@ cell_annotation <- setNames(cell_meta$cell_type_coarse, cell_meta$cell)
 
 ds <- cellAdmix(file.path("prepared", "molecules_all.csv.gz"),
   output_dir = "out", annotation = cell_annotation)
-fit <- ds$fit()
+nmf_fit <- ds$fit()
 ```
 
     ## Reusing cached run fit_manual_rank8_ls_nmf (parameters match)
@@ -38,7 +38,7 @@ fit <- ds$fit()
 ## The admixture pattern between cell types
 
 ``` r
-audit <- fit$audit_admixture()
+audit <- nmf_fit$audit_admixture()
 ```
 
     ## Excluded 72 likely induced genes from marker panels (exposure-linked excess far above the source-profile expectation): ADIRF, B2M, C5AR2, CAV1, CCL21, CCL3, CCL3L3, CCL4
@@ -82,23 +82,32 @@ ggplot(by_source, aes(reorder(source, admixed_molecules),
 
 ## Correcting with the generative model
 
+The model is fitted on the audit’s detected pairs (the NMF fit only
+initializes its expression programs), and the correction derives from
+the fitted model:
+
 ``` r
-correction <- audit$correct_generative(num_threads = 8)
-correction
+model <- audit$fit_generative(init = nmf_fit, num_threads = 8)
+model
 ```
 
-    ## cellAdmix generative correction
+    ## cellAdmix generative model
     ##   pairs: 27 
-    ##   removed molecules (expected): 2,618,351 
-    ##   induced genes retained: 88
+    ##   induced genes retained: 88 
+    ##   removed molecules (expected): 2,645,086 
+    ##   initialization: nmf_factors
+
+``` r
+correction <- model$correct()
+```
 
 The per-cell contamination fractions for the largest pair, by exposure
 and in space:
 
 ``` r
 top_pair <- pairs[order(-pairs$admixed_molecules), ][1, ]
-comp <- correction$composition(top_pair$source, top_pair$target)
-cells_xy <- fit$cell_factors()
+comp <- model$composition(top_pair$source, top_pair$target)
+cells_xy <- nmf_fit$cell_factors()
 expo <- setNames(
   cellAdmixCore:::.celladmix_source_exposure_counts(
     cells_xy, cell_annotation, 15L)$counts[, top_pair$source],
@@ -135,7 +144,7 @@ On this tissue the retained induced set reads as the classic stress,
 immediate-early and chemokine programs of cells at tissue interfaces:
 
 ``` r
-induced <- correction$induced
+induced <- model$induced
 head(induced[order(-induced$excess),
   c("source", "target", "gene", "excess", "fold", "z")], 10)
 ```
@@ -161,9 +170,9 @@ its gradient:
 ind_top <- induced[order(-induced$excess), ][1, ]
 mk <- audit$markers(ind_top$source, ind_top$target)
 transfer_gene <- setdiff(mk$pool, induced$gene)[1]
-before <- fit$counts()
+before <- nmf_fit$counts()
 after <- correction$counts()
-t_cells <- correction$composition(ind_top$source, ind_top$target)$cell_id
+t_cells <- model$composition(ind_top$source, ind_top$target)$cell_id
 expo_t <- setNames(
   cellAdmixCore:::.celladmix_source_exposure_counts(
     cells_xy, cell_annotation, 15L)$counts[, ind_top$source],
