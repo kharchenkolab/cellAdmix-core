@@ -111,6 +111,50 @@ excess is retained where it occurs (the per-cell activity multiplier
 concentrates it in the responding cells) while their proportional share
 is still removed as transfer.
 
+To be explicit about the reference of the comparison: each gene is
+tested individually against the proportional fit to the *source-cell
+profile* — there is no induced-profile template, and no correlation
+among induced genes is assumed or used. Figure 2a shows the test on the
+exocrine → ductal pair: the exposure-linked excess of the source-owned
+genes lies on the proportional line across three orders of magnitude —
+AMY2A, the largest transfer channel, sits exactly on it — while CFTR,
+PROX1 and CA4 sit severalfold above it and are flagged. Figure 2b shows
+why the profile must be interface-local: on the ductal → exocrine pair,
+the activation genes CXCL6, CFB and PPP1R1B lie far off the line when
+the expectation is computed from the ductal average, and move onto it
+when it is computed from the ductal cells that actually border exocrine
+tissue — their excess is transfer from activated edge cells, and only
+the interface-local profile prices it correctly.
+
+![Figure 2](figures/generative_fig2.png)
+
+**Figure 2. What the screen compares.** **(a)** Per-gene exposure-linked
+excess in ductal cells against the expectation from proportional
+exocrine transfer (interface-local profile); grey: source-owned genes,
+red squares: genes flagged as induced. **(b)** The same comparison for
+ductal → exocrine under two profiles: open red circles place CXCL6, CFB
+and PPP1R1B at their global-profile expectation, filled green points at
+their interface-local expectation; the arrows show that the apparent
+disproportionality disappears once the expectation reflects the
+bordering ductal cells.
+
+A separate question is how a flagged gene is known to be induced rather
+than admixed from a *different* source type. Three mechanisms address
+it. First, each gene is screened in the pair of its own top-expressing
+type: a gene owned by another type is tested against that type's
+profile, in that type's pair, where its transfer reads as proportional.
+Second, the fitted model is simultaneous over every detected source: a
+target cell carries one contamination term per source, each anchored to
+that source's own neighbor count, so molecules arriving from a second
+source load onto that source's term — the induced term only receives
+what no modeled source can explain. Third, what remains is the honest
+residual risk: material from a source with no detected pair — an
+unannotated or rare cell type — has no term to load onto, and its genes
+could be misread as induced if their arrival correlates with a modeled
+source's exposure. The screen's reports (`markers()` in the audit, the
+per-pair induced tables here) name the flagged genes precisely so such
+cases can be inspected.
+
 This same screen, applied to the audit's marker panels, is how the
 package excludes induced genes from admixture estimation (see
 [benchmarks.md](benchmarks.md) and the binding documentation); flagged
@@ -167,7 +211,7 @@ exposure-linked excess removed on the held-out half, weighted across the
   planted induction. The planted induction itself is retained or removed
   depending on how far it exceeds the transfer expectation of its genes —
   the full sweep over gene ranks and planted amounts is shown in
-  Figure 2 and discussed under the identifiability limit below.
+  Figure 3 and discussed under the identifiability limit below.
 - **Replication**: on the CosMx NSCLC dataset (98,002 cells, 960-gene
   panel, 27 detected pairs) the same configuration reaches 0.964 on
   held-out genes, removes 9.0% of the molecules, keeps own-marker
@@ -214,7 +258,7 @@ disproportionate to the local source profile; induction proportionate
 to a source's own top markers is indistinguishable from admixture at
 count level and will be removed.
 
-Figure 2 shows this boundary measured directly. Synthetic induced
+Figure 3 shows this boundary measured directly. Synthetic induced
 expression was planted across a range of gene ranks and amounts, and
 its retained fraction charted against the gene's total exposure-linked
 excess relative to the transfer expectation: retention turns on where
@@ -226,9 +270,9 @@ same curve — the model treats real and planted induction alike, and
 its largest real retention decision (CFTR, Figure 1d) sits well inside
 the recoverable regime at 3.9-fold.
 
-![Figure 2](figures/generative_fig2.png)
+![Figure 3](figures/generative_fig3.png)
 
-**Figure 2. The separation boundary.** Fraction of planted induced
+**Figure 3. The separation boundary.** Fraction of planted induced
 expression retained, as a function of the gene's exposure-linked excess
 relative to the transfer expectation (blue: spike-in sweep over planted
 gene ranks and amounts, pancreas); red squares: the real flagged genes

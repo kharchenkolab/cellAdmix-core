@@ -7,7 +7,14 @@ function of exocrine exposure; (c, d) two genes contrasted - AMY2A, whose
 exposure gradient is transferred material and is removed, and CFTR, whose
 gradient is an induced duct-cell program and is retained.
 
-Figure 2 - retention of planted induced expression as a function of its
+Figure 2 - how the screen identifies induced genes: (a) per-gene
+exposure-linked excess against the proportional-transfer expectation for
+exocrine -> ductal, with the flagged genes off the line; (b) the same test
+for ductal -> exocrine under the global versus interface-local ductal
+profile - the activation genes move onto the line when the expectation
+uses the ductal cells that actually border exocrine tissue.
+
+Figure 3 - retention of planted induced expression as a function of its
 disproportionality to the transfer expectation (spike-in sweep), with the
 real flagged genes overlaid.
 """
@@ -169,8 +176,123 @@ fig.savefig(os.path.join(OUT, "generative_fig1.png"), dpi=150,
             bbox_inches="tight")
 print("fig1 done")
 
-# ---- Figure 2: the retention boundary --------------------------------------
-fig2, ax = plt.subplots(figsize=(5.8, 4.4))
+# ---- Figure 2: how the screen identifies induced genes ---------------------
+def pair_excess(pair_name):
+    """Per-gene exposure-linked excess and its variance for one pair."""
+    pi = inp.pair_info[pair_name]
+    cells = pi["cells"]
+    e = pi["exposure"]
+    exp_c, un_c = cells[e > 0], cells[e == 0]
+    c_exp = np.asarray(inp.counts[:, exp_c].sum(axis=1)).ravel()
+    c_un = np.asarray(inp.counts[:, un_c].sum(axis=1)).ravel()
+    t_exp = inp.totals[exp_c].sum()
+    t_un = inp.totals[un_c].sum()
+    excess = c_exp - c_un / max(t_un, 1.0) * t_exp
+    var = c_exp + (t_exp / max(t_un, 1.0)) ** 2 * c_un + 1.0
+    return excess, var
+
+
+def screen_fit(pair_name, psi):
+    """Weighted proportional fit of per-gene excess on a source profile,
+    with the overdispersed residual z, over the source-owned genes."""
+    pi = inp.pair_info[pair_name]
+    excess, var = pair_excess(pair_name)
+    gset = np.flatnonzero(inp.top_type == pi["S"])
+    p = psi[gset]
+    w = 1.0 / var[gset]
+    slope = max(float((w * excess[gset] * p).sum())
+                / max(float((w * p * p).sum()), 1e-12), 0.0)
+    z = (excess[gset] - slope * p) / np.sqrt(
+        var[gset] + (gm.PROF_CV * slope * p) ** 2)
+    return gset, excess[gset], slope * p, z
+
+
+def zeroed_profile(prof, T):
+    p = prof.copy()
+    p[inp.top_type == T] = 0.0
+    return p
+
+
+fig2, (axa, axb) = plt.subplots(1, 2, figsize=(11.0, 4.4))
+
+# (a) the screen on exocrine -> ductal: excess versus proportional
+# expectation from the interface-local source profile.
+P_A = "Exocrine epithelial -> Ductal/tumor epithelial"
+S_A, T_A = "Exocrine epithelial", TARGET
+psi_a = zeroed_profile(inp.near_source_profile(S_A, T_A), T_A)
+gset, exc, expct, z = screen_fit(P_A, psi_a)
+ok = (exc > 10) & (expct > 1)
+flag = (z > gm.IND_Z) & (exc > gm.IND_MIN_EXCESS)
+axa.scatter(expct[ok & ~flag], exc[ok & ~flag], s=14, color="#9bb5c9",
+            lw=0, label="proportional (transferred)")
+axa.scatter(expct[flag], exc[flag], s=30, marker="s", facecolors="none",
+            edgecolors="#c0392b", label="flagged as induced")
+lim = [1, max(exc.max(), expct.max()) * 1.6]
+axa.plot(lim, lim, color="grey", lw=0.8)
+axa.set_xscale("log"); axa.set_yscale("log")
+axa.set_xlim(lim); axa.set_ylim([10, lim[1]])
+for gname in ["CFTR", "PROX1", "CA4", "AMY2A", "CELA2A"]:
+    gi = inp.gene_of.get(gname)
+    if gi is None or gi not in gset:
+        continue
+    k = int(np.flatnonzero(gset == gi)[0])
+    if exc[k] <= 10:
+        continue
+    axa.annotate(gname, (expct[k], exc[k]), fontsize=7.5,
+                 xytext=(4, 3), textcoords="offset points")
+axa.set_xlabel("expected from proportional transfer (molecules)")
+axa.set_ylabel("exposure-linked excess (molecules)")
+axa.set_title("(a) the screen: exocrine → ductal", fontsize=10)
+axa.legend(frameon=False, fontsize=8, loc="upper left")
+
+# (b) the same test for ductal -> exocrine under the global versus the
+# interface-local ductal profile: the activation genes CXCL6/CFB/PPP1R1B
+# sit far off the proportional line under the global profile and move
+# onto it when the expectation uses the ductal cells that actually border
+# exocrine tissue.
+P_B = "Ductal/tumor epithelial -> Exocrine epithelial"
+S_B, T_B = "Ductal/tumor epithelial", "Exocrine epithelial"
+psi_int = zeroed_profile(inp.near_source_profile(S_B, T_B), T_B)
+psi_glob = zeroed_profile(inp.psi_raw[S_B], T_B)
+gset_b, exc_b, expct_i, z_i = screen_fit(P_B, psi_int)
+_, _, expct_g, z_g = screen_fit(P_B, psi_glob)
+okb = (exc_b > 10) & (expct_i > 1)
+axb.scatter(expct_i[okb], exc_b[okb], s=14, color="#9bb5c9", lw=0,
+            label="other ductal-owned genes")
+limb = [1, max(exc_b.max(), expct_i.max()) * 1.6]
+axb.plot(limb, limb, color="grey", lw=0.8)
+for gname in ["CXCL6", "CFB", "PPP1R1B"]:
+    gi = inp.gene_of.get(gname)
+    if gi is None or gi not in gset_b:
+        continue
+    k = int(np.flatnonzero(gset_b == gi)[0])
+    axb.annotate("", xy=(expct_i[k], exc_b[k]), xytext=(expct_g[k], exc_b[k]),
+                 arrowprops=dict(arrowstyle="-|>", color="#1e8449", lw=1.2))
+    axb.scatter([expct_g[k]], [exc_b[k]], s=32, marker="o",
+                facecolors="none", edgecolors="#c0392b", zorder=5)
+    axb.scatter([expct_i[k]], [exc_b[k]], s=32, marker="o",
+                color="#1e8449", zorder=5)
+    dy = -11 if gname == "CXCL6" else 5
+    axb.annotate(gname, (expct_g[k], exc_b[k]), fontsize=7.5,
+                 xytext=(-6, dy), textcoords="offset points", ha="right")
+axb.scatter([], [], s=32, marker="o", facecolors="none",
+            edgecolors="#c0392b", label="global-profile expectation")
+axb.scatter([], [], s=32, marker="o", color="#1e8449",
+            label="interface-local expectation")
+axb.set_xscale("log"); axb.set_yscale("log")
+axb.set_xlim(limb); axb.set_ylim([10, limb[1]])
+axb.set_xlabel("expected from proportional transfer (molecules)")
+axb.set_ylabel("exposure-linked excess (molecules)")
+axb.set_title("(b) profile choice: ductal → exocrine", fontsize=10)
+axb.legend(frameon=False, fontsize=8, loc="upper left")
+
+fig2.tight_layout()
+fig2.savefig(os.path.join(OUT, "generative_fig2.png"), dpi=150,
+             bbox_inches="tight")
+print("fig2 done")
+
+# ---- Figure 3: the retention boundary --------------------------------------
+fig3, ax = plt.subplots(figsize=(5.8, 4.4))
 sw = pd.read_csv(os.path.join(GM, "results", "gm_spikein_sweep.csv"))
 sw["ratio"] = (sw.planted + sw.preexisting_excess) / sw.preexisting_excess
 ax.scatter(sw.ratio, sw.retention_molecule, s=28, color="#2980b9",
@@ -191,7 +313,7 @@ ax.set_ylabel("fraction of induced excess retained")
 ax.legend(frameon=False, fontsize=8, loc="lower right")
 ax.annotate("indistinguishable\nfrom transfer", (1.1, 0.32), fontsize=8,
             color="grey", ha="left")
-fig2.tight_layout()
-fig2.savefig(os.path.join(OUT, "generative_fig2.png"), dpi=150,
+fig3.tight_layout()
+fig3.savefig(os.path.join(OUT, "generative_fig3.png"), dpi=150,
              bbox_inches="tight")
-print("fig2 done")
+print("fig3 done")
