@@ -431,14 +431,18 @@ CellAdmixAudit <- R6::R6Class(
       if (detected_only) out[out$detected, , drop = FALSE] else out
     },
 
-    correct_generative = function(name = "generative", num_threads = NULL,
-                                  ...) {
+    fit_generative = function(init = NULL, n_programs = 4L, seed = 1L,
+                              num_threads = NULL, ...) {
       # Fit the generative admixture model on the detected pairs: each
       # target cell's counts are decomposed into own expression, per-source
-      # contamination, ambient background, and induced expression; the
-      # contamination and ambient shares are removed, the induced ones
-      # retained (see docs/generative.md). Returns a correction object
-      # accepted by evaluate().
+      # contamination, ambient background, and induced expression (see
+      # docs/generative.md). init selects the expression-program
+      # initialization: an NMF fit uses its factor-labeled molecules (the
+      # default), "clusters" derives programs by clustering each type's
+      # cells weighted toward lightly dosed ones, "pseudobulk" uses one
+      # pooled profile per type, and a named list of programs-by-genes
+      # matrices (names = cell types, columns = count-matrix genes)
+      # supplies explicit programs. Returns a CellAdmixGenerativeModel.
       counts <- private$.counts
       cells <- colnames(counts)
       types <- sort(unique(private$.cell_types[!is.na(private$.cell_types)]))
@@ -463,10 +467,51 @@ CellAdmixAudit <- R6::R6Class(
         pair_names[[length(pair_names) + 1]] <- c(d$source, d$target)
       }
 
+      # Resolve the initialization.
+      molecules_parquet <- ""
+      cells_parquet <- ""
+      programs_flat <- numeric(0)
+      program_type <- integer(0)
+      if (is.null(init)) init <- self$fit
+      if (inherits(init, "CellAdmixFit")) {
+        init_mode <- "factors"
+        init_label <- "nmf_factors"
+        molecules_parquet <- file.path(init$run_dir, "molecules.parquet")
+        cells_parquet <- file.path(init$run_dir, "cells.parquet")
+      } else if (is.character(init) && length(init) == 1) {
+        if (!init %in% c("clusters", "pseudobulk")) {
+          stop("init must be an NMF fit, \"clusters\", \"pseudobulk\", ",
+            "or a named list of program matrices")
+        }
+        init_mode <- init
+        init_label <- init
+      } else if (is.list(init)) {
+        init_mode <- "pseudobulk"
+        init_label <- "explicit"
+        for (t in names(init)) {
+          if (!t %in% types) stop("unknown cell type in init: ", t)
+          m <- init[[t]]
+          if (is.null(dim(m))) m <- matrix(m, nrow = 1)
+          if (ncol(m) != nrow(counts)) {
+            stop("init programs must have one column per gene")
+          }
+          for (k in seq_len(nrow(m))) {
+            programs_flat <- c(programs_flat, as.numeric(m[k, ]))
+            program_type <- c(program_type, unname(type_code[[t]]))
+          }
+        }
+      } else {
+        stop("init must be an NMF fit, \"clusters\", \"pseudobulk\", ",
+          "or a named list of program matrices")
+      }
+
       options <- list(...)
       if (is.null(options$neighbor_k)) {
         options$neighbor_k <- self$params$neighbor_k %||% 15L
       }
+      options$init_mode <- init_mode
+      options$n_programs <- as.integer(n_programs)
+      options$seed <- as.integer(seed)
       if (!is.null(num_threads)) options$num_threads <- num_threads
 
       res <- .celladmix_fit_generative(
@@ -479,14 +524,13 @@ CellAdmixAudit <- R6::R6Class(
         y = cell_tbl$y[pos],
         type_codes = codes,
         n_types = length(types),
-        molecules_parquet = file.path(self$fit$run_dir, "molecules.parquet"),
-        cells_parquet = file.path(self$fit$run_dir, "cells.parquet"),
+        molecules_parquet = molecules_parquet,
+        cells_parquet = cells_parquet,
         pairs = pair_specs,
         factor_to_type = integer(0),
+        programs_flat = programs_flat,
+        program_type = program_type,
         options = options)
-
-      corrected <- counts
-      corrected@x <- pmax(counts@x - res$removed, 0)
 
       pair_source <- vapply(pair_names, `[[`, "", 1)
       pair_target <- vapply(pair_names, `[[`, "", 2)
@@ -519,10 +563,20 @@ CellAdmixAudit <- R6::R6Class(
         mean_dose_exposed = res$pairs$mean_dose_exposed,
         stringsAsFactors = FALSE)
 
-      CellAdmixGenerativeCorrection$new(
-        name = name, counts = corrected, pairs = pairs_summary,
-        induced = induced, composition = composition,
-        whole_cell_profiles = isTRUE(res$whole_cell_profiles))
+      CellAdmixGenerativeModel$new(
+        counts = counts, removed = res$removed,
+        removed_without_retention = res$removed_without_retention,
+        pairs = pairs_summary, induced = induced, composition = composition,
+        n_programs = stats::setNames(res$n_programs_used, types),
+        whole_cell_profiles = isTRUE(res$whole_cell_profiles),
+        init = init_label)
+    },
+
+    correct_generative = function(name = "generative", ...) {
+      # Fit the generative model and derive its correction in one call;
+      # equivalent to fit_generative(...)$correct(name), discarding the
+      # fitted model's decomposition.
+      self$fit_generative(...)$correct(name = name)
     },
 
     markers = function(source, target) {
@@ -899,37 +953,36 @@ CellAdmixCleanupReport <- R6::R6Class(
 
 scales_comma <- function(x) format(x, big.mark = ",", scientific = FALSE)
 
-#' Generative Admixture Correction
+#' Generative Admixture Model
 #'
-#' Corrected counts from the generative admixture model, together with the
-#' model's per-cell decomposition: for every detected pair, the
-#' exposure-derived contamination dose, the fitted per-cell contamination
-#' fraction, the induced-expression activity, and the ambient scale. Created
-#' by `audit$correct_generative()`; accepted by `audit$evaluate()`.
+#' A fitted generative admixture model: the decomposition of every target
+#' cell's counts into own expression, per-source contamination, ambient
+#' background, and induced expression. Exposes the per-cell decomposition
+#' (`composition()`), the retained induced genes (`induced`), per-pair
+#' summaries (`pairs`), and derives corrections without refitting
+#' (`correct()`). Created by `audit$fit_generative()`.
 #' @export
-CellAdmixGenerativeCorrection <- R6::R6Class(
-  "CellAdmixGenerativeCorrection",
+CellAdmixGenerativeModel <- R6::R6Class(
+  "CellAdmixGenerativeModel",
   public = list(
-    name = NULL,
     pairs = NULL,
     induced = NULL,
-    rules = NULL,
+    n_programs = NULL,
     whole_cell_profiles = NULL,
+    init = NULL,
 
-    initialize = function(name, counts, pairs, induced, composition,
-                          whole_cell_profiles) {
-      self$name <- name
+    initialize = function(counts, removed, removed_without_retention,
+                          pairs, induced, composition, n_programs,
+                          whole_cell_profiles, init) {
       self$pairs <- pairs
       self$induced <- induced
-      self$rules <- data.frame(source_cell_type = pairs$source,
-        target_cell_type = pairs$target, stringsAsFactors = FALSE)
+      self$n_programs <- n_programs
       self$whole_cell_profiles <- whole_cell_profiles
+      self$init <- init
       private$.counts <- counts
+      private$.removed <- removed
+      private$.removed_strict <- removed_without_retention
       private$.composition <- composition
-    },
-
-    counts = function() {
-      private$.counts
     },
 
     composition = function(source = NULL, target = NULL) {
@@ -940,14 +993,63 @@ CellAdmixGenerativeCorrection <- R6::R6Class(
       d
     },
 
+    correct = function(name = "generative", retain_induced = TRUE) {
+      # Derive a correction from the fitted model, without refitting. With
+      # retain_induced = FALSE the induced share of each count is removed
+      # along with the contamination and ambient shares.
+      removed <- if (retain_induced) private$.removed else
+        private$.removed_strict
+      corrected <- private$.counts
+      corrected@x <- pmax(private$.counts@x - removed, 0)
+      CellAdmixGenerativeCorrection$new(name = name, counts = corrected,
+        rules = data.frame(source_cell_type = self$pairs$source,
+          target_cell_type = self$pairs$target, stringsAsFactors = FALSE),
+        retained_induced = retain_induced)
+    },
+
     print = function(...) {
-      cat("cellAdmix generative correction\n")
+      cat("cellAdmix generative model\n")
       cat("  pairs:", nrow(self$pairs), "\n")
-      cat("  removed molecules (expected):",
-        format(round(sum(self$pairs$removed_molecules_expected)), big.mark = ","), "\n")
       cat("  induced genes retained:", nrow(self$induced), "\n")
+      cat("  removed molecules (expected):",
+        format(round(sum(private$.removed)), big.mark = ","), "\n")
+      cat("  initialization:", self$init, "\n")
       invisible(self)
     }
   ),
-  private = list(.counts = NULL, .composition = NULL)
+  private = list(.counts = NULL, .removed = NULL, .removed_strict = NULL,
+    .composition = NULL)
+)
+
+#' Generative Admixture Correction
+#'
+#' Corrected counts derived from a fitted generative model by
+#' `model$correct()`; accepted by `audit$evaluate()`.
+#' @export
+CellAdmixGenerativeCorrection <- R6::R6Class(
+  "CellAdmixGenerativeCorrection",
+  public = list(
+    name = NULL,
+    rules = NULL,
+    retained_induced = NULL,
+
+    initialize = function(name, counts, rules, retained_induced) {
+      self$name <- name
+      self$rules <- rules
+      self$retained_induced <- retained_induced
+      private$.counts <- counts
+    },
+
+    counts = function() {
+      private$.counts
+    },
+
+    print = function(...) {
+      cat("cellAdmix generative correction\n")
+      cat("  pairs:", nrow(self$rules), "\n")
+      cat("  induced expression retained:", self$retained_induced, "\n")
+      invisible(self)
+    }
+  ),
+  private = list(.counts = NULL)
 )

@@ -849,7 +849,8 @@
                                       counts_values, n_genes, cell_ids,
                                       x, y, type_codes, n_types,
                                       molecules_parquet, cells_parquet,
-                                      pairs, factor_to_type, options) {
+                                      pairs, factor_to_type,
+                                      programs_flat, program_type, options) {
   .Call(
     "_cellAdmixCore_celladmix_fit_generative",
     as.integer(counts_indptr),
@@ -865,6 +866,8 @@
     as.character(cells_parquet),
     pairs,
     as.integer(factor_to_type),
+    as.numeric(programs_flat),
+    as.integer(program_type),
     options,
     PACKAGE = "cellAdmixCore"
   )

@@ -74,6 +74,15 @@ struct GenerativeOptions {
   bool use_ambient = true;
   bool use_induced = true;
   int num_threads = 1;
+  // Expression-program initialization: "factors" uses the run's
+  // factor-labeled molecules (requires a molecule table; falls back to
+  // pseudobulk without one), "clusters" derives programs by clustering each
+  // type's cells with weights favoring lightly dosed cells, "pseudobulk"
+  // uses one pooled profile per type. Explicit programs passed to
+  // fit_generative override the mode.
+  std::string init_mode = "factors";
+  int n_programs = 4;
+  unsigned int seed = 1;
 };
 
 // One source -> target pair, from the admixture audit. Gene sets are indices
@@ -111,6 +120,11 @@ struct GenerativeResult {
   // Removed molecule mass on the pattern of the input counts: value p of
   // the result aligns with value p of the input matrix.
   std::vector<double> removed;
+  // The same split with the induced share reallocated to removal, so a
+  // correction without retention derives from the fitted model directly.
+  std::vector<double> removed_without_retention;
+  // Number of expression programs fitted per type.
+  std::vector<int> n_programs_used;
   // Per pair: the target cells (columns of the count matrix), the prior
   // contamination fraction from the dose, the fitted per-cell fraction, and
   // the per-cell induced activity.
@@ -138,7 +152,10 @@ struct GenerativeResult {
 // initialized from type pseudobulk profiles and transfer profiles from
 // whole-cell counts (used by unit tests and runs without factor labels).
 // factor_to_type supplies an explicit factor alignment (factor index ->
-// type code, -1 unaligned); empty derives it from the data.
+// type code, -1 unaligned); empty derives it from the data. Explicit
+// expression-program initializations may be passed as programs_flat (one
+// row per program, row-major over genes) with program_type giving each
+// row's type code; empty uses options.init_mode.
 GenerativeResult fit_generative(
     const std::vector<int>& counts_indptr,
     const std::vector<int>& counts_indices,
@@ -153,6 +170,8 @@ GenerativeResult fit_generative(
     const std::string& cells_parquet,
     const std::vector<GenerativePairSpec>& pairs,
     const std::vector<int>& factor_to_type,
+    const std::vector<double>& programs_flat,
+    const std::vector<int>& program_type,
     const GenerativeOptions& options);
 
 // Weighted pool-adjacent-violators: monotone non-decreasing fit of y with

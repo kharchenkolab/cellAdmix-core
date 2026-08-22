@@ -1,12 +1,13 @@
-"""Generative admixture correction.
+"""Generative admixture model.
 
 Decomposes each cell's counts into its own expression, contamination from
 each detected source type, ambient background, and neighborhood-induced
-expression, then removes the contamination and ambient shares while
-retaining the induced ones. The model, its validation, and the limits of
-the separation are described in docs/generative.md. The fit runs in the
-C++ core; this module marshals the audit's measurements in and wraps the
-result as a correction object that ``audit.evaluate`` accepts.
+expression. The fitted model exposes the per-cell decomposition and the
+retained induced genes, and derives corrections (with or without
+retaining the induced expression) without refitting. The model, its
+validation, and the limits of the separation are described in
+docs/generative.md. The fit runs in the C++ core; this module marshals
+the audit's measurements in and wraps the results.
 """
 from __future__ import annotations
 
@@ -16,26 +17,47 @@ import scipy.sparse as sp
 
 
 class GenerativeCorrection:
-    """Corrected counts plus the model's per-cell decomposition."""
+    """Corrected counts derived from a fitted generative model."""
 
-    def __init__(self, audit, matrix, genes, cells, pairs, induced,
-                 composition, ambient_scale, whole_cell_profiles, name):
+    def __init__(self, matrix, genes, cells, rules, name, retained_induced):
         self._matrix = matrix
         self._genes = genes
         self._cells = cells
+        self.rules = rules
         self.name = name
-        self.pairs = pairs
-        self.induced = induced
-        self.whole_cell_profiles = whole_cell_profiles
-        self._composition = composition
-        self._ambient_scale = ambient_scale
-        # rule-style pair listing for symmetry with rule-based corrections
-        self.rules = pairs[["source", "target"]].rename(columns={
-            "source": "source_cell_type", "target": "target_cell_type"})
+        self.retained_induced = retained_induced
 
     def counts(self):
         """Corrected counts as ``(matrix, genes, cells)``."""
         return self._matrix, list(self._genes), list(self._cells)
+
+
+class GenerativeModel:
+    """A fitted generative admixture model.
+
+    Attributes: ``pairs`` (per-pair dose, expected removal and induced
+    molecule totals), ``induced`` (the retained induced genes with their
+    disproportionality statistics), ``n_programs`` (expression programs
+    fitted per type), ``whole_cell_profiles`` (True when the run carries
+    no nucleus flag and whole-cell transfer profiles were used).
+    """
+
+    def __init__(self, audit, matrix, genes, cells, removed, removed_strict,
+                 pairs, induced, composition, ambient_scale, n_programs,
+                 whole_cell_profiles, init):
+        self._audit = audit
+        self._matrix = matrix
+        self._genes = genes
+        self._cells = cells
+        self._removed = removed
+        self._removed_strict = removed_strict
+        self.pairs = pairs
+        self.induced = induced
+        self._composition = composition
+        self._ambient_scale = ambient_scale
+        self.n_programs = n_programs
+        self.whole_cell_profiles = whole_cell_profiles
+        self.init = init
 
     def composition(self, source=None, target=None):
         """Per-cell decomposition for one pair (or all pairs).
@@ -53,14 +75,42 @@ class GenerativeCorrection:
             d = d[d["target"] == target]
         return d.reset_index(drop=True)
 
+    def correct(self, name="generative", retain_induced=True):
+        """Derive a correction from the fitted model, without refitting.
 
-def correct_generative(audit, *, name="generative", num_threads=None,
-                       **options):
+        With ``retain_induced=False`` the induced share of each count is
+        removed along with the contamination and ambient shares.
+        """
+        removed = self._removed if retain_induced else self._removed_strict
+        corrected = sp.csc_matrix(
+            (self._matrix.data - removed, self._matrix.indices.copy(),
+             self._matrix.indptr.copy()), shape=self._matrix.shape)
+        corrected.data = np.maximum(corrected.data, 0.0)
+        rules = self.pairs[["source", "target"]].rename(columns={
+            "source": "source_cell_type", "target": "target_cell_type"})
+        return GenerativeCorrection(corrected, self._genes, self._cells,
+                                    rules, name, retain_induced)
+
+    def __repr__(self):
+        removed = float(self._removed.sum())
+        return (f"GenerativeModel(pairs={len(self.pairs)}, "
+                f"induced_genes={len(self.induced)}, "
+                f"removed_expected={removed:,.0f}, init={self.init!r})")
+
+
+def fit_generative(audit, *, init=None, n_programs=4, num_threads=None,
+                   seed=1, **options):
     """Fit the generative model on the audit's detected pairs.
 
-    Extra keyword arguments override the model's constants (see
-    ``GenerativeOptions`` in the C++ core; e.g. ``use_induced=False`` or
-    ``outer_rounds=1``).
+    ``init`` selects the expression-program initialization: an NMF fit
+    object uses its factor-labeled molecules (the default when the audit's
+    fit carries them); ``"clusters"`` derives programs by clustering each
+    type's cells, weighted toward lightly dosed ones; ``"pseudobulk"``
+    uses one pooled profile per type; a dict mapping cell-type names to
+    profile matrices (programs x genes, columns aligned with the count
+    matrix genes) supplies explicit programs, e.g. from an external
+    reference. Extra keyword arguments override the model's constants
+    (see ``GenerativeOptions`` in the C++ core).
     """
     from . import _core
 
@@ -95,12 +145,48 @@ def correct_generative(audit, *, name="generative", num_threads=None,
         ))
         pair_names.append((d["source"], d["target"]))
 
+    # Resolve the initialization.
+    molecules_parquet = ""
+    cells_parquet = ""
+    programs_flat: list[float] = []
+    program_type: list[int] = []
+    if init is None:
+        init = fit
+    if isinstance(init, str):
+        if init not in ("clusters", "pseudobulk"):
+            raise ValueError("init must be an NMF fit, 'clusters', "
+                             "'pseudobulk', or a dict of program matrices")
+        init_mode = init
+        init_label = init
+    elif isinstance(init, dict):
+        init_mode = "pseudobulk"  # fallback for types without programs
+        init_label = "explicit"
+        for t, mat in init.items():
+            if t not in type_of:
+                raise ValueError(f"unknown cell type in init: {t}")
+            arr = np.asarray(mat, dtype=float)
+            if arr.ndim == 1:
+                arr = arr[None, :]
+            if arr.shape[1] != len(genes):
+                raise ValueError("init programs must have one column per gene")
+            for row in arr:
+                programs_flat.extend(float(v) for v in row)
+                program_type.append(type_of[t])
+    else:
+        init_mode = "factors"
+        init_label = "nmf_factors"
+        paths = init.manifest["paths"]
+        molecules_parquet = str(paths["molecules_parquet"])
+        cells_parquet = str(paths["cells_parquet"])
+
     opts = dict(options)
     opts.setdefault("neighbor_k", int(audit.params["neighbor_k"]))
+    opts["init_mode"] = init_mode
+    opts["n_programs"] = int(n_programs)
+    opts["seed"] = int(seed)
     if num_threads is not None:
         opts["num_threads"] = int(num_threads)
 
-    paths = fit.manifest["paths"]
     res = _core.fit_generative(
         counts_indptr=matrix.indptr.astype(np.int64).tolist(),
         counts_indices=matrix.indices.astype(np.int64).tolist(),
@@ -111,19 +197,17 @@ def correct_generative(audit, *, name="generative", num_threads=None,
         y=np.asarray(y, dtype=float).tolist(),
         type_codes=type_codes.tolist(),
         n_types=len(types),
-        molecules_parquet=str(paths["molecules_parquet"]),
-        cells_parquet=str(paths["cells_parquet"]),
+        molecules_parquet=molecules_parquet,
+        cells_parquet=cells_parquet,
         pair_specs=pair_specs,
         factor_to_type=[],
+        programs_flat=programs_flat,
+        program_type=program_type,
         options=opts,
     )
 
     removed = np.asarray(res["removed"], dtype=float)
-    corrected = sp.csc_matrix(
-        (matrix.data - removed, matrix.indices.copy(), matrix.indptr.copy()),
-        shape=matrix.shape)
-    corrected.data = np.maximum(corrected.data, 0.0)
-
+    removed_strict = np.asarray(res["removed_without_retention"], dtype=float)
     ambient = np.asarray(res["ambient_scale"], dtype=float)
     comp_rows = []
     for j, (source, target) in enumerate(pair_names):
@@ -156,6 +240,14 @@ def correct_generative(audit, *, name="generative", num_threads=None,
              mean_dose_exposed=r["mean_dose_exposed"])
         for r in res["pairs"]])
 
-    return GenerativeCorrection(
-        audit, corrected, genes, cells, summaries, induced, composition,
-        ambient, bool(res["whole_cell_profiles"]), name)
+    n_programs_used = pd.Series(res["n_programs_used"], index=types)
+
+    return GenerativeModel(audit, matrix, genes, cells, removed,
+                           removed_strict, summaries, induced, composition,
+                           ambient, n_programs_used,
+                           bool(res["whole_cell_profiles"]), init_label)
+
+
+def correct_generative(audit, *, name="generative", **kwargs):
+    """Fit the generative model and derive its correction in one call."""
+    return fit_generative(audit, **kwargs).correct(name=name)

@@ -6,6 +6,7 @@
 #include <functional>
 #include <limits>
 #include <stdexcept>
+#include <random>
 #include <thread>
 #include <unordered_map>
 
@@ -186,6 +187,8 @@ GenerativeResult fit_generative(
     const std::string& cells_parquet,
     const std::vector<GenerativePairSpec>& pairs,
     const std::vector<int>& factor_to_type,
+    const std::vector<double>& programs_flat,
+    const std::vector<int>& program_type,
     const GenerativeOptions& opt) {
   const int n_cells = static_cast<int>(cell_ids.size());
   const int G = n_genes;
@@ -198,6 +201,8 @@ GenerativeResult fit_generative(
   }
   GenerativeResult result;
   result.removed.assign(counts_values.size(), 0.0);
+  result.removed_without_retention.assign(counts_values.size(), 0.0);
+  result.n_programs_used.assign(static_cast<std::size_t>(n_types), 0);
   result.ambient_scale.assign(static_cast<std::size_t>(n_cells), 0.0);
   result.pair_cells.resize(pairs.size());
   result.pair_dose.resize(pairs.size());
@@ -258,7 +263,18 @@ GenerativeResult fit_generative(
   // Cytoplasmic counts are only ever summed over column subsets, so they are
   // stored per column as sparse (gene, count) pairs.
   std::vector<std::vector<std::pair<int, float>>> cyto(static_cast<std::size_t>(n_cells));
-  bool have_molecules = !molecules_parquet.empty();
+  const bool have_molecules = !molecules_parquet.empty();
+  const bool explicit_programs = !programs_flat.empty();
+  if (explicit_programs) {
+    if (programs_flat.size() != program_type.size() * static_cast<std::size_t>(G)) {
+      throw std::runtime_error("generative: programs_flat does not match program_type x genes");
+    }
+  }
+  // Program source: explicit programs override the mode; "factors" needs a
+  // molecule table and otherwise falls back to pseudobulk.
+  const bool factor_programs = !explicit_programs && have_molecules &&
+      opt.init_mode == "factors";
+  const bool cluster_programs = !explicit_programs && opt.init_mode == "clusters";
   std::vector<DenseMatrix> program_init(static_cast<std::size_t>(n_types));
   result.whole_cell_profiles = true;
   std::vector<int> alignment = factor_to_type;
@@ -342,7 +358,7 @@ GenerativeResult fit_generative(
 
     // Factor-to-type alignment: supplied, or derived by cosine similarity of
     // square-root profiles with a required margin over the second-best type.
-    if (alignment.empty()) {
+    if (alignment.empty() && factor_programs) {
       alignment.assign(static_cast<std::size_t>(n_factors), -1);
       for (int k = 0; k < n_factors; ++k) {
         double total = 0.0;
@@ -388,7 +404,7 @@ GenerativeResult fit_generative(
     // Program initializations: the type's aligned factors plus unaligned
     // factors carrying at least program_share_min of the type's molecules;
     // pseudobulk fallback when none qualify.
-    for (int t = 0; t < n_types; ++t) {
+    for (int t = 0; factor_programs && t < n_types; ++t) {
       double type_total = 0.0;
       for (int k = 0; k < n_factors; ++k) type_total += type_factor_share(t, k);
       std::vector<int> own;
@@ -423,8 +439,7 @@ GenerativeResult fit_generative(
       program_init[static_cast<std::size_t>(t)] = std::move(F);
     }
   } else {
-    // No molecule table: whole-cell counts for profiles, one pseudobulk
-    // program per type.
+    // No molecule table: whole-cell counts serve as the transfer profiles.
     for (int c = 0; c < n_cells; ++c) {
       for (int p = counts_indptr[c]; p < counts_indptr[c + 1]; ++p) {
         cyto[static_cast<std::size_t>(c)].push_back(
@@ -432,13 +447,40 @@ GenerativeResult fit_generative(
              static_cast<float>(counts_values[static_cast<std::size_t>(p)])});
       }
     }
+  }
+  if (explicit_programs) {
     for (int t = 0; t < n_types; ++t) {
-      DenseMatrix F(1, G, 0.0);
-      double s = 0.0;
-      for (int g = 0; g < G; ++g) s += profiles_cpm(g, t);
-      for (int g = 0; g < G; ++g) F(0, g) = profiles_cpm(g, t) / std::max(s, 1.0);
+      std::vector<int> rows;
+      for (std::size_t r = 0; r < program_type.size(); ++r) {
+        if (program_type[r] == t) rows.push_back(static_cast<int>(r));
+      }
+      if (rows.empty()) continue;
+      DenseMatrix F(static_cast<int>(rows.size()), G, 0.0);
+      for (std::size_t k = 0; k < rows.size(); ++k) {
+        double sum = 0.0;
+        for (int g = 0; g < G; ++g) {
+          const double v = std::max(
+              programs_flat[static_cast<std::size_t>(rows[k]) * G + g], 0.0);
+          F(static_cast<int>(k), g) = v;
+          sum += v;
+        }
+        for (int g = 0; g < G; ++g) F(static_cast<int>(k), g) /= std::max(sum, 1e-12);
+      }
       program_init[static_cast<std::size_t>(t)] = std::move(F);
     }
+  }
+  // Any type still without programs (pseudobulk mode, "factors" without a
+  // molecule table, explicit programs omitting a type, or a type whose
+  // factor programs were all too small): one pooled profile. The "clusters"
+  // mode replaces this per type inside the fit, where the dose weights are
+  // available.
+  for (int t = 0; t < n_types; ++t) {
+    if (program_init[static_cast<std::size_t>(t)].rows() > 0) continue;
+    DenseMatrix F(1, G, 0.0);
+    double sum = 0.0;
+    for (int g = 0; g < G; ++g) sum += profiles_cpm(g, t);
+    for (int g = 0; g < G; ++g) F(0, g) = profiles_cpm(g, t) / std::max(sum, 1.0);
+    program_init[static_cast<std::size_t>(t)] = std::move(F);
   }
 
   // Interface-local raw transfer profile of source S toward target type T:
@@ -678,7 +720,145 @@ GenerativeResult fit_generative(
 
       // Own programs; the production configuration zeroes them on strict
       // genes (a gene the target does not express cannot be a program's).
+      // The "clusters" mode derives the programs here, where the dose
+      // priors are available: the type's cells are clustered on their gene
+      // fractions by weighted k-means, with weights favoring lightly dosed
+      // cells so that a contamination pattern cannot seed a program.
       DenseMatrix F = program_init[static_cast<std::size_t>(T)];
+      if (cluster_programs && n >= 20) {
+        std::vector<double> lam_tot(static_cast<std::size_t>(n), 0.0);
+        for (const auto& ps : plist) {
+          for (int i = 0; i < n; ++i) {
+            lam_tot[static_cast<std::size_t>(i)] += ps.lam_cell[static_cast<std::size_t>(i)];
+          }
+        }
+        std::vector<double> wgt(static_cast<std::size_t>(n));
+        for (int i = 0; i < n; ++i) {
+          wgt[static_cast<std::size_t>(i)] = blk.totals[static_cast<std::size_t>(i)] /
+              (1.0 + opt.dose_weight * lam_tot[static_cast<std::size_t>(i)]);
+        }
+        const int Kc = std::min(opt.n_programs, n);
+        // squared norms of the per-cell gene-fraction vectors
+        std::vector<double> xnorm(static_cast<std::size_t>(n), 0.0);
+        for (int i = 0; i < n; ++i) {
+          const double ti = std::max(blk.totals[static_cast<std::size_t>(i)], 1.0);
+          for (int p = blk.rowptr[static_cast<std::size_t>(i)]; p < blk.rowptr[static_cast<std::size_t>(i + 1)]; ++p) {
+            const double f = blk.value[static_cast<std::size_t>(p)] / ti;
+            xnorm[static_cast<std::size_t>(i)] += f * f;
+          }
+        }
+        // weighted k-means++ seeding, deterministic per type
+        std::mt19937 rng(opt.seed + static_cast<unsigned int>(T) * 7919u);
+        std::vector<std::vector<double>> cent;
+        {
+          std::discrete_distribution<int> first(wgt.begin(), wgt.end());
+          std::vector<double> d2(static_cast<std::size_t>(n),
+                                 std::numeric_limits<double>::max());
+          int pick = first(rng);
+          while (static_cast<int>(cent.size()) < Kc) {
+            std::vector<double> c(static_cast<std::size_t>(G), 0.0);
+            const double ti = std::max(blk.totals[static_cast<std::size_t>(pick)], 1.0);
+            for (int p = blk.rowptr[static_cast<std::size_t>(pick)]; p < blk.rowptr[static_cast<std::size_t>(pick + 1)]; ++p) {
+              c[static_cast<std::size_t>(blk.gene[static_cast<std::size_t>(p)])] =
+                  blk.value[static_cast<std::size_t>(p)] / ti;
+            }
+            cent.push_back(std::move(c));
+            if (static_cast<int>(cent.size()) == Kc) break;
+            const auto& cc = cent.back();
+            double cn = 0.0;
+            for (const double v : cc) cn += v * v;
+            std::vector<double> probs(static_cast<std::size_t>(n), 0.0);
+            for (int i = 0; i < n; ++i) {
+              double dot = 0.0;
+              const double ti2 = std::max(blk.totals[static_cast<std::size_t>(i)], 1.0);
+              for (int p = blk.rowptr[static_cast<std::size_t>(i)]; p < blk.rowptr[static_cast<std::size_t>(i + 1)]; ++p) {
+                dot += blk.value[static_cast<std::size_t>(p)] / ti2 *
+                    cc[static_cast<std::size_t>(blk.gene[static_cast<std::size_t>(p)])];
+              }
+              const double d = std::max(xnorm[static_cast<std::size_t>(i)] - 2.0 * dot + cn, 0.0);
+              d2[static_cast<std::size_t>(i)] = std::min(d2[static_cast<std::size_t>(i)], d);
+              probs[static_cast<std::size_t>(i)] = d2[static_cast<std::size_t>(i)] * wgt[static_cast<std::size_t>(i)];
+            }
+            std::discrete_distribution<int> next(probs.begin(), probs.end());
+            pick = next(rng);
+          }
+        }
+        // Lloyd iterations with weights
+        std::vector<int> assign(static_cast<std::size_t>(n), 0);
+        for (int it = 0; it < 10; ++it) {
+          std::vector<double> cn(cent.size(), 0.0);
+          for (std::size_t k = 0; k < cent.size(); ++k) {
+            for (const double v : cent[k]) cn[k] += v * v;
+          }
+          parallel_rows(n, opt.num_threads, [&](int begin, int end, int) {
+            for (int i = begin; i < end; ++i) {
+              const double ti = std::max(blk.totals[static_cast<std::size_t>(i)], 1.0);
+              double best = std::numeric_limits<double>::max();
+              int bk = 0;
+              for (std::size_t k = 0; k < cent.size(); ++k) {
+                double dot = 0.0;
+                for (int p = blk.rowptr[static_cast<std::size_t>(i)]; p < blk.rowptr[static_cast<std::size_t>(i + 1)]; ++p) {
+                  dot += blk.value[static_cast<std::size_t>(p)] / ti *
+                      cent[k][static_cast<std::size_t>(blk.gene[static_cast<std::size_t>(p)])];
+                }
+                const double d = xnorm[static_cast<std::size_t>(i)] - 2.0 * dot + cn[k];
+                if (d < best) { best = d; bk = static_cast<int>(k); }
+              }
+              assign[static_cast<std::size_t>(i)] = bk;
+            }
+          });
+          std::vector<std::vector<double>> nc(cent.size(),
+              std::vector<double>(static_cast<std::size_t>(G), 0.0));
+          std::vector<double> nw(cent.size(), 0.0);
+          for (int i = 0; i < n; ++i) {
+            const int k = assign[static_cast<std::size_t>(i)];
+            const double w = wgt[static_cast<std::size_t>(i)];
+            const double ti = std::max(blk.totals[static_cast<std::size_t>(i)], 1.0);
+            nw[static_cast<std::size_t>(k)] += w;
+            for (int p = blk.rowptr[static_cast<std::size_t>(i)]; p < blk.rowptr[static_cast<std::size_t>(i + 1)]; ++p) {
+              nc[static_cast<std::size_t>(k)][static_cast<std::size_t>(blk.gene[static_cast<std::size_t>(p)])] +=
+                  w * blk.value[static_cast<std::size_t>(p)] / ti;
+            }
+          }
+          for (std::size_t k = 0; k < cent.size(); ++k) {
+            if (nw[k] <= 0.0) continue;
+            for (int g = 0; g < G; ++g) nc[k][static_cast<std::size_t>(g)] /= nw[k];
+            cent[k] = std::move(nc[k]);
+          }
+        }
+        // programs: dose-weighted count sums per cluster, keeping clusters
+        // with enough molecules and share
+        std::vector<std::vector<double>> progs;
+        double type_mol = 0.0;
+        for (int i = 0; i < n; ++i) type_mol += blk.totals[static_cast<std::size_t>(i)];
+        for (std::size_t k = 0; k < cent.size(); ++k) {
+          std::vector<double> prog(static_cast<std::size_t>(G), 0.0);
+          double mol = 0.0;
+          for (int i = 0; i < n; ++i) {
+            if (assign[static_cast<std::size_t>(i)] != static_cast<int>(k)) continue;
+            mol += blk.totals[static_cast<std::size_t>(i)];
+            const double w = 1.0 / (1.0 + opt.dose_weight * lam_tot[static_cast<std::size_t>(i)]);
+            for (int p = blk.rowptr[static_cast<std::size_t>(i)]; p < blk.rowptr[static_cast<std::size_t>(i + 1)]; ++p) {
+              prog[static_cast<std::size_t>(blk.gene[static_cast<std::size_t>(p)])] +=
+                  w * blk.value[static_cast<std::size_t>(p)];
+            }
+          }
+          if (mol < opt.program_min_molecules || mol < opt.program_share_min * type_mol) {
+            continue;
+          }
+          double sum = 0.0;
+          for (const double v : prog) sum += v;
+          for (auto& v : prog) v /= std::max(sum, 1e-12);
+          progs.push_back(std::move(prog));
+        }
+        if (!progs.empty()) {
+          F = DenseMatrix(static_cast<int>(progs.size()), G, 0.0);
+          for (std::size_t k = 0; k < progs.size(); ++k) {
+            for (int g = 0; g < G; ++g) F(static_cast<int>(k), g) = progs[k][static_cast<std::size_t>(g)];
+          }
+        }
+      }
+      result.n_programs_used[static_cast<std::size_t>(T)] = F.rows();
       const int K = F.rows();
       if (opt.use_ambient && any_strict) {
         for (int k = 0; k < K; ++k) {
@@ -1129,6 +1309,22 @@ GenerativeResult fit_generative(
       }
 
       if (last_round) {
+        // Both removal policies from the same fit: with retention (the
+        // induced share stays) and without (it is removed too).
+        compute_rates();
+        parallel_rows(n, opt.num_threads, [&](int begin, int end, int) {
+          for (int i = begin; i < end; ++i) {
+            const double* th = &Theta[static_cast<std::size_t>(i) * K];
+            for (int p = blk.rowptr[static_cast<std::size_t>(i)]; p < blk.rowptr[static_cast<std::size_t>(i + 1)]; ++p) {
+              const int g = blk.gene[static_cast<std::size_t>(p)];
+              double own = eps_g;
+              for (int k = 0; k < K; ++k) own += th[k] * F(k, g);
+              const double keep2 = own / std::max(rate_nz[static_cast<std::size_t>(p)], 1e-300);
+              result.removed_without_retention[static_cast<std::size_t>(blk.gpos[p])] =
+                  blk.value[p] * (1.0 - keep2);
+            }
+          }
+        });
         for (std::size_t p = 0; p < bn; ++p) {
           result.removed[static_cast<std::size_t>(blk.gpos[p])] = blk.value[p] - kept[p];
         }

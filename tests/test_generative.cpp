@@ -123,7 +123,7 @@ TEST_CASE("Generative fit removes planted transfer, never target-owned genes") {
   const auto fx = make_fixture(false);
   const auto res = fit_generative(
       fx.indptr, fx.indices, fx.values, fx.n_genes, fx.cell_ids, fx.x, fx.y,
-      fx.type_codes, 2, "", "", {fx.pair}, {}, test_options());
+      fx.type_codes, 2, "", "", {fx.pair}, {}, {}, {}, test_options());
   const double removed = removed_from_targets(fx, res, 0, 3);
   std::cerr << "[debug] transfer removed " << removed << " of "
             << fx.planted_transfer << "\n";
@@ -138,7 +138,7 @@ TEST_CASE("Generative fit flags and retains disproportionate induction") {
   const auto fx = make_fixture(true);
   const auto res = fit_generative(
       fx.indptr, fx.indices, fx.values, fx.n_genes, fx.cell_ids, fx.x, fx.y,
-      fx.type_codes, 2, "", "", {fx.pair}, {}, test_options());
+      fx.type_codes, 2, "", "", {fx.pair}, {}, {}, {}, test_options());
   bool flagged = false;
   for (const auto& row : res.induced) {
     std::cerr << "[debug] induced gene " << row.gene << " excess " << row.excess
@@ -153,9 +153,52 @@ TEST_CASE("Generative fit flags and retains disproportionate induction") {
   opt_noind.use_induced = false;
   const auto res_noind = fit_generative(
       fx.indptr, fx.indices, fx.values, fx.n_genes, fx.cell_ids, fx.x, fx.y,
-      fx.type_codes, 2, "", "", {fx.pair}, {}, opt_noind);
+      fx.type_codes, 2, "", "", {fx.pair}, {}, {}, {}, opt_noind);
   const double removed_noind = removed_from_targets(fx, res_noind, 3, 3);
   REQUIRE_LT(removed_ind, 0.5 * removed_noind);
+}
+
+TEST_CASE("Cluster and explicit program initializations behave") {
+  const auto fx = make_fixture(false);
+  auto opt = test_options();
+  opt.init_mode = "clusters";
+  opt.n_programs = 3;
+  const auto res = fit_generative(
+      fx.indptr, fx.indices, fx.values, fx.n_genes, fx.cell_ids, fx.x, fx.y,
+      fx.type_codes, 2, "", "", {fx.pair}, {}, {}, {}, opt);
+  REQUIRE_GT(removed_from_targets(fx, res, 0, 3), 0.6 * fx.planted_transfer);
+  REQUIRE_NEAR(removed_from_targets(fx, res, 4, 6), 0.0, 1e-9);
+  REQUIRE_GE(res.n_programs_used[1], 1);
+  // explicit programs: the true target profile, one program
+  std::vector<double> prog(static_cast<std::size_t>(2 * fx.n_genes), 0.0);
+  for (int g = 4; g < 7; ++g) prog[static_cast<std::size_t>(fx.n_genes + g)] = 60.0;
+  prog[static_cast<std::size_t>(fx.n_genes + 7)] = 30.0;
+  for (int g = 0; g < 4; ++g) prog[static_cast<std::size_t>(g)] = 1.0;
+  prog[7] = 30.0;
+  const auto res2 = fit_generative(
+      fx.indptr, fx.indices, fx.values, fx.n_genes, fx.cell_ids, fx.x, fx.y,
+      fx.type_codes, 2, "", "", {fx.pair}, {}, prog, {0, 1}, test_options());
+  REQUIRE_GT(removed_from_targets(fx, res2, 0, 3), 0.6 * fx.planted_transfer);
+}
+
+TEST_CASE("The no-retention split removes the induced share") {
+  const auto fx = make_fixture(true);
+  const auto res = fit_generative(
+      fx.indptr, fx.indices, fx.values, fx.n_genes, fx.cell_ids, fx.x, fx.y,
+      fx.type_codes, 2, "", "", {fx.pair}, {}, {}, {}, test_options());
+  double kept3 = 0.0;
+  double kept3_strict = 0.0;
+  const int n_cells = static_cast<int>(fx.cell_ids.size());
+  for (int c = 0; c < n_cells; ++c) {
+    if (fx.type_codes[static_cast<std::size_t>(c)] != 1) continue;
+    for (int p = fx.indptr[c]; p < fx.indptr[c + 1]; ++p) {
+      if (fx.indices[static_cast<std::size_t>(p)] != 3) continue;
+      kept3 += fx.values[static_cast<std::size_t>(p)] - res.removed[static_cast<std::size_t>(p)];
+      kept3_strict += fx.values[static_cast<std::size_t>(p)] -
+          res.removed_without_retention[static_cast<std::size_t>(p)];
+    }
+  }
+  REQUIRE_LT(kept3_strict, 0.6 * kept3);
 }
 
 TEST_CASE("Permuted exposure collapses generative removal") {
@@ -183,7 +226,7 @@ TEST_CASE("Permuted exposure collapses generative removal") {
   opt.use_ambient = false;  // control convention: no exposure-independent removal
   const auto res = fit_generative(
       fx.indptr, fx.indices, fx.values, fx.n_genes, fx.cell_ids, fx.x, fx.y,
-      fx.type_codes, 2, "", "", {fx.pair}, {}, opt);
+      fx.type_codes, 2, "", "", {fx.pair}, {}, {}, {}, opt);
   const double removed = removed_from_targets(fx, res, 0, 3);
   std::cerr << "[debug] permuted removed " << removed << " of "
             << fx.planted_transfer << "\n";

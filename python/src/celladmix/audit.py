@@ -392,14 +392,27 @@ class CellAdmixAudit:
         df = pd.DataFrame(rows)
         return df[df["detected"]] if detected_only else df
 
-    def correct_generative(self, **kwargs):
+    def fit_generative(self, **kwargs):
         """Fit the generative admixture model on the detected pairs.
 
         Decomposes each target cell's counts into own expression,
         per-source contamination, ambient background, and induced
-        expression, removing the contamination and ambient shares while
-        retaining the induced ones; see docs/generative.md. Returns a
-        correction object accepted by ``evaluate``.
+        expression; see docs/generative.md. The returned model exposes
+        the per-cell decomposition and the retained induced genes, and
+        derives corrections via ``model.correct()``. The ``init``
+        argument selects the expression-program initialization (an NMF
+        fit, ``"clusters"``, ``"pseudobulk"``, or explicit profiles).
+        """
+        from .generative import fit_generative
+
+        return fit_generative(self, **kwargs)
+
+    def correct_generative(self, **kwargs):
+        """Fit the generative model and derive its correction in one call.
+
+        Equivalent to ``fit_generative(...).correct()``; the fitted model's
+        decomposition is discarded. Returns a correction object accepted
+        by ``evaluate``.
         """
         from .generative import correct_generative
 

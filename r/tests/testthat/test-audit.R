@@ -261,8 +261,18 @@ test_that("the generative correction removes planted admixture", {
   expect_gt(removed_a, 0.4 * planted)
   # target-owned genes are structurally untouchable
   expect_equal(removed_b, 0, tolerance = 1e-9)
-  comp <- correction$composition(source = "A", target = "B")
+  model <- audit$fit_generative(num_threads = 2L)
+  comp <- model$composition(source = "A", target = "B")
   expect_gt(max(comp$contamination), 0)
+  c2 <- model$correct()
+  expect_equal(sum(abs(c2$counts() - after)), 0, tolerance = 1e-6)
+  removed_default <- sum(before) - sum(after)
+  for (ini in c("pseudobulk", "clusters")) {
+    mi <- audit$fit_generative(init = ini, num_threads = 2L)$correct()$counts()
+    removed_i <- sum(before) - sum(mi)
+    expect_gt(removed_i, 0.5 * removed_default)
+    expect_lt(removed_i, 2 * removed_default)
+  }
   report <- audit$evaluate(correction)
   p <- report$pairs()
   ab <- p[p$source == "A" & p$target == "B", ]

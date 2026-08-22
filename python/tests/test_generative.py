@@ -84,6 +84,33 @@ class GenerativeCorrectionTests(unittest.TestCase):
     def tearDownClass(cls):
         cls.tmp.cleanup()
 
+    def test_fit_generative_model_and_init_modes(self):
+        model = self.audit.fit_generative(num_threads=2)
+        self.assertGreater(len(model.composition("A", "B")), 0)
+        c_default = model.correct()
+        c_again = self.audit.correct_generative(num_threads=2)
+        m1, _, _ = c_default.counts()
+        m2, _, _ = c_again.counts()
+        self.assertAlmostEqual(abs(m1 - m2).sum(), 0.0, delta=1e-6)
+        # alternative initializations run and remove comparable amounts
+        removed_default = float(self.audit._matrix.sum() - m1.sum())
+        for init in ("pseudobulk", "clusters"):
+            mod = self.audit.fit_generative(init=init, num_threads=2)
+            mi, _, _ = mod.correct().counts()
+            removed = float(self.audit._matrix.sum() - mi.sum())
+            self.assertGreater(removed, 0.5 * removed_default)
+            self.assertLess(removed, 2.0 * removed_default)
+        # explicit programs: the B pseudobulk profile
+        before, genes, cells = self.audit.fit.counts()
+        b_cols = np.array([self.audit._ctypes.get(c) == "B" for c in cells])
+        prof = np.asarray(before[:, b_cols].sum(axis=1)).ravel()
+        mod = self.audit.fit_generative(init={"B": prof, "A": np.asarray(
+            before[:, ~b_cols].sum(axis=1)).ravel()}, num_threads=2)
+        self.assertEqual(mod.init, "explicit")
+        mi, _, _ = mod.correct().counts()
+        self.assertGreater(float(self.audit._matrix.sum() - mi.sum()),
+                           0.5 * removed_default)
+
     def test_correct_generative_removes_planted_admixture(self):
         correction = self.audit.correct_generative(num_threads=2)
         before, genes, cells = self.audit.fit.counts()
@@ -100,9 +127,6 @@ class GenerativeCorrectionTests(unittest.TestCase):
         self.assertGreater(removed_a, 0.5 * self.planted)
         # target-owned genes are structurally untouchable
         self.assertAlmostEqual(removed_b, 0.0, delta=1e-6)
-        # composition and evaluation
-        comp = correction.composition(source="A", target="B")
-        self.assertGreater(comp["contamination"].max(), 0.0)
         report = self.audit.evaluate(correction)
         pairs = report.pairs()
         row = pairs[(pairs["source"] == "A") & (pairs["target"] == "B")]

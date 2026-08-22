@@ -4886,6 +4886,8 @@ extern "C" SEXP _cellAdmixCore_celladmix_fit_generative(
     SEXP cells_parquet_sexp,
     SEXP pairs_sexp,
     SEXP factor_to_type_sexp,
+    SEXP programs_flat_sexp,
+    SEXP program_type_sexp,
     SEXP options_sexp) {
   try {
     std::vector<celladmix::GenerativePairSpec> pairs;
@@ -4940,6 +4942,13 @@ extern "C" SEXP _cellAdmixCore_celladmix_fit_generative(
     set_bool("use_ambient", opt.use_ambient);
     set_bool("use_induced", opt.use_induced);
     set_int("num_threads", opt.num_threads);
+    set_int("n_programs", opt.n_programs);
+    if (options.containsElementNamed("init_mode")) {
+      opt.init_mode = as<std::string>(options["init_mode"]);
+    }
+    if (options.containsElementNamed("seed")) {
+      opt.seed = static_cast<unsigned int>(as<int>(options["seed"]));
+    }
 
     const auto res = celladmix::fit_generative(
         as<std::vector<int>>(counts_indptr_sexp),
@@ -4955,6 +4964,8 @@ extern "C" SEXP _cellAdmixCore_celladmix_fit_generative(
         as<std::string>(cells_parquet_sexp),
         pairs,
         as<std::vector<int>>(factor_to_type_sexp),
+        as<std::vector<double>>(programs_flat_sexp),
+        as<std::vector<int>>(program_type_sexp),
         opt);
 
     List pair_cells(res.pair_cells.size());
@@ -4993,6 +5004,8 @@ extern "C" SEXP _cellAdmixCore_celladmix_fit_generative(
     }
     return List::create(
         Named("removed") = wrap(res.removed),
+        Named("removed_without_retention") = wrap(res.removed_without_retention),
+        Named("n_programs_used") = wrap(res.n_programs_used),
         Named("pair_cells") = pair_cells,
         Named("pair_dose") = pair_dose,
         Named("pair_alpha") = pair_alpha,

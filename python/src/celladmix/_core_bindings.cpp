@@ -707,6 +707,8 @@ PYBIND11_MODULE(_core, m) {
          const std::string& cells_parquet,
          const py::list& pair_specs,
          const std::vector<int>& factor_to_type,
+         const std::vector<double>& programs_flat,
+         const std::vector<int>& program_type,
          const py::dict& options) {
         std::vector<celladmix::GenerativePairSpec> pairs;
         for (const auto& item : pair_specs) {
@@ -732,6 +734,13 @@ PYBIND11_MODULE(_core, m) {
         const auto set_bool = [&](const char* key, bool& field) {
           if (options.contains(key)) field = options[key].cast<bool>();
         };
+        if (options.contains("init_mode")) {
+          opt.init_mode = options["init_mode"].cast<std::string>();
+        }
+        if (options.contains("seed")) {
+          opt.seed = options["seed"].cast<unsigned int>();
+        }
+        set_int("n_programs", opt.n_programs);
         set_double("alpha_prior_strength", opt.alpha_prior_strength);
         set_double("alpha_cap", opt.alpha_cap);
         set_double("lambda_max", opt.lambda_max);
@@ -762,10 +771,12 @@ PYBIND11_MODULE(_core, m) {
           res = celladmix::fit_generative(
               counts_indptr, counts_indices, counts_values, n_genes, cell_ids,
               x, y, type_codes, n_types, molecules_parquet, cells_parquet,
-              pairs, factor_to_type, opt);
+              pairs, factor_to_type, programs_flat, program_type, opt);
         }
         py::dict out;
         out["removed"] = res.removed;
+        out["removed_without_retention"] = res.removed_without_retention;
+        out["n_programs_used"] = res.n_programs_used;
         out["pair_cells"] = res.pair_cells;
         out["pair_dose"] = res.pair_dose;
         out["pair_alpha"] = res.pair_alpha;
@@ -810,6 +821,8 @@ PYBIND11_MODULE(_core, m) {
       py::arg("cells_parquet"),
       py::arg("pair_specs"),
       py::arg("factor_to_type"),
+      py::arg("programs_flat"),
+      py::arg("program_type"),
       py::arg("options"));
 
   m.def(
