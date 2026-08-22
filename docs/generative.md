@@ -137,11 +137,19 @@ cells that border exocrine tissue, with an arrow connecting the two
 positions of the same gene. The measured excess — the vertical position
 — is the same in both cases; only the expectation moves. Against the
 average profile the three genes appear to carry ten to twenty times
-more excess than transfer could deliver, and would be called induced.
-Against the profile of the bordering cells, which genuinely express
-these genes 1.1–1.6 times above the ductal average, the same excess is
-exactly what transfer delivers, and the genes land on the diagonal:
-transfer, not induction.
+more excess than transfer could deliver, and would be called induced;
+against the profile of the bordering cells, the same excess is exactly
+what transfer delivers, and the genes land on the diagonal: transfer,
+not induction. The length of the arrow is the change in the
+expectation, and it is larger than the genes' raw share elevation in
+bordering cells (1.15–1.64-fold) for a reason worth stating: bordering
+ductal cells are themselves heavily contaminated — ductal-owned genes
+make up 26% of their cytoplasm, versus 52% in the average ductal cell —
+so every ductal-owned share is diluted, and the proportionality
+constant, refit on the gene cloud, grows to compensate. The arrow
+therefore measures the gene's enrichment in the bordering cells' output
+relative to the other ductal-owned genes, with the dilution common to
+all of them cancelled — an order of magnitude for these three.
 
 ![Figure 2](figures/generative_fig2.png)
 
@@ -158,7 +166,11 @@ connected by an arrow: at the expectation from the average ductal
 profile (open red) and from the bordering ductal cells (filled green).
 Their measured excess does not change between the two — only the
 expectation does — and with the profile of the cells the material
-actually comes from, all three sit on the diagonal.
+actually comes from, all three sit on the diagonal. The arrow's length
+is the gene's enrichment in the bordering cells' output relative to the
+other ductal-owned genes (the dilution of interface cytoplasm by
+contamination, common to all ductal-owned genes, is absorbed by the
+refit proportionality constant).
 
 A separate question is how a flagged gene is known to be induced rather
 than admixed from a *different* source type. Three mechanisms address
