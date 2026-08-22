@@ -164,11 +164,14 @@ the profile itself, with a wide safety margin — the red squares above
 it are the genes flagged as induced. No corresponding lower bound
 exists: at this margin the allowance exceeds the expectation itself, so
 a shortfall can never be flagged and the screen acts only on excess. **(b)** The
-reverse pair, ductal → exocrine, same axes. Grey: all ductal-owned
-genes under the expectation from the bordering ductal cells — the data
-the proportional fit is made from. CXCL6, CFB and PPP1R1B appear twice,
-connected by an arrow: at the expectation from the average ductal
-profile (open red) and from the bordering ductal cells (filled green).
+same plot for the reverse admixture direction, ductal → exocrine. Grey:
+all ductal-owned genes under the expectation from the bordering ductal
+cells — the data the proportional fit is made from; the dashed curve is
+the same significance bound as in (a). CXCL6, CFB and PPP1R1B appear
+twice, connected by an arrow: at the expectation from the average
+ductal profile (open red, above the bound — they would be flagged as
+induced) and from the bordering ductal cells (filled green, within
+it).
 Their measured excess does not change between the two — only the
 expectation does — and with the profile of the cells the material
 actually comes from, all three sit on the diagonal; the horizontal

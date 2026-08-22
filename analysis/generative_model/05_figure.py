@@ -253,8 +253,8 @@ for gname in ["CFTR", "PROX1", "CA4", "AMY2A", "CELA2A"]:
         continue
     axa.annotate(gname, (expct[k], exc[k]), fontsize=7.5,
                  xytext=(4, 3), textcoords="offset points")
-axa.set_xlabel("expected from proportional transfer (molecules)")
-axa.set_ylabel("exposure-linked excess (molecules)")
+axa.set_xlabel("expected in ductal cells from exocrine transfer (molecules)")
+axa.set_ylabel("measured excess in ductal cells (molecules)")
 axa.set_title("(a) the screen: exocrine → ductal", fontsize=10)
 axa.legend(frameon=False, fontsize=8, loc="upper left")
 
@@ -267,13 +267,19 @@ P_B = "Ductal/tumor epithelial -> Exocrine epithelial"
 S_B, T_B = "Ductal/tumor epithelial", "Exocrine epithelial"
 psi_int = zeroed_profile(inp.near_source_profile(S_B, T_B), T_B)
 psi_glob = zeroed_profile(inp.psi_raw[S_B], T_B)
-gset_b, exc_b, expct_i, z_i, _ = screen_fit(P_B, psi_int)
+gset_b, exc_b, expct_i, z_i, var_b = screen_fit(P_B, psi_int)
 _, _, expct_g, z_g, _ = screen_fit(P_B, psi_glob)
 okb = (exc_b > 10) & (expct_i > 1)
 axb.scatter(expct_i[okb], exc_b[okb], s=14, color="#9bb5c9", lw=0,
             label="other ductal-owned genes")
 limb = [1, max(exc_b.max(), expct_i.max()) * 1.6]
 axb.plot(limb, limb, color="grey", lw=0.8)
+# The same significance bound as in panel (a), for this pair's fit.
+fitokb = okb & (var_b > 0)
+b1b, b0b = np.polyfit(np.log(expct_i[fitokb]), np.log(var_b[fitokb]), 1)
+xgb = np.geomspace(limb[0], limb[1], 200)
+sdb = np.sqrt(np.exp(b0b) * xgb ** b1b + (gm.PROF_CV * xgb) ** 2)
+axb.plot(xgb, xgb + 8 * sdb, ls="--", color="grey", lw=0.8)
 for gname in ["CXCL6", "CFB", "PPP1R1B"]:
     gi = inp.gene_of.get(gname)
     if gi is None or gi not in gset_b:
@@ -294,8 +300,8 @@ axb.scatter([], [], s=32, marker="o", color="#1e8449",
             label="interface-local expectation")
 axb.set_xscale("log"); axb.set_yscale("log")
 axb.set_xlim(limb); axb.set_ylim([10, limb[1]])
-axb.set_xlabel("expected from proportional transfer (molecules)")
-axb.set_ylabel("exposure-linked excess (molecules)")
+axb.set_xlabel("expected in exocrine cells from ductal transfer (molecules)")
+axb.set_ylabel("measured excess in exocrine cells (molecules)")
 axb.set_title("(b) the screen: ductal → exocrine", fontsize=10)
 axb.legend(frameon=False, fontsize=8, loc="upper left")
 
