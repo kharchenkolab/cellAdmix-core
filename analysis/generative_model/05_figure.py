@@ -245,46 +245,42 @@ axa.set_ylabel("exposure-linked excess (molecules)")
 axa.set_title("(a) the screen: exocrine → ductal", fontsize=10)
 axa.legend(frameon=False, fontsize=8, loc="upper left")
 
-# (b) the same test for ductal -> exocrine under the global versus the
-# interface-local ductal profile: the activation genes CXCL6/CFB/PPP1R1B
-# sit far off the proportional line under the global profile and move
-# onto it when the expectation uses the ductal cells that actually border
-# exocrine tissue.
+# (b) the three activation genes of the ductal -> exocrine pair, shown as
+# their measured excess relative to the transfer expectation under two
+# profiles: computed from the ductal average, the excess looks severalfold
+# disproportionate (would be flagged as induced); computed from the ductal
+# cells that actually border exocrine tissue, it is proportional.
 P_B = "Ductal/tumor epithelial -> Exocrine epithelial"
 S_B, T_B = "Ductal/tumor epithelial", "Exocrine epithelial"
 psi_int = zeroed_profile(inp.near_source_profile(S_B, T_B), T_B)
 psi_glob = zeroed_profile(inp.psi_raw[S_B], T_B)
 gset_b, exc_b, expct_i, z_i = screen_fit(P_B, psi_int)
 _, _, expct_g, z_g = screen_fit(P_B, psi_glob)
-okb = (exc_b > 10) & (expct_i > 1)
-axb.scatter(expct_i[okb], exc_b[okb], s=14, color="#9bb5c9", lw=0,
-            label="other ductal-owned genes")
-limb = [1, max(exc_b.max(), expct_i.max()) * 1.6]
-axb.plot(limb, limb, color="grey", lw=0.8)
-for gname in ["CXCL6", "CFB", "PPP1R1B"]:
-    gi = inp.gene_of.get(gname)
-    if gi is None or gi not in gset_b:
-        continue
+genes3 = ["CXCL6", "CFB", "PPP1R1B"]
+yy = np.arange(len(genes3))[::-1]
+for yi, gname in zip(yy, genes3):
+    gi = inp.gene_of[gname]
     k = int(np.flatnonzero(gset_b == gi)[0])
-    axb.annotate("", xy=(expct_i[k], exc_b[k]), xytext=(expct_g[k], exc_b[k]),
-                 arrowprops=dict(arrowstyle="-|>", color="#1e8449", lw=1.2))
-    axb.scatter([expct_g[k]], [exc_b[k]], s=32, marker="o",
-                facecolors="none", edgecolors="#c0392b", zorder=5)
-    axb.scatter([expct_i[k]], [exc_b[k]], s=32, marker="o",
-                color="#1e8449", zorder=5)
-    dy = -11 if gname == "CXCL6" else 5
-    axb.annotate(gname, (expct_g[k], exc_b[k]), fontsize=7.5,
-                 xytext=(-6, dy), textcoords="offset points", ha="right")
-axb.scatter([], [], s=32, marker="o", facecolors="none",
-            edgecolors="#c0392b", label="global-profile expectation")
-axb.scatter([], [], s=32, marker="o", color="#1e8449",
-            label="interface-local expectation")
-axb.set_xscale("log"); axb.set_yscale("log")
-axb.set_xlim(limb); axb.set_ylim([10, limb[1]])
-axb.set_xlabel("expected from proportional transfer (molecules)")
-axb.set_ylabel("exposure-linked excess (molecules)")
-axb.set_title("(b) profile choice: ductal → exocrine", fontsize=10)
-axb.legend(frameon=False, fontsize=8, loc="upper left")
+    fg = exc_b[k] / max(expct_g[k], 1e-9)
+    fi = exc_b[k] / max(expct_i[k], 1e-9)
+    axb.plot([fg, fi], [yi, yi], color="#8a8a8a", lw=1.1, zorder=2)
+    axb.scatter([fg], [yi], s=52, facecolors="none", edgecolors="#c0392b",
+                zorder=3)
+    axb.scatter([fi], [yi], s=52, color="#1e8449", zorder=3)
+axb.axvline(1.0, color="grey", lw=0.9, ls="--")
+axb.text(1.0, len(genes3) - 0.45, " proportional\n to transfer", fontsize=8,
+         color="grey", va="top")
+axb.scatter([], [], s=52, facecolors="none", edgecolors="#c0392b",
+            label="expectation from the ductal average")
+axb.scatter([], [], s=52, color="#1e8449",
+            label="expectation from bordering ductal cells")
+axb.set_xscale("log")
+axb.set_yticks(yy, genes3)
+axb.set_ylim(-0.6, len(genes3) - 0.2)
+axb.set_xlabel("excess relative to the transfer expectation (fold)")
+axb.set_title("(b) the same genes under two profiles (ductal → exocrine)",
+              fontsize=10)
+axb.legend(frameon=False, fontsize=8, loc="lower right")
 
 fig2.tight_layout()
 fig2.savefig(os.path.join(OUT, "generative_fig2.png"), dpi=150,

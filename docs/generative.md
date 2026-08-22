@@ -120,23 +120,27 @@ genes lies on the proportional line across three orders of magnitude —
 AMY2A, the largest transfer channel, sits exactly on it — while CFTR,
 PROX1 and CA4 sit severalfold above it and are flagged. Figure 2b shows
 why the profile must be interface-local: on the ductal → exocrine pair,
-the activation genes CXCL6, CFB and PPP1R1B lie far off the line when
-the expectation is computed from the ductal average, and move onto it
-when it is computed from the ductal cells that actually border exocrine
-tissue — their excess is transfer from activated edge cells, and only
-the interface-local profile prices it correctly.
+the excess of the activation genes CXCL6, CFB and PPP1R1B measures ten-
+to twenty-fold disproportionate against the ductal-average profile, but
+proportional (0.9- to 1.8-fold) against the profile of the ductal cells
+that actually border exocrine tissue — their excess is transfer from
+activated edge cells, and only the interface-local profile prices it
+correctly.
 
 ![Figure 2](figures/generative_fig2.png)
 
 **Figure 2. What the screen compares.** **(a)** Per-gene exposure-linked
 excess in ductal cells against the expectation from proportional
-exocrine transfer (interface-local profile); grey: source-owned genes,
-red squares: genes flagged as induced. **(b)** The same comparison for
-ductal → exocrine under two profiles: open red circles place CXCL6, CFB
-and PPP1R1B at their global-profile expectation, filled green points at
-their interface-local expectation; the arrows show that the apparent
-disproportionality disappears once the expectation reflects the
-bordering ductal cells.
+exocrine transfer (interface-local profile); grey: source-owned genes on
+the proportional line, red squares: genes flagged as induced. **(b)**
+For the three activation genes of the ductal → exocrine pair, the ratio
+of measured excess to the transfer expectation, computed two ways: from
+the ductal-average profile (open red) and from the profile of the
+ductal cells bordering exocrine tissue (filled green). The dashed line
+marks proportionality: the apparent ten- to twenty-fold
+disproportionality is an artifact of the average profile and vanishes
+when the expectation reflects the cells the material actually comes
+from.
 
 A separate question is how a flagged gene is known to be induced rather
 than admixed from a *different* source type. Three mechanisms address
