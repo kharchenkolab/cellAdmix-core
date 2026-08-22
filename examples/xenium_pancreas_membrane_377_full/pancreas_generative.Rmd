@@ -322,10 +322,11 @@ What this means for downstream analysis is best seen the way
 the corrected counts, every gene of the target type is tested for
 expression change with each source's proximity, jointly across all
 sources so correlated neighborhoods do not cross-attribute. Genes with
-essentially none of their content removed as transfer (filled points)
-are unambiguous expression changes — the induced interface program
-rising (green) and the ductal identity program falling (purple) — while
-genes entangled with the transfer split stay open grey:
+essentially none of their content removed as transfer and no meaningful
+share of the source's transfer profile (filled points) are unambiguous
+expression changes — the induced interface program rising (green) and
+the ductal identity program falling (purple) — while genes entangled
+with the transfer split stay open grey:
 
 ```{r volcano, fig.width=6.8, fig.height=5}
 duct_cells <- model$composition("Exocrine epithelial",
@@ -335,9 +336,16 @@ E <- sapply(duct_pairs$source, function(src) pmin(setNames(
   cellAdmixCore:::.celladmix_source_exposure_counts(
     cells_xy, cell_annotation, 15L)$counts[, src],
   as.character(cells_xy$cell_id))[duct_cells], 4))
+removed_frac_g <- 1 - Matrix::rowSums(after[, duct_cells]) /
+  pmax(Matrix::rowSums(before[, duct_cells]), 1)
 K <- after[, duct_cells]
 t_kept <- Matrix::colSums(K)
+ok_c <- t_kept > 10
+K <- K[, ok_c]
+E <- E[ok_c, , drop = FALSE]
+t_kept <- t_kept[ok_c]
 X <- cbind(1, E)
+exo_ix <- 1L + match("Exocrine epithelial", duct_pairs$source)
 fit_gene <- function(y) {
   beta <- c(log(max(sum(y), 0.5) / sum(t_kept)), numeric(ncol(E)))
   for (it in 1:25) {
@@ -354,25 +362,32 @@ fit_gene <- function(y) {
     max(length(y) - ncol(X), 1), 1)
   se <- sqrt(pmax(diag(solve(crossprod(X, X * as.numeric(mu)) +
     diag(1e-8, ncol(X)))), 1e-300) * disp)
-  c(beta[[2]], beta[[2]] / se[[2]])  # exocrine coefficient and its z
+  c(beta[[exo_ix]], beta[[exo_ix]] / se[[exo_ix]])
 }
-removed_frac_g <- 1 - Matrix::rowSums(after[, duct_cells]) /
-  pmax(Matrix::rowSums(before[, duct_cells]), 1)
 res <- t(sapply(rownames(K), function(g) {
   y <- as.numeric(K[g, ])
   if (sum(y) < 100) return(c(NA, NA))
   out <- fit_gene(y)
   if (is.null(out)) c(NA, NA) else out
 }))
+# the transfer-profile guard: the gene's share of the exocrine cells'
+# interface-local profile, with ductal-owned genes zeroed
+S_cells <- names(cell_types)[!is.na(cell_types) &
+  cell_types == "Exocrine epithelial"]
+dist_T <- cellAdmixCore:::.celladmix_source_nearest_distance(
+  cells_xy, cell_annotation)[, "Ductal/tumor epithelial"]
+psi <- cellAdmixCore:::.celladmix_audit_interface_profile(before, S_cells,
+  dist_T)
+psi[names(top_type)[top_type == "Ductal/tumor epithelial"]] <- 0
 vol <- data.frame(gene = rownames(K), lfc = res[, 1] / log(2),
   z = pmin(abs(res[, 2]), 60), dir = sign(res[, 1]),
   stringsAsFactors = FALSE)
-vol$clean <- removed_frac_g[vol$gene] < 0.10
+vol$clean <- removed_frac_g[vol$gene] < 0.10 & psi[vol$gene] * 1e4 < 20
 vol <- vol[!is.na(vol$z), ]
 vol$tier <- ifelse(!vol$clean, "transfer-entangled",
   ifelse(vol$dir > 0, "increased near exocrine", "decreased near exocrine"))
-lab <- vol[vol$clean & vol$z > 6, ]
-lab <- lab[order(-lab$z), ][1:8, ]
+lab <- vol[vol$clean, ]
+lab <- lab[order(-lab$z), ][1:7, ]
 ggplot(vol, aes(lfc, z)) +
   geom_point(data = vol[!vol$clean, ], shape = 1, size = 1.3,
     color = "#b6b6b6") +
@@ -386,7 +401,7 @@ ggplot(vol, aes(lfc, z)) +
   theme_classic(base_size = 11)
 ```
 
-The evidence behind these calls is a proportionality test.The evidence behind these calls is a proportionality test. Transferred
+The evidence behind these calls is a proportionality test. Transferred
 material samples the source's transcriptome, so a gene's excess in
 ductal cells should be proportional to its share of the exocrine
 profile; genes above the significance bound are the ductal cells' own
@@ -398,10 +413,6 @@ un_cells <- duct_cells[expo[duct_cells] == 0]
 t_exp <- sum(Matrix::colSums(before[, exp_cells]))
 t_un <- sum(Matrix::colSums(before[, un_cells]))
 gset <- names(top_type)[top_type == "Exocrine epithelial"]
-S_cells <- names(cell_types)[!is.na(cell_types) &
-  cell_types == "Exocrine epithelial"]
-dist_T <- cellAdmixCore:::.celladmix_source_nearest_distance(
-  cells_xy, cell_annotation)[, "Ductal/tumor epithelial"]
 m_exp <- Matrix::rowSums(before[gset, exp_cells])
 m_un <- Matrix::rowSums(before[gset, un_cells])
 excess <- m_exp - m_un / t_un * t_exp
@@ -458,7 +469,7 @@ so the markers superimpose. The dashed curve is the largest excess
 still consistent with proportional transfer, allowing counting noise
 and a 15% profile error.
 
-The consequence is visible gene by gene.The consequence is visible gene by gene. AMY2A sits on the diagonal
+The consequence is visible gene by gene. AMY2A sits on the diagonal
 above — the largest exocrine transfer channel — and the correction
 flattens its exposure gradient to the unexposed level. CFTR sits far
 above the diagonal, and the correction preserves its gradient, removing
