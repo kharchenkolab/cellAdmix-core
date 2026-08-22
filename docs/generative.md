@@ -153,7 +153,13 @@ exocrine-owned gene in the exocrine → ductal pair: measured excess in
 ductal cells (vertical) against the excess that proportional transfer
 would deliver given the gene's share of the interface-local exocrine
 profile (horizontal). The diagonal means "fully accounted for by
-transfer"; red squares are the genes flagged as induced. **(b)** The
+transfer"; the dashed curve is the screen's significance bound — a
+deviation of eight standard deviations, combining counting noise with
+the 15% profile uncertainty — and the red squares above it are the
+genes flagged as induced. No corresponding lower bound exists: with a
+15% profile uncertainty, eight standard deviations always exceed the
+expectation itself, so a shortfall can never reach the flagging
+significance and the screen acts only on excess. **(b)** The
 reverse pair, ductal → exocrine, same axes. Grey: all ductal-owned
 genes under the expectation from the bordering ductal cells — the data
 the proportional fit is made from. CXCL6, CFB and PPP1R1B appear twice,

@@ -204,7 +204,7 @@ def screen_fit(pair_name, psi):
                 / max(float((w * p * p).sum()), 1e-12), 0.0)
     z = (excess[gset] - slope * p) / np.sqrt(
         var[gset] + (gm.PROF_CV * slope * p) ** 2)
-    return gset, excess[gset], slope * p, z
+    return gset, excess[gset], slope * p, z, var[gset]
 
 
 def zeroed_profile(prof, T):
@@ -220,7 +220,7 @@ fig2, (axa, axb) = plt.subplots(1, 2, figsize=(11.0, 4.4))
 P_A = "Exocrine epithelial -> Ductal/tumor epithelial"
 S_A, T_A = "Exocrine epithelial", TARGET
 psi_a = zeroed_profile(inp.near_source_profile(S_A, T_A), T_A)
-gset, exc, expct, z = screen_fit(P_A, psi_a)
+gset, exc, expct, z, var_a = screen_fit(P_A, psi_a)
 ok = (exc > 10) & (expct > 1)
 flag = (z > gm.IND_Z) & (exc > gm.IND_MIN_EXCESS)
 axa.scatter(expct[ok & ~flag], exc[ok & ~flag], s=14, color="#9bb5c9",
@@ -229,6 +229,19 @@ axa.scatter(expct[flag], exc[flag], s=30, marker="s", facecolors="none",
             edgecolors="#c0392b", label="flagged as induced")
 lim = [1, max(exc.max(), expct.max()) * 1.6]
 axa.plot(lim, lim, color="grey", lw=0.8)
+# Significance bounds of the screen: a deviation of more than 8 standard
+# deviations, the standard deviation combining counting noise (smooth fit
+# of the per-gene variance against the expectation) with the 15% profile
+# uncertainty. The screen flags genes above the upper bound; points below
+# the lower bound would carry significantly less excess than transfer
+# predicts.
+fitok = ok & (expct > 1) & (var_a > 0)
+b1, b0 = np.polyfit(np.log(expct[fitok]), np.log(var_a[fitok]), 1)
+xg = np.geomspace(lim[0], lim[1], 200)
+sd = np.sqrt(np.exp(b0) * xg ** b1 + (gm.PROF_CV * xg) ** 2)
+axa.plot(xg, xg + 8 * sd, ls="--", color="grey", lw=0.8)
+lo = xg - 8 * sd
+axa.plot(xg[lo > 10], lo[lo > 10], ls="--", color="grey", lw=0.8)
 axa.set_xscale("log"); axa.set_yscale("log")
 axa.set_xlim(lim); axa.set_ylim([10, lim[1]])
 for gname in ["CFTR", "PROX1", "CA4", "AMY2A", "CELA2A"]:
@@ -242,7 +255,8 @@ for gname in ["CFTR", "PROX1", "CA4", "AMY2A", "CELA2A"]:
                  xytext=(4, 3), textcoords="offset points")
 axa.set_xlabel("expected from proportional transfer (molecules)")
 axa.set_ylabel("exposure-linked excess (molecules)")
-axa.set_title("(a) the screen: exocrine → ductal", fontsize=10)
+axa.set_title("(a) induced changes deviate from the transfer expectation",
+              fontsize=10)
 axa.legend(frameon=False, fontsize=8, loc="upper left")
 
 # (b) the same test for ductal -> exocrine under the global versus the
@@ -254,8 +268,8 @@ P_B = "Ductal/tumor epithelial -> Exocrine epithelial"
 S_B, T_B = "Ductal/tumor epithelial", "Exocrine epithelial"
 psi_int = zeroed_profile(inp.near_source_profile(S_B, T_B), T_B)
 psi_glob = zeroed_profile(inp.psi_raw[S_B], T_B)
-gset_b, exc_b, expct_i, z_i = screen_fit(P_B, psi_int)
-_, _, expct_g, z_g = screen_fit(P_B, psi_glob)
+gset_b, exc_b, expct_i, z_i, _ = screen_fit(P_B, psi_int)
+_, _, expct_g, z_g, _ = screen_fit(P_B, psi_glob)
 okb = (exc_b > 10) & (expct_i > 1)
 axb.scatter(expct_i[okb], exc_b[okb], s=14, color="#9bb5c9", lw=0,
             label="other ductal-owned genes")
