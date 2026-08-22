@@ -101,7 +101,7 @@ class GenerativeCorrectionTests(unittest.TestCase):
             self.assertGreater(removed, 0.5 * removed_default)
             self.assertLess(removed, 2.0 * removed_default)
         # explicit programs: the B pseudobulk profile
-        before, genes, cells = self.audit.fit.counts()
+        before, genes, cells = self.fit.counts()
         b_cols = np.array([self.audit._ctypes.get(c) == "B" for c in cells])
         prof = np.asarray(before[:, b_cols].sum(axis=1)).ravel()
         mod = self.audit.fit_generative(init={"B": prof, "A": np.asarray(
@@ -113,7 +113,7 @@ class GenerativeCorrectionTests(unittest.TestCase):
 
     def test_correct_generative_removes_planted_admixture(self):
         correction = self.audit.correct_generative(num_threads=2)
-        before, genes, cells = self.audit.fit.counts()
+        before, genes, cells = self.fit.counts()
         after, genes_a, cells_a = correction.counts()
         self.assertEqual(list(genes), list(genes_a))
         gi = {g: i for i, g in enumerate(genes)}
@@ -131,6 +131,36 @@ class GenerativeCorrectionTests(unittest.TestCase):
         pairs = report.pairs()
         row = pairs[(pairs["source"] == "A") & (pairs["target"] == "B")]
         self.assertGreater(float(row["sensitivity"].iloc[0]), 0.5)
+
+
+class DatasetLevelAuditTests(unittest.TestCase):
+    def test_dataset_audit_matches_fit_audit_and_runs_nmf_free(self):
+        from celladmix import CellAdmix
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            annotation, planted = make_split_bundle(root / "bundle")
+            ds = CellAdmix(
+                str(root / "bundle"), output_dir=str(root / "out"),
+                annotation=annotation.set_index("cell_id")["cell_type"],
+                num_threads=2)
+            # dataset-level audit: no fit is ever created
+            audit = ds.audit_admixture(
+                neighbor_k=6, min_target_cells=50, min_reference_cells=20,
+                min_excess=50)
+            pairs = audit.pairs(detected_only=True)
+            row = pairs[(pairs["source"] == "A") & (pairs["target"] == "B")]
+            self.assertEqual(len(row), 1)
+            self.assertGreater(float(row["excess"].iloc[0]), 0.5 * planted)
+            # the full NMF-free chain through correction and verification
+            model = audit.fit_generative(num_threads=2)
+            self.assertEqual(model.init, "clusters")
+            report = audit.evaluate(model.correct())
+            rp = report.pairs()
+            ab = rp[(rp["source"] == "A") & (rp["target"] == "B")]
+            self.assertGreater(float(ab["sensitivity"].iloc[0]), 0.5)
+            self.assertFalse((root / "out" / "runs").exists()
+                             and any((root / "out" / "runs").iterdir()))
 
 
 if __name__ == "__main__":

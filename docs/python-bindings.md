@@ -219,11 +219,22 @@ model.correct(retain_induced=False)  # ... or removed along with contamination
 audit.evaluate(correction)         # verified like any other correction
 ```
 
-The `init` argument selects the expression-program initialization: an
-NMF fit (its factor-labeled molecules; the default), `"clusters"`,
-`"pseudobulk"`, or a dict of explicit profile matrices — the model does
-not require an NMF fit. `audit.correct_generative()` remains as the
-one-call convenience.
+The `init` argument selects the expression-program initialization:
+`"clusters"` (the default), an NMF fit (its factor-labeled molecules —
+recommended on large panels, where it preserves the most induced
+biology), `"pseudobulk"`, or a dict of explicit profile matrices.
+`audit.correct_generative()` remains as the one-call convenience.
+
+Neither the audit nor the generative model requires a factorization:
+`ds.audit_admixture()` computes the same audit straight from the
+dataset's input store, so the whole chain — measure, fit the model,
+correct, verify — runs without an NMF fit:
+
+```python
+audit = ds.audit_admixture()
+correction = audit.fit_generative().correct()
+audit.evaluate(correction)
+```
 
 `evaluate()` warns from the corrected counts themselves — a pair is
 flagged when its molecules were measurably not removed, regardless of what

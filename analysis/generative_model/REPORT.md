@@ -400,8 +400,18 @@ fit). Full table: results/init_comparison.csv.
 | NSCLC | nmf_factors | 0.762 | 0.911 | 0 | 1.000 | 81 |
 | NSCLC | clusters | 0.772 | 0.910 | 0 | 0.959 | 67 |
 | NSCLC | pseudobulk | 0.813 | 0.901 | 0 | 0.933 | 34 |
+| breast | nmf_factors | 0.752 | 0.778 | 0 | 1.000 | 277 |
+| breast | clusters | 0.768 | 0.619 | 0 | 0.945 | 271 |
+| breast | pseudobulk | 0.787 | 0.617 | 0 | 0.910 | 220 |
 
-Conclusion: the initialization barely matters - sensitivities differ by
+Breast adds the one real difference: on the 5,101-gene panel the
+factor-initialized model flags 180 induced gene-pair combinations and
+retains 78% of their excess, against 129 and ~62% under the simpler
+initializations - richer starting programs let the model separate more
+induced structure from transfer on panels with substantial within-type
+state structure.
+
+Conclusion: on the removal side the initialization barely matters - sensitivities differ by
 1-5 points with no consistent winner, retention is stable, own-marker
 removal is exactly zero in every case, and the removals agree entry by
 entry at 0.93-1.00. The model's constraints (dose-anchored

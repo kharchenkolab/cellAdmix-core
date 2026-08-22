@@ -102,10 +102,10 @@ def fit_generative(audit, *, init=None, n_programs=4, num_threads=None,
                    seed=1, **options):
     """Fit the generative model on the audit's detected pairs.
 
-    ``init`` selects the expression-program initialization: an NMF fit
-    object uses its factor-labeled molecules (the default when the audit's
-    fit carries them); ``"clusters"`` derives programs by clustering each
-    type's cells, weighted toward lightly dosed ones; ``"pseudobulk"``
+    ``init`` selects the expression-program initialization:
+    ``"clusters"`` (the default) derives programs by clustering each
+    type's cells, weighted toward lightly dosed ones; an NMF fit object
+    uses its factor-labeled molecules; ``"pseudobulk"``
     uses one pooled profile per type; a dict mapping cell-type names to
     profile matrices (programs x genes, columns aligned with the count
     matrix genes) supplies explicit programs, e.g. from an external
@@ -114,14 +114,13 @@ def fit_generative(audit, *, init=None, n_programs=4, num_threads=None,
     """
     from . import _core
 
-    fit = audit.fit
     matrix = audit._matrix.tocsc()
     genes = audit._genes
     cells = audit._cells
     types = audit._types
     type_of = {t: i for i, t in enumerate(types)}
 
-    cell_tbl = fit.cell_factors()
+    cell_tbl = audit._cells_table
     order = pd.Index(cell_tbl["cell_id"].astype(str))
     pos = order.get_indexer(cells)
     if (pos < 0).any():
@@ -151,7 +150,7 @@ def fit_generative(audit, *, init=None, n_programs=4, num_threads=None,
     programs_flat: list[float] = []
     program_type: list[int] = []
     if init is None:
-        init = fit
+        init = "clusters"
     if isinstance(init, str):
         if init not in ("clusters", "pseudobulk"):
             raise ValueError("init must be an NMF fit, 'clusters', "

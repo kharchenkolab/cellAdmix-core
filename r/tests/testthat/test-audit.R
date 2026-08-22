@@ -278,3 +278,29 @@ test_that("the generative correction removes planted admixture", {
   ab <- p[p$source == "A" & p$target == "B", ]
   expect_gt(ab$sensitivity, 0.5)
 })
+
+test_that("the dataset-level audit matches the fit-level audit and runs NMF-free", {
+  fit <- make_audit_fit()
+  audit_fit <- fit$audit_admixture(neighbor_k = 6L, min_target_cells = 50L,
+    min_reference_cells = 20L, min_excess = 50)
+  ds <- fit$dataset
+  audit_ds <- ds$audit_admixture(neighbor_k = 6L, min_target_cells = 50L,
+    min_reference_cells = 20L, min_excess = 50)
+  pf <- audit_fit$pairs()
+  pd <- audit_ds$pairs()
+  expect_equal(nrow(pd), nrow(pf))
+  key <- function(p) paste(p$source, p$target)
+  pd <- pd[match(key(pf), key(pd)), ]
+  expect_equal(pd$excess, pf$excess, tolerance = 1e-6)
+  expect_equal(pd$detected, pf$detected)
+
+  # The full NMF-free path: dataset -> audit -> generative model ->
+  # correction -> evaluation, with no factorization involved anywhere.
+  model <- audit_ds$fit_generative(num_threads = 2L)
+  expect_identical(model$init, "clusters")
+  correction <- model$correct()
+  report <- audit_ds$evaluate(correction)
+  p <- report$pairs()
+  ab <- p[p$source == "A" & p$target == "B", ]
+  expect_gt(ab$sensitivity, 0.5)
+})

@@ -220,18 +220,22 @@ def _screen_panel(matrix, candidates, cols_exposed, cols_unexposed,
 class CellAdmixAudit:
     """Per-cell-type-pair admixture estimates and cleanup verification."""
 
-    def __init__(self, fit, *, neighbor_k=15, n_pool=20, q_thresh=0.01,
-                 min_excess=200, min_target_cells=200, min_reference_cells=100):
+    def __init__(self, counts, cells, annotation, *, neighbor_k=15, n_pool=20,
+                 q_thresh=0.01, min_excess=200, min_target_cells=200,
+                 min_reference_cells=100):
+        """Build the audit from its actual inputs: counts as
+        ``(matrix, genes, cell_ids)``, a cell table with ``cell_id``/``x``/
+        ``y`` columns, and a cell-type annotation. No factorization is
+        involved; ``from_fit`` and ``from_dataset`` construct these from
+        the respective objects."""
         from ._score_utils import source_exposure_counts, source_nearest_distance
 
-        annotation = getattr(getattr(fit, "dataset", None), "annotation", None)
         if annotation is None:
             raise ValueError("audit_admixture requires a cell-type annotation")
-        self.fit = fit
         self.params = dict(neighbor_k=neighbor_k, n_pool=n_pool,
             q_thresh=q_thresh, min_excess=min_excess)
-        cells = fit.cell_factors()
-        matrix, genes, cell_ids = fit.counts()
+        self._cells_table = cells
+        matrix, genes, cell_ids = counts
         self._matrix = matrix.tocsc()
         self._genes = pd.Index(genes)
         self._cells = pd.Index([str(c) for c in cell_ids])
@@ -391,6 +395,19 @@ class CellAdmixAudit:
                 n_induced=len(d["induced"])))
         df = pd.DataFrame(rows)
         return df[df["detected"]] if detected_only else df
+
+    @classmethod
+    def from_fit(cls, fit, **kwargs):
+        """The audit over a fitted run's counts and cell table."""
+        annotation = getattr(getattr(fit, "dataset", None), "annotation", None)
+        return cls(fit.counts(), fit.cell_factors(), annotation, **kwargs)
+
+    @classmethod
+    def from_dataset(cls, dataset, **kwargs):
+        """The audit straight from the dataset's input store — no
+        factorization of any kind is run or required."""
+        matrix, genes, cells, table = dataset._store_counts()
+        return cls((matrix, genes, cells), table, dataset.annotation, **kwargs)
 
     def fit_generative(self, **kwargs):
         """Fit the generative admixture model on the detected pairs.

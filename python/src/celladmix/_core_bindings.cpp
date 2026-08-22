@@ -693,6 +693,27 @@ PYBIND11_MODULE(_core, m) {
       py::arg("n_types"));
 
   m.def(
+      "collect_input_store_counts",
+      [](const std::string& store_dir) {
+        celladmix::CellCountMatrix counts;
+        {
+          py::gil_scoped_release release;
+          counts = celladmix::load_input_store_counts(store_dir);
+        }
+        py::dict out;
+        out["indptr"] = counts.indptr;
+        out["indices"] = counts.indices;
+        out["values"] = counts.values;
+        out["genes"] = counts.genes;
+        out["cells"] = counts.cells.cell_ids;
+        out["cell_x"] = counts.cells.centroid_x;
+        out["cell_y"] = counts.cells.centroid_y;
+        out["cell_type"] = counts.cells.cell_types;
+        return out;
+      },
+      py::arg("store_dir"));
+
+  m.def(
       "fit_generative",
       [](const std::vector<int>& counts_indptr,
          const std::vector<int>& counts_indices,

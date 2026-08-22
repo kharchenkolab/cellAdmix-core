@@ -251,8 +251,20 @@ celladmix_audit_admixture <- function(fit, annotation = NULL, neighbor_k = 15L,
   if (is.null(ann)) {
     stop("audit_admixture requires a cell-type annotation")
   }
-  cells <- fit$cell_factors()
-  counts <- fit$counts()
+  .celladmix_audit_from_data(counts = fit$counts(),
+    cells = fit$cell_factors(), annotation = ann, neighbor_k = neighbor_k,
+    n_pool = n_pool, q_thresh = q_thresh, min_excess = min_excess,
+    min_target_cells = min_target_cells,
+    min_reference_cells = min_reference_cells)
+}
+
+# The audit itself, from its actual inputs: a gene x cell count matrix, a
+# cell table with positions (cell_id, x, y), and a cell-type annotation.
+# No factorization is involved at any point.
+.celladmix_audit_from_data <- function(counts, cells, annotation,
+    neighbor_k = 15L, n_pool = 20L, q_thresh = 0.01, min_excess = 200,
+    min_target_cells = 200L, min_reference_cells = 100L) {
+  ann <- annotation
   exposure <- .celladmix_source_exposure_counts(cells, ann, neighbor_k)
   rownames(exposure$counts) <- as.character(cells$cell_id)
   # Exposure at growing neighborhood sizes, used only to pick each pair's
@@ -366,7 +378,7 @@ celladmix_audit_admixture <- function(fit, annotation = NULL, neighbor_k = 15L,
       length(induced_all), if (length(induced_all) > 1) "s" else "",
       paste(utils::head(sort(induced_all), 8), collapse = ", ")))
   }
-  CellAdmixAudit$new(fit = fit, pair_defs = pair_defs, counts = counts,
+  CellAdmixAudit$new(cells = cells, pair_defs = pair_defs, counts = counts,
     totals = totals, cell_types = cell_types, native_markers = native_markers,
     params = list(neighbor_k = neighbor_k, n_pool = n_pool, q_thresh = q_thresh,
       min_excess = min_excess))
@@ -383,13 +395,12 @@ celladmix_audit_admixture <- function(fit, annotation = NULL, neighbor_k = 15L,
 CellAdmixAudit <- R6::R6Class(
   "CellAdmixAudit",
   public = list(
-    fit = NULL,
     params = NULL,
 
-    initialize = function(fit, pair_defs, counts, totals, cell_types,
+    initialize = function(cells, pair_defs, counts, totals, cell_types,
                           native_markers, params = list()) {
-      self$fit <- fit
       self$params <- params
+      private$.cells <- cells
       private$.pair_defs <- pair_defs
       private$.counts <- counts
       private$.totals <- totals
@@ -437,17 +448,17 @@ CellAdmixAudit <- R6::R6Class(
       # target cell's counts are decomposed into own expression, per-source
       # contamination, ambient background, and induced expression (see
       # docs/generative.md). init selects the expression-program
-      # initialization: an NMF fit uses its factor-labeled molecules (the
-      # default), "clusters" derives programs by clustering each type's
-      # cells weighted toward lightly dosed ones, "pseudobulk" uses one
-      # pooled profile per type, and a named list of programs-by-genes
+      # initialization: "clusters" (the default) derives programs by
+      # clustering each type's cells weighted toward lightly dosed ones,
+      # an NMF fit uses its factor-labeled molecules, "pseudobulk" uses
+      # one pooled profile per type, and a named list of programs-by-genes
       # matrices (names = cell types, columns = count-matrix genes)
       # supplies explicit programs. Returns a CellAdmixGenerativeModel.
       counts <- private$.counts
       cells <- colnames(counts)
       types <- sort(unique(private$.cell_types[!is.na(private$.cell_types)]))
       type_code <- stats::setNames(seq_along(types) - 1L, types)
-      cell_tbl <- self$fit$cell_factors()
+      cell_tbl <- private$.cells
       pos <- match(cells, as.character(cell_tbl$cell_id))
       if (anyNA(pos)) {
         stop("audit cells missing from the fit cell table")
@@ -472,7 +483,7 @@ CellAdmixAudit <- R6::R6Class(
       cells_parquet <- ""
       programs_flat <- numeric(0)
       program_type <- integer(0)
-      if (is.null(init)) init <- self$fit
+      if (is.null(init)) init <- "clusters"
       if (inherits(init, "CellAdmixFit")) {
         init_mode <- "factors"
         init_label <- "nmf_factors"
@@ -876,6 +887,7 @@ CellAdmixAudit <- R6::R6Class(
     }
   ),
   private = list(
+    .cells = NULL,
     .pair_defs = NULL, .counts = NULL, .totals = NULL,
     .cell_types = NULL, .native_markers = NULL,
     .pair = function(source, target) {

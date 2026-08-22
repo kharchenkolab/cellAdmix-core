@@ -8,6 +8,8 @@ import shutil
 from pathlib import Path
 from typing import Optional
 
+import pandas as pd
+
 from . import _core
 from .fit import CellAdmixFit
 from .io import annotation_vectors, ensure_list, read_annotation, recommended_rank
@@ -151,6 +153,40 @@ class CellAdmix:
             cell_id_col=cell_id_col,
             num_threads=num_threads,
         )
+
+    def _store_counts(self):
+        """Counts and the cell table assembled from the input store."""
+        import scipy.sparse as sp
+
+        self.ensure_store(materialize_molecules=False, verbose=False)
+        raw = _core.collect_input_store_counts(str(self.store_dir))
+        matrix = sp.csc_matrix(
+            (raw["values"], raw["indices"], raw["indptr"]),
+            shape=(len(raw["genes"]), len(raw["cells"])))
+        table = pd.DataFrame(dict(cell_id=raw["cells"], x=raw["cell_x"],
+                                  y=raw["cell_y"]))
+        return matrix, list(raw["genes"]), list(raw["cells"]), table
+
+    def counts(self):
+        """Gene-by-cell counts as ``(matrix, genes, cells)``, assembled
+        from the input store (no fit involved)."""
+        matrix, genes, cells, _ = self._store_counts()
+        return matrix, genes, cells
+
+    def cells(self) -> pd.DataFrame:
+        """Cell table (id and position) from the input store."""
+        return self._store_counts()[3]
+
+    def audit_admixture(self, **kwargs):
+        """The admixture audit straight from the dataset.
+
+        The audit needs only the counts, cell positions, and annotation —
+        no factorization is run or required. ``fit.audit_admixture()``
+        gives the same audit computed from a fitted run's counts.
+        """
+        from .audit import CellAdmixAudit
+
+        return CellAdmixAudit.from_dataset(self, **kwargs)
 
     def load_fit(self, run_id_or_path) -> CellAdmixFit:
         """Load a persisted fit by run id or path."""

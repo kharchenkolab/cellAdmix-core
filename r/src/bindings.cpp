@@ -2327,6 +2327,8 @@ List sparse_counts_to_r_list(const celladmix::CellCountMatrix& counts) {
       _["x"] = wrap(counts.values),
       _["genes"] = wrap(counts.genes),
       _["cells"] = wrap(counts.cells.cell_ids),
+      _["cell_x"] = wrap(counts.cells.centroid_x),
+      _["cell_y"] = wrap(counts.cells.centroid_y),
       _["cell_type"] = counts.cells.cell_types.empty()
           ? wrap(std::vector<std::string>(counts.cells.cell_ids.size(), ""))
           : wrap(counts.cells.cell_types));

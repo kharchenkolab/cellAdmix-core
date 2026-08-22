@@ -249,11 +249,22 @@ class CellAdmixFit:
         matrix = sparse.csc_matrix((data, indices, indptr), shape=(len(genes), len(cells)))
         return matrix, genes, cells
 
+    def score_neighbor_enrichment(self, **kwargs):
+        """Score admixture by source-cell neighborhood enrichment."""
+        from .neighbor import score_neighbor_enrichment
+
+        return score_neighbor_enrichment(self, **kwargs)
+
     def audit_admixture(self, **kwargs):
-        """Estimate per-cell-type-pair admixture from spatial exposure."""
+        """Estimate per-cell-type-pair admixture from spatial exposure.
+
+        Computed from this run's counts and cell table; the audit involves
+        no factorization, and ``dataset.audit_admixture()`` gives the same
+        measurement straight from the input store.
+        """
         from .audit import CellAdmixAudit
 
-        return CellAdmixAudit(self, **kwargs)
+        return CellAdmixAudit.from_fit(self, **kwargs)
 
     def score_factor_sources(self, *, annotation=None, counts=None, **kwargs):
         """Score factor source cell types using marker-weighted gene content."""

@@ -163,6 +163,32 @@ CellAdmixDataset <- R6::R6Class(
       do.call(celladmix_collect_store_counts, c(list(self$prep), dots))
     },
 
+    cells = function(...) {
+      # Cell table (id and position) from the input store.
+      store <- self$ensure_store(required = "counts", store_mode = "counts",
+        verbose = FALSE)
+      raw <- .celladmix_collect_input_store_counts(store$path)
+      data.frame(cell_id = raw$cells, x = raw$cell_x, y = raw$cell_y,
+        stringsAsFactors = FALSE)
+    },
+
+    audit_admixture = function(annotation = NULL, ...) {
+      # The admixture audit straight from the dataset: it needs only the
+      # counts, cell positions, and annotation, none of which involve a
+      # factorization. fit$audit_admixture() gives the same audit computed
+      # from a fitted run's counts.
+      ann <- private$resolve_annotation(annotation, register = TRUE)
+      ann_vec <- ann$labels
+      store <- self$ensure_store(required = "counts", store_mode = "counts",
+        verbose = FALSE)
+      raw <- .celladmix_collect_input_store_counts(store$path)
+      counts <- .celladmix_sparse_counts_from_raw(raw)
+      cells <- data.frame(cell_id = raw$cells, x = raw$cell_x,
+        y = raw$cell_y, stringsAsFactors = FALSE)
+      .celladmix_audit_from_data(counts = counts, cells = cells,
+        annotation = ann_vec, ...)
+    },
+
     cell_state_umap = function(annotation = NULL, cells_max = 5000L,
                                min_molecules = 10L, min_genes = 5L,
                                n_variable_genes = 1000L, pca_dims = 30L,
