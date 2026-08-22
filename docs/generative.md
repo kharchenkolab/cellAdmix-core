@@ -30,50 +30,68 @@ $$y_{cg} \sim \mathrm{Poisson}\Big(t_c \big[ \textstyle\sum_k \theta_{ck} F_{kg}
 \sum_S u_{cS}\, \rho_{cS}\, m_{Sg} \;+\; \epsilon_g \big]\Big)$$
 
 where $t_c$ is the cell's total molecule count, so every bracketed
-quantity is a fraction of the cell's content. The terms are, in order:
-the cell's own expression programs ($F_k$, gene profiles with per-cell
-weights $\theta_{ck}$); contamination from each detected source type $S$
-(profile $\psi_S$, per-cell fraction $\alpha_{cS}$); ambient background
-($a_g$, per-cell scale $\beta_c$); a sparse induced-expression term
-active only on screened gene support ($u_{cS}$; per-gene rate $m_{Sg}$
-with a per-cell activity multiplier $\rho_{cS}$); and a small uniform
-floor $\epsilon_g$. After fitting by expectation–maximization, each
-observed count is split among the components in proportion to their
-fitted rates, and the corrected count keeps the own, induced, and floor
-shares.
+quantity is a fraction of the cell's content (Figure 1a). The
+components, and where each one's parameters come from:
 
-Four structural choices carry most of the model's behavior, each adopted
-for a measured reason:
+- **Own expression** ($\theta_{ck}$, $F_{kg}$): the target type's
+  expression programs — gene profiles $F_k$ with per-cell weights
+  $\theta_{ck}$, initialized from the profiles of factor-labeled
+  molecules of the type's own NMF factors. The programs are re-estimated
+  during fitting, but predominantly from lightly contaminated cells
+  (each cell's contribution is down-weighted by its prior contamination
+  fraction): without this, a program shared between source and target
+  absorbs the transferred material as if it were a cell state, and the
+  affected pair's removal collapses.
+- **Contamination** ($\alpha_{cS}$, $\psi_{Sg}$): one term per detected
+  source type. The profile $\psi_S$ is the cytoplasmic expression
+  profile of the source cells that actually border the target type
+  (within 30 µm, widening when sparse) — cell states are not uniform
+  across a tissue, and material transferred from activated interface
+  cells carries their elevated activation-gene share; against a global
+  profile those genes would be misread as induced. The profile is zeroed
+  on target-owned genes, where contamination is indistinguishable from
+  own expression: it is deliberately left in place, which makes removal
+  of the target's own markers structurally impossible. The per-cell
+  fraction $\alpha_{cS}$ has a prior mean given by a monotone (isotonic)
+  dose–response of marker content on the number of source neighbors, and
+  its posterior update from the cell's own expression is bounded — at
+  most five-fold the prior, exactly zero where the prior is zero — so
+  removal stays anchored to the demonstrated spatial signal (with an
+  unbounded update, the model keeps finding the true contamination even
+  after the exposure covariate is destroyed, and the permutation control
+  fails).
+- **Ambient background** ($\beta_c$, $a_g$): restricted to the strict
+  genes (essentially absent from the target natively), with profile and
+  level measured on target cells far from any source cell, and a bounded
+  per-cell scale. This is the component that removes the
+  exposure-independent baseline of strict genes.
+- **Induced expression** ($u_{cS}$, $\rho_{cS}$, $m_{Sg}$): a sparse
+  term active only on genes selected by the proportionality screen
+  (next section). The per-cell activity $\rho_{cS}$ concentrates the
+  induced content in the cells that actually respond. This content is
+  retained; the genes' proportional (transferred) share is still
+  removed.
+- **Uniform floor** ($\epsilon_g$): 0.2% of cell content spread over
+  all genes, keeping the posterior split well-defined where every
+  structured component is near zero.
 
-- **Interface-local source profiles.** $\psi_S$ is estimated from the
-  cytoplasmic molecules of the source cells that actually border the
-  target type (within 30 µm of the nearest target-type cell, widening
-  when sparse), not from the source type as a whole. Cell states are not
-  uniform across a tissue: source cells at an interface can express
-  activation genes several-fold above the source average, and material
-  transferred from them carries that elevated share. Against the global
-  profile such genes would be misread as induced in the target (see the
-  interface-activation finding below).
-- **Source profiles are zeroed on target-owned genes.** Contamination on
-  a gene whose top expresser is the target cannot be distinguished from
-  own expression, and the model deliberately leaves it in place. This
-  makes removal of a target's own marker genes structurally impossible —
-  measured own-marker false removal is exactly zero — rather than merely
-  calibrated to be small.
-- **The contamination fraction is anchored to the measured exposure
-  dose.** The prior mean of $\alpha_{cS}$ is a monotone (isotonic)
-  dose–response of marker content on the number of source cells among
-  the cell's nearest neighbors, and the posterior update from the cell's
-  own expression is bounded (at most five-fold the prior, and exactly
-  zero where the prior is zero). The bound is what keeps removal tied to
-  the demonstrated spatial signal: with an unbounded update the model
-  keeps finding the true contamination even after the exposure covariate
-  is destroyed, and the permutation control fails.
-- **Own programs are learned from lightly contaminated cells.** Program
-  updates weight each cell down by its prior contamination fraction;
-  without this, a program shared between source and target absorbs the
-  transferred material as if it were a cell state, and the affected
-  pair's removal collapses.
+![Figure 1](figures/generative_fig1.png)
+
+**Figure 1. The components, fitted on the pancreas exocrine → ductal
+pair.** **(a)** A target cell's observed counts are a mixture of its own
+expression programs (blue), material transferred from bordering source
+cells (red), ambient background (grey), and the cell's own transcription
+induced by the neighborhood (green). **(b)** The fitted composition of
+ductal-cell content, stratified by the number of exocrine cells among
+the 15 nearest: at high exposure the model attributes most of the
+cell's molecules to contamination, while the induced share appears
+exactly where exposure is high. **(c)** AMY2A, the largest acinar
+transfer channel: its entire exposure gradient — and its ambient
+baseline, since ductal cells do not express it — is removed. **(d)**
+CFTR, the duct-cell gene induced at acinar interfaces: its
+fourteen-fold gradient is almost entirely retained, with only the
+proportional transferred share removed. The same measurement that
+flattens (c) preserves (d) — the separation the model exists to make.
 
 ## The induced-expression screen
 
@@ -149,7 +167,7 @@ exposure-linked excess removed on the held-out half, weighted across the
   planted induction. The planted induction itself is retained or removed
   depending on how far it exceeds the transfer expectation of its genes —
   the full sweep over gene ranks and planted amounts is shown in
-  Figure 1a and discussed under the identifiability limit below.
+  Figure 2 and discussed under the identifiability limit below.
 - **Replication**: on the CosMx NSCLC dataset (98,002 cells, 960-gene
   panel, 27 detected pairs) the same configuration reaches 0.964 on
   held-out genes, removes 9.0% of the molecules, keeps own-marker
@@ -196,7 +214,7 @@ disproportionate to the local source profile; induction proportionate
 to a source's own top markers is indistinguishable from admixture at
 count level and will be removed.
 
-Figure 1a shows this boundary measured directly. Synthetic induced
+Figure 2 shows this boundary measured directly. Synthetic induced
 expression was planted across a range of gene ranks and amounts, and
 its retained fraction charted against the gene's total exposure-linked
 excess relative to the transfer expectation: retention turns on where
@@ -204,26 +222,18 @@ the excess exceeds the expectation about three-fold and is essentially
 complete beyond ten-fold, while excess below two-fold is removed as
 transfer. The real flagged genes, plotted at their measured
 disproportionality and their realized retained fractions, fall on the
-same curve — the model treats real and planted induction alike.
-Figure 1b shows the model's largest single retention decision as a
-worked example: CFTR content of ductal cells rises fourteen-fold with
-exocrine exposure, and the model splits that rise into a retained share
-(native expression plus the induced duct-cell program, most of the
-signal) and a removed transferred share, rather than flattening the
-gradient wholesale as a marker-based correction would.
+same curve — the model treats real and planted induction alike, and
+its largest real retention decision (CFTR, Figure 1d) sits well inside
+the recoverable regime at 3.9-fold.
 
-![Figure 1](figures/generative_fig1.png)
+![Figure 2](figures/generative_fig2.png)
 
-**Figure 1. The separation boundary, and a worked example.** **(a)**
-Fraction of planted induced expression retained, as a function of the
-gene's exposure-linked excess relative to the transfer expectation
-(blue: spike-in sweep over planted gene ranks and amounts, pancreas);
-red squares: the real flagged genes at their measured
-disproportionality. The dotted line marks 80% retention. **(b)** CFTR
-in ductal cells stratified by the number of exocrine cells among the 15
-nearest: observed rate (red), the model's retained share (blue), and
-the removed transferred share (shaded); the dotted line is the rate in
-unexposed ductal cells.
+**Figure 2. The separation boundary.** Fraction of planted induced
+expression retained, as a function of the gene's exposure-linked excess
+relative to the transfer expectation (blue: spike-in sweep over planted
+gene ranks and amounts, pancreas); red squares: the real flagged genes
+at their measured disproportionality. The dotted line marks 80%
+retention.
 
 ## A practical composite
 
