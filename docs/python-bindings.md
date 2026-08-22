@@ -198,6 +198,26 @@ report.plot_cleanup()               # uncorrected and for severe own-marker
                                     # over-removal (>25%)
 ```
 
+The audit can also correct the admixture it measures, through the
+generative model described in [generative.md](generative.md): each target
+cell's counts are decomposed into the cell's own expression, contamination
+from each detected source type, ambient background, and
+neighborhood-induced expression; the contamination and ambient shares are
+removed while the induced ones are retained. The fit runs in the C++ core
+(seconds to a few minutes depending on dataset size) and returns a
+correction object that `evaluate()` accepts, together with the model's
+per-cell decomposition:
+
+```python
+correction = audit.correct_generative(num_threads=8)
+correction.counts()                # corrected (matrix, genes, cells)
+correction.pairs                   # per-pair removed and induced molecule totals
+correction.induced                 # retained induced genes with disproportionality
+correction.composition("Exocrine epithelial", "Ductal/tumor epithelial")
+                                   # per-cell dose, contamination, induced activity
+audit.evaluate(correction)         # verified like any other correction
+```
+
 `evaluate()` warns from the corrected counts themselves — a pair is
 flagged when its molecules were measurably not removed, regardless of what
 the correction's rule list claims. The reported rates and molecule counts

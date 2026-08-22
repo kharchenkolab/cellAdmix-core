@@ -467,6 +467,17 @@ non-flagged content, 80.1% retention). Scripts and per-pair tables:
 `analysis/audit_guided/17_composite.R` and
 `analysis/audit_guided/results/`.
 
+The model ships in the package: `audit$correct_generative()` in R and
+`audit.correct_generative()` in Python fit it on the audit's detected
+pairs through a shared C++ implementation (both bindings marshal the
+same inputs to the same code, so their results are identical), returning
+corrected counts, the per-cell decomposition, and the retained
+induced-gene table as a correction object that `evaluate()` verifies
+like any other. The fit reproduces the reference implementation exactly
+(the removed-molecule totals agree to the last count on all three
+datasets) and runs in 20 seconds on the pancreas dataset, 50 seconds on
+NSCLC, and about four minutes on breast 5K.
+
 The three correctors order naturally by need. The exposure-regression
 corrector is the simplest and fastest way to flatten exposure-linked
 marker gradients, at the known cost of removing induced and interface
