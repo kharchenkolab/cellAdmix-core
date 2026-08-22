@@ -351,3 +351,42 @@ fig3.tight_layout()
 fig3.savefig(os.path.join(OUT, "generative_fig3.png"), dpi=150,
              bbox_inches="tight")
 print("fig3 done")
+
+
+# ---- Figure 4: neighborhood-associated expression changes ------------------
+dg = pd.read_csv(os.path.join(GM, "results",
+                              "gm_induced_general_pancreas.csv"))
+fig4, axes4 = plt.subplots(1, 2, figsize=(11.0, 4.4))
+for ax, (src, tgt), title in [
+        (axes4[0], ("Exocrine epithelial", "Ductal/tumor epithelial"),
+         "(a) ductal cells, by exocrine proximity"),
+        (axes4[1], ("Exocrine epithelial", "Fibroblast / CAF"),
+         "(b) fibroblasts, by exocrine proximity")]:
+    d = dg[(dg.source == src) & (dg.target == tgt)].copy()
+    clean = (d.removed_frac < 0.10) & (d.psi_share_e4 < 20)
+    x = d.log_fold_per_neighbor.to_numpy() / np.log(2)
+    y = np.minimum(np.abs(d.z.to_numpy()), 60)
+    ax.scatter(x[~clean], y[~clean], s=12, facecolors="none",
+               edgecolors="#b6b6b6", lw=0.8, label="transfer-entangled")
+    up = clean & (d.z > 0)
+    dn = clean & (d.z < 0)
+    ax.scatter(x[up], y[up], s=14, color="#1e8449", lw=0,
+               label="increased near source")
+    ax.scatter(x[dn], y[dn], s=14, color="#7d3c98", lw=0,
+               label="decreased near source")
+    ax.axhline(6, color="grey", lw=0.7, ls=":")
+    lab = d[clean].reindex(d[clean].z.abs().sort_values(ascending=False)
+                           .index).head(7)
+    for r in lab.itertuples():
+        xi = r.log_fold_per_neighbor / np.log(2)
+        yi = min(abs(r.z), 60)
+        ax.annotate(r.gene, (xi, yi), fontsize=7.5,
+                    xytext=(4, 2), textcoords="offset points")
+    ax.set_xlabel("fold change per source neighbor (log2)")
+    ax.set_ylabel("significance |z| (capped at 60)")
+    ax.set_title(title, fontsize=10)
+    ax.legend(frameon=False, fontsize=7.5, loc="upper left")
+fig4.tight_layout()
+fig4.savefig(os.path.join(OUT, "generative_fig4.png"), dpi=150,
+             bbox_inches="tight")
+print("fig4 done")

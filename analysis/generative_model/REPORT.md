@@ -334,3 +334,19 @@ pancreas validation arm) and changes the cost from (cells x genes) to
 the number of observed molecules: the pancreas arm runs in under a
 minute, and a breast 5K arm in 5-16 minutes where the dense version
 needed about ten hours.
+
+## General induced-change detection (06_induced_general.py)
+
+Per-gene quasi-Poisson regression of the production fit's retained
+counts on all sources' exposures jointly, per target type; overdispersed
+errors; reported at |z| > 6 and |log fold| > 0.05 per neighbor. On
+pancreas: 672 reported changes across 8,040 gene-source tests, zero
+under a joint permutation of the exposures; 55% in the unambiguous tier
+(removed fraction < 0.1 and source-profile share < 20 per 10,000).
+Findings: ductal identity-program loss and induced interface program
+near exocrine tissue, reciprocal CFTR/PROX1/CA4 induction in exocrine
+cells near ductal tissue, a fibroblast complement/matrix program near
+exocrine tissue (C7 z = 64), proliferation suppression in ductal cells
+near fibroblasts; coarse-annotation composition shifts flagged as a
+reading caveat (immune class). Results:
+results/gm_induced_general_pancreas.csv and _calibration.csv.

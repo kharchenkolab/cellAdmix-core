@@ -1,0 +1,8 @@
+target,tests,hits_observed,hits_permuted
+Ductal/tumor epithelial,1872,264,0
+Endocrine,212,6,0
+Endothelial,882,41,0
+Exocrine epithelial,1680,62,0
+Fibroblast / CAF,1608,183,0
+Immune,1536,104,0
+Mural / pericyte,250,12,0

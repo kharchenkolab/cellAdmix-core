@@ -347,6 +347,63 @@ gene ranks and amounts, pancreas); red squares: the real flagged genes
 at their measured disproportionality. The dotted line marks 80%
 retention.
 
+## Induced changes across all genes
+
+The screens above serve admixture estimation, and so examine only
+source-owned genes. The corrected counts enable the general question:
+for each source and target type, which genes — of any ownership, in
+either direction — change their expression in the target cells with
+that source's proximity? On the retained counts (transfer and ambient
+removed), each gene of a target type is fitted with a quasi-Poisson
+regression on all sources' exposures jointly, so that spatially
+correlated neighborhoods do not attribute one source's effect to
+another; the significance is widened by the empirically measured
+overdispersion, and a change is reported at a deviation of six standard
+errors with at least a 4% change per neighboring cell
+(`06_induced_general.py`).
+
+Two safeguards accompany every reported gene. Rerunning the identical
+fit with the exposure values permuted across cells — one joint
+permutation, preserving the correlation between sources — yields zero
+reported changes across all seven pancreas target types, against 672
+observed. And each gene carries the fraction of its content the model
+removed as transfer, together with its share of the source's transfer
+profile: genes with essentially nothing removed (55% of the reported
+changes, including half on the target's own genes) are pure expression
+changes, while the remainder are entangled with the transfer split and
+inherit its uncertainty — CFTR is in this second tier by construction,
+since a sixth of its content in ductal cells is removed as transfer,
+and its retention rests on the separately validated split of Figure 1d.
+
+The pancreas results (Figure 4) extend the interface picture in both
+directions. Ductal cells near exocrine tissue not only gain the induced
+program (PPP1R1B, CFB, CXCL2 among the unambiguous tier) but lose part
+of their identity program — GPRC5A, MALL, FHL2, GPX2 and TMC5 fall
+one-and-a-half to three-fold per exocrine neighbor. Exocrine cells near
+ductal tissue induce CFTR, PROX1 and CA4 reciprocally: the duct-gene
+program is a property of the epithelial boundary, expressed on both of
+its sides. Fibroblasts near exocrine tissue mount a complement and
+matrix program (C7 at 1.6-fold per neighbor, SFRP4, FBLN1, PDGFRA,
+DPT), and ductal/tumor cells adjacent to fibroblasts suppress their
+proliferation program (MKI67, CDK1, CCNB2, CENPF). One reading caveat:
+under a coarse annotation, a shift of subtype composition within the
+target class reads as expression change — the immune rows near tumor
+(macrophage markers rising, T-cell markers falling) are most naturally
+composition, not per-cell state.
+
+![Figure 4](figures/generative_fig4.png)
+
+**Figure 4. Neighborhood-associated expression changes on the corrected
+counts.** Each point is one gene of the target type: fold change per
+source neighbor (horizontal, log scale) against the significance of the
+association (vertical). Filled points are the unambiguous tier —
+essentially none of the gene's content was removed as transfer — green
+increasing near the source, purple decreasing; open grey points are
+entangled with the transfer split. **(a)** Ductal cells by exocrine
+proximity: the induced interface program on the right, the loss of the
+ductal identity program on the left. **(b)** Fibroblasts by exocrine
+proximity: the complement and matrix program.
+
 ## A practical composite
 
 The model's two transferable mechanisms — the interface-local
