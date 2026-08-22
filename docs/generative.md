@@ -140,10 +140,11 @@ average profile the three genes appear to carry ten to twenty times
 more excess than transfer could deliver, and would be called induced;
 against the profile of the bordering cells, the same excess is exactly
 what transfer delivers, and the genes land on the diagonal: transfer,
-not induction. The horizontal shift shows how many-fold the gene is
-enriched in the output of the bordering ductal cells compared with the
-average ductal cell, measured relative to the other ductal-owned genes
-— an order of magnitude for these three.
+not induction. The horizontal shift (green line) shows how much richer
+in each of these transcripts the material shed by the bordering ductal
+cells is, compared with material from an average ductal cell — about
+ten-fold — and the transfer expectation grows by that factor when it is
+computed from the cells the material actually comes from.
 
 ![Figure 2](figures/generative_fig2.png)
 
@@ -161,8 +162,8 @@ profile (open red) and from the bordering ductal cells (filled green).
 Their measured excess does not change between the two — only the
 expectation does — and with the profile of the cells the material
 actually comes from, all three sit on the diagonal; the horizontal
-shift shows how many-fold the gene is enriched in the bordering cells'
-output relative to the other ductal-owned genes.
+shift shows how much richer in each transcript the material shed by the
+bordering ductal cells is than material from an average ductal cell.
 
 A separate question is how a flagged gene is known to be induced rather
 than admixed from a *different* source type. Three mechanisms address
