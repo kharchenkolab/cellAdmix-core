@@ -49,8 +49,10 @@ components, and where each one's parameters come from:
   across a tissue, and material transferred from activated interface
   cells carries their elevated activation-gene share; against a global
   profile those genes would be misread as induced. The profile is zeroed
-  on target-owned genes, where contamination is indistinguishable from
-  own expression: it is deliberately left in place, which makes removal
+  on target-owned genes (a gene is *owned* by the cell type in which it
+  makes up the largest share of the transcriptome, by pseudobulk counts
+  per million), where contamination is indistinguishable from own
+  expression: it is deliberately left in place, which makes removal
   of the target's own markers structurally impossible. The per-cell
   fraction $\alpha_{cS}$ has a prior mean given by a monotone (isotonic)
   dose–response of marker content on the number of source neighbors, and
@@ -160,7 +162,11 @@ mistaken for transferred source material — and panel (a)'s flagged
 genes are the genuinely confusable case: CFTR, PROX1 and CA4 are
 assigned to exocrine by top expression yet switched on by ductal cells
 at the border, so their induced excess looks exactly like exocrine
-admixture and must be flagged to be retained. The horizontal shift (green line) shows how much richer
+admixture and must be flagged to be retained. For CFTR the ownership
+call is a near-tie (71,145 per million in exocrine versus 70,475 in
+ductal), but either assignment preserves the gene: owned by exocrine,
+its ductal excess is flagged and retained; owned by ductal, it would be
+a target-owned gene and untouchable in ductal cells by construction. The horizontal shift (green line) shows how much richer
 in each of these transcripts the material shed by the bordering ductal
 cells is, compared with material from an average ductal cell — about
 ten-fold — and the transfer expectation grows by that factor when it is
