@@ -50,8 +50,8 @@ components, and where each one's parameters come from:
   cells carries their elevated activation-gene share; against a global
   profile those genes would be misread as induced. The profile is zeroed
   on target-owned genes (a gene is *owned* by the cell type in which it
-  makes up the largest share of the transcriptome, by pseudobulk counts
-  per million), where contamination is indistinguishable from own
+  makes up the largest share of the transcriptome, counting over all the
+  type's cells together), where contamination is indistinguishable from own
   expression: it is deliberately left in place, which makes removal
   of the target's own markers structurally impossible. The per-cell
   fraction $\alpha_{cS}$ has a prior mean given by a monotone (isotonic)
@@ -74,7 +74,7 @@ components, and where each one's parameters come from:
   retained; the genes' proportional (transferred) share is still
   removed.
 - **Uniform floor** ($\epsilon_g$): 0.2% of cell content spread over
-  all genes, keeping the posterior split well-defined where every
+  all genes, keeping the division of each count well-defined where every
   structured component is near zero.
 
 ![Figure 1](figures/generative_fig1.png)
@@ -85,9 +85,9 @@ expression programs (blue), material transferred from bordering source
 cells (red), ambient background (grey), and the cell's own transcription
 induced by the neighborhood (green). **(b)** The fitted composition of
 ductal-cell content, stratified by the number of exocrine cells among
-the 15 nearest: at high exposure the model attributes most of the
-cell's molecules to contamination, while the induced share appears
-exactly where exposure is high. **(c)** AMY2A, the largest acinar
+the 15 nearest: with three or more exocrine neighbors, the model
+attributes most of a ductal cell's molecules to contamination, and the
+induced share appears in exactly those cells. **(c)** AMY2A, the largest acinar
 transfer channel: its entire exposure gradient — and its ambient
 baseline, since ductal cells do not express it — is removed. **(d)**
 CFTR, the duct-cell gene induced at acinar interfaces: its
@@ -146,7 +146,10 @@ average profile the three genes appear to carry ten to twenty times
 more excess than transfer could deliver, and would be called induced;
 against the profile of the bordering cells, the same excess is exactly
 what transfer delivers, and the genes land on the diagonal: transfer,
-not induction.
+not induction. The length of the shift is itself a measurement: it
+shows how much richer in each of these transcripts the material shed by
+the bordering ductal cells is, compared with material from an average
+ductal cell — about ten-fold.
 
 The two panels also explain why each shows different genes, although
 both concern transcriptional changes in ductal cells at the exocrine
@@ -166,11 +169,7 @@ admixture and must be flagged to be retained. For CFTR the ownership
 call is a near-tie (71,145 per million in exocrine versus 70,475 in
 ductal), but either assignment preserves the gene: owned by exocrine,
 its ductal excess is flagged and retained; owned by ductal, it would be
-a target-owned gene and untouchable in ductal cells by construction. The horizontal shift (green line) shows how much richer
-in each of these transcripts the material shed by the bordering ductal
-cells is, compared with material from an average ductal cell — about
-ten-fold — and the transfer expectation grows by that factor when it is
-computed from the cells the material actually comes from.
+a target-owned gene and untouchable in ductal cells by construction.
 
 ![Figure 2](figures/generative_fig2.png)
 
@@ -231,26 +230,23 @@ genes and their measured disproportionality are reported by
 
 ## The interface-activation finding
 
-Whether the comparison profile is global or interface-local changes the
-verdict for a whole class of genes. On pancreas, the inflammation genes
-CXCL6, CFB and PPP1R1B show exposure-linked excess in cells near
-ductal/tumor tissue at 4- to 20-fold their share of the *global* ductal
-profile — reading as induction in the neighbors.
-But the enrichment sits in the source cells themselves: ductal cells
-within 30 µm of another cell type carry 1.1–1.6 times the ductal-average
-cytoplasmic share of these genes (they are, plausibly, the inflamed
-tumor edge), and against that interface-local profile the neighbors'
-excess is largely proportional — transferred material made by activated
-source cells, not a response by the receiving cells. The genes the
+Figure 2b's three genes exemplify a general finding: what looks like
+induction in a cell's neighbors can be activation of the cell itself,
+carried over by transfer. The direct evidence sits in the source cells'
+own cytoplasm, measured independently of any target: ductal cells
+within 30 µm of another cell type carry 1.1–1.6 times the
+ductal-average share of CXCL6, CFB and PPP1R1B — they are, plausibly,
+the inflamed tumor edge — and that elevation, compounded across the
+transferred material, accounts for the neighbors' excess. The genes the
 screen does flag as induced behave differently: their excess tracks
-exposure but not the source-side composition shift, at folds of 2.3–22
-(on pancreas, led by CFTR — the canonical duct gene, peaking in duct
-cells at acinar interfaces, at 3.9-fold its transfer expectation —
-with interface programs of fibroblasts, immune and endothelial/mural
-cells behind it). The same screen applied across datasets flags
-inflammatory and myoepithelial contractile programs on breast 5K (CCL2,
-IL6, LIF; MYH11, MYLK, CNN1) and the classic stress and chemokine
-programs on NSCLC (FOS, JUNB, HSPA1A/B, CCL3/4, CXCL2/3).
+exposure but not the source-side composition shift, at 2.3- to 22-fold
+their transfer expectation (on pancreas, led by CFTR — the canonical
+duct gene, peaking in duct cells at acinar interfaces — with interface
+programs of fibroblasts, immune and endothelial/mural cells behind it).
+The same screen applied across datasets flags inflammatory and
+myoepithelial contractile programs on breast 5K (CCL2, IL6, LIF; MYH11,
+MYLK, CNN1) and the classic stress and chemokine programs on NSCLC
+(FOS, JUNB, HSPA1A/B, CCL3/4, CXCL2/3).
 
 ## Validation
 
@@ -306,9 +302,10 @@ exposure-linked excess removed on the held-out half, weighted across the
 ## The identifiability limit
 
 Any method of this family — target counts modeled as own expression
-plus transfer proportional to a source profile, driven by a spatial
-covariate — can separate induction from admixture through only three
-signals, and each has a floor. Disproportionality is bounded by how well
+plus transfer proportional to a source profile, with the amount of
+transfer tied to a spatial measurement such as the neighbor count — can
+separate induction from admixture through only three signals, and each
+has a floor. Disproportionality is bounded by how well
 the source profile is known: with interface-composition effects alone
 shifting profiles 10–60%, induction on a source's dominant expression
 channels is invisible until it rivals the transfer itself (the planted
@@ -410,9 +407,9 @@ proximity: the complement and matrix program.
 Several of the model's inputs are estimated from the same contaminated
 data the model is meant to explain, so each loop deserves a named check.
 
-*Gene ownership.* Ownership is computed from observed pseudobulk
-profiles, and contamination between two types is part of why their
-rates for a shared gene are close. Recomputing ownership on the
+*Gene ownership.* Ownership is computed from the observed per-type
+expression profiles, and contamination between two types is part of why
+their rates for a shared gene are close. Recomputing ownership on the
 corrected counts changes the owner of 8 of the panel's 377 genes — all
 near-ties with margins of a few percent, none among the genes any
 result here rests on. The loop is real but confined to genes whose
@@ -454,10 +451,10 @@ molecules add false positives, and inflated totals hide true changes.
 
 ## A practical composite
 
-The model's two transferable mechanisms — the interface-local
-overdispersed screen and per-gene retention of the disproportionate
-excess share — graft directly onto the much simpler exposure-regression
-corrector: measure the removal dose on unflagged genes only, and cap
+The model's two transferable mechanisms — the screen, with its
+bordering-cell profiles and its allowance for profile error, and the
+per-gene retention of the disproportionate excess share — graft
+directly onto the much simpler exposure-regression corrector: measure the removal dose on unflagged genes only, and cap
 each flagged gene's removable content at its proportional (transferred)
 share, leaving the induced share with the cell. Under the same harness
 this composite removes transferred content at the regression corrector's
