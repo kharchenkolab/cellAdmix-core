@@ -431,6 +431,100 @@ CellAdmixAudit <- R6::R6Class(
       if (detected_only) out[out$detected, , drop = FALSE] else out
     },
 
+    correct_generative = function(name = "generative", num_threads = NULL,
+                                  ...) {
+      # Fit the generative admixture model on the detected pairs: each
+      # target cell's counts are decomposed into own expression, per-source
+      # contamination, ambient background, and induced expression; the
+      # contamination and ambient shares are removed, the induced ones
+      # retained (see docs/generative.md). Returns a correction object
+      # accepted by evaluate().
+      counts <- private$.counts
+      cells <- colnames(counts)
+      types <- sort(unique(private$.cell_types[!is.na(private$.cell_types)]))
+      type_code <- stats::setNames(seq_along(types) - 1L, types)
+      cell_tbl <- self$fit$cell_factors()
+      pos <- match(cells, as.character(cell_tbl$cell_id))
+      if (anyNA(pos)) {
+        stop("audit cells missing from the fit cell table")
+      }
+      codes <- type_code[as.character(private$.cell_types[cells])]
+      codes[is.na(codes)] <- -1L
+
+      pair_specs <- list()
+      pair_names <- list()
+      for (d in private$.pair_defs) {
+        if (!d$detected) next
+        pair_specs[[length(pair_specs) + 1]] <- list(
+          source_type = unname(type_code[[d$source]]),
+          target_type = unname(type_code[[d$target]]),
+          pool = match(d$pool, rownames(counts)) - 1L,
+          strict = match(d$strict, rownames(counts)) - 1L)
+        pair_names[[length(pair_names) + 1]] <- c(d$source, d$target)
+      }
+
+      options <- list(...)
+      if (is.null(options$neighbor_k)) {
+        options$neighbor_k <- self$params$neighbor_k %||% 15L
+      }
+      if (!is.null(num_threads)) options$num_threads <- num_threads
+
+      res <- .celladmix_fit_generative(
+        counts_indptr = counts@p,
+        counts_indices = counts@i,
+        counts_values = counts@x,
+        n_genes = nrow(counts),
+        cell_ids = cells,
+        x = cell_tbl$x[pos],
+        y = cell_tbl$y[pos],
+        type_codes = codes,
+        n_types = length(types),
+        molecules_parquet = file.path(self$fit$run_dir, "molecules.parquet"),
+        cells_parquet = file.path(self$fit$run_dir, "cells.parquet"),
+        pairs = pair_specs,
+        factor_to_type = integer(0),
+        options = options)
+
+      corrected <- counts
+      corrected@x <- pmax(counts@x - res$removed, 0)
+
+      pair_source <- vapply(pair_names, `[[`, "", 1)
+      pair_target <- vapply(pair_names, `[[`, "", 2)
+      composition <- do.call(rbind, lapply(seq_along(pair_specs), function(j) {
+        cols <- res$pair_cells[[j]] + 1L
+        if (!length(cols)) return(NULL)
+        data.frame(cell_id = cells[cols],
+          source = pair_source[[j]], target = pair_target[[j]],
+          dose = res$pair_dose[[j]],
+          contamination = res$pair_alpha[[j]],
+          induced_activity = res$pair_rho[[j]],
+          ambient = res$ambient_scale[cols],
+          stringsAsFactors = FALSE)
+      }))
+      induced <- data.frame(
+        source = pair_source[res$induced$pair + 1L],
+        target = pair_target[res$induced$pair + 1L],
+        gene = rownames(counts)[res$induced$gene + 1L],
+        excess = res$induced$excess,
+        expected = res$induced$expected,
+        z = res$induced$z,
+        fold = res$induced$excess / pmax(res$induced$expected, 1e-9),
+        stringsAsFactors = FALSE)
+      pairs_summary <- data.frame(
+        source = pair_source[res$pairs$pair + 1L],
+        target = pair_target[res$pairs$pair + 1L],
+        estimated_dose_molecules = res$pairs$prior_molecules,
+        removed_molecules_expected = res$pairs$posterior_molecules,
+        induced_molecules = res$pairs$induced_molecules,
+        mean_dose_exposed = res$pairs$mean_dose_exposed,
+        stringsAsFactors = FALSE)
+
+      CellAdmixGenerativeCorrection$new(
+        name = name, counts = corrected, pairs = pairs_summary,
+        induced = induced, composition = composition,
+        whole_cell_profiles = isTRUE(res$whole_cell_profiles))
+    },
+
     markers = function(source, target) {
       d <- private$.pair(source, target)
       list(pool = d$pool, strict = d$strict, induced = d$induced,
@@ -804,3 +898,56 @@ CellAdmixCleanupReport <- R6::R6Class(
 )
 
 scales_comma <- function(x) format(x, big.mark = ",", scientific = FALSE)
+
+#' Generative Admixture Correction
+#'
+#' Corrected counts from the generative admixture model, together with the
+#' model's per-cell decomposition: for every detected pair, the
+#' exposure-derived contamination dose, the fitted per-cell contamination
+#' fraction, the induced-expression activity, and the ambient scale. Created
+#' by `audit$correct_generative()`; accepted by `audit$evaluate()`.
+#' @export
+CellAdmixGenerativeCorrection <- R6::R6Class(
+  "CellAdmixGenerativeCorrection",
+  public = list(
+    name = NULL,
+    pairs = NULL,
+    induced = NULL,
+    rules = NULL,
+    whole_cell_profiles = NULL,
+
+    initialize = function(name, counts, pairs, induced, composition,
+                          whole_cell_profiles) {
+      self$name <- name
+      self$pairs <- pairs
+      self$induced <- induced
+      self$rules <- data.frame(source_cell_type = pairs$source,
+        target_cell_type = pairs$target, stringsAsFactors = FALSE)
+      self$whole_cell_profiles <- whole_cell_profiles
+      private$.counts <- counts
+      private$.composition <- composition
+    },
+
+    counts = function() {
+      private$.counts
+    },
+
+    composition = function(source = NULL, target = NULL) {
+      d <- private$.composition
+      if (!is.null(source)) d <- d[d$source == source, , drop = FALSE]
+      if (!is.null(target)) d <- d[d$target == target, , drop = FALSE]
+      rownames(d) <- NULL
+      d
+    },
+
+    print = function(...) {
+      cat("cellAdmix generative correction\n")
+      cat("  pairs:", nrow(self$pairs), "\n")
+      cat("  removed molecules (expected):",
+        format(round(sum(self$pairs$removed_molecules_expected)), big.mark = ","), "\n")
+      cat("  induced genes retained:", nrow(self$induced), "\n")
+      invisible(self)
+    }
+  ),
+  private = list(.counts = NULL, .composition = NULL)
+)

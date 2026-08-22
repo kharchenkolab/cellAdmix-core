@@ -31,6 +31,7 @@
 
 #include "celladmix/clustering.hpp"
 #include "celladmix/coherence.hpp"
+#include "celladmix/generative.hpp"
 #include "celladmix/domains.hpp"
 #include "celladmix/input_store.hpp"
 #include "celladmix/membrane.hpp"
@@ -4867,6 +4868,154 @@ extern "C" SEXP _cellAdmixCore_celladmix_cell_neighbor_type_counts(
     forward_exception_to_r(ex);
   } catch (...) {
     ::Rf_error("celladmix_cell_neighbor_type_counts: unknown C++ exception");
+  }
+  return R_NilValue;
+}
+
+extern "C" SEXP _cellAdmixCore_celladmix_fit_generative(
+    SEXP counts_indptr_sexp,
+    SEXP counts_indices_sexp,
+    SEXP counts_values_sexp,
+    SEXP n_genes_sexp,
+    SEXP cell_ids_sexp,
+    SEXP x_sexp,
+    SEXP y_sexp,
+    SEXP type_codes_sexp,
+    SEXP n_types_sexp,
+    SEXP molecules_parquet_sexp,
+    SEXP cells_parquet_sexp,
+    SEXP pairs_sexp,
+    SEXP factor_to_type_sexp,
+    SEXP options_sexp) {
+  try {
+    std::vector<celladmix::GenerativePairSpec> pairs;
+    const List pair_list(pairs_sexp);
+    for (R_xlen_t i = 0; i < pair_list.size(); ++i) {
+      const List d(pair_list[i]);
+      celladmix::GenerativePairSpec ps;
+      ps.source_type = as<int>(d["source_type"]);
+      ps.target_type = as<int>(d["target_type"]);
+      ps.pool = as<std::vector<int>>(d["pool"]);
+      ps.strict = as<std::vector<int>>(d["strict"]);
+      if (d.containsElementNamed("guide")) {
+        ps.guide = as<std::vector<int>>(d["guide"]);
+      }
+      if (d.containsElementNamed("exposure")) {
+        ps.exposure = as<std::vector<double>>(d["exposure"]);
+      }
+      pairs.push_back(std::move(ps));
+    }
+    celladmix::GenerativeOptions opt;
+    const List options(options_sexp);
+    const auto set_double = [&](const char* key, double& field) {
+      if (options.containsElementNamed(key)) field = as<double>(options[key]);
+    };
+    const auto set_int = [&](const char* key, int& field) {
+      if (options.containsElementNamed(key)) field = as<int>(options[key]);
+    };
+    const auto set_bool = [&](const char* key, bool& field) {
+      if (options.containsElementNamed(key)) field = as<bool>(options[key]);
+    };
+    set_double("alpha_prior_strength", opt.alpha_prior_strength);
+    set_double("alpha_cap", opt.alpha_cap);
+    set_double("lambda_max", opt.lambda_max);
+    set_double("ambient_prior_strength", opt.ambient_prior_strength);
+    set_double("ambient_cap", opt.ambient_cap);
+    set_double("floor_total", opt.floor_total);
+    set_double("induced_z", opt.induced_z);
+    set_double("induced_min_excess", opt.induced_min_excess);
+    set_double("profile_cv", opt.profile_cv);
+    set_double("rho_shape", opt.rho_shape);
+    set_double("rho_cap", opt.rho_cap);
+    set_double("near_um", opt.near_um);
+    set_double("near_min_molecules", opt.near_min_molecules);
+    set_double("dose_weight", opt.dose_weight);
+    set_double("far_um", opt.far_um);
+    set_double("far_min_molecules", opt.far_min_molecules);
+    set_int("em_iterations", opt.em_iterations);
+    set_int("topup_em_iterations", opt.topup_em_iterations);
+    set_int("topup_passes", opt.topup_passes);
+    set_int("outer_rounds", opt.outer_rounds);
+    set_int("neighbor_k", opt.neighbor_k);
+    set_bool("use_ambient", opt.use_ambient);
+    set_bool("use_induced", opt.use_induced);
+    set_int("num_threads", opt.num_threads);
+
+    const auto res = celladmix::fit_generative(
+        as<std::vector<int>>(counts_indptr_sexp),
+        as<std::vector<int>>(counts_indices_sexp),
+        as<std::vector<double>>(counts_values_sexp),
+        as<int>(n_genes_sexp),
+        as<std::vector<std::string>>(cell_ids_sexp),
+        as<std::vector<double>>(x_sexp),
+        as<std::vector<double>>(y_sexp),
+        as<std::vector<int>>(type_codes_sexp),
+        as<int>(n_types_sexp),
+        as<std::string>(molecules_parquet_sexp),
+        as<std::string>(cells_parquet_sexp),
+        pairs,
+        as<std::vector<int>>(factor_to_type_sexp),
+        opt);
+
+    List pair_cells(res.pair_cells.size());
+    List pair_dose(res.pair_dose.size());
+    List pair_alpha(res.pair_alpha.size());
+    List pair_rho(res.pair_rho.size());
+    for (std::size_t j = 0; j < res.pair_cells.size(); ++j) {
+      pair_cells[j] = wrap(res.pair_cells[j]);
+      pair_dose[j] = wrap(res.pair_dose[j]);
+      pair_alpha[j] = wrap(res.pair_alpha[j]);
+      pair_rho[j] = wrap(res.pair_rho[j]);
+    }
+    std::vector<int> ind_pair;
+    std::vector<int> ind_gene;
+    std::vector<double> ind_excess;
+    std::vector<double> ind_expected;
+    std::vector<double> ind_z;
+    for (const auto& row : res.induced) {
+      ind_pair.push_back(row.pair);
+      ind_gene.push_back(row.gene);
+      ind_excess.push_back(row.excess);
+      ind_expected.push_back(row.expected);
+      ind_z.push_back(row.z);
+    }
+    std::vector<int> sum_pair;
+    std::vector<double> sum_prior;
+    std::vector<double> sum_post;
+    std::vector<double> sum_ind;
+    std::vector<double> sum_dose;
+    for (const auto& row : res.pairs) {
+      sum_pair.push_back(row.pair);
+      sum_prior.push_back(row.prior_molecules);
+      sum_post.push_back(row.posterior_molecules);
+      sum_ind.push_back(row.induced_molecules);
+      sum_dose.push_back(row.mean_dose_exposed);
+    }
+    return List::create(
+        Named("removed") = wrap(res.removed),
+        Named("pair_cells") = pair_cells,
+        Named("pair_dose") = pair_dose,
+        Named("pair_alpha") = pair_alpha,
+        Named("pair_rho") = pair_rho,
+        Named("ambient_scale") = wrap(res.ambient_scale),
+        Named("factor_alignment") = wrap(res.factor_alignment),
+        Named("whole_cell_profiles") = res.whole_cell_profiles,
+        Named("induced") = List::create(
+            Named("pair") = wrap(ind_pair),
+            Named("gene") = wrap(ind_gene),
+            Named("excess") = wrap(ind_excess),
+            Named("expected") = wrap(ind_expected),
+            Named("z") = wrap(ind_z)),
+        Named("pairs") = List::create(
+            Named("pair") = wrap(sum_pair),
+            Named("prior_molecules") = wrap(sum_prior),
+            Named("posterior_molecules") = wrap(sum_post),
+            Named("induced_molecules") = wrap(sum_ind),
+            Named("mean_dose_exposed") = wrap(sum_dose)));
+  } catch (std::exception& ex) {
+    forward_exception_to_r(ex);
+  } catch (...) {
+    ::Rf_error("celladmix_fit_generative: unknown C++ exception");
   }
   return R_NilValue;
 }

@@ -17,6 +17,7 @@
 
 #include "celladmix/bridge.hpp"
 #include "celladmix/clustering.hpp"
+#include "celladmix/generative.hpp"
 #include "celladmix/input_store.hpp"
 #include "celladmix/membrane.hpp"
 #include "celladmix/pipeline_store.hpp"
@@ -690,6 +691,126 @@ PYBIND11_MODULE(_core, m) {
       py::arg("y"),
       py::arg("type_codes"),
       py::arg("n_types"));
+
+  m.def(
+      "fit_generative",
+      [](const std::vector<int>& counts_indptr,
+         const std::vector<int>& counts_indices,
+         const std::vector<double>& counts_values,
+         int n_genes,
+         const std::vector<std::string>& cell_ids,
+         const std::vector<double>& x,
+         const std::vector<double>& y,
+         const std::vector<int>& type_codes,
+         int n_types,
+         const std::string& molecules_parquet,
+         const std::string& cells_parquet,
+         const py::list& pair_specs,
+         const std::vector<int>& factor_to_type,
+         const py::dict& options) {
+        std::vector<celladmix::GenerativePairSpec> pairs;
+        for (const auto& item : pair_specs) {
+          const py::dict d = item.cast<py::dict>();
+          celladmix::GenerativePairSpec ps;
+          ps.source_type = d["source_type"].cast<int>();
+          ps.target_type = d["target_type"].cast<int>();
+          ps.pool = d["pool"].cast<std::vector<int>>();
+          ps.strict = d["strict"].cast<std::vector<int>>();
+          if (d.contains("guide")) ps.guide = d["guide"].cast<std::vector<int>>();
+          if (d.contains("exposure")) {
+            ps.exposure = d["exposure"].cast<std::vector<double>>();
+          }
+          pairs.push_back(std::move(ps));
+        }
+        celladmix::GenerativeOptions opt;
+        const auto set_double = [&](const char* key, double& field) {
+          if (options.contains(key)) field = options[key].cast<double>();
+        };
+        const auto set_int = [&](const char* key, int& field) {
+          if (options.contains(key)) field = options[key].cast<int>();
+        };
+        const auto set_bool = [&](const char* key, bool& field) {
+          if (options.contains(key)) field = options[key].cast<bool>();
+        };
+        set_double("alpha_prior_strength", opt.alpha_prior_strength);
+        set_double("alpha_cap", opt.alpha_cap);
+        set_double("lambda_max", opt.lambda_max);
+        set_double("ambient_prior_strength", opt.ambient_prior_strength);
+        set_double("ambient_cap", opt.ambient_cap);
+        set_double("floor_total", opt.floor_total);
+        set_double("induced_z", opt.induced_z);
+        set_double("induced_min_excess", opt.induced_min_excess);
+        set_double("profile_cv", opt.profile_cv);
+        set_double("rho_shape", opt.rho_shape);
+        set_double("rho_cap", opt.rho_cap);
+        set_double("near_um", opt.near_um);
+        set_double("near_min_molecules", opt.near_min_molecules);
+        set_double("dose_weight", opt.dose_weight);
+        set_double("far_um", opt.far_um);
+        set_double("far_min_molecules", opt.far_min_molecules);
+        set_int("em_iterations", opt.em_iterations);
+        set_int("topup_em_iterations", opt.topup_em_iterations);
+        set_int("topup_passes", opt.topup_passes);
+        set_int("outer_rounds", opt.outer_rounds);
+        set_int("neighbor_k", opt.neighbor_k);
+        set_bool("use_ambient", opt.use_ambient);
+        set_bool("use_induced", opt.use_induced);
+        set_int("num_threads", opt.num_threads);
+        celladmix::GenerativeResult res;
+        {
+          py::gil_scoped_release release;
+          res = celladmix::fit_generative(
+              counts_indptr, counts_indices, counts_values, n_genes, cell_ids,
+              x, y, type_codes, n_types, molecules_parquet, cells_parquet,
+              pairs, factor_to_type, opt);
+        }
+        py::dict out;
+        out["removed"] = res.removed;
+        out["pair_cells"] = res.pair_cells;
+        out["pair_dose"] = res.pair_dose;
+        out["pair_alpha"] = res.pair_alpha;
+        out["pair_rho"] = res.pair_rho;
+        out["ambient_scale"] = res.ambient_scale;
+        out["factor_alignment"] = res.factor_alignment;
+        out["whole_cell_profiles"] = res.whole_cell_profiles;
+        py::list induced;
+        for (const auto& row : res.induced) {
+          py::dict r;
+          r["pair"] = row.pair;
+          r["gene"] = row.gene;
+          r["excess"] = row.excess;
+          r["expected"] = row.expected;
+          r["z"] = row.z;
+          induced.append(r);
+        }
+        out["induced"] = induced;
+        py::list summaries;
+        for (const auto& row : res.pairs) {
+          py::dict r;
+          r["pair"] = row.pair;
+          r["prior_molecules"] = row.prior_molecules;
+          r["posterior_molecules"] = row.posterior_molecules;
+          r["induced_molecules"] = row.induced_molecules;
+          r["mean_dose_exposed"] = row.mean_dose_exposed;
+          summaries.append(r);
+        }
+        out["pairs"] = summaries;
+        return out;
+      },
+      py::arg("counts_indptr"),
+      py::arg("counts_indices"),
+      py::arg("counts_values"),
+      py::arg("n_genes"),
+      py::arg("cell_ids"),
+      py::arg("x"),
+      py::arg("y"),
+      py::arg("type_codes"),
+      py::arg("n_types"),
+      py::arg("molecules_parquet"),
+      py::arg("cells_parquet"),
+      py::arg("pair_specs"),
+      py::arg("factor_to_type"),
+      py::arg("options"));
 
   m.def(
       "score_membrane",

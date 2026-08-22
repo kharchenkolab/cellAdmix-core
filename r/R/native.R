@@ -844,3 +844,28 @@
     PACKAGE = "cellAdmixCore"
   )
 }
+
+.celladmix_fit_generative <- function(counts_indptr, counts_indices,
+                                      counts_values, n_genes, cell_ids,
+                                      x, y, type_codes, n_types,
+                                      molecules_parquet, cells_parquet,
+                                      pairs, factor_to_type, options) {
+  .Call(
+    "_cellAdmixCore_celladmix_fit_generative",
+    as.integer(counts_indptr),
+    as.integer(counts_indices),
+    as.numeric(counts_values),
+    as.integer(n_genes),
+    as.character(cell_ids),
+    as.numeric(x),
+    as.numeric(y),
+    as.integer(type_codes),
+    as.integer(n_types),
+    as.character(molecules_parquet),
+    as.character(cells_parquet),
+    pairs,
+    as.integer(factor_to_type),
+    options,
+    PACKAGE = "cellAdmixCore"
+  )
+}

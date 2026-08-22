@@ -4,6 +4,7 @@ CXX_STD = CXX17
 CORE_SOURCES = \
 	../../src/bridge.cpp \
 	../../src/clustering.cpp \
+	../../src/generative.cpp \
 	../../src/coherence.cpp \
 	../../src/domains.cpp \
 	../../src/graph.cpp \

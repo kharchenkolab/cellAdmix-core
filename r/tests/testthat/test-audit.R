@@ -243,3 +243,28 @@ test_that("evaluate warns from measured removal, not the rule list", {
     }
   }
 })
+
+test_that("the generative correction removes planted admixture", {
+  fit <- make_audit_fit()
+  audit <- fit$audit_admixture(neighbor_k = 6L, min_target_cells = 50L,
+    min_reference_cells = 20L, min_excess = 50)
+  correction <- audit$correct_generative(num_threads = 2L)
+  before <- fit$counts()
+  after <- correction$counts()
+  genes_a <- paste0("a", 1:3); genes_b <- paste0("b", 1:3)
+  ann <- fit$dataset$annotation(fit$annotation_name, as_vector = TRUE)
+  b_cells <- colnames(before)[!is.na(ann[colnames(before)]) &
+    ann[colnames(before)] == "B"]
+  planted <- sum(before[genes_a, b_cells])
+  removed_a <- sum(before[genes_a, b_cells]) - sum(after[genes_a, b_cells])
+  removed_b <- sum(before[genes_b, b_cells]) - sum(after[genes_b, b_cells])
+  expect_gt(removed_a, 0.4 * planted)
+  # target-owned genes are structurally untouchable
+  expect_equal(removed_b, 0, tolerance = 1e-9)
+  comp <- correction$composition(source = "A", target = "B")
+  expect_gt(max(comp$contamination), 0)
+  report <- audit$evaluate(correction)
+  p <- report$pairs()
+  ab <- p[p$source == "A" & p$target == "B", ]
+  expect_gt(ab$sensitivity, 0.5)
+})
