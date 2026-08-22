@@ -1,0 +1,188 @@
+---
+title: "Generative Admixture Correction on Xenium Pancreas"
+output:
+  github_document:
+    toc: true
+    toc_depth: 2
+    html_preview: false
+---
+
+```{r setup, include=FALSE}
+library(cellAdmixCore)
+library(ggplot2)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = TRUE,
+  fig.align = "center", dpi = 96, fig.retina = 2)
+```
+
+Molecules leak between neighboring cells, so a cell's counts mix its own
+expression with material from the cells around it. But not every count
+that rises near a neighbor is leakage: cells also change their own
+transcription in response to their neighborhood, and a correction that
+flattens every neighbor-linked gradient erases exactly that biology. The
+generative model separates the two: it decomposes each cell's counts into
+the cell's own expression programs, contamination from each neighboring
+cell type, ambient background, and neighborhood-induced expression, then
+removes the contamination and ambient shares while keeping the induced
+ones ([docs/generative.md](../../docs/generative.md) describes the model
+and its validation; [the minimal version](pancreas_generative_minimal.md)
+of this page is four calls long).
+
+This example characterizes both sides on the pancreas dataset: how much
+material moves between which cell types, and which genes the model
+recognizes as the cells' own induced expression.
+
+```{r fit}
+annotation <- read.csv(file.path("annotations", "annotation.csv.gz"))
+cell_annotation <- setNames(annotation$merged_annotation, annotation$cell_id)
+
+ds <- cellAdmix("data", output_dir = "out", annotation = cell_annotation)
+fit <- ds$fit(nmf_variant = "invsqrt_kl")
+```
+
+## The admixture pattern between cell types
+
+The audit measures, for every ordered pair of cell types, how many
+molecules leaked from the source type into cells of the target type,
+using the rise of source-marker content with the number of source-type
+neighbors:
+
+```{r audit-map, fig.width=6.5, fig.height=5}
+audit <- fit$audit_admixture()
+audit$plot_map()
+```
+
+The magnitudes are far from uniform. Sorting the detected pairs by their
+estimated admixture rate — the fraction of the target type's molecules
+that originated in the source:
+
+```{r audit-pairs}
+pairs <- audit$pairs(detected_only = TRUE)
+head(pairs[order(-pairs$rate),
+  c("source", "target", "admixed_molecules", "rate")], 8)
+```
+
+Aggregating over targets shows which cell types shed the most material —
+on this tissue, the exocrine compartment dominates as a source:
+
+```{r audit-sources, fig.width=6, fig.height=3.2}
+by_source <- aggregate(admixed_molecules ~ source, pairs, sum)
+ggplot(by_source, aes(reorder(source, admixed_molecules),
+    admixed_molecules / 1e3)) +
+  geom_col(fill = "#c0392b", alpha = 0.85) +
+  coord_flip() +
+  labs(x = NULL, y = "estimated admixed molecules shed (thousands)") +
+  theme_classic(base_size = 11)
+```
+
+## Correcting with the generative model
+
+One call fits the model on all detected pairs (about twenty seconds on
+this dataset):
+
+```{r correct}
+correction <- audit$correct_generative(num_threads = 8)
+correction
+```
+
+The model's central quantity is the per-cell contamination fraction: how
+much of each cell's content arrived from each source. Its dependence on
+the number of source neighbors, for the largest pair:
+
+```{r composition, fig.width=6, fig.height=3.6}
+comp <- correction$composition("Exocrine epithelial",
+  "Ductal/tumor epithelial")
+cells_xy <- fit$cell_factors()
+expo <- setNames(
+  cellAdmixCore:::.celladmix_source_exposure_counts(
+    cells_xy, cell_annotation, 15L)$counts[, "Exocrine epithelial"],
+  as.character(cells_xy$cell_id))
+comp$exposure <- pmin(expo[comp$cell_id], 4)
+ggplot(comp, aes(factor(exposure), contamination)) +
+  geom_boxplot(outlier.size = 0.3, fill = "#f4a582") +
+  labs(x = "exocrine cells among 15 nearest neighbors",
+    y = "fraction of the ductal cell's molecules\nattributed to exocrine contamination") +
+  theme_classic(base_size = 11)
+```
+
+The same fractions drawn in space show the admixture concentrating at
+the tissue interfaces:
+
+```{r composition-map, fig.width=7, fig.height=5}
+xy <- cells_xy[match(comp$cell_id, as.character(cells_xy$cell_id)), ]
+ggplot(cbind(comp, x = xy$x, y = xy$y), aes(x, y,
+    color = pmin(contamination, 0.6))) +
+  geom_point(size = 0.25) +
+  scale_color_viridis_c(option = "inferno",
+    name = "exocrine share\nof ductal-cell\ncontent") +
+  coord_equal() +
+  labs(x = NULL, y = NULL,
+    title = "Exocrine contamination of ductal cells") +
+  theme_void(base_size = 11)
+```
+
+## The induction pattern
+
+The model retains genes whose exposure-linked excess exceeds what
+transfer from the source can deliver — expression the target cells
+switched on themselves. On this tissue the retained set is led by the
+duct-cell program that ductal cells activate at acinar interfaces:
+
+```{r induced}
+induced <- correction$induced
+head(induced[order(-induced$excess),
+  c("source", "target", "gene", "excess", "fold", "z")], 8)
+```
+
+The distinction is visible gene by gene. AMY2A is the largest exocrine
+transfer channel: its rise with exocrine exposure in ductal cells is
+transferred material, and the correction flattens it to the unexposed
+level. CFTR carries an induced duct-cell program: its rise is the ductal
+cells' own expression, and the correction preserves it while removing
+only the transferred share:
+
+```{r gene-contrast, fig.width=8.5, fig.height=3.6}
+before <- fit$counts()
+after <- correction$counts()
+t_cells <- comp$cell_id
+tot <- Matrix::colSums(before[, t_cells])
+bins <- pmin(expo[t_cells], 3)
+rate_by_bin <- function(m, gene) {
+  tapply(m[gene, t_cells], bins, sum) / tapply(tot, bins, sum) * 1e3
+}
+df <- do.call(rbind, lapply(c("AMY2A", "CFTR"), function(g) {
+  rbind(
+    data.frame(gene = g, counts = "observed", bin = 0:3,
+      rate = as.numeric(rate_by_bin(before, g))),
+    data.frame(gene = g, counts = "corrected", bin = 0:3,
+      rate = as.numeric(rate_by_bin(after, g))))
+}))
+ggplot(df, aes(bin, rate, color = counts)) +
+  geom_line() + geom_point() +
+  facet_wrap(~gene, scales = "free_y") +
+  scale_color_manual(values = c(observed = "#c0392b",
+    corrected = "#2980b9")) +
+  labs(x = "exocrine cells among 15 nearest neighbors",
+    y = "rate in ductal cells (per 1,000 molecules)") +
+  theme_classic(base_size = 11)
+```
+
+## Verification
+
+The correction is verified against the audit's own measurements, like
+any other correction in the package:
+
+```{r verify, fig.width=8, fig.height=4}
+report <- audit$evaluate(correction)
+report$summary()
+report$plot_cleanup()
+```
+
+Two limits are worth keeping in mind when reading the results. The model
+never removes a target type's own marker genes (their contamination is
+indistinguishable from native expression and is deliberately left in
+place), so shared-gene admixture is under-removed by construction. And
+induced expression is only recognizable when it is disproportionate to
+the source's transfer profile: induction of a source's own top marker
+genes cannot be told apart from admixture at count level and is removed
+with it ([docs/generative.md](../../docs/generative.md), the
+identifiability limit).
