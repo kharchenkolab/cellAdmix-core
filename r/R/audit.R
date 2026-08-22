@@ -567,6 +567,7 @@ CellAdmixAudit <- R6::R6Class(
           dose = res$pair_dose[[j]],
           contamination = res$pair_alpha[[j]],
           induced_activity = res$pair_rho[[j]],
+          induced = res$pair_induced[[j]],
           ambient = res$ambient_scale[cols],
           stringsAsFactors = FALSE)
       }))
@@ -594,7 +595,7 @@ CellAdmixAudit <- R6::R6Class(
         pairs = pairs_summary, induced = induced, composition = composition,
         n_programs = stats::setNames(res$n_programs_used, types),
         whole_cell_profiles = isTRUE(res$whole_cell_profiles),
-        init = init_label)
+        init = init_label, cell_types = private$.cell_types)
     },
 
     correct_generative = function(name = "generative", ...) {
@@ -1000,7 +1001,7 @@ CellAdmixGenerativeModel <- R6::R6Class(
 
     initialize = function(counts, removed, removed_without_retention,
                           pairs, induced, composition, n_programs,
-                          whole_cell_profiles, init) {
+                          whole_cell_profiles, init, cell_types = NULL) {
       self$pairs <- pairs
       self$induced <- induced
       self$n_programs <- n_programs
@@ -1010,6 +1011,7 @@ CellAdmixGenerativeModel <- R6::R6Class(
       private$.removed <- removed
       private$.removed_strict <- removed_without_retention
       private$.composition <- composition
+      private$.cell_types <- cell_types
     },
 
     composition = function(source = NULL, target = NULL) {
@@ -1031,7 +1033,8 @@ CellAdmixGenerativeModel <- R6::R6Class(
       CellAdmixGenerativeCorrection$new(name = name, counts = corrected,
         rules = data.frame(source_cell_type = self$pairs$source,
           target_cell_type = self$pairs$target, stringsAsFactors = FALSE),
-        retained_induced = retain_induced)
+        retained_induced = retain_induced,
+        cell_types = private$.cell_types)
     },
 
     print = function(...) {
@@ -1045,7 +1048,7 @@ CellAdmixGenerativeModel <- R6::R6Class(
     }
   ),
   private = list(.counts = NULL, .removed = NULL, .removed_strict = NULL,
-    .composition = NULL)
+    .composition = NULL, .cell_types = NULL)
 )
 
 #' Generative Admixture Correction
@@ -1060,15 +1063,41 @@ CellAdmixGenerativeCorrection <- R6::R6Class(
     rules = NULL,
     retained_induced = NULL,
 
-    initialize = function(name, counts, rules, retained_induced) {
+    initialize = function(name, counts, rules, retained_induced,
+                          cell_types = NULL) {
       self$name <- name
       self$rules <- rules
       self$retained_induced <- retained_induced
       private$.counts <- counts
+      private$.cell_types <- cell_types
     },
 
     counts = function() {
       private$.counts
+    },
+
+    cell_state_umap = function(annotation = NULL, cells_max = 5000L,
+                               min_molecules = 10L, min_genes = 5L,
+                               n_variable_genes = 1000L, pca_dims = 30L,
+                               graph_k = 15L, umap_neighbors = 15L,
+                               umap_epochs = 200L,
+                               normalization_scale = 5000, seed = 1L,
+                               num_threads = 1L) {
+      # Cell-state embedding of the corrected counts, matching the other
+      # corrections' cell_state_umap.
+      m <- private$.counts
+      result <- .celladmix_cluster_counts_matrix(
+        p = m@p, i = m@i, x = m@x,
+        genes = rownames(m), cells = colnames(m),
+        min_molecules = min_molecules, min_genes = min_genes,
+        cells_max = if (is.null(cells_max)) NA_integer_ else
+          as.integer(cells_max),
+        n_variable_genes = n_variable_genes, pca_dims = pca_dims,
+        graph_k = graph_k, umap_neighbors = umap_neighbors,
+        umap_epochs = umap_epochs, num_threads = num_threads,
+        normalization_scale = normalization_scale, seed = seed)
+      labels <- annotation %||% private$.cell_types
+      .celladmix_clustering_frame(result, annotation = labels)
     },
 
     print = function(...) {
@@ -1078,5 +1107,5 @@ CellAdmixGenerativeCorrection <- R6::R6Class(
       invisible(self)
     }
   ),
-  private = list(.counts = NULL)
+  private = list(.counts = NULL, .cell_types = NULL)
 )

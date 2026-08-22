@@ -19,17 +19,45 @@ import scipy.sparse as sp
 class GenerativeCorrection:
     """Corrected counts derived from a fitted generative model."""
 
-    def __init__(self, matrix, genes, cells, rules, name, retained_induced):
+    def __init__(self, matrix, genes, cells, rules, name, retained_induced,
+                 cell_types=None):
         self._matrix = matrix
         self._genes = genes
         self._cells = cells
         self.rules = rules
         self.name = name
         self.retained_induced = retained_induced
+        self._cell_types = cell_types
 
     def counts(self):
         """Corrected counts as ``(matrix, genes, cells)``."""
         return self._matrix, list(self._genes), list(self._cells)
+
+    def cell_state_umap(self, *, annotation=None, cells_max=5000,
+                        min_molecules=10, min_genes=5, n_variable_genes=1000,
+                        pca_dims=30, graph_k=15, umap_neighbors=15,
+                        umap_epochs=200, normalization_scale=5000.0, seed=1,
+                        num_threads=1):
+        """Cell-state UMAP of the corrected counts, matching the other
+        corrections' ``cell_state_umap``."""
+        from . import _core
+        from .state import clustering_result_to_frame
+
+        m = self._matrix.tocsc()
+        result = _core.cluster_counts_matrix(
+            indptr=m.indptr.tolist(), indices=m.indices.tolist(),
+            values=m.data.astype(float).tolist(),
+            genes=[str(g) for g in self._genes],
+            cells=[str(c) for c in self._cells],
+            min_molecules=min_molecules, min_genes=min_genes,
+            cells_max=int(cells_max), n_variable_genes=n_variable_genes,
+            pca_dims=pca_dims, graph_k=graph_k,
+            umap_neighbors=umap_neighbors, umap_epochs=umap_epochs,
+            num_threads=int(num_threads),
+            normalization_scale=normalization_scale, seed=int(seed))
+        if annotation is None:
+            annotation = self._cell_types
+        return clustering_result_to_frame(result, annotation=annotation)
 
 
 class GenerativeModel:
@@ -45,6 +73,7 @@ class GenerativeModel:
     def __init__(self, audit, matrix, genes, cells, removed, removed_strict,
                  pairs, induced, composition, ambient_scale, n_programs,
                  whole_cell_profiles, init):
+        self._cell_types = audit._ctypes
         self._audit = audit
         self._matrix = matrix
         self._genes = genes
@@ -89,7 +118,8 @@ class GenerativeModel:
         rules = self.pairs[["source", "target"]].rename(columns={
             "source": "source_cell_type", "target": "target_cell_type"})
         return GenerativeCorrection(corrected, self._genes, self._cells,
-                                    rules, name, retain_induced)
+                                    rules, name, retain_induced,
+                                    cell_types=self._cell_types)
 
     def __repr__(self):
         removed = float(self._removed.sum())
@@ -221,6 +251,7 @@ def fit_generative(audit, *, init=None, n_programs=4, num_threads=None,
             dose=np.asarray(res["pair_dose"][j], dtype=float),
             contamination=np.asarray(res["pair_alpha"][j], dtype=float),
             induced_activity=np.asarray(res["pair_rho"][j], dtype=float),
+            induced=np.asarray(res["pair_induced"][j], dtype=float),
             ambient=ambient[cols])))
     composition = pd.concat(comp_rows, ignore_index=True) if comp_rows else \
         pd.DataFrame(columns=["cell_id", "source", "target", "dose",

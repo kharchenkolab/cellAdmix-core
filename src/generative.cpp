@@ -208,6 +208,7 @@ GenerativeResult fit_generative(
   result.pair_dose.resize(pairs.size());
   result.pair_alpha.resize(pairs.size());
   result.pair_rho.resize(pairs.size());
+  result.pair_induced.resize(pairs.size());
 
   // Per-cell totals and per-type pseudobulk profiles (counts per million).
   std::vector<double> totals(static_cast<std::size_t>(n_cells), 0.0);
@@ -1339,10 +1340,12 @@ GenerativeResult fit_generative(
           auto& dose_out = result.pair_dose[static_cast<std::size_t>(pj)];
           auto& alpha_out = result.pair_alpha[static_cast<std::size_t>(pj)];
           auto& rho_out = result.pair_rho[static_cast<std::size_t>(pj)];
+          auto& ind_out = result.pair_induced[static_cast<std::size_t>(pj)];
           cells_out.resize(static_cast<std::size_t>(n));
           dose_out.resize(static_cast<std::size_t>(n));
           alpha_out.resize(static_cast<std::size_t>(n));
           rho_out.resize(static_cast<std::size_t>(n));
+          ind_out.resize(static_cast<std::size_t>(n));
           GenerativePairSummary summary;
           summary.pair = pj;
           double dose_sum = 0.0;
@@ -1352,6 +1355,8 @@ GenerativeResult fit_generative(
             dose_out[static_cast<std::size_t>(i)] = Lam[static_cast<std::size_t>(i) * S_n + j];
             alpha_out[static_cast<std::size_t>(i)] = Alpha[static_cast<std::size_t>(i) * S_n + j];
             rho_out[static_cast<std::size_t>(i)] = Rho[static_cast<std::size_t>(i) * S_n + j];
+            ind_out[static_cast<std::size_t>(i)] = U[static_cast<std::size_t>(i) * S_n + j] *
+                Rho[static_cast<std::size_t>(i) * S_n + j] * M_rowsum[static_cast<std::size_t>(j)];
             const double ti = blk.totals[static_cast<std::size_t>(i)];
             summary.prior_molecules += Lam[static_cast<std::size_t>(i) * S_n + j] * ti;
             summary.posterior_molecules += Alpha[static_cast<std::size_t>(i) * S_n + j] * ti;

@@ -3703,6 +3703,83 @@ extern "C" SEXP _cellAdmixCore_celladmix_cluster_store(
   return R_NilValue;
 }
 
+extern "C" SEXP _cellAdmixCore_celladmix_cluster_counts_matrix(
+    SEXP p_sexp,
+    SEXP i_sexp,
+    SEXP x_sexp,
+    SEXP genes_sexp,
+    SEXP cells_sexp,
+    SEXP min_molecules_sexp,
+    SEXP min_genes_sexp,
+    SEXP cells_max_sexp,
+    SEXP n_variable_genes_sexp,
+    SEXP pca_dims_sexp,
+    SEXP graph_k_sexp,
+    SEXP cluster_resolution_sexp,
+    SEXP compute_umap_sexp,
+    SEXP umap_neighbors_sexp,
+    SEXP umap_epochs_sexp,
+    SEXP num_threads_sexp,
+    SEXP umap_parallel_optimization_sexp,
+    SEXP normalization_scale_sexp,
+    SEXP seed_sexp) {
+  try {
+    celladmix::CellCountMatrix counts;
+    counts.indptr = as<std::vector<int>>(p_sexp);
+    counts.indices = as<std::vector<int>>(i_sexp);
+    counts.values = as<std::vector<double>>(x_sexp);
+    counts.genes = as<std::vector<std::string>>(genes_sexp);
+    counts.cells.cell_ids = as<std::vector<std::string>>(cells_sexp);
+
+    counts.transcript_counts.resize(counts.cells.cell_ids.size(), 0);
+    counts.detected_genes.resize(counts.cells.cell_ids.size(), 0);
+    for (std::size_t c = 0; c + 1 < counts.indptr.size(); ++c) {
+      double total = 0.0;
+      for (int p = counts.indptr[c]; p < counts.indptr[c + 1]; ++p) {
+        total += counts.values[static_cast<std::size_t>(p)];
+      }
+      counts.transcript_counts[c] = static_cast<int>(total);
+      counts.detected_genes[c] = counts.indptr[c + 1] - counts.indptr[c];
+    }
+    counts.crop_ids.assign(counts.cells.cell_ids.size(), "");
+    counts.cells.centroid_x.assign(counts.cells.cell_ids.size(), 0.0);
+    counts.cells.centroid_y.assign(counts.cells.cell_ids.size(), 0.0);
+    counts.cells.centroid_z.assign(counts.cells.cell_ids.size(), 0.0);
+
+    celladmix::CellClusteringOptions options;
+    options.min_molecules = as<int>(min_molecules_sexp);
+    options.min_genes = as<int>(min_genes_sexp);
+    options.cells_max = optional_int_sexp(cells_max_sexp, -1);
+    options.n_variable_genes = as<int>(n_variable_genes_sexp);
+    options.pca_dims = as<int>(pca_dims_sexp);
+    options.graph_k = as<int>(graph_k_sexp);
+    options.cluster_resolution = as<double>(cluster_resolution_sexp);
+    options.compute_umap = as<bool>(compute_umap_sexp);
+    options.umap_neighbors = as<int>(umap_neighbors_sexp);
+    options.umap_epochs = as<int>(umap_epochs_sexp);
+    options.num_threads = as<int>(num_threads_sexp);
+    options.umap_parallel_optimization = as<bool>(umap_parallel_optimization_sexp);
+    options.normalization_scale = as<double>(normalization_scale_sexp);
+    options.seed = optional_seed_sexp(seed_sexp, 1U);
+
+    const auto result = celladmix::cluster_cell_counts(counts, options);
+    return List::create(
+        _["clusters"] = cell_clusters_to_df(result),
+        _["embedding"] = cell_embedding_to_df(result),
+        _["n_cells"] = static_cast<double>(result.cells.size()),
+        _["n_clusters"] = static_cast<double>(
+            result.clusters.empty() ? 0 : *std::max_element(result.clusters.begin(), result.clusters.end())),
+        _["n_variable_genes"] = static_cast<double>(result.variable_genes.size()),
+        _["variable_genes"] = wrap(result.variable_genes),
+        _["pca_variance_explained"] = wrap(result.pca_variance_explained));
+  } catch (std::exception& ex) {
+    forward_exception_to_r(ex);
+  } catch (...) {
+    ::Rf_error("celladmix_cluster_counts_matrix: unknown C++ exception");
+  }
+  return R_NilValue;
+}
+
 extern "C" SEXP _cellAdmixCore_celladmix_cluster_run_counts(
     SEXP run_dir_sexp,
     SEXP min_molecules_sexp,
@@ -4974,11 +5051,13 @@ extern "C" SEXP _cellAdmixCore_celladmix_fit_generative(
     List pair_dose(res.pair_dose.size());
     List pair_alpha(res.pair_alpha.size());
     List pair_rho(res.pair_rho.size());
+    List pair_induced(res.pair_induced.size());
     for (std::size_t j = 0; j < res.pair_cells.size(); ++j) {
       pair_cells[j] = wrap(res.pair_cells[j]);
       pair_dose[j] = wrap(res.pair_dose[j]);
       pair_alpha[j] = wrap(res.pair_alpha[j]);
       pair_rho[j] = wrap(res.pair_rho[j]);
+      pair_induced[j] = wrap(res.pair_induced[j]);
     }
     std::vector<int> ind_pair;
     std::vector<int> ind_gene;
@@ -5012,6 +5091,7 @@ extern "C" SEXP _cellAdmixCore_celladmix_fit_generative(
         Named("pair_dose") = pair_dose,
         Named("pair_alpha") = pair_alpha,
         Named("pair_rho") = pair_rho,
+        Named("pair_induced") = pair_induced,
         Named("ambient_scale") = wrap(res.ambient_scale),
         Named("factor_alignment") = wrap(res.factor_alignment),
         Named("whole_cell_profiles") = res.whole_cell_profiles,

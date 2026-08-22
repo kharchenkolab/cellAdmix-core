@@ -802,6 +802,7 @@ PYBIND11_MODULE(_core, m) {
         out["pair_dose"] = res.pair_dose;
         out["pair_alpha"] = res.pair_alpha;
         out["pair_rho"] = res.pair_rho;
+        out["pair_induced"] = res.pair_induced;
         out["ambient_scale"] = res.ambient_scale;
         out["factor_alignment"] = res.factor_alignment;
         out["whole_cell_profiles"] = res.whole_cell_profiles;
@@ -1277,6 +1278,89 @@ PYBIND11_MODULE(_core, m) {
         return clustering_to_dict(result);
       },
       py::arg("run_path"),
+      py::arg("min_molecules") = 10,
+      py::arg("min_genes") = 5,
+      py::arg("cells_max") = -1,
+      py::arg("n_variable_genes") = 1000,
+      py::arg("pca_dims") = 30,
+      py::arg("graph_k") = 15,
+      py::arg("cluster_resolution") = 1.0,
+      py::arg("compute_umap") = true,
+      py::arg("umap_neighbors") = 15,
+      py::arg("umap_epochs") = 200,
+      py::arg("num_threads") = 1,
+      py::arg("umap_parallel_optimization") = true,
+      py::arg("normalization_scale") = 5000.0,
+      py::arg("seed") = 1U);
+
+  m.def(
+      "cluster_counts_matrix",
+      [](const std::vector<int>& indptr,
+         const std::vector<int>& indices,
+         const std::vector<double>& values,
+         const std::vector<std::string>& genes,
+         const std::vector<std::string>& cells,
+         int min_molecules,
+         int min_genes,
+         int cells_max,
+         int n_variable_genes,
+         int pca_dims,
+         int graph_k,
+         double cluster_resolution,
+         bool compute_umap,
+         int umap_neighbors,
+         int umap_epochs,
+         int num_threads,
+         bool umap_parallel_optimization,
+         double normalization_scale,
+         unsigned int seed) {
+        auto options = make_clustering_options(
+            min_molecules,
+            min_genes,
+            cells_max,
+            n_variable_genes,
+            pca_dims,
+            graph_k,
+            cluster_resolution,
+            compute_umap,
+            umap_neighbors,
+            umap_epochs,
+            num_threads,
+            umap_parallel_optimization,
+            normalization_scale,
+            seed);
+        celladmix::CellClusteringResult result;
+        {
+          py::gil_scoped_release release;
+          celladmix::CellCountMatrix counts;
+          counts.indptr = indptr;
+          counts.indices = indices;
+          counts.values = values;
+          counts.genes = genes;
+          counts.cells.cell_ids = cells;
+          counts.transcript_counts.resize(cells.size(), 0);
+          counts.detected_genes.resize(cells.size(), 0);
+          for (std::size_t c = 0; c + 1 < counts.indptr.size(); ++c) {
+            double total = 0.0;
+            for (int p = counts.indptr[c]; p < counts.indptr[c + 1]; ++p) {
+              total += counts.values[static_cast<std::size_t>(p)];
+            }
+            counts.transcript_counts[c] = static_cast<int>(total);
+            counts.detected_genes[c] = counts.indptr[c + 1] - counts.indptr[c];
+          }
+          counts.crop_ids.assign(cells.size(), "");
+          counts.cells.centroid_x.assign(cells.size(), 0.0);
+          counts.cells.centroid_y.assign(cells.size(), 0.0);
+          counts.cells.centroid_z.assign(cells.size(), 0.0);
+          result = celladmix::cluster_cell_counts(counts, options);
+        }
+        return clustering_to_dict(result);
+      },
+      py::arg("indptr"),
+      py::arg("indices"),
+      py::arg("values"),
+      py::arg("genes"),
+      py::arg("cells"),
       py::arg("min_molecules") = 10,
       py::arg("min_genes") = 5,
       py::arg("cells_max") = -1,

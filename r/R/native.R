@@ -872,3 +872,25 @@
     PACKAGE = "cellAdmixCore"
   )
 }
+
+.celladmix_cluster_counts_matrix <- function(p, i, x, genes, cells,
+    min_molecules = 10L, min_genes = 5L, cells_max = NA_integer_,
+    n_variable_genes = 1000L, pca_dims = 30L, graph_k = 15L,
+    cluster_resolution = 1, compute_umap = TRUE, umap_neighbors = 15L,
+    umap_epochs = 200L, num_threads = 1L,
+    umap_parallel_optimization = TRUE, normalization_scale = 5000,
+    seed = 1L) {
+  .Call(
+    "_cellAdmixCore_celladmix_cluster_counts_matrix",
+    as.integer(p), as.integer(i), as.numeric(x),
+    as.character(genes), as.character(cells),
+    as.integer(min_molecules), as.integer(min_genes),
+    as.integer(cells_max), as.integer(n_variable_genes),
+    as.integer(pca_dims), as.integer(graph_k),
+    as.numeric(cluster_resolution), as.logical(compute_umap),
+    as.integer(umap_neighbors), as.integer(umap_epochs),
+    as.integer(num_threads), as.logical(umap_parallel_optimization),
+    as.numeric(normalization_scale), as.integer(seed),
+    PACKAGE = "cellAdmixCore"
+  )
+}

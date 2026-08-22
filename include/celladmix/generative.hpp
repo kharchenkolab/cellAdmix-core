@@ -132,6 +132,9 @@ struct GenerativeResult {
   std::vector<std::vector<double>> pair_dose;
   std::vector<std::vector<double>> pair_alpha;
   std::vector<std::vector<double>> pair_rho;
+  // Per pair per target cell: the fitted induced share of the cell's
+  // molecules (the content retained by the induced term).
+  std::vector<std::vector<double>> pair_induced;
   // Per cell: fitted ambient scale (zero for cells of types without one).
   std::vector<double> ambient_scale;
   std::vector<GenerativeInducedGene> induced;
