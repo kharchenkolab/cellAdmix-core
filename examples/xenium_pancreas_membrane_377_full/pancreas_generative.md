@@ -108,32 +108,81 @@ correction
     ##   removed molecules (expected): 1,082,659 
     ##   induced genes retained: 28
 
-The model’s central quantity is the per-cell contamination fraction: how
-much of each cell’s content arrived from each source. Its dependence on
-the number of source neighbors, for the largest pair:
+``` r
+before <- fit$counts()
+after <- correction$counts()
+```
+
+The most quotable summary of the result is the admixture burden per cell
+type: the fraction of each type’s total molecule content that the model
+attributed to contamination or ambient background and removed.
 
 ``` r
-comp <- correction$composition("Exocrine epithelial",
-  "Ductal/tumor epithelial")
+cell_types <- cell_annotation[colnames(before)]
+removed_by_type <- tapply(Matrix::colSums(before) - Matrix::colSums(after),
+  cell_types, sum)
+total_by_type <- tapply(Matrix::colSums(before), cell_types, sum)
+burden <- data.frame(type = names(removed_by_type),
+  share = as.numeric(removed_by_type / total_by_type))
+ggplot(burden, aes(reorder(type, share), share)) +
+  geom_col(fill = "#c0392b", alpha = 0.85) +
+  scale_y_continuous(labels = scales::percent) +
+  coord_flip() +
+  labs(x = NULL, y = "share of the type's molecules removed as admixture") +
+  theme_classic(base_size = 11)
+```
+
+<img src="pancreas_generative_files/figure-gfm/burden-1.png" alt="" width="576" style="display: block; margin: auto;" />
+
+The model’s central output is the per-cell decomposition. Averaged over
+ductal cells at each exocrine exposure, it shows where a contaminated
+cell’s molecules come from: the cell’s own expression share falls with
+exposure as the exocrine contamination share grows, with smaller
+contributions from the other bordering types and the ambient background:
+
+``` r
+comp_all <- correction$composition(target = "Ductal/tumor epithelial")
 cells_xy <- fit$cell_factors()
 expo <- setNames(
   cellAdmixCore:::.celladmix_source_exposure_counts(
     cells_xy, cell_annotation, 15L)$counts[, "Exocrine epithelial"],
   as.character(cells_xy$cell_id))
-comp$exposure <- pmin(expo[comp$cell_id], 4)
-ggplot(comp, aes(factor(exposure), contamination)) +
-  geom_boxplot(outlier.size = 0.3, fill = "#f4a582") +
+comp_all$bin <- factor(pmin(expo[comp_all$cell_id], 3), levels = 0:3,
+  labels = c("0", "1", "2", "3+"))
+shares <- aggregate(contamination ~ bin + source, comp_all, mean)
+ambient <- aggregate(ambient ~ bin, comp_all[!duplicated(comp_all$cell_id), ],
+  mean)
+shares <- rbind(shares,
+  data.frame(bin = ambient$bin, source = "ambient",
+    contamination = ambient$ambient))
+own <- aggregate(contamination ~ bin, shares, sum)
+shares <- rbind(shares,
+  data.frame(bin = own$bin, source = "own expression",
+    contamination = 1 - own$contamination))
+shares$source <- factor(shares$source,
+  levels = c("own expression", "ambient",
+    rev(unique(comp_all$source))))
+ggplot(shares, aes(bin, contamination, fill = source)) +
+  geom_col(width = 0.72) +
+  scale_fill_manual(values = c("own expression" = "#a8c6df",
+    "ambient" = "#8a8a8a",
+    setNames(hcl.colors(length(unique(comp_all$source)), "Reds 3"),
+      rev(unique(comp_all$source))))) +
   labs(x = "exocrine cells among 15 nearest neighbors",
-    y = "fraction of the ductal cell's molecules\nattributed to exocrine contamination") +
+    y = "mean share of ductal-cell content", fill = NULL) +
   theme_classic(base_size = 11)
 ```
 
-<img src="pancreas_generative_files/figure-gfm/composition-1.png" alt="" width="576" style="display: block; margin: auto;" />
+<img src="pancreas_generative_files/figure-gfm/composition-1.png" alt="" width="672" style="display: block; margin: auto;" />
 
 The same fractions drawn in space show the admixture concentrating at
-the tissue interfaces:
+the tissue interfaces: ductal cells inside the acinar tissue carry up to
+half exocrine content, while the ductal/tumor mass itself is nearly
+clean:
 
 ``` r
+comp <- correction$composition("Exocrine epithelial",
+  "Ductal/tumor epithelial")
 xy <- cells_xy[match(comp$cell_id, as.character(cells_xy$cell_id)), ]
 ggplot(cbind(comp, x = xy$x, y = xy$y), aes(x, y,
     color = pmin(contamination, 0.6))) +
@@ -147,6 +196,28 @@ ggplot(cbind(comp, x = xy$x, y = xy$y), aes(x, y,
 ```
 
 <img src="pancreas_generative_files/figure-gfm/composition-map-1.png" alt="" width="672" style="display: block; margin: auto;" />
+
+The transferred material itself is profile-shaped, not uniform: the
+genes removed from ductal cells are dominated by the source’s largest
+expression channels, the digestive enzymes of the exocrine pancreas:
+
+``` r
+duct_cells <- comp$cell_id
+removed_g <- Matrix::rowSums(before[, duct_cells]) -
+  Matrix::rowSums(after[, duct_cells])
+head(data.frame(gene = names(sort(removed_g, decreasing = TRUE)),
+  removed = round(sort(removed_g, decreasing = TRUE))), 8)
+```
+
+    ##          gene removed
+    ## AMY2A   AMY2A  150613
+    ## GATM     GATM   64326
+    ## CFTR     CFTR   16975
+    ## AQP8     AQP8   11748
+    ## ANPEP   ANPEP    8360
+    ## VCAN     VCAN    7508
+    ## FBN1     FBN1    5239
+    ## COL5A2 COL5A2    4803
 
 ## The induction pattern
 
@@ -180,34 +251,94 @@ head(induced[order(-induced$excess),
     ## 7  11.999946
     ## 5  16.955261
 
-The distinction is visible gene by gene. AMY2A is the largest exocrine
-transfer channel: its rise with exocrine exposure in ductal cells is
-transferred material, and the correction flattens it to the unexposed
-level. CFTR carries an induced duct-cell program: its rise is the ductal
-cells’ own expression, and the correction preserves it while removing
-only the transferred share:
+The evidence behind these calls is a proportionality test. Transferred
+material samples the source’s transcriptome, so a gene’s excess in
+ductal cells should be proportional to its share of the exocrine
+profile; genes far above that expectation are the ductal cells’ own
+response. Each point below is one exocrine-owned gene, with the genes
+the model flagged in this pair highlighted:
 
 ``` r
-before <- fit$counts()
-after <- correction$counts()
-t_cells <- comp$cell_id
-tot <- Matrix::colSums(before[, t_cells])
-bins <- pmin(expo[t_cells], 3)
+exp_cells <- duct_cells[expo[duct_cells] > 0]
+un_cells <- duct_cells[expo[duct_cells] == 0]
+t_exp <- sum(Matrix::colSums(before[, exp_cells]))
+t_un <- sum(Matrix::colSums(before[, un_cells]))
+profiles <- cellAdmixCore:::.celladmix_audit_profiles(before, cell_types)
+gset <- rownames(profiles)[
+  colnames(profiles)[max.col(profiles, ties.method = "first")] ==
+    "Exocrine epithelial"]
+S_cells <- names(cell_types)[!is.na(cell_types) &
+  cell_types == "Exocrine epithelial"]
+dist_T <- cellAdmixCore:::.celladmix_source_nearest_distance(
+  cells_xy, cell_annotation)[, "Ductal/tumor epithelial"]
+psi <- cellAdmixCore:::.celladmix_audit_interface_profile(
+  before, S_cells, dist_T)[gset]
+m_exp <- Matrix::rowSums(before[gset, exp_cells])
+m_un <- Matrix::rowSums(before[gset, un_cells])
+excess <- m_exp - m_un / t_un * t_exp
+v <- m_exp + (t_exp / t_un)^2 * m_un + 1
+slope <- max(sum(excess * psi / v) / sum(psi^2 / v), 0)
+scr <- data.frame(gene = gset, excess = excess, expected = slope * psi)
+scr$flagged <- scr$gene %in%
+  induced$gene[induced$source == "Exocrine epithelial" &
+    induced$target == "Ductal/tumor epithelial"]
+scr <- scr[scr$excess > 10 & scr$expected > 1, ]
+ggplot(scr, aes(expected, excess)) +
+  geom_abline(color = "grey40", linewidth = 0.4) +
+  geom_point(data = scr[!scr$flagged, ], size = 1.3, color = "#9bb5c9") +
+  geom_point(data = scr[scr$flagged, ], size = 2.2, shape = 15,
+    color = "#c0392b") +
+  ggrepel::geom_text_repel(
+    data = scr[scr$flagged | scr$excess > 5e4, ],
+    aes(label = gene), size = 3) +
+  scale_x_log10() + scale_y_log10() +
+  labs(x = "excess expected from proportional exocrine transfer (molecules)",
+    y = "measured excess in ductal cells (molecules)") +
+  theme_classic(base_size = 11)
+```
+
+<img src="pancreas_generative_files/figure-gfm/screen-1.png" alt="" width="595.2" style="display: block; margin: auto;" />
+
+The consequence is visible gene by gene. AMY2A sits on the diagonal
+above — the largest exocrine transfer channel — and the correction
+flattens its exposure gradient to the unexposed level. CFTR sits far
+above the diagonal, and the correction preserves its gradient, removing
+only the transferred share. Refitting with the induced term disabled
+separates the model’s two protective mechanisms: without it, CFTR keeps
+74% of its exposure-linked excess instead of 85%, because ductal cells
+also express CFTR natively and the own-expression programs reclaim much
+of the induced content on their own — the induced term protects the
+disproportionate remainder, and is the sole protection for induced genes
+the target does not express natively. AMY2A is identical in both fits:
+retention costs nothing on transferred content.
+
+``` r
+correction_noind <- audit$correct_generative(name = "generative_noind",
+  use_induced = FALSE, num_threads = 8)
+after_noind <- correction_noind$counts()
+tot <- Matrix::colSums(before[, duct_cells])
+bins <- pmin(expo[duct_cells], 3)
 rate_by_bin <- function(m, gene) {
-  tapply(m[gene, t_cells], bins, sum) / tapply(tot, bins, sum) * 1e3
+  tapply(m[gene, duct_cells], bins, sum) / tapply(tot, bins, sum) * 1e3
 }
 df <- do.call(rbind, lapply(c("AMY2A", "CFTR"), function(g) {
-  rbind(
-    data.frame(gene = g, counts = "observed", bin = 0:3,
-      rate = as.numeric(rate_by_bin(before, g))),
-    data.frame(gene = g, counts = "corrected", bin = 0:3,
-      rate = as.numeric(rate_by_bin(after, g))))
+  do.call(rbind, lapply(list(
+    list(m = before, lab = "observed"),
+    list(m = after, lab = "corrected"),
+    list(m = after_noind, lab = "corrected, retention off")), function(a) {
+    data.frame(gene = g, counts = a$lab, bin = 0:3,
+      rate = as.numeric(rate_by_bin(a$m, g)))
+  }))
 }))
-ggplot(df, aes(bin, rate, color = counts)) +
-  geom_line() + geom_point() +
+df$counts <- factor(df$counts,
+  levels = c("observed", "corrected", "corrected, retention off"))
+ggplot(df, aes(bin, rate, color = counts, linetype = counts)) +
+  geom_line() + geom_point(size = 1.6) +
   facet_wrap(~gene, scales = "free_y") +
-  scale_color_manual(values = c(observed = "#c0392b",
-    corrected = "#2980b9")) +
+  scale_color_manual(values = c("observed" = "#c0392b",
+    "corrected" = "#2980b9", "corrected, retention off" = "#7d3c98")) +
+  scale_linetype_manual(values = c("observed" = "solid",
+    "corrected" = "solid", "corrected, retention off" = "22")) +
   labs(x = "exocrine cells among 15 nearest neighbors",
     y = "rate in ductal cells (per 1,000 molecules)") +
   theme_classic(base_size = 11)
@@ -215,10 +346,66 @@ ggplot(df, aes(bin, rate, color = counts)) +
 
 <img src="pancreas_generative_files/figure-gfm/gene-contrast-1.png" alt="" width="816" style="display: block; margin: auto;" />
 
+Across all retained genes, most of the exposure-linked excess survives
+the correction — the retained fraction per gene, for the largest calls:
+
+``` r
+gene_excess <- function(m, gene, source, target) {
+  t_cells <- names(cell_types)[!is.na(cell_types) & cell_types == target]
+  e <- setNames(cellAdmixCore:::.celladmix_source_exposure_counts(
+    cells_xy, cell_annotation, 15L)$counts[, source],
+    as.character(cells_xy$cell_id))[t_cells]
+  tt <- Matrix::colSums(before[, t_cells])
+  sum(m[gene, t_cells[e > 0]]) -
+    sum(m[gene, t_cells[e == 0]]) / max(sum(tt[e == 0]), 1) * sum(tt[e > 0])
+}
+top_ind <- head(induced[order(-induced$excess), ], 8)
+ret <- do.call(rbind, lapply(seq_len(nrow(top_ind)), function(i) {
+  r <- top_ind[i, ]
+  data.frame(gene = r$gene,
+    counts = c("observed excess", "excess after correction"),
+    excess = c(gene_excess(before, r$gene, r$source, r$target),
+      gene_excess(after, r$gene, r$source, r$target)))
+}))
+ret$counts <- factor(ret$counts,
+  levels = c("observed excess", "excess after correction"))
+ggplot(ret, aes(reorder(gene, -excess), excess / 1e3, fill = counts)) +
+  geom_col(position = "dodge", width = 0.7) +
+  scale_fill_manual(values = c("observed excess" = "#c0392b",
+    "excess after correction" = "#1e8449")) +
+  labs(x = NULL, y = "exposure-linked excess (thousand molecules)",
+    fill = NULL) +
+  theme_classic(base_size = 11)
+```
+
+<img src="pancreas_generative_files/figure-gfm/retention-1.png" alt="" width="720" style="display: block; margin: auto;" />
+
+The retained program has a spatial identity of its own. Drawing the
+corrected CFTR expression across ductal cells shows it peaking exactly
+where the induced table says it should — the duct cells embedded in
+acinar tissue — a pattern a marker-based correction would have removed
+as contamination:
+
+``` r
+cftr_rate <- after["CFTR", duct_cells] /
+  pmax(Matrix::colSums(after[, duct_cells]), 1) * 1e3
+ggplot(cbind(comp, x = xy$x, y = xy$y, cftr = pmin(cftr_rate, 250)),
+    aes(x, y, color = cftr)) +
+  geom_point(size = 0.25) +
+  scale_color_viridis_c(name = "corrected CFTR\n(per 1,000\nmolecules)") +
+  coord_equal() +
+  labs(x = NULL, y = NULL,
+    title = "The retained CFTR program in ductal cells") +
+  theme_void(base_size = 11)
+```
+
+<img src="pancreas_generative_files/figure-gfm/cftr-map-1.png" alt="" width="672" style="display: block; margin: auto;" />
+
 ## Verification
 
 The correction is verified against the audit’s own measurements, like
-any other correction in the package:
+any other correction in the package. The pooled exposure profile shows
+the flattening directly:
 
 ``` r
 report <- audit$evaluate(correction)
@@ -248,6 +435,12 @@ report$plot_cleanup()
 ```
 
 <img src="pancreas_generative_files/figure-gfm/verify-1.png" alt="" width="768" style="display: block; margin: auto;" />
+
+``` r
+audit$plot_exposure(correction = correction)
+```
+
+<img src="pancreas_generative_files/figure-gfm/verify-exposure-1.png" alt="" width="576" style="display: block; margin: auto;" />
 
 Two limits are worth keeping in mind when reading the results. The model
 never removes a target type’s own marker genes (their contamination is
