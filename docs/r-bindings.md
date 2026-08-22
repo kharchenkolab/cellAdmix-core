@@ -370,6 +370,9 @@ for the full option list.
 - [Detailed Xenium pancreas tutorial](../examples/xenium_pancreas_membrane_377_full/pancreas_membrane_scoring_clean.md): the full walkthrough on a membrane-stained Xenium bundle - audit, membrane and bridge scoring on their recommended factorizations, and the variant comparison behind that pairing.
 - [Seurat Xenium integration tutorial](../examples/xenium_pancreas_membrane_377_full/pancreas_seurat_integration.md): the same pancreas dataset, using Seurat for cell-level state and cellAdmix for molecule-complete fitting, scoring, and correction.
 - [Xenium breast 5K membrane scoring tutorial](../examples/xenium_breast_membrane_5k_full/breast_5k_membrane_scoring.md): the same workflow at full 5K-panel scale.
+- [Generative correction in brief](../examples/xenium_pancreas_membrane_377_full/pancreas_generative_minimal.md): the generative admixture model in four calls.
+- [Generative correction on Xenium pancreas](../examples/xenium_pancreas_membrane_377_full/pancreas_generative.md): the admixture pattern between cell types and the induced expression the model preserves, characterized and visualized.
+- [Generative correction on CosMx NSCLC](../examples/cosmx_nsclc_giotto/nsclc_generative.md): the same characterization on a CosMx dataset.
 
 ## Detailed Pages
 
