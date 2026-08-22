@@ -144,7 +144,23 @@ average profile the three genes appear to carry ten to twenty times
 more excess than transfer could deliver, and would be called induced;
 against the profile of the bordering cells, the same excess is exactly
 what transfer delivers, and the genes land on the diagonal: transfer,
-not induction. The horizontal shift (green line) shows how much richer
+not induction.
+
+The two panels also explain why each shows different genes, although
+both concern transcriptional changes in ductal cells at the exocrine
+border. The elevated expression of CXCL6, CFB and PPP1R1B is a genuine
+induced change *of the ductal cells* — but in the ductal cells these
+are the cells' own genes, which the audit never counts as admixture and
+the model structurally cannot remove (contamination profiles are zeroed
+on target-owned genes), so it needs no flag and appears in no screen.
+Its only risk of misinterpretation arises in the neighbors that receive
+the transferred products, which is panel (b). The screens therefore
+examine only source-owned genes — the genes whose excess could be
+mistaken for transferred source material — and panel (a)'s flagged
+genes are the genuinely confusable case: CFTR, PROX1 and CA4 are
+assigned to exocrine by top expression yet switched on by ductal cells
+at the border, so their induced excess looks exactly like exocrine
+admixture and must be flagged to be retained. The horizontal shift (green line) shows how much richer
 in each of these transcripts the material shed by the bordering ductal
 cells is, compared with material from an average ductal cell — about
 ten-fold — and the transfer expectation grows by that factor when it is
