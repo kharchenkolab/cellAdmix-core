@@ -234,6 +234,7 @@ class CellAdmixAudit:
             raise ValueError("audit_admixture requires a cell-type annotation")
         self.params = dict(neighbor_k=neighbor_k, n_pool=n_pool,
             q_thresh=q_thresh, min_excess=min_excess)
+        self._default_init = "clusters"
         self._cells_table = cells
         matrix, genes, cell_ids = counts
         self._matrix = matrix.tocsc()
@@ -398,9 +399,16 @@ class CellAdmixAudit:
 
     @classmethod
     def from_fit(cls, fit, **kwargs):
-        """The audit over a fitted run's counts and cell table."""
+        """The audit over a fitted run's counts and cell table.
+
+        A fit-derived audit defaults the generative model's
+        expression-program initialization to this fit's factor-labeled
+        molecules — the validated configuration, and the one that
+        preserves the most induced biology on large panels."""
         annotation = getattr(getattr(fit, "dataset", None), "annotation", None)
-        return cls(fit.counts(), fit.cell_factors(), annotation, **kwargs)
+        audit = cls(fit.counts(), fit.cell_factors(), annotation, **kwargs)
+        audit._default_init = fit
+        return audit
 
     @classmethod
     def from_dataset(cls, dataset, **kwargs):

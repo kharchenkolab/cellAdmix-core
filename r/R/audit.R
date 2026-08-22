@@ -251,11 +251,17 @@ celladmix_audit_admixture <- function(fit, annotation = NULL, neighbor_k = 15L,
   if (is.null(ann)) {
     stop("audit_admixture requires a cell-type annotation")
   }
-  .celladmix_audit_from_data(counts = fit$counts(),
+  audit <- .celladmix_audit_from_data(counts = fit$counts(),
     cells = fit$cell_factors(), annotation = ann, neighbor_k = neighbor_k,
     n_pool = n_pool, q_thresh = q_thresh, min_excess = min_excess,
     min_target_cells = min_target_cells,
     min_reference_cells = min_reference_cells)
+  # A fit-derived audit defaults the generative model's expression-program
+  # initialization to this fit's factor-labeled molecules - the validated
+  # configuration, and the one that preserves the most induced biology on
+  # large panels. A dataset-derived audit defaults to "clusters".
+  audit$set_default_init(fit)
+  audit
 }
 
 # The audit itself, from its actual inputs: a gene x cell count matrix, a
@@ -400,6 +406,7 @@ CellAdmixAudit <- R6::R6Class(
     initialize = function(cells, pair_defs, counts, totals, cell_types,
                           native_markers, params = list()) {
       self$params <- params
+      private$.default_init <- "clusters"
       private$.cells <- cells
       private$.pair_defs <- pair_defs
       private$.counts <- counts
@@ -442,18 +449,25 @@ CellAdmixAudit <- R6::R6Class(
       if (detected_only) out[out$detected, , drop = FALSE] else out
     },
 
+    set_default_init = function(init) {
+      private$.default_init <- init
+      invisible(self)
+    },
+
     fit_generative = function(init = NULL, n_programs = 4L, seed = 1L,
                               num_threads = NULL, ...) {
       # Fit the generative admixture model on the detected pairs: each
       # target cell's counts are decomposed into own expression, per-source
       # contamination, ambient background, and induced expression (see
       # docs/generative.md). init selects the expression-program
-      # initialization: "clusters" (the default) derives programs by
-      # clustering each type's cells weighted toward lightly dosed ones,
-      # an NMF fit uses its factor-labeled molecules, "pseudobulk" uses
-      # one pooled profile per type, and a named list of programs-by-genes
-      # matrices (names = cell types, columns = count-matrix genes)
-      # supplies explicit programs. Returns a CellAdmixGenerativeModel.
+      # initialization: an NMF fit uses its factor-labeled molecules (the
+      # default for a fit-derived audit - the recommended configuration),
+      # "clusters" derives programs by clustering each type's cells
+      # weighted toward lightly dosed ones (the default for a
+      # dataset-derived audit), "pseudobulk" uses one pooled profile per
+      # type, and a named list of programs-by-genes matrices (names =
+      # cell types, columns = count-matrix genes) supplies explicit
+      # programs. Returns a CellAdmixGenerativeModel.
       counts <- private$.counts
       cells <- colnames(counts)
       types <- sort(unique(private$.cell_types[!is.na(private$.cell_types)]))
@@ -483,7 +497,7 @@ CellAdmixAudit <- R6::R6Class(
       cells_parquet <- ""
       programs_flat <- numeric(0)
       program_type <- integer(0)
-      if (is.null(init)) init <- "clusters"
+      if (is.null(init)) init <- private$.default_init
       if (inherits(init, "CellAdmixFit")) {
         init_mode <- "factors"
         init_label <- "nmf_factors"
@@ -888,6 +902,7 @@ CellAdmixAudit <- R6::R6Class(
   ),
   private = list(
     .cells = NULL,
+    .default_init = "clusters",
     .pair_defs = NULL, .counts = NULL, .totals = NULL,
     .cell_types = NULL, .native_markers = NULL,
     .pair = function(source, target) {

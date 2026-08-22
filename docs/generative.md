@@ -488,12 +488,14 @@ datasets) and runs in 20 seconds on the pancreas dataset, 50 seconds on
 NSCLC, and about four minutes on breast 5K.
 
 The expression programs that represent each type's own states are an
-initialization, selected by the `init` argument: `"clusters"` (the
-default) derives them by clustering each type's cells with weights
-favoring lightly dosed ones, an NMF fit supplies them from its
-factor-labeled molecules, `"pseudobulk"` uses one pooled profile per
-type, and a named set of profile matrices supplies them explicitly —
-for example from an external reference. On the removal side the choice
+initialization, selected by the `init` argument: an NMF fit supplies
+them from its factor-labeled molecules — the recommended configuration,
+and the default for an audit derived from a fit — while `"clusters"`
+derives them by clustering each type's cells with weights favoring
+lightly dosed ones (the default for an audit derived directly from a
+dataset), `"pseudobulk"` uses one pooled profile per type, and a named
+set of profile matrices supplies them explicitly — for example from an
+external reference. On the removal side the choice
 matters little: across pancreas, NSCLC, and breast 5K the
 initializations agree at the removal-entry level to 0.91–1.00, with
 sensitivities within a few points of each other and zero own-marker
@@ -505,9 +507,10 @@ does matter is retention on large panels: on breast 5K the
 factor-initialized model flags 180 induced genes and keeps 78% of their
 excess, against 129 genes and 62% under the simpler initializations —
 richer starting programs let the model separate more induced structure
-from transfer. The practical guidance: on focused panels any
-initialization serves; on large panels, passing the NMF fit as `init`
-preserves the most induced biology.
+from transfer. The practical guidance: use the NMF
+initialization when a fit exists (it is the validated configuration and
+preserves the most induced biology); the alternatives serve when no
+factorization is available.
 
 The three correctors order naturally by need. The exposure-regression
 corrector is the simplest and fastest way to flatten exposure-linked

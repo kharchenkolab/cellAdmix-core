@@ -219,10 +219,11 @@ model.correct(retain_induced=False)  # ... or removed along with contamination
 audit.evaluate(correction)         # verified like any other correction
 ```
 
-The `init` argument selects the expression-program initialization:
-`"clusters"` (the default), an NMF fit (its factor-labeled molecules —
-recommended on large panels, where it preserves the most induced
-biology), `"pseudobulk"`, or a dict of explicit profile matrices.
+The `init` argument selects the expression-program initialization: an
+NMF fit's factor-labeled molecules (the recommended configuration, and
+the default for a fit-derived audit), `"clusters"` (the default for a
+dataset-derived audit), `"pseudobulk"`, or a dict of explicit profile
+matrices.
 `audit.correct_generative()` remains as the one-call convenience.
 
 Neither the audit nor the generative model requires a factorization:

@@ -102,11 +102,13 @@ def fit_generative(audit, *, init=None, n_programs=4, num_threads=None,
                    seed=1, **options):
     """Fit the generative model on the audit's detected pairs.
 
-    ``init`` selects the expression-program initialization:
-    ``"clusters"`` (the default) derives programs by clustering each
-    type's cells, weighted toward lightly dosed ones; an NMF fit object
-    uses its factor-labeled molecules; ``"pseudobulk"``
-    uses one pooled profile per type; a dict mapping cell-type names to
+    ``init`` selects the expression-program initialization: an NMF fit
+    object uses its factor-labeled molecules (the default for a
+    fit-derived audit — the recommended configuration); ``"clusters"``
+    derives programs by clustering each type's cells, weighted toward
+    lightly dosed ones (the default for a dataset-derived audit);
+    ``"pseudobulk"`` uses one pooled profile per type; a dict mapping
+    cell-type names to
     profile matrices (programs x genes, columns aligned with the count
     matrix genes) supplies explicit programs, e.g. from an external
     reference. Extra keyword arguments override the model's constants
@@ -150,7 +152,7 @@ def fit_generative(audit, *, init=None, n_programs=4, num_threads=None,
     programs_flat: list[float] = []
     program_type: list[int] = []
     if init is None:
-        init = "clusters"
+        init = audit._default_init
     if isinstance(init, str):
         if init not in ("clusters", "pseudobulk"):
             raise ValueError("init must be an NMF fit, 'clusters', "
