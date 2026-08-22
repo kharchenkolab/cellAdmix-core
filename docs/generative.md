@@ -467,16 +467,37 @@ non-flagged content, 80.1% retention). Scripts and per-pair tables:
 `analysis/audit_guided/17_composite.R` and
 `analysis/audit_guided/results/`.
 
-The model ships in the package: `audit$correct_generative()` in R and
-`audit.correct_generative()` in Python fit it on the audit's detected
-pairs through a shared C++ implementation (both bindings marshal the
-same inputs to the same code, so their results are identical), returning
-corrected counts, the per-cell decomposition, and the retained
-induced-gene table as a correction object that `evaluate()` verifies
-like any other. The fit reproduces the reference implementation exactly
+The model ships in the package with the fit separated from the
+correction: `audit$fit_generative()` in R and `audit.fit_generative()`
+in Python fit it on the audit's detected pairs through a shared C++
+implementation (both bindings marshal the same inputs to the same code,
+so their results are identical). The fitted model exposes the per-cell
+decomposition (`composition()`), the retained induced genes
+(`induced`), and per-pair summaries (`pairs`), and derives corrections
+without refitting: `model$correct()` keeps the induced expression,
+`model$correct(retain_induced = FALSE)` removes the fitted induced
+share along with the contamination — the direct demonstration of what
+retention protects. `correct_generative()` remains as the one-call
+convenience. The fit reproduces the reference implementation exactly
 (the removed-molecule totals agree to the last count on all three
 datasets) and runs in 20 seconds on the pancreas dataset, 50 seconds on
 NSCLC, and about four minutes on breast 5K.
+
+The expression programs that represent each type's own states are an
+initialization, selected by the `init` argument: an NMF fit supplies
+them from its factor-labeled molecules (the default when one exists),
+`"clusters"` derives them by clustering each type's cells with weights
+favoring lightly dosed ones, `"pseudobulk"` uses one pooled profile per
+type, and a named set of profile matrices supplies them explicitly —
+for example from an external reference. The choice matters little: on
+pancreas the three built-in initializations agree at the removal-entry
+level to 0.995 or better, with excess-weighted sensitivity 0.94–0.96
+and identical zero own-marker removal, because the model's constraints
+— the dose-anchored contamination, the target-owned-gene protection,
+and the contamination-weighted program learning — determine where the
+fit converges far more than its starting point. The NMF factorization
+is therefore not a requirement of the model, only its most convenient
+initializer.
 
 The three correctors order naturally by need. The exposure-regression
 corrector is the simplest and fastest way to flatten exposure-linked

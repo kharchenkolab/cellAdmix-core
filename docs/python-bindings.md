@@ -209,14 +209,21 @@ correction object that `evaluate()` accepts, together with the model's
 per-cell decomposition:
 
 ```python
-correction = audit.correct_generative(num_threads=8)
-correction.counts()                # corrected (matrix, genes, cells)
-correction.pairs                   # per-pair removed and induced molecule totals
-correction.induced                 # retained induced genes with disproportionality
-correction.composition("Exocrine epithelial", "Ductal/tumor epithelial")
+model = audit.fit_generative(init=nmf_fit, num_threads=8)
+model.pairs                        # per-pair removed and induced molecule totals
+model.induced                      # retained induced genes with disproportionality
+model.composition("Exocrine epithelial", "Ductal/tumor epithelial")
                                    # per-cell dose, contamination, induced activity
+correction = model.correct()       # corrected counts, induced expression kept
+model.correct(retain_induced=False)  # ... or removed along with contamination
 audit.evaluate(correction)         # verified like any other correction
 ```
+
+The `init` argument selects the expression-program initialization: an
+NMF fit (its factor-labeled molecules; the default), `"clusters"`,
+`"pseudobulk"`, or a dict of explicit profile matrices — the model does
+not require an NMF fit. `audit.correct_generative()` remains as the
+one-call convenience.
 
 `evaluate()` warns from the corrected counts themselves — a pair is
 flagged when its molecules were measurably not removed, regardless of what
