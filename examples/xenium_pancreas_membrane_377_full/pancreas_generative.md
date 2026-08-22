@@ -22,8 +22,8 @@ neighboring cell type, ambient background, and neighborhood-induced
 expression, then removes the contamination and ambient shares while
 keeping the induced ones ([docs/generative.md](../../docs/generative.md)
 describes the model and its validation; [the minimal
-version](pancreas_generative_minimal.md) of this page is four calls
-long).
+version](pancreas_generative_minimal.md) of this page runs the same
+workflow in a handful of calls).
 
 This example characterizes both sides on the pancreas dataset: how much
 material moves between which cell types, and which genes the model
