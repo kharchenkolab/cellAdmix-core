@@ -365,3 +365,19 @@ results/gm_induced_general_pancreas.csv and _calibration.csv.
   total-count inflation of exposed cells (CFB z 3.8 raw -> 52
   corrected). Results: results/gm_dose_marginal_vs_joint.csv,
   results/gm_induced_raw_vs_corrected.csv.
+
+## Native implementation (C++ core)
+
+The model now ships in the package: src/generative.cpp implements the
+full production fit (molecule-table preparation, dose-response, screen,
+sparse EM, top-up, profile refinement) behind audit$correct_generative()
+in R and audit.correct_generative() in Python - both bindings marshal
+identical inputs to the same code. Verified against this directory's
+Python implementation on identical problem specifications
+(08_cpp_parity.py): removed-molecule totals agree exactly on all three
+datasets (pancreas 1,206,425; NSCLC 2,726,671; breast 6,663,604), entry
+correlation 1.000000, per-pair posteriors identical. Runtime: pancreas
+22 s, NSCLC 51 s, breast 5K 4.4 min at 12 threads (thread scaling
+saturates around 4 threads; the serial molecule-table read dominates
+beyond). 01_model.py remains as the reference implementation for the
+evaluation arms.
