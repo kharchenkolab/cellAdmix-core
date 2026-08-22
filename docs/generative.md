@@ -125,9 +125,13 @@ line up on the diagonal across three orders of magnitude — AMY2A, the
 largest channel, sits exactly on it — while CFTR, PROX1 and CA4 carry
 several times more excess than transfer can deliver, and are flagged.
 
-Figure 2b shows, on the reverse pair (ductal cells the source, exocrine
-cells the target), why the transfer expectation must come from the
-bordering source cells. The grey points are all ductal-owned genes with
+Figure 2b asks the same question for the reverse admixture direction:
+ductal cells are now the source, exocrine cells the targets, and the
+plot shows the excess of ductal-owned genes found in exocrine cells —
+are the CXCL6, CFB and PPP1R1B molecules appearing in exocrine cells
+near ductal tissue induced in the exocrine cells, or transferred from
+the ductal cells? The answer depends on which ductal cells define the
+transfer expectation. The grey points are all ductal-owned genes with
 the expectation computed from the bordering ductal cells — these are
 the data the proportional fit is made from, and they line up on the
 diagonal. The activation genes CXCL6, CFB and PPP1R1B are drawn twice:
@@ -148,18 +152,18 @@ computed from the cells the material actually comes from.
 
 ![Figure 2](figures/generative_fig2.png)
 
-**Figure 2. What the screen compares.** **(a)** Each point is one
+**Figure 2. What the screen compares.** **(a)** *Induced changes
+deviate from the transfer expectation.* Each point is one
 exocrine-owned gene in the exocrine → ductal pair: measured excess in
 ductal cells (vertical) against the excess that proportional transfer
 would deliver given the gene's share of the interface-local exocrine
 profile (horizontal). The diagonal means "fully accounted for by
-transfer"; the dashed curve is the screen's significance bound — a
-deviation of eight standard deviations, combining counting noise with
-the 15% profile uncertainty — and the red squares above it are the
-genes flagged as induced. No corresponding lower bound exists: with a
-15% profile uncertainty, eight standard deviations always exceed the
-expectation itself, so a shortfall can never reach the flagging
-significance and the screen acts only on excess. **(b)** The
+transfer"; the dashed curve marks the largest excess still consistent
+with proportional transfer, allowing counting noise and a 15% error in
+the profile itself, with a wide safety margin — the red squares above
+it are the genes flagged as induced. No corresponding lower bound
+exists: at this margin the allowance exceeds the expectation itself, so
+a shortfall can never be flagged and the screen acts only on excess. **(b)** The
 reverse pair, ductal → exocrine, same axes. Grey: all ductal-owned
 genes under the expectation from the bordering ductal cells — the data
 the proportional fit is made from. CXCL6, CFB and PPP1R1B appear twice,

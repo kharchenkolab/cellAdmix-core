@@ -255,8 +255,7 @@ for gname in ["CFTR", "PROX1", "CA4", "AMY2A", "CELA2A"]:
                  xytext=(4, 3), textcoords="offset points")
 axa.set_xlabel("expected from proportional transfer (molecules)")
 axa.set_ylabel("exposure-linked excess (molecules)")
-axa.set_title("(a) induced changes deviate from the transfer expectation",
-              fontsize=10)
+axa.set_title("(a) the screen: exocrine → ductal", fontsize=10)
 axa.legend(frameon=False, fontsize=8, loc="upper left")
 
 # (b) the same test for ductal -> exocrine under the global versus the
@@ -297,7 +296,7 @@ axb.set_xscale("log"); axb.set_yscale("log")
 axb.set_xlim(limb); axb.set_ylim([10, limb[1]])
 axb.set_xlabel("expected from proportional transfer (molecules)")
 axb.set_ylabel("exposure-linked excess (molecules)")
-axb.set_title("(b) profile choice: ductal → exocrine", fontsize=10)
+axb.set_title("(b) the screen: ductal → exocrine", fontsize=10)
 axb.legend(frameon=False, fontsize=8, loc="upper left")
 
 fig2.tight_layout()
