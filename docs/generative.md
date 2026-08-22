@@ -115,32 +115,50 @@ To be explicit about the reference of the comparison: each gene is
 tested individually against the proportional fit to the *source-cell
 profile* — there is no induced-profile template, and no correlation
 among induced genes is assumed or used. Figure 2a shows the test on the
-exocrine → ductal pair: the exposure-linked excess of the source-owned
-genes lies on the proportional line across three orders of magnitude —
-AMY2A, the largest transfer channel, sits exactly on it — while CFTR,
-PROX1 and CA4 sit severalfold above it and are flagged. Figure 2b shows
-why the profile must be interface-local: on the ductal → exocrine pair,
-the excess of the activation genes CXCL6, CFB and PPP1R1B measures ten-
-to twenty-fold disproportionate against the ductal-average profile, but
-proportional (0.9- to 1.8-fold) against the profile of the ductal cells
-that actually border exocrine tissue — their excess is transfer from
-activated edge cells, and only the interface-local profile prices it
-correctly.
+exocrine → ductal pair. Each point is one exocrine-owned gene; its
+vertical position is the measured excess — how many extra molecules of
+that gene appear in ductal cells as exocrine neighbors accumulate — and
+its horizontal position is how many extra molecules proportional
+transfer would deliver, given the gene's share of the exocrine profile.
+A gene on the diagonal is fully accounted for by transfer. The genes
+line up on the diagonal across three orders of magnitude — AMY2A, the
+largest channel, sits exactly on it — while CFTR, PROX1 and CA4 carry
+several times more excess than transfer can deliver, and are flagged.
+
+Figure 2b shows, on the reverse pair (ductal cells the source, exocrine
+cells the target), why the transfer expectation must come from the
+bordering source cells. The grey points are all ductal-owned genes with
+the expectation computed from the bordering ductal cells — these are
+the data the proportional fit is made from, and they line up on the
+diagonal. The activation genes CXCL6, CFB and PPP1R1B are drawn twice:
+an open circle at the expectation computed from the average ductal
+cell, and a filled point at the expectation computed from the ductal
+cells that border exocrine tissue, with an arrow connecting the two
+positions of the same gene. The measured excess — the vertical position
+— is the same in both cases; only the expectation moves. Against the
+average profile the three genes appear to carry ten to twenty times
+more excess than transfer could deliver, and would be called induced.
+Against the profile of the bordering cells, which genuinely express
+these genes 1.1–1.6 times above the ductal average, the same excess is
+exactly what transfer delivers, and the genes land on the diagonal:
+transfer, not induction.
 
 ![Figure 2](figures/generative_fig2.png)
 
-**Figure 2. What the screen compares.** **(a)** Per-gene exposure-linked
-excess in ductal cells against the expectation from proportional
-exocrine transfer (interface-local profile); grey: source-owned genes on
-the proportional line, red squares: genes flagged as induced. **(b)**
-For the three activation genes of the ductal → exocrine pair, the ratio
-of measured excess to the transfer expectation, computed two ways: from
-the ductal-average profile (open red) and from the profile of the
-ductal cells bordering exocrine tissue (filled green). The dashed line
-marks proportionality: the apparent ten- to twenty-fold
-disproportionality is an artifact of the average profile and vanishes
-when the expectation reflects the cells the material actually comes
-from.
+**Figure 2. What the screen compares.** **(a)** Each point is one
+exocrine-owned gene in the exocrine → ductal pair: measured excess in
+ductal cells (vertical) against the excess that proportional transfer
+would deliver given the gene's share of the interface-local exocrine
+profile (horizontal). The diagonal means "fully accounted for by
+transfer"; red squares are the genes flagged as induced. **(b)** The
+reverse pair, ductal → exocrine, same axes. Grey: all ductal-owned
+genes under the expectation from the bordering ductal cells — the data
+the proportional fit is made from. CXCL6, CFB and PPP1R1B appear twice,
+connected by an arrow: at the expectation from the average ductal
+profile (open red) and from the bordering ductal cells (filled green).
+Their measured excess does not change between the two — only the
+expectation does — and with the profile of the cells the material
+actually comes from, all three sit on the diagonal.
 
 A separate question is how a flagged gene is known to be induced rather
 than admixed from a *different* source type. Three mechanisms address
