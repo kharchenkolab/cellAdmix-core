@@ -163,7 +163,12 @@ with proportional transfer, allowing counting noise and a 15% error in
 the profile itself, with a wide safety margin — the red squares above
 it are the genes flagged as induced. No corresponding lower bound
 exists: at this margin the allowance exceeds the expectation itself, so
-a shortfall can never be flagged and the screen acts only on excess. **(b)** The
+a shortfall can never be flagged and the screen acts only on excess.
+Only one expectation is drawn because for this pair the two coincide:
+exocrine cells bordering ductal tissue have the same composition as
+average exocrine cells (expectations agree within 1%), so the
+border-state effect shown in (b) is a property of the ductal cells, not
+a general feature of interfaces. **(b)** The
 same plot for the reverse admixture direction, ductal → exocrine. Grey:
 all ductal-owned genes under the expectation from the bordering ductal
 cells — the data the proportional fit is made from; the dashed curve is
