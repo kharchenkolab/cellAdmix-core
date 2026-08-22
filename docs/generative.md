@@ -60,7 +60,7 @@ components, and where each one's parameters come from:
   most five-fold the prior, exactly zero where the prior is zero — so
   removal stays anchored to the demonstrated spatial signal (with an
   unbounded update, the model keeps finding the true contamination even
-  after the exposure covariate is destroyed, and the permutation control
+  after the exposure values are scrambled, and the permutation control
   fails).
 - **Ambient background** ($\beta_c$, $a_g$): restricted to the strict
   genes (essentially absent from the target natively), with profile and
@@ -317,8 +317,9 @@ principle, while the same mass on mid-rank genes is recovered at 94%).
 Spatial coherence — fragments arrive as gene-diverse patches, induced
 molecules sit among the cell's own — is real but weak at
 single-molecule resolution in dense tissue: per-molecule likelihood
-ratios stay under an order of magnitude, against identity priors of
-order a thousand to one. And cell-level concentration of induction can
+ratios stay under an order of magnitude, against prior odds — of
+order a thousand to one — that a strict-tier molecule in an exposed
+cell is contamination. And cell-level concentration of induction can
 sharpen a gene already flagged but cannot flag one hidden below the
 disproportionality floor. The honest claim for this model and any
 successor is therefore: induced expression is preserved when it is
@@ -354,12 +355,12 @@ source-owned genes. The corrected counts enable the general question:
 for each source and target type, which genes — of any ownership, in
 either direction — change their expression in the target cells with
 that source's proximity? On the retained counts (transfer and ambient
-removed), each gene of a target type is fitted with a quasi-Poisson
+removed), each gene of a target type is fitted with a Poisson
 regression on all sources' exposures jointly, so that spatially
 correlated neighborhoods do not attribute one source's effect to
-another; the significance is widened by the empirically measured
-overdispersion, and a change is reported at a deviation of six standard
-errors with at least a 4% change per neighboring cell
+another; the error estimates are widened by the variability actually
+measured in the residuals, and a change is reported at a deviation of
+six such errors with at least a 4% change per neighboring cell
 (`06_induced_general.py`).
 
 Two safeguards accompany every reported gene. Rerunning the identical
@@ -403,6 +404,53 @@ entangled with the transfer split. **(a)** Ductal cells by exocrine
 proximity: the induced interface program on the right, the loss of the
 ductal identity program on the left. **(b)** Fibroblasts by exocrine
 proximity: the complement and matrix program.
+
+## Circular reasoning, and the measurements that check it
+
+Several of the model's inputs are estimated from the same contaminated
+data the model is meant to explain, so each loop deserves a named check.
+
+*Gene ownership.* Ownership is computed from observed pseudobulk
+profiles, and contamination between two types is part of why their
+rates for a shared gene are close. Recomputing ownership on the
+corrected counts changes the owner of 8 of the panel's 377 genes — all
+near-ties with margins of a few percent, none among the genes any
+result here rests on. The loop is real but confined to genes whose
+ownership was a coin flip either way.
+
+*Source profiles.* The transfer profile of each source is measured from
+its bordering cells, which are themselves the most contaminated members
+of their type. The fit breaks this loop by iterating: after all types
+are fitted once, each profile is cleaned by its own type's fitted
+own-expression fraction per gene, and the fit repeats — so a profile
+progressively sheds the contamination it carried.
+
+*The dose.* Each pair's contamination dose is measured against its own
+source's neighbor count, but neighborhoods are correlated — where there
+are mural cells there are endothelial cells — so a marginal measurement
+books some of one source's material to another. Re-estimating every
+pair's dose jointly across all sources' exposures shifts the median
+pair by 12% (the marginal estimate being the larger), with one pair
+beyond 1.5-fold: mural → ductal, whose mural dose halves once the
+accompanying vessel cells are accounted for. The simultaneous fit
+already limits the damage — molecules are attributed by competition
+among all sources at the count level — and replacing the marginal dose
+measurement with the joint one is the identified next improvement.
+
+*Detection on the model's own output.* The induced-change test of the
+previous section runs on retained counts, so an error in the transfer
+split could manufacture or erase a change. Two measurements bound this.
+The per-gene guard already reported: 55% of the changes are on genes
+with essentially nothing removed, where no split error is possible. And
+rerunning the identical test on the raw, uncorrected counts: 79% of the
+reported changes are visible there too, with 96% agreement in direction
+in the unambiguous tier. The changes visible only after correction are
+rescues, not artifacts, and for a stated reason: contamination inflates
+the total molecule count of exposed cells, which deflates every gene's
+rate there and masks genuine changes — CFB's induction in ductal cells
+measures z = 3.8 on raw counts and z = 52 on corrected ones. An
+uncorrected neighborhood analysis is confounded twice over: transferred
+molecules add false positives, and inflated totals hide true changes.
 
 ## A practical composite
 

@@ -350,3 +350,18 @@ exocrine tissue (C7 z = 64), proliferation suppression in ductal cells
 near fibroblasts; coarse-annotation composition shifts flagged as a
 reading caveat (immune class). Results:
 results/gm_induced_general_pancreas.csv and _calibration.csv.
+
+## Robustness and circularity checks (07_robustness.py)
+
+- Ownership recomputed on corrected counts: 8 of 377 genes flip, all
+  near-ties (margins of a few percent), none consequential.
+- Marginal versus joint dose (all sources' exposures simultaneously):
+  joint/marginal ratio median 0.88 (quartiles 0.83-0.95); one pair
+  beyond 1.5-fold (Mural -> Ductal 0.58). Joint dose priors are the
+  identified improvement.
+- General induced-change screen on raw versus corrected counts: 79% of
+  corrected-count hits present on raw counts, 96% sign-consistency in
+  the unambiguous tier; correction-only hits are rescues from the
+  total-count inflation of exposed cells (CFB z 3.8 raw -> 52
+  corrected). Results: results/gm_dose_marginal_vs_joint.csv,
+  results/gm_induced_raw_vs_corrected.csv.
