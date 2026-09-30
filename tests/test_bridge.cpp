@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "celladmix/bridge.hpp"
 #include "test_framework.hpp"
 

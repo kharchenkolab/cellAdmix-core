@@ -1781,6 +1781,11 @@ EncodedMoleculeStore build_xenium_encoded_store_from_parquet(
 }
 
 struct TabularStreamSource {
+  // Arrow requires FileReaders to outlive the record-batch readers they
+  // produce, and the stream is consumed only after this source is returned,
+  // so the source owns the parquet FileReader alongside its reader. Declared
+  // before `reader` so it is destroyed after it.
+  std::shared_ptr<parquet::arrow::FileReader> parquet_reader;
   std::shared_ptr<arrow::RecordBatchReader> reader;
   bool used_parquet = false;
   bool has_z = false;
@@ -1857,11 +1862,12 @@ TabularStreamSource make_tabular_stream_source(
     parquet::arrow::FileReaderBuilder builder;
     arrow_check(builder.Open(input), "Open tabular parquet reader");
     auto reader = arrow_unwrap(builder.Build(), "Build tabular parquet reader");
-    reader->set_use_threads(true);
-    reader->set_batch_size(65536);
+    out.parquet_reader = std::move(reader);
+    out.parquet_reader->set_use_threads(true);
+    out.parquet_reader->set_batch_size(65536);
 
     std::shared_ptr<arrow::Schema> schema;
-    arrow_check(reader->GetSchema(&schema), "Read tabular parquet schema");
+    arrow_check(out.parquet_reader->GetSchema(&schema), "Read tabular parquet schema");
     const int x_col = required_named_field(schema, source.x_col, "x");
     const int y_col = required_named_field(schema, source.y_col, "y");
     const int gene_col = required_named_field(schema, source.gene_col, "gene");
@@ -1902,7 +1908,7 @@ TabularStreamSource make_tabular_stream_source(
       return out;
     }
     out.reader = arrow_unwrap(
-        reader->GetRecordBatchReader(row_groups, projected),
+        out.parquet_reader->GetRecordBatchReader(row_groups, projected),
         "Create tabular parquet batch reader");
     return out;
   }
