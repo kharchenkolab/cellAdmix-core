@@ -1,6 +1,11 @@
 #include "celladmix/tabular.hpp"
 #include "celladmix/input_store.hpp"
 
+#include <arrow/api.h>
+#include <arrow/io/api.h>
+#include <parquet/arrow/writer.h>
+
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -13,6 +18,59 @@
 using namespace celladmix;
 
 namespace {
+
+void require_arrow_status(const arrow::Status& status, const char* context) {
+  if (!status.ok()) {
+    throw std::runtime_error(std::string(context) + ": " + status.ToString());
+  }
+}
+
+// Write a synthetic molecules parquet table with num_rows rows spread over
+// cells distinct cell ids and genes distinct gene names, split into
+// row_group_size-sized row groups. The many row groups keep the streaming
+// parquet reader busy reading metadata long after the store source returned.
+void write_molecules_parquet(
+    const std::filesystem::path& path,
+    int num_rows,
+    int cells,
+    int genes,
+    std::int64_t row_group_size) {
+  arrow::DoubleBuilder x;
+  arrow::DoubleBuilder y;
+  arrow::StringBuilder gene;
+  arrow::StringBuilder cell;
+  require_arrow_status(x.Reserve(num_rows), "reserve x");
+  require_arrow_status(y.Reserve(num_rows), "reserve y");
+  require_arrow_status(gene.Reserve(num_rows), "reserve gene");
+  require_arrow_status(cell.Reserve(num_rows), "reserve cell");
+  for (int i = 0; i < num_rows; ++i) {
+    require_arrow_status(x.Append(static_cast<double>(i % 512)), "append x");
+    require_arrow_status(y.Append(static_cast<double>(i % 383)), "append y");
+    require_arrow_status(
+        gene.Append("G" + std::to_string(i % genes)), "append gene");
+    require_arrow_status(
+        cell.Append("c" + std::to_string(i % cells)), "append cell");
+  }
+
+  auto table = arrow::Table::Make(
+      arrow::schema({
+          arrow::field("x", arrow::float64()),
+          arrow::field("y", arrow::float64()),
+          arrow::field("gene", arrow::utf8()),
+          arrow::field("cell", arrow::utf8()),
+      }),
+      {
+          x.Finish().ValueOrDie(),
+          y.Finish().ValueOrDie(),
+          gene.Finish().ValueOrDie(),
+          cell.Finish().ValueOrDie(),
+      });
+
+  auto sink = arrow::io::FileOutputStream::Open(path.string()).ValueOrDie();
+  require_arrow_status(
+      parquet::arrow::WriteTable(*table, arrow::default_memory_pool(), sink, row_group_size),
+      "write molecules parquet");
+}
 
 void write_text(const std::filesystem::path& path, const std::string& text) {
   std::ofstream out(path);
@@ -187,6 +245,49 @@ TEST_CASE("Tabular input store streams labeled TIFF mask assignment") {
   REQUIRE_EQ(block.size(), 2U);
   REQUIRE_EQ(block.cell_idx[0], 0);
   REQUIRE_EQ(block.cell_idx[1], 1);
+
+  std::filesystem::remove_all(dir);
+}
+
+TEST_CASE("Tabular parquet store build keeps the parquet reader alive while streaming") {
+  const auto dir = std::filesystem::temp_directory_path() /
+      "celladmix_tabular_store_test_parquet";
+  std::filesystem::remove_all(dir);
+  std::filesystem::create_directories(dir);
+
+  constexpr int kRows = 50000;
+  constexpr int kCells = 500;
+  constexpr int kGenes = 40;
+  write_molecules_parquet(dir / "molecules.parquet", kRows, kCells, kGenes, 4096);
+
+  TabularSourceSpec source;
+  source.molecules_path = (dir / "molecules.parquet").string();
+  source.gene_col = "gene";
+  source.x_col = "x";
+  source.y_col = "y";
+  source.cell_id_col = "cell";
+
+  TabularLoadOptions load_options;
+
+  InputStoreBuildOptions store_options;
+  store_options.store_dir = (dir / "input_store").string();
+  store_options.materialize_molecules = true;
+  store_options.force = true;
+
+  const auto manifest = build_tabular_input_store(source, load_options, store_options);
+  REQUIRE_EQ(manifest.store_mode, std::string("full"));
+  REQUIRE_EQ(manifest.has_molecule_rows, true);
+  REQUIRE_EQ(manifest.n_molecules, static_cast<std::size_t>(kRows));
+  REQUIRE_EQ(manifest.n_cells, static_cast<std::size_t>(kCells));
+  REQUIRE_EQ(manifest.n_genes, static_cast<std::size_t>(kGenes));
+
+  const auto counts = load_input_store_counts(store_options.store_dir);
+  REQUIRE_EQ(counts.transcript_counts.size(), static_cast<std::size_t>(kCells));
+  std::size_t total = 0;
+  for (const auto value : counts.transcript_counts) {
+    total += static_cast<std::size_t>(value);
+  }
+  REQUIRE_EQ(total, static_cast<std::size_t>(kRows));
 
   std::filesystem::remove_all(dir);
 }
