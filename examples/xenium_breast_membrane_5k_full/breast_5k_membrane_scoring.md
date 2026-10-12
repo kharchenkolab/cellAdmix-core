@@ -113,7 +113,7 @@ ds
 
 The fit uses the `invsqrt_kl` NMF variant — the recommended pairing for
 membrane scoring on stained data (see
-[docs/benchmarks.md](../../docs/benchmarks.md)) — with automatic rank
+[docs/audit.md](../../docs/audit.md)) — with automatic rank
 based on the number of annotated cell types, multiple NMF restarts, and
 gene-loading molecule scoring.
 
@@ -542,7 +542,7 @@ contrast along molecule-to-centroid lines, which is weak for thin,
 elongated cell types such as endothelium and fibroblasts. Bridge scoring
 uses molecule adjacency instead of the stain image and pairs best with
 the `ls_nmf` factorization (see
-[docs/benchmarks.md](../../docs/benchmarks.md)). It detects these pairs
+[docs/audit.md](../../docs/audit.md)). It detects these pairs
 decisively — but, as shown below, it cannot correct them safely on this
 dataset, and the reason is instructive.
 
@@ -637,7 +637,7 @@ scoring sees it but cannot separate it, because the factorization never
 formed native endothelial or fibroblast factors. Correcting these pairs
 safely requires factorization-level remedies (a rank that resolves the
 small types, or anchor-based factor recovery — see
-[docs/benchmarks.md](../../docs/benchmarks.md)). Downstream analysis in
+[docs/audit.md](../../docs/audit.md)). Downstream analysis in
 this notebook therefore proceeds with the membrane correction, and the
 endothelial and fibroblast admixture flagged by the audit should be kept
 in mind when interpreting those cell types.
@@ -658,43 +658,43 @@ original_state <- ds$cell_state_umap(cells_max = state_cells_max,
   min_molecules = 30, min_genes = 15, verbose = TRUE)
 ```
 
-    ## [INFO 02:21:10 +0.031s] Reused compatible Xenium input store (0.000s)
-    ## [INFO 02:21:10 +0.031s] Built Xenium input store: 82144903 molecules, 688099 cells (0.031s)
-    ## [INFO 02:21:16 +5.586s] Loaded input-store cell-gene counts: 688099 cells (5.586s)
-    ## [INFO 02:21:16 +5.781s] Indexed cell counts: 470549 eligible cells (min_molecules=30, min_genes=15) (0.195s)
-    ## [INFO 02:21:16 +6.310s] Selected clustering cells: 5000 cells (0.529s)
-    ## [INFO 02:21:16 +6.380s] Loaded sparse cell-gene counts: 776043 non-zero entries (0.069s)
-    ## [INFO 02:21:16 +6.446s] Selected variable genes: 1000 genes (0.066s)
-    ## [INFO 02:21:17 +6.554s] Materialized dense clustering matrix: 1000 x 5000 (0.108s)
-    ## [INFO 02:21:19 +8.694s] Computed cell PCA: 30 x 5000 (2.140s)
-    ## [INFO 02:21:19 +9.323s] Built HNSW cell KNN graph: 75000 directed edges using 10 thread(s); reusing 15 cosine-distance neighbors for UMAP (0.629s)
-    ## [INFO 02:21:19 +9.335s] Ran Louvain clustering (0.012s)
-    ## [INFO 02:21:19 +9.378s] Initialized UMAP layout (0.043s)
-    ## [INFO 02:23:39 +149.466s] Optimized UMAP layout with parallel optimization (140.088s)
-    ## [INFO 02:23:39 +149.466s] Computed cell UMAP (140.131s)
-    ## [INFO 02:23:39 +149.468s] Assembled cell clustering result (0.002s)
-    ## [INFO 02:23:39 +149.468s] Finished store-backed cell clustering (143.882s)
-    ## [INFO 02:23:39 +149.522s] Wrote cell clustering outputs (0.055s)
+    ## [INFO 12:57:50 +0.016s] Reused compatible Xenium input store (0.000s)
+    ## [INFO 12:57:50 +0.016s] Built Xenium input store: 82144903 molecules, 688099 cells (0.016s)
+    ## [INFO 12:57:52 +2.557s] Loaded input-store cell-gene counts: 688099 cells (2.556s)
+    ## [INFO 12:57:52 +2.624s] Indexed cell counts: 470549 eligible cells (min_molecules=30, min_genes=15) (0.067s)
+    ## [INFO 12:57:52 +2.721s] Selected clustering cells: 5000 cells (0.098s)
+    ## [INFO 12:57:52 +2.732s] Loaded sparse cell-gene counts: 776043 non-zero entries (0.011s)
+    ## [INFO 12:57:52 +2.746s] Selected variable genes: 1000 genes (0.013s)
+    ## [INFO 12:57:53 +2.778s] Materialized dense clustering matrix: 1000 x 5000 (0.032s)
+    ## [INFO 12:57:53 +3.322s] Computed cell PCA: 30 x 5000 (0.545s)
+    ## [INFO 12:57:53 +3.465s] Built HNSW cell KNN graph: 75000 directed edges using 10 thread(s); reusing 15 cosine-distance neighbors for UMAP (0.142s)
+    ## [INFO 12:57:53 +3.474s] Ran Louvain clustering (0.010s)
+    ## [INFO 12:57:53 +3.502s] Initialized UMAP layout (0.028s)
+    ## [INFO 12:57:55 +5.385s] Optimized UMAP layout with parallel optimization (1.883s)
+    ## [INFO 12:57:55 +5.385s] Computed cell UMAP (1.910s)
+    ## [INFO 12:57:55 +5.386s] Assembled cell clustering result (0.001s)
+    ## [INFO 12:57:55 +5.386s] Finished store-backed cell clustering (2.829s)
+    ## [INFO 12:57:55 +5.395s] Wrote cell clustering outputs (0.009s)
 
 ``` r
 corrected_state <- membrane_correction$cell_state_umap(cells_max = state_cells_max,
   min_molecules = 30, min_genes = 15, verbose = TRUE)
 ```
 
-    ## [INFO 02:24:10 +29.846s] Loaded run cell-gene counts: 688099 cells (29.846s)
-    ## [INFO 02:24:10 +30.130s] Indexed cell counts: 368117 eligible cells (min_molecules=30, min_genes=15) (0.284s)
-    ## [INFO 02:24:10 +30.555s] Selected clustering cells: 5000 cells (0.425s)
-    ## [INFO 02:24:10 +30.619s] Loaded sparse cell-gene counts: 761964 non-zero entries (0.064s)
-    ## [INFO 02:24:10 +30.657s] Selected variable genes: 1000 genes (0.037s)
-    ## [INFO 02:24:10 +30.746s] Materialized dense clustering matrix: 1000 x 5000 (0.089s)
-    ## [INFO 02:24:12 +32.501s] Computed cell PCA: 30 x 5000 (1.755s)
-    ## [INFO 02:24:13 +32.980s] Built HNSW cell KNN graph: 75000 directed edges using 10 thread(s); reusing 15 cosine-distance neighbors for UMAP (0.479s)
-    ## [INFO 02:24:13 +33.104s] Ran Louvain clustering (0.124s)
-    ## [INFO 02:24:13 +33.180s] Initialized UMAP layout (0.076s)
-    ## [INFO 02:24:38 +57.808s] Optimized UMAP layout with parallel optimization (24.628s)
-    ## [INFO 02:24:38 +57.809s] Computed cell UMAP (24.705s)
-    ## [INFO 02:24:38 +57.812s] Assembled cell clustering result (0.003s)
-    ## [INFO 02:24:38 +57.812s] Finished run-count cell-state embedding (27.965s)
+    ## [INFO 12:58:07 +11.743s] Loaded run cell-gene counts: 688099 cells (11.743s)
+    ## [INFO 12:58:07 +11.800s] Indexed cell counts: 368117 eligible cells (min_molecules=30, min_genes=15) (0.056s)
+    ## [INFO 12:58:07 +11.882s] Selected clustering cells: 5000 cells (0.082s)
+    ## [INFO 12:58:07 +11.900s] Loaded sparse cell-gene counts: 761964 non-zero entries (0.018s)
+    ## [INFO 12:58:07 +11.914s] Selected variable genes: 1000 genes (0.014s)
+    ## [INFO 12:58:07 +11.946s] Materialized dense clustering matrix: 1000 x 5000 (0.032s)
+    ## [INFO 12:58:08 +12.531s] Computed cell PCA: 30 x 5000 (0.585s)
+    ## [INFO 12:58:08 +12.702s] Built HNSW cell KNN graph: 75000 directed edges using 10 thread(s); reusing 15 cosine-distance neighbors for UMAP (0.171s)
+    ## [INFO 12:58:08 +12.750s] Ran Louvain clustering (0.047s)
+    ## [INFO 12:58:08 +12.775s] Initialized UMAP layout (0.025s)
+    ## [INFO 12:58:10 +14.857s] Optimized UMAP layout with parallel optimization (2.082s)
+    ## [INFO 12:58:10 +14.857s] Computed cell UMAP (2.107s)
+    ## [INFO 12:58:10 +14.858s] Assembled cell clustering result (0.001s)
+    ## [INFO 12:58:10 +14.858s] Finished run-count cell-state embedding (3.115s)
 
 ``` r
 cell_type_levels <- sort(unique(cell_annotation))

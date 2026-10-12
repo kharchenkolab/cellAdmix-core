@@ -132,7 +132,7 @@ from the panel and cell sizes, NMF uses the weighted least-squares (`ls_nmf`)
 formulation, molecule scoring uses gene loadings, and at least 10 NMF restarts
 are run. The default variant is the right choice here: this dataset carries no
 membrane stain, so cleanup will use bridge scoring, which pairs best with
-`ls_nmf` factors (see [docs/benchmarks.md](../../docs/benchmarks.md)).
+`ls_nmf` factors (see [docs/audit.md](../../docs/audit.md)).
 
 ```{r fit-default}
 fit <- ds$fit()

@@ -88,7 +88,7 @@ ds
 
 The fit uses the `invsqrt_kl` NMF variant — the recommended pairing for
 membrane scoring on stained data (see
-[docs/benchmarks.md](../../docs/benchmarks.md)) — with automatic rank based
+[docs/audit.md](../../docs/audit.md)) — with automatic rank based
 on the number of annotated cell types, multiple NMF restarts, and
 gene-loading molecule scoring.
 
@@ -366,7 +366,7 @@ endothelial and fibroblast cells. Membrane scoring depends on stain-path contras
 molecule-to-centroid lines, which is weak for thin, elongated cell types
 such as endothelium and fibroblasts. Bridge scoring uses molecule
 adjacency instead of the stain image and pairs best with the `ls_nmf`
-factorization (see [docs/benchmarks.md](../../docs/benchmarks.md)). It
+factorization (see [docs/audit.md](../../docs/audit.md)). It
 detects these pairs decisively — but, as shown below, it cannot correct
 them safely on this dataset, and the reason is instructive.
 
@@ -440,7 +440,7 @@ scoring sees it but cannot separate it, because the factorization never
 formed native endothelial or fibroblast factors. Correcting these pairs
 safely requires factorization-level remedies (a rank that resolves the
 small types, or anchor-based factor recovery — see
-[docs/benchmarks.md](../../docs/benchmarks.md)). Downstream analysis in
+[docs/audit.md](../../docs/audit.md)). Downstream analysis in
 this notebook therefore proceeds with the membrane correction, and the
 endothelial and fibroblast admixture flagged by the audit should be kept
 in mind when interpreting those cell types.

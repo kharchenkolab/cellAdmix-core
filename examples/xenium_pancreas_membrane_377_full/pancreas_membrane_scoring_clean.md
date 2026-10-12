@@ -137,7 +137,7 @@ and summarizes the result at cell level. The rank is automatically
 derived from the number of cell types in the active annotation.
 
 The NMF variant is chosen to match the scoring method that will consume
-the factors (see [docs/benchmarks.md](../../docs/benchmarks.md)): on
+the factors (see [docs/audit.md](../../docs/audit.md)): on
 membrane-stained data, membrane scoring removes the most admixture when
 paired with the sparse `invsqrt_kl` factorization, whose
 inverse-square-root gene weighting yields sharp, marker-driven loadings.
@@ -214,7 +214,7 @@ control. It needs only the annotation, cell positions, and counts — no
 factorization. The directly measured marker excess is a conservative
 lower bound, which the audit extrapolates to per-pair admixture rates
 and molecule counts by the markers’ share of the source transcriptome
-(see [docs/benchmarks.md](../../docs/benchmarks.md)).
+(see [docs/audit.md](../../docs/audit.md)).
 
 ``` r
 audit <- fit$audit_admixture()
@@ -764,7 +764,7 @@ and physically adjacent to target molecules — and it is the method to
 reach for on datasets without usable stains. Its contact-based statistic
 pairs best with the `ls_nmf` factorization, whose concentrated
 per-cell-type factors carry the bridge test’s evidence (see
-[docs/benchmarks.md](../../docs/benchmarks.md)), so the rules below are
+[docs/audit.md](../../docs/audit.md)), so the rules below are
 derived from the `fit_ls` comparison fit.
 
 ``` r

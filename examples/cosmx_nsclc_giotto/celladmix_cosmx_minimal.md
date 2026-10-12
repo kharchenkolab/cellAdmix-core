@@ -148,7 +148,7 @@ the weighted least-squares (`ls_nmf`) formulation, molecule scoring uses
 gene loadings, and at least 10 NMF restarts are run. The default variant
 is the right choice here: this dataset carries no membrane stain, so
 cleanup will use bridge scoring, which pairs best with `ls_nmf` factors
-(see [docs/benchmarks.md](../../docs/benchmarks.md)).
+(see [docs/audit.md](../../docs/audit.md)).
 
 ``` r
 fit <- ds$fit()
@@ -402,41 +402,17 @@ correction and the pooled exposure profile before and after cleanup.
 report <- audit$evaluate(correction)
 ```
 
-    ## Warning: Detected ~50,035 admixed molecules from endothelial into epithelial,
-    ## but no removal rule covers this pair
+    ## Warning: Correction removed only 11% of the estimated ~86,661 admixed molecules
+    ## from endothelial into fibroblast
 
-    ## Warning: Detected ~150,226 admixed molecules from endothelial into fibroblast,
-    ## but no removal rule covers this pair
+    ## Warning: Correction removed only 10% of the estimated ~81,534 admixed molecules
+    ## from epithelial into malignant
 
-    ## Warning: Detected ~225,464 admixed molecules from endothelial into immune
-    ## other, but no removal rule covers this pair
+    ## Warning: Correction removed only 0% of the estimated ~107,226 admixed molecules
+    ## from fibroblast into endothelial
 
-    ## Warning: Detected ~17,704 admixed molecules from endothelial into macrophage,
-    ## but no removal rule covers this pair
-
-    ## Warning: Detected ~17,283 admixed molecules from endothelial into malignant,
-    ## but no removal rule covers this pair
-
-    ## Warning: Detected ~52,074 admixed molecules from epithelial into endothelial,
-    ## but no removal rule covers this pair
-
-    ## Warning: Detected ~38,067 admixed molecules from epithelial into fibroblast,
-    ## but no removal rule covers this pair
-
-    ## Warning: Detected ~142,099 admixed molecules from epithelial into immune other,
-    ## but no removal rule covers this pair
-
-    ## Warning: Detected ~15,103 admixed molecules from epithelial into macrophage,
-    ## but no removal rule covers this pair
-
-    ## Warning: Detected ~58,519 admixed molecules from epithelial into malignant, but
-    ## no removal rule covers this pair
-
-    ## Warning: Detected ~86,715 admixed molecules from fibroblast into endothelial,
-    ## but no removal rule covers this pair
-
-    ## Warning: Detected ~34,129 admixed molecules from malignant into epithelial, but
-    ## no removal rule covers this pair
+    ## Warning: Correction removed only 0% of the estimated ~51,489 admixed molecules
+    ## from malignant into epithelial
 
 ``` r
 report$summary()
@@ -446,13 +422,13 @@ report$summary()
     ## [1] 27
     ## 
     ## $estimated_admixed_molecules
-    ## [1] 3064797
+    ## [1] 4381180
     ## 
     ## $leakage_removed_overall
-    ## [1] 0.69881
+    ## [1] 0.7810519
     ## 
     ## $median_pair_sensitivity
-    ## [1] 0.7789844
+    ## [1] 0.7983823
     ## 
     ## $own_marker_false_removal
     ## [1] 0.006143006

@@ -19,7 +19,7 @@ the result. Inputs are the Xenium output bundle (`data/`) and a cell-type
 annotation (see the
 [full tutorial](pancreas_membrane_scoring_clean.md) for download
 instructions and a walkthrough of the intermediate diagnostics; see
-[docs/benchmarks.md](../../docs/benchmarks.md) for how the settings below
+[docs/audit.md](../../docs/audit.md) for how the settings below
 were chosen).
 
 ```{r construct}

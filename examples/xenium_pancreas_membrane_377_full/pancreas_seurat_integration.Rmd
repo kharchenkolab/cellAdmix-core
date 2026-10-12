@@ -146,7 +146,7 @@ classes. Multiple random/cluster-initialized NMF runs are run in parallel by
 default, and the lowest-loss solution is retained. Because this
 membrane-stained dataset will be cleaned with membrane scoring, we fit the
 `invsqrt_kl` variant, the recommended pairing for membrane scoring (see
-[docs/benchmarks.md](../../docs/benchmarks.md)).
+[docs/audit.md](../../docs/audit.md)).
 
 ```{r fit}
 fit <- ds$fit(nmf_variant = "invsqrt_kl", verbose = TRUE)

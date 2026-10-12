@@ -208,7 +208,7 @@ of annotation classes. Multiple random/cluster-initialized NMF runs are
 run in parallel by default, and the lowest-loss solution is retained.
 Because this membrane-stained dataset will be cleaned with membrane
 scoring, we fit the `invsqrt_kl` variant, the recommended pairing for
-membrane scoring (see [docs/benchmarks.md](../../docs/benchmarks.md)).
+membrane scoring (see [docs/audit.md](../../docs/audit.md)).
 
 ``` r
 fit <- ds$fit(nmf_variant = "invsqrt_kl", verbose = TRUE)
@@ -256,6 +256,11 @@ the data. It frames what the correction below should fix.
 
 ``` r
 audit <- fit$audit_admixture()
+```
+
+    ## Excluded 23 likely induced genes from marker panels (exposure-linked excess far above the source-profile expectation): ACTG2, ADAMTS1, APCDD1, APOLD1, BASP1, C5orf46, CA4, CAVIN1
+
+``` r
 audit$plot_map()
 ```
 
@@ -271,17 +276,17 @@ consistent with external admixture than with native signal.
 membrane_score <- fit$score_membrane(verbose = TRUE)
 ```
 
-    ## [INFO 13:29:15 +1.079s] Loaded membrane run data: molecules=6104194, cells=125723 (1.079s)
-    ## [INFO 13:29:15 +1.080s] Starting membrane test: molecules=6104194, cells=125723 (0.000s)
-    ## [INFO 13:29:15 +1.080s] Opened membrane image: width=34155, height=13770 (0.000s)
-    ## [INFO 13:29:16 +1.307s] Prepared membrane data: cell_types=7, factors=9, active_cells=125723, typed_active_cells=125723 (0.227s)
-    ## [INFO 13:29:17 +2.427s] Discovered membrane candidates: pairs=18940 (1.120s)
-    ## [INFO 13:29:27 +13.025s] Scored membrane candidates: score_rows=34873 (10.597s)
-    ## [INFO 13:29:27 +13.031s] Summarized membrane scores: summaries=384 (0.006s)
-    ## [INFO 13:29:27 +13.031s] Finished membrane test: summaries=384 (11.951s)
-    ## [INFO 13:29:28 +13.222s] Ran membrane test: score_rows=34873, summaries=384 (12.142s)
-    ## [INFO 13:29:28 +13.286s] Wrote membrane outputs (0.065s)
-    ## [INFO 13:29:28 +13.329s] Materialized membrane results for R (0.043s)
+    ## [INFO 11:16:39 +0.798s] Loaded membrane run data: molecules=6104194, cells=125723 (0.798s)
+    ## [INFO 11:16:39 +0.798s] Starting membrane test: molecules=6104194, cells=125723 (0.000s)
+    ## [INFO 11:16:39 +0.798s] Opened membrane image: width=34155, height=13770 (0.000s)
+    ## [INFO 11:16:39 +0.913s] Prepared membrane data: cell_types=7, factors=9, active_cells=125723, typed_active_cells=125723 (0.115s)
+    ## [INFO 11:16:40 +1.706s] Discovered membrane candidates: pairs=18940 (0.793s)
+    ## [INFO 11:16:47 +8.600s] Scored membrane candidates: score_rows=34873 (6.894s)
+    ## [INFO 11:16:47 +8.605s] Summarized membrane scores: summaries=384 (0.005s)
+    ## [INFO 11:16:47 +8.605s] Finished membrane test: summaries=384 (7.807s)
+    ## [INFO 11:16:47 +8.792s] Ran membrane test: score_rows=34873, summaries=384 (7.994s)
+    ## [INFO 11:16:47 +8.868s] Wrote membrane outputs (0.076s)
+    ## [INFO 11:16:47 +8.893s] Materialized membrane results for R (0.025s)
 
 The heatmap is a compact factor-by-cell-type summary of putative source
 and admixture labels.
@@ -387,26 +392,29 @@ pooled exposure profile before and after cleanup.
 report <- audit$evaluate(membrane_correction)
 ```
 
-    ## Warning: Detected ~3,030 admixed molecules from Endocrine into Ductal/tumor
-    ## epithelial, but no removal rule covers this pair
+    ## Warning: Correction removed only 5% of the estimated ~6,399 admixed molecules
+    ## from Endocrine into Ductal/tumor epithelial
 
-    ## Warning: Detected ~65,266 admixed molecules from Exocrine epithelial into
-    ## Immune, but no removal rule covers this pair
+    ## Warning: Correction removed only 13% of the estimated ~70,310 admixed molecules
+    ## from Exocrine epithelial into Immune
 
-    ## Warning: Detected ~37,616 admixed molecules from Fibroblast / CAF into
-    ## Endothelial, but no removal rule covers this pair
+    ## Warning: Correction removed only 2% of the estimated ~45,514 admixed molecules
+    ## from Fibroblast / CAF into Endothelial
 
-    ## Warning: Detected ~94,156 admixed molecules from Fibroblast / CAF into Immune,
-    ## but no removal rule covers this pair
+    ## Warning: Correction removed only 0% of the estimated ~101,290 admixed molecules
+    ## from Fibroblast / CAF into Immune
 
-    ## Warning: Detected ~6,281 admixed molecules from Fibroblast / CAF into Mural /
-    ## pericyte, but no removal rule covers this pair
+    ## Warning: Correction removed only 2% of the estimated ~6,281 admixed molecules
+    ## from Fibroblast / CAF into Mural / pericyte
 
-    ## Warning: Detected ~13,399 admixed molecules from Mural / pericyte into
-    ## Endothelial, but no removal rule covers this pair
+    ## Warning: Correction removed only 0% of the estimated ~18,567 admixed molecules
+    ## from Mural / pericyte into Endothelial
 
-    ## Warning: Detected ~12,150 admixed molecules from Mural / pericyte into
-    ## Fibroblast / CAF, but no removal rule covers this pair
+    ## Warning: Correction removed only 7% of the estimated ~29,847 admixed molecules
+    ## from Mural / pericyte into Fibroblast / CAF
+
+    ## Warning: Correction removed only 6% of the estimated ~21,513 admixed molecules
+    ## from Mural / pericyte into Immune
 
 ``` r
 report$summary()
@@ -416,13 +424,13 @@ report$summary()
     ## [1] 39
     ## 
     ## $estimated_admixed_molecules
-    ## [1] 1505210
+    ## [1] 1620704
     ## 
     ## $leakage_removed_overall
-    ## [1] 0.8254954
+    ## [1] 0.8098688
     ## 
     ## $median_pair_sensitivity
-    ## [1] 0.9913663
+    ## [1] 0.9928196
     ## 
     ## $own_marker_false_removal
     ## [1] 0.02776138
