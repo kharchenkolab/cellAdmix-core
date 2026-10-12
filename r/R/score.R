@@ -83,13 +83,26 @@ CellAdmixScore <- R6::R6Class(
       rules
     },
 
-    plot_heatmap = function(...) {
+    plot_heatmap = function(..., p_thresh = 0.1, adjust_p = FALSE,
+                            native_check = TRUE) {
+      # Removal calls rejected by the native-factor check are marked on the
+      # heatmap, so it shows what the correction will actually apply.
+      vetoed <- NULL
+      if (isTRUE(native_check)) {
+        flagged <- tryCatch(
+          self$rules(p_thresh = p_thresh, adjust_p = adjust_p),
+          error = function(e) NULL)
+        vetoed <- .celladmix_vetoed_calls(flagged)
+      }
       if (identical(self$method, "membrane")) {
-        celladmix_plot_membrane_heatmap(self$result, ...)
+        celladmix_plot_membrane_heatmap(self$result, p_thresh = p_thresh,
+          adjust_p = adjust_p, vetoed_calls = vetoed, ...)
       } else if (identical(self$method, "coherence")) {
-        celladmix_plot_coherence_heatmap(self$result, ...)
+        celladmix_plot_coherence_heatmap(self$result, p_thresh = p_thresh,
+          adjust_p = adjust_p, vetoed_calls = vetoed, ...)
       } else {
-        celladmix_plot_bridge_heatmap(self$result, ...)
+        celladmix_plot_bridge_heatmap(self$result, p_thresh = p_thresh,
+          adjust_p = adjust_p, vetoed_calls = vetoed, ...)
       }
     },
 
@@ -188,6 +201,25 @@ CellAdmixScore <- R6::R6Class(
   colnames(dist) <- types
   rownames(dist) <- as.character(cells$cell_id)
   dist
+}
+
+#' Removal calls rejected by the native-factor check, in the heatmap's
+#' `remove_calls` id format (`factor_target`). Returns `NULL` when the rule
+#' table is missing, empty, or carries no `keep` column.
+#' @keywords internal
+#' @noRd
+.celladmix_vetoed_calls <- function(rules) {
+  if (is.null(rules) || !nrow(rules) || !("keep" %in% names(rules))) {
+    return(NULL)
+  }
+  # A factor/target combination can carry one rule per source; the
+  # correction applies it as long as any rule survives, so the combination
+  # is vetoed only when every one of its rules is rejected.
+  id <- paste0(as.integer(rules$factor), "_", as.character(rules$target_cell_type))
+  kept <- is.na(rules$keep) | rules$keep
+  surviving <- unique(id[kept])
+  vetoed <- setdiff(unique(id), surviving)
+  if (!length(vetoed)) NULL else vetoed
 }
 
 #' Flag likely-native factor/target rules using source-distant cells

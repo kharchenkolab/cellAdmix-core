@@ -247,6 +247,10 @@ def select_example_cells(
     score_annotation = score_annotation or score.annotation(p_thresh=p_thresh, adjust_p=adjust_p)
     if use_rules and rules is None:
         rules = score.rules(p_thresh=p_thresh, adjust_p=adjust_p, targets=targets)
+    if rules is not None and not rules.empty and "keep" in rules.columns:
+        # Rules vetoed by the native-factor check never drive correction, so
+        # their factor/target combinations are not presented as examples either.
+        rules = rules[rules["keep"].isna() | (rules["keep"] == True)]  # noqa: E712 - NA-safe
     if targets is not None:
         targets = list(map(str, targets))
         pairs = pairs[pairs["target_cell_type"].astype(str).isin(targets)]

@@ -297,3 +297,22 @@ def apply_native_check(
     for key, values in checks.items():
         rules[key] = values
     return rules
+
+
+def vetoed_calls_from_rules(rules: pd.DataFrame | None):
+    """Removal calls rejected by the native-factor check, as a set of
+    ``(factor, target_cell_type)`` pairs (the heatmap's ``remove_calls``
+    format).
+
+    A factor/target combination can carry one rule per source; the
+    correction applies it as long as any rule survives, so the combination
+    is vetoed only when every one of its rules is rejected. Returns ``None``
+    when the table is missing, empty, or carries no ``keep`` column.
+    """
+    if rules is None or rules.empty or "keep" not in rules.columns:
+        return None
+    ids = list(zip(rules["factor"].astype(int), rules["target_cell_type"].astype(str)))
+    kept = rules["keep"].isna() | (rules["keep"] == True)  # noqa: E712 - NA-safe
+    surviving = {i for i, k in zip(ids, kept) if k}
+    vetoed = set(ids) - surviving
+    return vetoed or None

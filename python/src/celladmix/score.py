@@ -257,10 +257,26 @@ class CellAdmixScore:
         )
         return {"rules": rules, "member": frame_members, "pair_sets": pair_sets}
 
-    def plot_heatmap(self, *, p_thresh: float = 0.1, adjust_p: bool = False, **kwargs):
+    def plot_heatmap(self, *, p_thresh: float = 0.1, adjust_p: bool = False,
+                     native_check: bool = True, **kwargs):
+        """Plot the factor-annotation heatmap.
+
+        With ``native_check`` (the default), removal calls that the
+        native-factor check rejects are marked ``(*)`` instead of ``*``,
+        so the heatmap shows what the correction will actually apply.
+        """
+        from ._score_utils import vetoed_calls_from_rules
         from .plotting import plot_score_heatmap
 
-        return plot_score_heatmap(self.summary, p_thresh=p_thresh, adjust_p=adjust_p, **kwargs)
+        vetoed = None
+        if native_check:
+            try:
+                flagged = self.rules(p_thresh=p_thresh, adjust_p=adjust_p)
+            except Exception:
+                flagged = None
+            vetoed = vetoed_calls_from_rules(flagged)
+        return plot_score_heatmap(self.summary, p_thresh=p_thresh, adjust_p=adjust_p,
+                                  vetoed_calls=vetoed, **kwargs)
 
     def plot_pairs(self, *, factors=None, factor=None, **kwargs):
         from .plotting import plot_score_pairs

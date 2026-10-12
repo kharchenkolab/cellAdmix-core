@@ -52,7 +52,11 @@ among their nearest neighbors are flagged `keep=False` with the reason in the
 `native_check` column, and `correct()` skips them. Pass `native_check=False`
 to disable, or tune `native_median_thresh` and related thresholds. See the
 Native-Factor Check section in
-[docs/scoring_methods.md](scoring_methods.md).
+[docs/scoring_methods.md](scoring_methods.md). The veto carries through
+the downstream views: `score.plot_heatmap()` marks a removal call `(*)`
+instead of `*` when every one of its rules is rejected, and
+`score.examples()` does not present vetoed factor/target combinations
+as admixture examples.
 
 `score.correct()` applies the correction as a molecule-vote ensemble by
 default: up to `ensemble` (default 10) of the fit's NMF restarts are scored

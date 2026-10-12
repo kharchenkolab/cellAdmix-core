@@ -410,6 +410,11 @@ celladmix_select_example_cells <- function(
   if (isTRUE(use_rules) && is.null(rules)) {
     rules <- score$rules(p_thresh = p_thresh, adjust_p = adjust_p, targets = targets)
   }
+  if (!is.null(rules) && "keep" %in% names(rules)) {
+    # Rules vetoed by the native-factor check never drive correction, so
+    # their factor/target combinations are not presented as examples either.
+    rules <- rules[is.na(rules$keep) | rules$keep, , drop = FALSE]
+  }
 
   required <- c("target_cell", "target_cell_type", "factor", "mean_score")
   missing <- setdiff(required, names(pairs))

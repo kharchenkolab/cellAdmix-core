@@ -163,8 +163,16 @@ def plot_score_heatmap(
     source_prior=None,
     source_prior_min_score: float = 0.15,
     source_prior_min_margin: float = 0.03,
+    vetoed_calls=None,
     ax=None,
 ):
+    """Draw the factor-annotation heatmap.
+
+    ``vetoed_calls`` is an optional set of ``(factor, target_cell_type)``
+    pairs (the ``remove_calls`` format) whose removal the native-factor
+    check rejected; those cells are marked ``(*)`` instead of ``*`` — the
+    score proposes the removal, but the correction will not apply it.
+    """
     import matplotlib.pyplot as plt
     from matplotlib.colors import LinearSegmentedColormap
 
@@ -214,6 +222,7 @@ def plot_score_heatmap(
     ax.tick_params(which="minor", bottom=False, left=False)
 
     remove_calls = set(ann["remove_calls"])
+    vetoed = {(int(f), str(t)) for f, t in (vetoed_calls or ())}
     for i, cell_type in enumerate(matrix.index):
         for j, column in enumerate(matrix.columns):
             factor = int(str(column).lstrip("F"))
@@ -227,7 +236,8 @@ def plot_score_heatmap(
             elif gene_source == cell_type:
                 label = "G"
             if (factor, cell_type) in remove_calls:
-                label = f"{label}*"
+                star = "(*)" if (factor, str(cell_type)) in vetoed else "*"
+                label = f"{label}{star}"
             if label:
                 ax.text(
                     j,
@@ -247,11 +257,16 @@ def plot_score_heatmap(
     ax.set_xlabel("Factor")
     ax.set_ylabel("")
     ax.set_title(f"Factor annotation, p < {p_thresh:g}")
+    caption = []
     if prior is not None:
+        caption.append("S spatial source; G gene-content source; SG agreement; * target")
+    if vetoed:
+        caption.append("(*) removal proposed by the score but vetoed by the native-factor check")
+    for k, line in enumerate(caption):
         ax.text(
             0.0,
-            -0.16,
-            "S spatial source; G gene-content source; SG agreement; * target",
+            -0.16 - 0.06 * k,
+            line,
             transform=ax.transAxes,
             fontsize=7,
             ha="left",

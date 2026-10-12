@@ -683,6 +683,11 @@ cell-neighborhood construction as the neighbor-enrichment score: enrichment
 reads the positive direction (exposed target cells carry more of the factor),
 while this check reads the negative control (unexposed cells still carry it).
 
+The veto carries through the views built on the rules: the score
+heatmaps mark a removal call `(*)` instead of `*` when every one of the
+combination's rules is rejected, and example-cell selection does not
+present vetoed factor/target combinations as admixture examples.
+
 ## Strengths and Weaknesses
 
 ### Bridge Score

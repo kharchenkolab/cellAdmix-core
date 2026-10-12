@@ -1796,6 +1796,10 @@ celladmix_bridge_rules <- function(
 #' @param source_prior Optional factor source prior from
 #'   `fit$score_factor_sources()`. When supplied, `G` marks gene-content source
 #'   calls, `S` marks spatial source calls, and `SG` marks agreement.
+#' @param vetoed_calls Optional character vector of `factor_target` ids (the
+#'   `remove_calls` format) whose removal the native-factor check rejected.
+#'   Those cells are marked `(*)` instead of `*`: the score proposes the
+#'   removal, but the correction will not apply it.
 #' @param use_complexheatmap If `TRUE` and `ComplexHeatmap`/`circlize` are
 #'   installed, return a `ComplexHeatmap::Heatmap` object. Otherwise draw a
 #'   base R heatmap.
@@ -1814,6 +1818,7 @@ celladmix_plot_bridge_heatmap <- function(
     source_prior = NULL,
     source_prior_min_score = 0.15,
     source_prior_min_margin = 0.03,
+    vetoed_calls = NULL,
     use_complexheatmap = FALSE
   ) {
   main <- main %||% sprintf("Bridge factor annotation, p < %.2g", p_thresh)
@@ -1876,7 +1881,8 @@ celladmix_plot_bridge_heatmap <- function(
           label <- "G"
         }
         if (remove_id %in% ann$remove_calls) {
-          label <- paste0(label, "*")
+          label <- paste0(label,
+            if (remove_id %in% vetoed_calls) "(*)" else "*")
         }
         if (length(label) && nzchar(label)) {
           grid::grid.text(label, x, y, gp = grid::gpar(fontsize = fontsize,
@@ -1898,12 +1904,20 @@ celladmix_plot_bridge_heatmap <- function(
     palette_fun(100L)[max(1L, min(100L, ceiling(scaled * 100)))]
   }
 
+  caption <- c(
+    if (!is.null(source_prior_ann)) {
+      "S spatial source; G gene-content source; SG agreement; separate S/G in one column indicates conflict; * target"
+    },
+    if (length(vetoed_calls)) {
+      "(*) removal proposed by the score but vetoed by the native-factor check"
+    })
+
   old_par <- graphics::par(no.readonly = TRUE)
   on.exit(graphics::par(old_par), add = TRUE)
   nr <- nrow(values)
   nc <- ncol(values)
   left_margin <- max(8, min(18, 4 + 0.35 * max(nchar(rownames(values)))))
-  graphics::par(mar = c(if (!is.null(source_prior_ann)) 5 else 4, left_margin, 3, 5), xpd = NA)
+  graphics::par(mar = c(4 + length(caption), left_margin, 3, 5), xpd = NA)
   graphics::plot(NA, xlim = c(0.5, nc + 1.45), ylim = c(0.5, nr + 0.5),
                  axes = FALSE, xlab = "Factor", ylab = "", main = main)
   graphics::axis(1, at = seq_len(nc), labels = colnames(values), las = 2)
@@ -1928,7 +1942,8 @@ celladmix_plot_bridge_heatmap <- function(
         label <- "G"
       }
       if (remove_id %in% ann$remove_calls) {
-        label <- paste0(label, "*")
+        label <- paste0(label,
+          if (remove_id %in% vetoed_calls) "(*)" else "*")
       }
       if (length(label) && nzchar(label)) {
         graphics::text(j, y, label, font = 2,
@@ -1936,9 +1951,8 @@ celladmix_plot_bridge_heatmap <- function(
       }
     }
   }
-  if (!is.null(source_prior_ann)) {
-    graphics::mtext("S spatial source; G gene-content source; SG agreement; separate S/G in one column indicates conflict; * target",
-      side = 1, line = 3.7, cex = 0.68)
+  for (k in seq_along(caption)) {
+    graphics::mtext(caption[[k]], side = 1, line = 2.7 + k, cex = 0.68)
   }
 
   key_n <- 80L
@@ -2456,6 +2470,7 @@ celladmix_plot_membrane_heatmap <- function(
     source_prior = NULL,
     source_prior_min_score = 0.15,
     source_prior_min_margin = 0.03,
+    vetoed_calls = NULL,
     use_complexheatmap = FALSE
   ) {
   main <- main %||% sprintf("Membrane factor annotation, p < %.2g", p_thresh)
@@ -2473,6 +2488,7 @@ celladmix_plot_membrane_heatmap <- function(
     source_prior = source_prior,
     source_prior_min_score = source_prior_min_score,
     source_prior_min_margin = source_prior_min_margin,
+    vetoed_calls = vetoed_calls,
     use_complexheatmap = use_complexheatmap
   )
 }
@@ -2973,6 +2989,7 @@ celladmix_plot_coherence_heatmap <- function(
     source_prior = NULL,
     source_prior_min_score = 0.15,
     source_prior_min_margin = 0.03,
+    vetoed_calls = NULL,
     use_complexheatmap = FALSE,
     ...
   ) {
@@ -2991,6 +3008,7 @@ celladmix_plot_coherence_heatmap <- function(
     source_prior = source_prior,
     source_prior_min_score = source_prior_min_score,
     source_prior_min_margin = source_prior_min_margin,
+    vetoed_calls = vetoed_calls,
     use_complexheatmap = use_complexheatmap
   )
 }

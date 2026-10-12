@@ -185,6 +185,13 @@ cells are flagged `keep = FALSE` with the reason in the `native_check` column
 related thresholds. See the Native-Factor Check section in
 [scoring_methods.md](scoring_methods.md).
 
+The check's outcome is carried through the downstream views so they show
+what the correction will actually apply: on `score$plot_heatmap()`, a
+removal call whose every rule the check rejects is marked `(*)` instead of
+`*` (with a caption line noting the veto), and `score$examples()` does not
+present a vetoed factor/target combination as an admixture example.
+Explicitly requested example cells are unaffected.
+
 ## Auditing Admixture and Verifying Cleanup
 
 Independently of factorization and scoring, the amount of admixture in a
