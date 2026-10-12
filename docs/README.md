@@ -14,7 +14,7 @@ This folder contains user-facing documentation for `cellAdmix-core`.
 - [NMF restart stability](nmf_stability.md): the per-factor stability
   diagnostic, restart recipe, and how to use it for factor trust and rank
   selection.
-- [Cleanup benchmarks](benchmarks.md): the neighbor-benchmark methodology
+- [Admixture audit](audit.md): the audit methodology
   and the factorization/scoring comparisons behind the recommended
   workflow settings.
 - [Admixture and induced expression](generative.md): the generative model

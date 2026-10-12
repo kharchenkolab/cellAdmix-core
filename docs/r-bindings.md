@@ -100,11 +100,11 @@ The default rank is derived from the active annotation. The default NMF method
 is `ls_nmf`, the weighted least-squares formulation of the original cellAdmix:
 across datasets it recovers cell-type-native factors far more reproducibly
 than the KL variants (gene-ownership correlation 0.92 versus 0.48 between
-restarts; see [benchmarks.md](benchmarks.md), Figure 2a), and the
+restarts; see [audit.md](audit.md), Figure 2a), and the
 factor decomposition it aims for — native factors per cell type or state,
 with admixture read from their minor contributions in non-native cells —
 matches the scoring model directly. In cleanup benchmarks
-([benchmarks.md](benchmarks.md)) the most effective variant follows the
+([audit.md](audit.md)) the most effective variant follows the
 scoring method: `invsqrt_kl` paired with membrane scoring on stained data,
 `ls_nmf` paired with bridge scoring — the pancreas quickstart follows this
 pairing.
@@ -198,7 +198,7 @@ Independently of factorization and scoring, the amount of admixture in a
 dataset can be estimated from its spatial structure: source-marker content
 in target cells rises with the number of source-type neighbor cells, while
 unexposed target cells provide an internal negative control (see
-[benchmarks.md](benchmarks.md) for the methodology). Because a tissue
+[audit.md](audit.md) for the methodology). Because a tissue
 section shows only a slab of the tissue, cells with zero observed
 source-type neighbors can still be contaminated by source cells just above
 or below the section plane; the audit therefore takes its reference level
@@ -326,7 +326,7 @@ check; a molecule is removed when at least `vote` (default 0.3) of the
 members remove it. Single-fit corrections are highly seed-dependent, and the
 vote both stabilizes them and consistently reaches the upper range of the
 individual restarts on the cleanup benchmark (see
-[benchmarks.md](benchmarks.md)), with the threshold acting as a
+[audit.md](audit.md)), with the threshold acting as a
 sensitivity/specificity dial:
 
 ```r
@@ -406,5 +406,5 @@ for the full option list.
 - [Installation](install.md)
 - [Scoring methods](scoring_methods.md)
 - [NMF restart stability](nmf_stability.md)
-- [Cleanup benchmarks](benchmarks.md)
+- [Admixture audit](audit.md)
 - [Documentation index](README.md)

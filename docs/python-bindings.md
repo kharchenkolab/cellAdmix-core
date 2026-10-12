@@ -64,7 +64,7 @@ and vetted independently (each with its own native-factor check), and a
 molecule is removed when at least `vote` (default 0.3) of the members remove
 it. The
 vote stabilizes the seed-dependence of single-fit corrections and acts as a
-sensitivity/specificity dial (see [benchmarks.md](benchmarks.md)). Pass
+sensitivity/specificity dial (see [audit.md](audit.md)). Pass
 `ensemble=1` for a single-fit correction from the selected restart;
 `correction.ensemble()` reports the member count, minimum votes, and vote
 histogram, and the returned `correction.rules` carry a `support` column with
@@ -166,7 +166,7 @@ Independently of factorization and scoring, admixture can be estimated
 from the dataset's spatial structure: source-marker content in target
 cells rises with source-type neighbor exposure, while unexposed target
 cells provide an internal negative control (see
-[benchmarks.md](benchmarks.md) for the methodology). Because a section
+[audit.md](audit.md) for the methodology). Because a section
 shows only a slab of the tissue, cells with zero observed source-type
 neighbors can still carry material from source cells above or below the
 section plane; the audit therefore takes its reference level from target

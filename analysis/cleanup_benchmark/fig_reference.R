@@ -25,6 +25,6 @@ p2 <- audit$plot_exposure(sel$source, sel$target, strict = FALSE) +
     subtitle = "dotted: zero-neighbor rate; dashed: ambient reference") +
   scale_y_log10()
 fig <- cowplot::plot_grid(p1, p2, ncol = 2, align = "hv", axis = "tblr")
-ggsave("/home/pkharchenko/cellAdmix/cellAdmix-core/docs/figures/benchmark_fig5.png",
+ggsave("/home/pkharchenko/cellAdmix/cellAdmix-core/docs/figures/audit_fig5.png",
   fig, width = 10.5, height = 3.8, dpi = 150)
 message("FIG REFERENCE DONE")

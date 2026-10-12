@@ -18,7 +18,7 @@ that resulted. The complete experimental record lives in
 `analysis/generative_model/` (model, evaluation scripts, findings) and
 `analysis/audit_guided/` (the shared evaluation harness); the audit
 vocabulary used throughout — exposure, marker pools, the ambient
-reference — is defined in [benchmarks.md](benchmarks.md).
+reference — is defined in [audit.md](audit.md).
 
 ## The model
 
@@ -224,7 +224,7 @@ cases can be inspected.
 
 This same screen, applied to the audit's marker panels, is how the
 package excludes induced genes from admixture estimation (see
-[benchmarks.md](benchmarks.md) and the binding documentation); flagged
+[audit.md](audit.md) and the binding documentation); flagged
 genes and their measured disproportionality are reported by
 `markers()`.
 

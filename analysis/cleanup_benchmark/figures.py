@@ -1,4 +1,4 @@
-"""Render the figures for docs/benchmarks.md from benchmark result files."""
+"""Render the figures for docs/audit.md from benchmark result files."""
 import json
 import os
 import re
@@ -90,7 +90,7 @@ ax.set_ylabel('estimated sensitivity (strict tier)')
 ax.set_ylim(0, 1.05)
 ax.set_title('all detected pairs under a standard single-fit cleanup (bare ls-NMF, membrane scoring)',
     fontsize=9)
-fig.savefig(f'{OUT}/benchmark_fig1.png', bbox_inches='tight')
+fig.savefig(f'{OUT}/audit_fig1.png', bbox_inches='tight')
 print('fig1 done')
 
 # ---------- Figure 2: stochasticity ----------
@@ -138,7 +138,7 @@ if have_dec:
 J = {v: np.array(ov[v]['jaccard'])[np.triu_indices(10, 1)] for v in ['ls_nmf', 'invsqrt_kl']}
 dot_panel(axes[2], J, 'c', 'overlap of removed molecules\n(Jaccard)', 'net effect')
 fig.tight_layout()
-fig.savefig(f'{OUT}/benchmark_fig2.png', bbox_inches='tight')
+fig.savefig(f'{OUT}/audit_fig2.png', bbox_inches='tight')
 print('fig2 done')
 
 # ---------- Figure 3: vote-threshold trade-off ----------
@@ -179,7 +179,7 @@ if sweep_log and os.path.exists(sweep_log):
     axes[1].set_ylabel('own-marker false-removal rate (%)')
     axes[1].annotate('b', (-0.22, 1.04), xycoords='axes fraction', fontsize=13, fontweight='bold')
     fig.tight_layout()
-    fig.savefig(f'{OUT}/benchmark_fig3.png', bbox_inches='tight')
+    fig.savefig(f'{OUT}/audit_fig3.png', bbox_inches='tight')
     print('fig3 done')
 
 # ---------- Figure 4: cross-dataset summary ----------
@@ -231,7 +231,7 @@ if os.path.exists(f'{R}/vote_sweep_all.csv'):
     ax.legend(frameon=False, fontsize=8, loc='lower left')
     ax.set_title('cleanup across datasets, scoring methods, variants, and correction strategies')
     fig.tight_layout()
-    fig.savefig(f'{OUT}/benchmark_fig4.png', bbox_inches='tight')
+    fig.savefig(f'{OUT}/audit_fig4.png', bbox_inches='tight')
     print('fig4 done')
 
 print('FIGURES DONE')

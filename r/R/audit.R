@@ -5,7 +5,7 @@
 # admixture: contamination of a target cell by a source cell type requires
 # physical adjacency, so source-marker content in target cells rises with
 # the number of source-type neighbor cells, while unexposed target cells
-# form an internal negative control. See docs/benchmarks.md for the
+# form an internal negative control. See docs/audit.md for the
 # methodology and its validation.
 
 .celladmix_audit_pseudobulk <- function(counts, cells, scale = 1e6) {

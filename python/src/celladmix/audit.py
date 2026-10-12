@@ -5,7 +5,7 @@ corrections against them.
 The measure exploits the spatial structure of segmentation-driven admixture:
 source-marker content in target cells rises with the number of source-type
 neighbor cells, while unexposed target cells form an internal negative
-control. See docs/benchmarks.md for the methodology and validation.
+control. See docs/audit.md for the methodology and validation.
 """
 
 from __future__ import annotations

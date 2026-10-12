@@ -1,4 +1,4 @@
-# Figure data for docs/benchmarks.md: exposure-bin marker rates before/after
+# Figure data for docs/audit.md: exposure-bin marker rates before/after
 # a standard (bare ls_nmf, seed 1) membrane cleanup, for every detected pair
 # on the pancreas dataset.
 .libPaths(c(Sys.getenv("CELLADMIX_R_LIB", "/tmp/celladmix_r_lib"), .libPaths()))

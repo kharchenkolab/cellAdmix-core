@@ -1,9 +1,10 @@
-# Benchmarking admixture cleanup
+# The admixture audit
 
 Admixture correction removes individual molecules from cells, yet no ground
-truth marks which molecules actually leaked between cells — so how well a
-correction works is ordinarily a matter of judgment. This report builds an
-evaluation benchmark from the spatial structure of admixture itself: a
+truth marks which molecules actually leaked between cells — so both the
+amount of admixture in a dataset and the quality of a correction are
+ordinarily matters of judgment. The admixture audit turns them into
+measurements, built from the spatial structure of admixture itself: a
 target cell can only be contaminated by a cell type it physically borders,
 so the content of source-specific genes in target cells must rise with the
 number of source-type neighbors, while target cells with no such neighbors
@@ -12,14 +13,15 @@ control gives, for every ordered cell-type pair (source → target), an
 estimate of the pair's admixture rate and of its number of admixed
 molecules. Applying the same measurement before and after correction
 scores how much of the admixture a cleanup removed, in terms of estimated
-sensitivity and specificity. We use the benchmark to compare cellAdmix's factorization
+sensitivity and specificity. This page describes the audit and applies it
+to compare cellAdmix's factorization
 variants and scoring methods across three datasets, to expose the strong
 seed-to-seed stochasticity of single-fit corrections, and to derive an
 ensemble correction whose vote threshold acts as a calibrable
-sensitivity/specificity dial. The harness lives in
+sensitivity/specificity dial. The evaluation harness lives in
 `analysis/cleanup_benchmark/`.
 
-## The neighbor benchmark
+## The neighbor-exposure measurement
 
 For an ordered pair of cell types — a *source* S and a *target* T — each
 cell of type T has an *exposure*: the number of type-S cells among its 15
@@ -105,14 +107,14 @@ target cell above this ambient level counts as leakage. On simulations
 with planted contact, hidden out-of-section, and ambient contamination,
 the base reference recovers 36% of the truth and the ladder 65%, always
 conservatively — material arriving from beyond the ladder's radius stays
-uncounted. Cleanup scores in this report read the exposure dependence
+uncounted. The audit's cleanup scores read the exposure dependence
 rather than the absolute level: a correction is credited for flattening
 the curve toward $\hat\rho_0$, because removal of the
 exposure-independent component below it cannot be verified against the
 exposure contrast. Pair detection is likewise gradient-based under
 either reference.
 
-![Figure 5](figures/benchmark_fig5.png)
+![Figure 5](figures/audit_fig5.png)
 
 **Figure 5. The ambient reference.** **(a)** The reference ladder for the
 pancreas pair with the largest reference correction: points show the
@@ -148,9 +150,9 @@ $\sum_{\text{pairs}} L / M$. Both are clean sums: each
 gene belongs to the pool of its unique top-expressing type and each cell
 to a single target type, so no molecule is counted by two pairs.
 
-![Figure 1](figures/benchmark_fig1.png)
+![Figure 1](figures/audit_fig1.png)
 
-**Figure 1. The neighbor benchmark.** **(a)** Strict-tier
+**Figure 1. The admixture audit.** **(a)** Strict-tier
 admixture-marker rates $\hat\rho_B$ in target cells, stratified by the number of source-type
 neighbors, before (red) and after (blue) a standard cleanup (bare
 ls-NMF fit, membrane scoring, pancreas dataset). The dotted line is the
@@ -160,7 +162,7 @@ and the gap between the two is contamination carried even by cells with
 no visible source neighbors. The rise with exposure reflects
 contamination; cleanup quality is scored by how completely the blue
 curve flattens — the excess of exposed bins above $\hat\rho_0$ — because
-only that exposure-linked excess is verifiable within the benchmark,
+only that exposure-linked excess is verifiable within the audit,
 while the absolute estimates in (b) measure all content above the
 ambient reference. Compare the near-complete flattening of
 endocrine → endothelial with fibroblast → immune, where the curves
@@ -177,7 +179,7 @@ measurable without molecule-level ground truth, and a standard single-fit
 correction is highly uneven across cell-type pairs — including a
 near-zero score on one of the largest leakage pairs (exocrine → ductal).
 
-Pairs enter the benchmark when the exposed counts
+Pairs are detected by the audit when the exposed counts
 exceed the $\hat\rho_0$ expectation by a one-sided Poisson test
 (Benjamini–Hochberg $q < 0.01$) with $L \geq 200$: 39 of 42 candidate
 pairs on pancreas, 13 on the breast crop, 27 on NSCLC, with no manual
@@ -206,7 +208,7 @@ contamination estimator of Mitchel et al. (2025), which classifies each
 molecule using cell-type expression profiles from an scRNA-seq reference,
 weighted by cell-type adjacency. That estimator counts as contamination
 any expression the reference fails to predict for the target type, and —
-decisive for benchmarking — it returns zero for a correction that deletes
+decisive for evaluating corrections — it returns zero for a correction that deletes
 all source-gene molecules from target cells, native molecules included.
 The audit needs no reference; it requires the signal to rise with source
 exposure, so native expression, however unexpected, is absorbed by the
@@ -215,7 +217,7 @@ instead appears in the own-marker false-removal rate.
 
 ## From excess removal to sensitivity and specificity
 
-The benchmark's two headline metrics estimate standard classification
+The audit's two headline metrics estimate standard classification
 quantities, each on a subset of molecules whose true origin is nearly
 certain:
 
@@ -241,9 +243,9 @@ these terms.
 
 ## Running the audit
 
-The measurement ships in the package as the admixture audit, with the
-ambient reference and induced-gene screening described above (the harness
-in `analysis/cleanup_benchmark/` uses the $\hat\rho_0$ floor for its
+The audit ships in the package with the
+ambient reference and induced-gene screening described above (the
+evaluation harness in `analysis/cleanup_benchmark/` uses the $\hat\rho_0$ floor for its
 sweeps). On pancreas the reference deepens for 36 of 39 pairs (median
 correction 1.21x, total estimate 1.57M molecules) and the screening
 excludes 23 genes as likely induced, led by CFTR at 3.9-fold its
@@ -302,7 +304,7 @@ share only about half their members (median Jaccard 0.56 invsqrt,
 ls-NMF despite its stable factors — there, the variation enters through
 the per-molecule label assignments.
 
-![Figure 2](figures/benchmark_fig2.png)
+![Figure 2](figures/audit_fig2.png)
 
 **Figure 2. Stochasticity of factorization and scoring (pancreas,
 membrane scoring, ten random seeds).** Each dot compares two seeds; bars
@@ -349,7 +351,7 @@ membrane scoring: 0.40 → 0.85) but cannot supply labels a fit never
 produced. The molecule-level vote subsumes it whenever at least the
 threshold number of runs label the molecules correctly.
 
-![Figure 3](figures/benchmark_fig3.png)
+![Figure 3](figures/audit_fig3.png)
 
 **Figure 3. The vote threshold is a sensitivity/false-removal dial
 (10 seeds; the recommended variant for each scoring method).**
@@ -362,7 +364,7 @@ up to an order of magnitude; majority and stricter thresholds discard
 genuine cleanup because correct removals are typically minority events
 across restarts.
 
-## Benchmarks across datasets and scoring methods
+## Evaluating corrections across datasets and scoring methods
 
 Figure 4 and Table 1 summarize the strict-tier sensitivity of the main
 correction strategies across all dataset × scoring-method × variant
@@ -388,13 +390,13 @@ ensembling.
 | breast (bridge) | 0.34 – 0.69 | **0.75** (0.3%) | 0.26 – 0.76 | 0.71 (0.03%) |
 | NSCLC (bridge) | 0.72 – 0.80 | **0.82** (1.0%) | 0.69 – 0.74 | 0.74 (0.2%) |
 
-**Table 1. Strict-tier estimated sensitivity across the benchmark matrix.**
+**Table 1. Strict-tier estimated sensitivity across the evaluation matrix.**
 Single-fit columns give the min-max range over individually evaluated seed
 refits; vote columns give the 3-of-10 molecule-vote ensemble (votes pooled
 over ten seeds) with its own-marker false-removal rate in parentheses. Bold
 marks the stronger vote-ensemble arm in each row.
 
-![Figure 4](figures/benchmark_fig4.png)
+![Figure 4](figures/audit_fig4.png)
 
 **Figure 4. Cleanup across datasets, scoring methods, variants, and
 correction strategies.** Each group shows, for one dataset × scoring
@@ -409,7 +411,7 @@ bridge scoring — the variant choice should follow the scoring method.
 
 ## Conclusions
 
-The neighbor benchmark makes admixture cleanup measurable on real data, at
+The audit makes admixture cleanup measurable on real data, at
 the resolution of cell-type pairs, in estimated sensitivity/specificity
 terms, and with no manual curation — which in turn makes method comparison
 and tuning an empirical exercise rather than a judgment call. Applied to
@@ -446,8 +448,8 @@ cellAdmix it yields three conclusions:
    bridge scoring (pancreas membrane under invsqrt
    KL-NMF: 0.848 vs 0.857 strict-tier sensitivity at equal false removal;
    ls-NMF bridge improves from 0.55 to 0.67 at 0.5% false removal;
-   `results/pancreas_restart_vs_seed_members.csv`). On the
-   benchmark this default achieves
+   `results/pancreas_restart_vs_seed_members.csv`). On this
+   evaluation the default achieves
    0.45-0.86 strict-tier sensitivity at 0.03-3.2% own-marker false removal,
    consistently in the upper range of the individual restarts, with the threshold
    exposed as the user's sensitivity/specificity dial — calibrable per

@@ -47,7 +47,7 @@ short steps.
 - Admixture audit: exposure-gradient estimates of leaked molecules per
   cell-type pair, independent of the factorization, with post-correction
   verification of cleanup sensitivity and false removal
-  ([docs/benchmarks.md](docs/benchmarks.md)).
+  ([docs/audit.md](docs/audit.md)).
 - Ensemble correction by default: molecule-level voting across NMF restarts
   stabilizes seed-dependent corrections, with the vote threshold as a
   sensitivity/specificity dial.
@@ -55,7 +55,7 @@ short steps.
 ## NMF Methods
 
 cellAdmix-core supports several factorization modes. `ls_nmf` is the
-default; in cleanup benchmarks ([docs/benchmarks.md](docs/benchmarks.md))
+default; in the audit's cleanup evaluations ([docs/audit.md](docs/audit.md))
 the most effective variant follows the scoring method — `invsqrt_kl` for
 membrane-scored corrections on stained data, `ls_nmf` for bridge-scored
 ones.
@@ -159,7 +159,7 @@ notebooks.
 - [docs/inputs.md](docs/inputs.md): supported input formats.
 - [docs/scoring_methods.md](docs/scoring_methods.md): bridge, membrane, and coherence scoring definitions.
 - [docs/nmf_stability.md](docs/nmf_stability.md): the per-factor restart stability diagnostic.
-- [docs/benchmarks.md](docs/benchmarks.md): the cleanup benchmark methodology and factorization/scoring comparisons.
+- [docs/audit.md](docs/audit.md): the admixture audit methodology and factorization/scoring comparisons.
 - [docs/python-bindings.md](docs/python-bindings.md): Python interface and SpatialData integration overview.
 - [docs/python-batch.md](docs/python-batch.md): Python command-line batch workflow.
 
