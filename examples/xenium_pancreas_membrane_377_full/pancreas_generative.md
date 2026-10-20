@@ -27,7 +27,11 @@ workflow in a handful of calls).
 
 This example characterizes both sides on the pancreas dataset: how much
 material moves between which cell types, and which genes the model
-recognizes as the cells’ own induced expression.
+recognizes as the cells’ own induced expression. The figures follow the
+designs of the model documentation; the functions that draw them from
+the package’s objects live in
+[analysis/generative_model/tools/generative_plots.R](../../analysis/generative_model/tools/generative_plots.R),
+sourced at the top of this page.
 
 ``` r
 annotation <- read.csv(file.path("annotations", "annotation.csv.gz"))
@@ -115,7 +119,7 @@ model
     ## cellAdmix generative model
     ##   pairs: 39 
     ##   induced genes retained: 28 
-    ##   removed molecules (expected): 1,193,699 
+    ##   removed molecules (expected): 1,253,319 
     ##   initialization: nmf_factors
 
 ``` r
@@ -129,18 +133,7 @@ type: the fraction of each type’s total molecule content that the model
 attributed to contamination or ambient background and removed.
 
 ``` r
-cell_types <- cell_annotation[colnames(before)]
-removed_by_type <- tapply(Matrix::colSums(before) - Matrix::colSums(after),
-  cell_types, sum)
-total_by_type <- tapply(Matrix::colSums(before), cell_types, sum)
-burden <- data.frame(type = names(removed_by_type),
-  share = as.numeric(removed_by_type / total_by_type))
-ggplot(burden, aes(reorder(type, share), share)) +
-  geom_col(fill = "#c0392b", alpha = 0.85) +
-  scale_y_continuous(labels = scales::percent) +
-  coord_flip() +
-  labs(x = NULL, y = "share of the type's molecules removed as admixture") +
-  theme_classic(base_size = 11)
+generative_plot_burden(before, after, cell_annotation)
 ```
 
 <img src="pancreas_generative_files/figure-gfm/burden-1.png" alt="" width="576" style="display: block; margin: auto;" />
@@ -153,39 +146,12 @@ throughout and the induced expression appearing exactly in the exposed
 cells:
 
 ``` r
-comp_all <- model$composition(target = "Ductal/tumor epithelial")
+source_type <- "Exocrine epithelial"
+target_type <- "Ductal/tumor epithelial"
 cells_xy <- ds$cells()
-expo <- setNames(
-  cellAdmixCore:::.celladmix_source_exposure_counts(
-    cells_xy, cell_annotation, 15L)$counts[, "Exocrine epithelial"],
-  as.character(cells_xy$cell_id))
-cont <- tapply(comp_all$contamination, comp_all$cell_id, sum)
-indv <- tapply(comp_all$induced, comp_all$cell_id, sum)
-amb <- tapply(comp_all$ambient, comp_all$cell_id, max)
-per_cell <- data.frame(cell_id = names(cont),
-  contamination = as.numeric(cont), induced = as.numeric(indv),
-  ambient = as.numeric(amb), stringsAsFactors = FALSE)
-per_cell$own <- pmax(1 - per_cell$contamination - per_cell$induced -
-  per_cell$ambient, 0)
-per_cell$bin <- factor(pmin(expo[per_cell$cell_id], 3), levels = 0:3,
-  labels = c("0", "1", "2", "3+"))
-agg <- aggregate(cbind(own, contamination, ambient, induced) ~ bin,
-  per_cell, mean)
-shares <- data.frame(bin = rep(agg$bin, 4),
-  part = rep(c("own expression", "contamination", "ambient", "induced"),
-    each = nrow(agg)),
-  share = c(agg$own, agg$contamination, agg$ambient, agg$induced))
-shares$part <- factor(shares$part,
-  levels = rev(c("own expression", "contamination", "ambient", "induced")))
-ggplot(shares, aes(bin, share, fill = part)) +
-  geom_col(width = 0.72) +
-  scale_fill_manual(values = c("own expression" = "#2980b9",
-    "contamination" = "#c0392b", "ambient" = "#8a8a8a",
-    "induced" = "#1e8449"), name = NULL,
-    breaks = c("own expression", "contamination", "ambient", "induced")) +
-  labs(x = "exocrine cells among 15 nearest neighbors",
-    y = "mean share of ductal-cell content") +
-  theme_classic(base_size = 11)
+expo <- generative_exposure(cells_xy, cell_annotation, source_type)
+generative_plot_composition(model, target_type, expo,
+  "exocrine cells among 15 nearest neighbors")
 ```
 
 <img src="pancreas_generative_files/figure-gfm/composition-1.png" alt="" width="576" style="display: block; margin: auto;" />
@@ -196,18 +162,7 @@ half exocrine content, while the ductal/tumor mass itself is nearly
 clean:
 
 ``` r
-comp <- model$composition("Exocrine epithelial",
-  "Ductal/tumor epithelial")
-xy <- cells_xy[match(comp$cell_id, as.character(cells_xy$cell_id)), ]
-ggplot(cbind(comp, x = xy$x, y = xy$y), aes(x, y,
-    color = pmin(contamination, 0.6))) +
-  geom_point(size = 0.25) +
-  scale_color_viridis_c(option = "inferno",
-    name = "exocrine share\nof ductal-cell\ncontent") +
-  coord_equal() +
-  labs(x = NULL, y = NULL,
-    title = "Exocrine contamination of ductal cells") +
-  theme_void(base_size = 11)
+generative_plot_composition_map(model, source_type, target_type, cells_xy)
 ```
 
 <img src="pancreas_generative_files/figure-gfm/composition-map-1.png" alt="" width="816" style="display: block; margin: auto;" />
@@ -217,38 +172,10 @@ individual cells. Three ductal cells illustrate the range — one deep in
 the tumor mass, one moderately exposed, one embedded in acinar tissue:
 
 ``` r
-comp_all_pairs <- model$composition(target = "Ductal/tumor epithelial")
-tot_by_cell <- Matrix::colSums(before[, comp$cell_id])
-elig <- comp$cell_id[tot_by_cell[comp$cell_id] >= 100]
-cc <- setNames(comp$contamination, comp$cell_id)[elig]
-picks <- c(
-  `tumor mass` = names(which.min(cc + (expo[elig] > 0))),
-  `interface, moderate` = names(which.min(abs(cc - 0.25))),
-  `interface, heavy` = names(which.max(cc)))
-stopifnot(!anyDuplicated(picks))
-anat <- comp_all_pairs[comp_all_pairs$cell_id %in% picks, ]
-anat$which <- names(picks)[match(anat$cell_id, picks)]
-anat_amb <- anat[!duplicated(anat$cell_id),
-  c("cell_id", "which", "ambient")]
-stack <- rbind(
-  data.frame(which = anat$which, part = anat$source,
-    share = anat$contamination),
-  data.frame(which = anat_amb$which, part = "ambient",
-    share = anat_amb$ambient))
-own_share <- 1 - tapply(stack$share, stack$which, sum)
-stack <- rbind(stack, data.frame(which = names(own_share),
-  part = "own expression", share = as.numeric(own_share)))
-stack$part <- factor(stack$part, levels = c("own expression", "ambient",
-  rev(sort(unique(anat$source)))))
-stack$which <- factor(stack$which, levels = names(picks))
-ggplot(stack, aes(which, share, fill = part)) +
-  geom_col(width = 0.6) +
-  scale_fill_manual(values = c("own expression" = "#a8c6df",
-    "ambient" = "#8a8a8a",
-    setNames(hcl.colors(length(unique(anat$source)), "Reds 3"),
-      rev(sort(unique(anat$source)))))) +
-  labs(x = NULL, y = "share of the cell's molecules", fill = NULL) +
-  theme_classic(base_size = 11)
+picks <- generative_pick_example_cells(model, source_type, target_type,
+  before, expo)
+names(picks)[[1]] <- "tumor mass"
+generative_plot_cell_composition(model, target_type, picks)
 ```
 
 <img src="pancreas_generative_files/figure-gfm/anatomy-cells-1.png" alt="" width="624" style="display: block; margin: auto;" />
@@ -265,42 +192,29 @@ nearly absent; at the acinar interface, the same kind of cell holds a
 clearly visible population of exocrine-marker molecules — the same
 material that dominates the neighboring exocrine cells. The red class
 understates the fitted contamination fraction: the marker panel covers
-only the exocrine-specific genes, while the fitted 35% also counts
+only the exocrine-specific genes, while the fitted fraction also counts
 transferred molecules of genes the two types share:
 
 ``` r
-profiles <- cellAdmixCore:::.celladmix_audit_profiles(before,
-  cell_annotation[colnames(before)])
-top_type <- setNames(
-  colnames(profiles)[max.col(profiles, ties.method = "first")],
-  rownames(profiles))
-ductal_genes <- names(top_type)[top_type == "Ductal/tumor epithelial"]
+comp <- model$composition(source_type, target_type)
+cc <- setNames(comp$contamination, comp$cell_id)
+owner <- generative_gene_owner(before, cell_annotation)$owner
+ductal_genes <- names(owner)[owner == target_type]
+elig <- names(cc)[Matrix::colSums(before[, names(cc)]) >= 100]
 duct_own_count <- Matrix::colSums(before[ductal_genes, elig])
 rich <- elig[duct_own_count >= stats::quantile(duct_own_count, 0.6)]
 cid_clean <- rich[which.min(cc[rich] + (expo[rich] > 0))]
 cid_cont <- rich[which.max(cc[rich])]
-mk_pool <- audit$markers("Exocrine epithelial",
-  "Ductal/tumor epithelial")$pool
+mk_pool <- audit$markers(source_type, target_type)$pool
 gene_classes <- c("ductal marker genes", "exocrine marker genes",
   "other genes")
-example_panel <- function(cid, title) {
-  prep <- celladmix_prepare_cell_example(nmf_fit,
-    data.frame(target_cell = cid,
-      target_cell_type = "Ductal/tumor epithelial",
-      top_admix_factor = NA, stringsAsFactors = FALSE),
-    markers = mk_pool)
-  g <- prep$molecules$gene
-  prep$molecules$role <- factor(ifelse(g %in% mk_pool, gene_classes[[2]],
-    ifelse(g %in% ductal_genes, gene_classes[[1]], gene_classes[[3]])),
-    levels = gene_classes)
-  prep$role_levels <- gene_classes
-  celladmix_plot_cell_example(prep, title = title)
-}
 cowplot::plot_grid(
-  example_panel(cid_clean, sprintf("Tumor mass: %.0f%% exocrine content",
-    100 * cc[[cid_clean]])),
-  example_panel(cid_cont, sprintf("Acinar interface: %.0f%% exocrine content",
-    100 * cc[[cid_cont]])),
+  generative_plot_gene_origin_cell(nmf_fit, cid_clean, target_type,
+    ductal_genes, mk_pool, gene_classes,
+    sprintf("Tumor mass: %.0f%% exocrine content", 100 * cc[[cid_clean]])),
+  generative_plot_gene_origin_cell(nmf_fit, cid_cont, target_type,
+    ductal_genes, mk_pool, gene_classes,
+    sprintf("Acinar interface: %.0f%% exocrine content", 100 * cc[[cid_cont]])),
   ncol = 2)
 ```
 
@@ -313,15 +227,8 @@ bounded factor — removal stays anchored to the demonstrated spatial
 signal:
 
 ``` r
-ggplot(comp, aes(dose, contamination,
-    color = factor(pmin(expo[cell_id], 3)))) +
-  geom_point(size = 0.4, alpha = 0.5) +
-  geom_abline(color = "grey40", linewidth = 0.4) +
-  scale_color_viridis_d(name = "exocrine
-neighbors", end = 0.9) +
-  labs(x = "dose: prior contamination fraction from exposure",
-    y = "fitted contamination fraction") +
-  theme_classic(base_size = 11)
+generative_plot_dose_vs_fitted(model, source_type, target_type, expo,
+  "exocrine\nneighbors")
 ```
 
 <img src="pancreas_generative_files/figure-gfm/dose-vs-alpha-1.png" alt="" width="576" style="display: block; margin: auto;" />
@@ -331,8 +238,7 @@ intervals, the zero-neighbor line, and the ambient reference — verifies
 the pair directly, before and after the correction:
 
 ``` r
-audit$plot_exposure("Exocrine epithelial", "Ductal/tumor epithelial",
-  correction = correction)
+audit$plot_exposure(source_type, target_type, correction = correction)
 ```
 
 <img src="pancreas_generative_files/figure-gfm/pair-exposure-1.png" alt="" width="624" style="display: block; margin: auto;" />
@@ -352,12 +258,12 @@ head(data.frame(gene = names(sort(removed_g, decreasing = TRUE)),
     ##          gene removed
     ## AMY2A   AMY2A  150613
     ## GATM     GATM   64326
-    ## CFTR     CFTR   16975
+    ## CFTR     CFTR   16732
     ## AQP8     AQP8   11748
-    ## ANPEP   ANPEP    8360
-    ## VCAN     VCAN    7508
-    ## FBN1     FBN1    5239
-    ## COL5A2 COL5A2    4803
+    ## ANPEP   ANPEP    8108
+    ## VCAN     VCAN    7722
+    ## FBN1     FBN1    5240
+    ## COL5A2 COL5A2    4804
 
 ## The induction pattern
 
@@ -373,23 +279,23 @@ head(induced[order(-induced$excess),
 ```
 
     ##                 source                  target    gene     excess     fold
-    ## 4  Exocrine epithelial Ductal/tumor epithelial    CFTR 110866.738 4.640906
-    ## 6  Exocrine epithelial Ductal/tumor epithelial   PROX1  11709.747 3.320398
-    ## 8     Fibroblast / CAF Ductal/tumor epithelial  SEMA3C   4181.181 7.741020
-    ## 25    Fibroblast / CAF                  Immune   PMP22   3183.480 3.092253
-    ## 9     Fibroblast / CAF Ductal/tumor epithelial   BASP1   2750.508 2.332749
-    ## 19    Mural / pericyte             Endothelial ADAMTS1   2045.614 3.725193
-    ## 7     Fibroblast / CAF Ductal/tumor epithelial  APCDD1   2035.355 3.465643
-    ## 5  Exocrine epithelial Ductal/tumor epithelial     CA4   1681.018 4.159392
+    ## 4  Exocrine epithelial Ductal/tumor epithelial    CFTR 110866.738 4.640903
+    ## 6  Exocrine epithelial Ductal/tumor epithelial   PROX1  11709.747 3.320363
+    ## 8     Fibroblast / CAF Ductal/tumor epithelial  SEMA3C   4181.181 7.741105
+    ## 25    Fibroblast / CAF                  Immune   PMP22   3183.480 3.092250
+    ## 9     Fibroblast / CAF Ductal/tumor epithelial   BASP1   2750.508 2.332770
+    ## 19    Mural / pericyte             Endothelial ADAMTS1   2045.614 3.725197
+    ## 7     Fibroblast / CAF Ductal/tumor epithelial  APCDD1   2035.355 3.465730
+    ## 5  Exocrine epithelial Ductal/tumor epithelial     CA4   1681.018 4.159023
     ##            z
-    ## 4  24.154536
-    ## 6  15.121410
-    ## 8  22.477063
-    ## 25 10.279826
-    ## 9   8.124244
-    ## 19 15.015948
-    ## 7  11.999946
-    ## 5  16.955261
+    ## 4  24.154513
+    ## 6  15.121189
+    ## 8  22.477162
+    ## 25 10.279818
+    ## 9   8.124358
+    ## 19 15.015962
+    ## 7  12.000228
+    ## 5  16.953810
 
 What this means for downstream analysis is best seen the way
 [docs/generative.md](../../docs/generative.md) (Figure 4) shows it: on
@@ -403,76 +309,9 @@ the ductal identity program falling (purple) — while genes entangled
 with the transfer split stay open grey:
 
 ``` r
-duct_cells <- model$composition("Exocrine epithelial",
-  "Ductal/tumor epithelial")$cell_id
-duct_pairs <- model$pairs[model$pairs$target == "Ductal/tumor epithelial", ]
-E <- sapply(duct_pairs$source, function(src) pmin(setNames(
-  cellAdmixCore:::.celladmix_source_exposure_counts(
-    cells_xy, cell_annotation, 15L)$counts[, src],
-  as.character(cells_xy$cell_id))[duct_cells], 4))
-removed_frac_g <- 1 - Matrix::rowSums(after[, duct_cells]) /
-  pmax(Matrix::rowSums(before[, duct_cells]), 1)
-K <- after[, duct_cells]
-t_kept <- Matrix::colSums(K)
-ok_c <- t_kept > 10
-K <- K[, ok_c]
-E <- E[ok_c, , drop = FALSE]
-t_kept <- t_kept[ok_c]
-X <- cbind(1, E)
-exo_ix <- 1L + match("Exocrine epithelial", duct_pairs$source)
-fit_gene <- function(y) {
-  beta <- c(log(max(sum(y), 0.5) / sum(t_kept)), numeric(ncol(E)))
-  for (it in 1:25) {
-    mu <- t_kept * exp(pmin(pmax(X %*% beta, -30), 5))
-    H <- crossprod(X, X * as.numeric(mu))
-    step <- tryCatch(solve(H + diag(1e-8, ncol(X)), crossprod(X, y - mu)),
-      error = function(e) NULL)
-    if (is.null(step)) return(NULL)
-    beta <- beta + step
-    if (max(abs(step)) < 1e-6) break
-  }
-  mu <- t_kept * exp(pmin(pmax(X %*% beta, -30), 5))
-  disp <- max(sum((y - mu)^2 / pmax(mu, 1e-9)) /
-    max(length(y) - ncol(X), 1), 1)
-  se <- sqrt(pmax(diag(solve(crossprod(X, X * as.numeric(mu)) +
-    diag(1e-8, ncol(X)))), 1e-300) * disp)
-  c(beta[[exo_ix]], beta[[exo_ix]] / se[[exo_ix]])
-}
-res <- t(sapply(rownames(K), function(g) {
-  y <- as.numeric(K[g, ])
-  if (sum(y) < 100) return(c(NA, NA))
-  out <- fit_gene(y)
-  if (is.null(out)) c(NA, NA) else out
-}))
-# the transfer-profile guard: the gene's share of the exocrine cells'
-# interface-local profile, with ductal-owned genes zeroed
-S_cells <- names(cell_types)[!is.na(cell_types) &
-  cell_types == "Exocrine epithelial"]
-dist_T <- cellAdmixCore:::.celladmix_source_nearest_distance(
-  cells_xy, cell_annotation)[, "Ductal/tumor epithelial"]
-psi <- cellAdmixCore:::.celladmix_audit_interface_profile(before, S_cells,
-  dist_T)
-psi[names(top_type)[top_type == "Ductal/tumor epithelial"]] <- 0
-vol <- data.frame(gene = rownames(K), lfc = res[, 1] / log(2),
-  z = pmin(abs(res[, 2]), 60), dir = sign(res[, 1]),
-  stringsAsFactors = FALSE)
-vol$clean <- removed_frac_g[vol$gene] < 0.10 & psi[vol$gene] * 1e4 < 20
-vol <- vol[!is.na(vol$z), ]
-vol$tier <- ifelse(!vol$clean, "transfer-entangled",
-  ifelse(vol$dir > 0, "increased near exocrine", "decreased near exocrine"))
-lab <- vol[vol$clean, ]
-lab <- lab[order(-lab$z), ][1:7, ]
-ggplot(vol, aes(lfc, z)) +
-  geom_point(data = vol[!vol$clean, ], shape = 1, size = 1.3,
-    color = "#b6b6b6") +
-  geom_point(data = vol[vol$clean, ], aes(color = tier), size = 1.5) +
-  geom_hline(yintercept = 6, color = "grey50", linetype = "13") +
-  ggrepel::geom_text_repel(data = lab, aes(label = gene), size = 3) +
-  scale_color_manual(values = c("increased near exocrine" = "#1e8449",
-    "decreased near exocrine" = "#7d3c98"), name = NULL) +
-  labs(x = "fold change per exocrine neighbor (log2)",
-    y = "significance |z| (capped at 60)") +
-  theme_classic(base_size = 11)
+changes <- generative_induced_changes(before, after, model, cells_xy,
+  cell_annotation, target_type)
+generative_plot_volcano(changes, source_type)
 ```
 
 <img src="pancreas_generative_files/figure-gfm/volcano-1.png" alt="" width="652.8" style="display: block; margin: auto;" />
@@ -484,57 +323,8 @@ profile; genes above the significance bound are the ductal cells’ own
 response. Each point below is one exocrine-owned gene:
 
 ``` r
-exp_cells <- duct_cells[expo[duct_cells] > 0]
-un_cells <- duct_cells[expo[duct_cells] == 0]
-t_exp <- sum(Matrix::colSums(before[, exp_cells]))
-t_un <- sum(Matrix::colSums(before[, un_cells]))
-gset <- names(top_type)[top_type == "Exocrine epithelial"]
-m_exp <- Matrix::rowSums(before[gset, exp_cells])
-m_un <- Matrix::rowSums(before[gset, un_cells])
-excess <- m_exp - m_un / t_un * t_exp
-v <- m_exp + (t_exp / t_un)^2 * m_un + 1
-expected_of <- function(prof) {
-  p <- prof
-  p[names(p) %in% names(top_type)[top_type == "Ductal/tumor epithelial"]] <- 0
-  p <- p[gset]
-  slope <- max(sum(excess * p / v) / sum(p^2 / v), 0)
-  slope * p
-}
-exp_int <- expected_of(cellAdmixCore:::.celladmix_audit_interface_profile(
-  before, S_cells, dist_T))
-exp_glob <- expected_of(profiles[, "Exocrine epithelial"] /
-  sum(profiles[, "Exocrine epithelial"]))
-scr <- data.frame(gene = gset, excess = excess, expected = exp_int,
-  expected_global = exp_glob, stringsAsFactors = FALSE)
-scr$flagged <- scr$gene %in%
-  induced$gene[induced$source == "Exocrine epithelial" &
-    induced$target == "Ductal/tumor epithelial"]
-scr <- scr[scr$excess > 10 & scr$expected > 1, ]
-vdf <- data.frame(lx = log(scr$expected), ly = log(v[scr$gene]))
-vfit <- stats::lm(ly ~ lx, vdf)
-xg <- exp(seq(log(min(scr$expected)), log(max(scr$expected) * 1.5),
-  length.out = 200))
-bound_df <- data.frame(expected = xg,
-  excess = xg + 8 * sqrt(exp(predict(vfit, data.frame(lx = log(xg)))) +
-    (0.15 * xg)^2))
-flag <- scr[scr$flagged, ]
-ggplot(scr, aes(expected, excess)) +
-  geom_abline(color = "grey40", linewidth = 0.4) +
-  geom_line(data = bound_df, linetype = "22", color = "grey50",
-    linewidth = 0.4) +
-  geom_point(data = scr[!scr$flagged, ], size = 1.3, color = "#9bb5c9") +
-  geom_segment(data = flag, aes(x = expected_global, xend = expected,
-    y = excess, yend = excess), color = "#1e8449", linewidth = 0.5) +
-  geom_point(data = flag, aes(x = expected_global), size = 3.6, shape = 1,
-    stroke = 1.1, color = "#c0392b") +
-  geom_point(data = flag, size = 2, color = "#1e8449") +
-  ggrepel::geom_text_repel(
-    data = scr[scr$flagged | scr$excess > 5e4, ],
-    aes(label = gene), size = 3) +
-  scale_x_log10() + scale_y_log10() +
-  labs(x = "excess expected in ductal cells from exocrine transfer (molecules)",
-    y = "measured excess in ductal cells (molecules)") +
-  theme_classic(base_size = 11)
+generative_plot_transfer_screen(before, model, cells_xy, cell_annotation,
+  source_type, target_type, expo)
 ```
 
 <img src="pancreas_generative_files/figure-gfm/screen-1.png" alt="" width="672" style="display: block; margin: auto;" />
@@ -559,53 +349,10 @@ what retention protects, at no change on the transferred gene:
 ``` r
 correction_noind <- model$correct(name = "generative_noind",
   retain_induced = FALSE)
-after_noind <- correction_noind$counts()
-tot <- Matrix::colSums(before[, duct_cells])
-bins <- pmin(expo[duct_cells], 3)
-rates_ci <- function(m, gene) {
-  mm <- tapply(m[gene, duct_cells], bins, sum)
-  MM <- tapply(tot, bins, sum)
-  data.frame(bin = 0:3, rate = as.numeric(mm / MM) * 1e3,
-    lo = stats::qgamma(0.025, pmax(as.numeric(mm), 1e-9)) /
-      as.numeric(MM) * 1e3,
-    hi = stats::qgamma(0.975, as.numeric(mm) + 1) / as.numeric(MM) * 1e3)
-}
-df <- do.call(rbind, lapply(c("AMY2A", "CFTR"), function(g) {
-  do.call(rbind, lapply(list(
-    list(m = before, lab = "observed"),
-    list(m = after, lab = "retained"),
-    list(m = after_noind, lab = "induced share also removed")), function(a) {
-    cbind(gene = g, counts = a$lab, rates_ci(a$m, g))
-  }))
-}))
-df$counts <- factor(df$counts,
-  levels = c("observed", "retained", "induced share also removed"))
-band <- merge(
-  df[df$counts == "retained", c("gene", "bin", "rate")],
-  df[df$counts == "observed", c("gene", "bin", "rate")],
-  by = c("gene", "bin"), suffixes = c("_ret", "_obs"))
-base0 <- df[df$counts == "observed" & df$bin == 0, c("gene", "rate")]
-ggplot(df, aes(bin, rate)) +
-  geom_ribbon(data = band, aes(bin, ymin = rate_ret, ymax = rate_obs),
-    fill = "#c0392b", alpha = 0.12, inherit.aes = FALSE) +
-  geom_hline(data = base0, aes(yintercept = rate), color = "grey50",
-    linetype = "13", linewidth = 0.5) +
-  geom_line(aes(color = counts, linetype = counts)) +
-  geom_errorbar(aes(ymin = lo, ymax = hi, color = counts), width = 0.1,
-    linewidth = 0.4, show.legend = FALSE) +
-  geom_point(aes(color = counts, shape = counts), size = 1.9) +
-  facet_wrap(~gene, scales = "free_y") +
-  scale_color_manual(values = c("observed" = "#c0392b",
-    "retained" = "#2980b9", "induced share also removed" = "#7d3c98"),
-    name = NULL) +
-  scale_shape_manual(values = c("observed" = 15, "retained" = 16,
-    "induced share also removed" = 16), name = NULL) +
-  scale_linetype_manual(values = c("observed" = "solid",
-    "retained" = "solid", "induced share also removed" = "22"),
-    name = NULL) +
-  labs(x = "exocrine cells among 15 nearest neighbors",
-    y = "rate in ductal cells (per 1,000 molecules)") +
-  theme_classic(base_size = 11)
+generative_plot_gene_contrast(before, after, duct_cells, expo,
+  c("AMY2A", "CFTR"), "exocrine cells among 15 nearest neighbors",
+  "rate in ductal cells (per 1,000 molecules)",
+  after_alt = correction_noind$counts())
 ```
 
 <img src="pancreas_generative_files/figure-gfm/gene-contrast-1.png" alt="" width="816" style="display: block; margin: auto;" />
@@ -614,32 +361,8 @@ Across all retained genes, most of the exposure-linked excess survives
 the correction — the retained fraction per gene, for the largest calls:
 
 ``` r
-gene_excess <- function(m, gene, source, target) {
-  t_cells <- names(cell_types)[!is.na(cell_types) & cell_types == target]
-  e <- setNames(cellAdmixCore:::.celladmix_source_exposure_counts(
-    cells_xy, cell_annotation, 15L)$counts[, source],
-    as.character(cells_xy$cell_id))[t_cells]
-  tt <- Matrix::colSums(before[, t_cells])
-  sum(m[gene, t_cells[e > 0]]) -
-    sum(m[gene, t_cells[e == 0]]) / max(sum(tt[e == 0]), 1) * sum(tt[e > 0])
-}
-top_ind <- head(induced[order(-induced$excess), ], 8)
-ret <- do.call(rbind, lapply(seq_len(nrow(top_ind)), function(i) {
-  r <- top_ind[i, ]
-  data.frame(gene = r$gene,
-    counts = c("observed excess", "excess after correction"),
-    excess = c(gene_excess(before, r$gene, r$source, r$target),
-      gene_excess(after, r$gene, r$source, r$target)))
-}))
-ret$counts <- factor(ret$counts,
-  levels = c("observed excess", "excess after correction"))
-ggplot(ret, aes(reorder(gene, -excess), excess / 1e3, fill = counts)) +
-  geom_col(position = "dodge", width = 0.7) +
-  scale_fill_manual(values = c("observed excess" = "#c0392b",
-    "excess after correction" = "#1e8449")) +
-  labs(x = NULL, y = "exposure-linked excess (thousand molecules)",
-    fill = NULL) +
-  theme_classic(base_size = 11)
+generative_plot_induced_retention(before, after, model, cells_xy,
+  cell_annotation)
 ```
 
 <img src="pancreas_generative_files/figure-gfm/retention-1.png" alt="" width="720" style="display: block; margin: auto;" />
@@ -649,42 +372,8 @@ program, retained in its own pair. The largest retained gene of four
 different pairs, each in its target cells against its source’s exposure:
 
 ``` r
-top_by_pair <- do.call(rbind, lapply(
-  split(induced, paste(induced$source, induced$target)), function(d)
-    d[which.max(d$excess), ]))
-top_by_pair <- top_by_pair[order(-top_by_pair$excess), ]
-top_by_pair <- top_by_pair[top_by_pair$gene != "CFTR", ][1:4, ]
-expo_of <- function(source) setNames(
-  cellAdmixCore:::.celladmix_source_exposure_counts(
-    cells_xy, cell_annotation, 15L)$counts[, source],
-  as.character(cells_xy$cell_id))
-df2 <- do.call(rbind, lapply(seq_len(nrow(top_by_pair)), function(i) {
-  r <- top_by_pair[i, ]
-  tc <- model$composition(r$source, r$target)$cell_id
-  e <- pmin(expo_of(r$source)[tc], 3)
-  tt <- Matrix::colSums(before[, tc])
-  rb <- function(m) {
-    mm <- tapply(m[r$gene, tc], e, sum)
-    MM <- tapply(tt, e, sum)
-    data.frame(bin = 0:3, rate = as.numeric(mm / MM) * 1e3,
-      lo = stats::qgamma(0.025, pmax(as.numeric(mm), 1e-9)) /
-        as.numeric(MM) * 1e3,
-      hi = stats::qgamma(0.975, as.numeric(mm) + 1) / as.numeric(MM) * 1e3)
-  }
-  lab <- sprintf("%s\n(%s \u2192 %s)", r$gene,
-    sub("/.*", "", r$source), sub("/.*", "", r$target))
-  rbind(cbind(panel = lab, counts = "observed", rb(before)),
-    cbind(panel = lab, counts = "corrected", rb(after)))
-}))
-ggplot(df2, aes(bin, rate, color = counts)) +
-  geom_line() + geom_point(size = 1.4) +
-  geom_errorbar(aes(ymin = lo, ymax = hi), width = 0.12, linewidth = 0.4) +
-  facet_wrap(~panel, scales = "free_y", nrow = 2) +
-  scale_color_manual(values = c(observed = "#c0392b",
-    corrected = "#2980b9")) +
-  labs(x = "source-type cells among 15 nearest neighbors",
-    y = "rate in target cells (per 1,000 molecules)", color = NULL) +
-  theme_classic(base_size = 10)
+generative_plot_induced_pairs(before, after, model, cells_xy,
+  cell_annotation, exclude = "CFTR")
 ```
 
 <img src="pancreas_generative_files/figure-gfm/induced-pairs-1.png" alt="" width="816" style="display: block; margin: auto;" />
@@ -694,11 +383,8 @@ induced activity concentrates in the exposed cells, rather than being
 spread uniformly over the type:
 
 ``` r
-ggplot(comp, aes(factor(pmin(expo[cell_id], 3)), induced_activity)) +
-  geom_boxplot(outlier.size = 0.3, fill = "#a9dfbf") +
-  labs(x = "exocrine cells among 15 nearest neighbors",
-    y = "fitted induced activity of the cell\n(multiplier of the pair's induced term)") +
-  theme_classic(base_size = 11)
+generative_plot_induced_activity(model, source_type, target_type, expo,
+  "exocrine cells among 15 nearest neighbors")
 ```
 
 <img src="pancreas_generative_files/figure-gfm/induced-activity-1.png" alt="" width="576" style="display: block; margin: auto;" />
@@ -710,16 +396,8 @@ acinar tissue — a pattern a marker-based correction would have removed
 as contamination:
 
 ``` r
-cftr_rate <- after["CFTR", duct_cells] /
-  pmax(Matrix::colSums(after[, duct_cells]), 1) * 1e3
-ggplot(cbind(comp, x = xy$x, y = xy$y, cftr = pmin(cftr_rate, 250)),
-    aes(x, y, color = cftr)) +
-  geom_point(size = 0.25) +
-  scale_color_viridis_c(name = "corrected CFTR\n(per 1,000\nmolecules)") +
-  coord_equal() +
-  labs(x = NULL, y = NULL,
-    title = "The retained CFTR program in ductal cells") +
-  theme_void(base_size = 11)
+generative_plot_gene_map(after, model, source_type, target_type, cells_xy,
+  "CFTR")
 ```
 
 <img src="pancreas_generative_files/figure-gfm/cftr-map-1.png" alt="" width="816" style="display: block; margin: auto;" />
@@ -742,10 +420,10 @@ report$summary()
     ## [1] 1574854
     ## 
     ## $leakage_removed_overall
-    ## [1] 0.9405623
+    ## [1] 0.9724715
     ## 
     ## $median_pair_sensitivity
-    ## [1] 0.9587951
+    ## [1] 0.9904802
     ## 
     ## $own_marker_false_removal
     ## [1] 0
@@ -774,25 +452,7 @@ boundaries between clusters:
 original_state <- ds$cell_state_umap(cells_max = 5000)
 corrected_state <- correction$cell_state_umap(cells_max = 5000,
   num_threads = 8)
-type_levels <- sort(unique(cell_annotation))
-palette <- setNames(grDevices::hcl.colors(length(type_levels), "Dark 3"),
-  type_levels)
-umap_panel <- function(df, title) {
-  ggplot(df, aes(umap_1, umap_2,
-      color = factor(cell_type, levels = type_levels))) +
-    geom_point(size = 0.4, alpha = 0.7) +
-    scale_color_manual(values = palette, drop = FALSE, name = NULL) +
-    labs(title = title, x = "UMAP 1", y = "UMAP 2") +
-    theme_classic(base_size = 10) +
-    guides(color = guide_legend(override.aes = list(size = 3, alpha = 1)))
-}
-p1 <- umap_panel(original_state, "Original counts")
-p2 <- umap_panel(corrected_state, "Generative correction")
-shared_legend <- cowplot::get_legend(p1)
-cowplot::plot_grid(
-  cowplot::plot_grid(p1 + theme(legend.position = "none"),
-    p2 + theme(legend.position = "none"), ncol = 2, align = "hv"),
-  shared_legend, ncol = 2, rel_widths = c(1, 0.22))
+generative_plot_state_umaps(original_state, corrected_state, cell_annotation)
 ```
 
 <img src="pancreas_generative_files/figure-gfm/state-umap-1.png" alt="" width="1056" style="display: block; margin: auto;" />

@@ -45,7 +45,7 @@ model
     ## cellAdmix generative model
     ##   pairs: 39 
     ##   induced genes retained: 28 
-    ##   removed molecules (expected): 1,193,699 
+    ##   removed molecules (expected): 1,253,319 
     ##   initialization: nmf_factors
 
 ``` r
@@ -69,17 +69,17 @@ head(model$induced[order(-model$induced$excess), ], 5)
 ```
 
     ##                 source                  target   gene     excess   expected
-    ## 4  Exocrine epithelial Ductal/tumor epithelial   CFTR 110866.738 23889.0283
-    ## 6  Exocrine epithelial Ductal/tumor epithelial  PROX1  11709.747  3526.6096
-    ## 8     Fibroblast / CAF Ductal/tumor epithelial SEMA3C   4181.181   540.1331
-    ## 25    Fibroblast / CAF                  Immune  PMP22   3183.480  1029.5018
-    ## 9     Fibroblast / CAF Ductal/tumor epithelial  BASP1   2750.508  1179.0843
+    ## 4  Exocrine epithelial Ductal/tumor epithelial   CFTR 110866.738 23889.0462
+    ## 6  Exocrine epithelial Ductal/tumor epithelial  PROX1  11709.747  3526.6467
+    ## 8     Fibroblast / CAF Ductal/tumor epithelial SEMA3C   4181.181   540.1271
+    ## 25    Fibroblast / CAF                  Immune  PMP22   3183.480  1029.5026
+    ## 9     Fibroblast / CAF Ductal/tumor epithelial  BASP1   2750.508  1179.0739
     ##            z     fold
-    ## 4  24.154536 4.640906
-    ## 6  15.121410 3.320398
-    ## 8  22.477063 7.741020
-    ## 25 10.279826 3.092253
-    ## 9   8.124244 2.332749
+    ## 4  24.154513 4.640903
+    ## 6  15.121189 3.320363
+    ## 8  22.477162 7.741105
+    ## 25 10.279818 3.092250
+    ## 9   8.124358 2.332770
 
 And it is verified like any other correction, against the audit’s own
 measurements:
@@ -96,10 +96,10 @@ report$summary()
     ## [1] 1574854
     ## 
     ## $leakage_removed_overall
-    ## [1] 0.9405623
+    ## [1] 0.9724715
     ## 
     ## $median_pair_sensitivity
-    ## [1] 0.9587951
+    ## [1] 0.9904802
     ## 
     ## $own_marker_false_removal
     ## [1] 0

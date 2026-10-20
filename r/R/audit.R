@@ -587,6 +587,8 @@ CellAdmixAudit <- R6::R6Class(
         removed_molecules_expected = res$pairs$posterior_molecules,
         induced_molecules = res$pairs$induced_molecules,
         mean_dose_exposed = res$pairs$mean_dose_exposed,
+        prior_unexposed_molecules = res$pairs$prior_unexposed_molecules,
+        cross_attributed_molecules = res$pairs$cross_attributed_molecules,
         stringsAsFactors = FALSE)
 
       CellAdmixGenerativeModel$new(

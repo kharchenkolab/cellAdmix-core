@@ -54,14 +54,26 @@ components, and where each one's parameters come from:
   type's cells together), where contamination is indistinguishable from own
   expression: it is deliberately left in place, which makes removal
   of the target's own markers structurally impossible. The per-cell
-  fraction $\alpha_{cS}$ has a prior mean given by a monotone (isotonic)
-  dose–response of marker content on the number of source neighbors, and
-  its posterior update from the cell's own expression is bounded — at
-  most five-fold the prior, exactly zero where the prior is zero — so
-  removal stays anchored to the demonstrated spatial signal (with an
-  unbounded update, the model keeps finding the true contamination even
-  after the exposure values are scrambled, and the permutation control
-  fails).
+  fraction $\alpha_{cS}$ has a prior mean given by the pair's
+  dose–response: the source's marker content in the target cells, fitted
+  monotonically along an ordered exposure axis. Exposed cells sit on that
+  axis by their number of source neighbors; unexposed cells by how many
+  nearest neighbors must be inspected before a source cell appears (the
+  rungs of the audit's reference ladder), so a cell near but not
+  adjacent to source tissue receives the contamination the audit
+  measures in such cells, and the prior is anchored at zero at the
+  deepest, source-free stratum. The dose–responses of all of a target
+  type's sources are fitted jointly, each pair keeping only its own
+  component, so material a co-located source delivered is not credited
+  to the pair (the content its other components explain is reported per
+  pair); and a response enters the prior only when its rise above the
+  reference is significant against the cell-to-cell variation, since a
+  monotone fit of a covariate carrying no signal drifts upward. The
+  posterior update from the cell's own expression is bounded — at most
+  five-fold the prior, exactly zero where the prior is zero — so removal
+  stays anchored to the demonstrated spatial signal (with an unbounded
+  update, the model keeps finding the true contamination even after the
+  spatial covariates are scrambled, and the permutation control fails).
 - **Ambient background** ($\beta_c$, $a_g$): restricted to the strict
   genes (essentially absent from the target natively), with profile and
   level measured on target cells far from any source cell, and a bounded
@@ -256,19 +268,26 @@ sees only the guide half, and performance is the fraction of
 exposure-linked excess removed on the held-out half, weighted across the
 39 detected pancreas pairs.
 
-- **Held-out-gene generalization**: 0.974 (median 1.000), versus 0.906
+- **Held-out-gene generalization**: 0.967 (median 0.993), versus 0.906
   for an exposure-regression corrector guided by the same genes and
   0.961 for the default molecule-vote ensemble — the ensemble reaching
   its number at 7.5% own-marker false removal, the model at 0.000. A
   dose measured on half the markers generalizes to the other half best
   when delivered through a full source profile with per-cell posterior
-  updates.
-- **Production behavior**: 0.982 weighted removal, taking out 1.21M of
-  the dataset's 6.19M cell-assigned molecules (the ensemble removes
-  1.99M for the same downstream benefit). The flagged genes retain 79.5%
-  of their exposure-linked excess in aggregate — for CFTR, 89k of its
-  111k excess molecules stay in the ductal cells — while unflagged
-  marker content is removed at 96–99%.
+  updates. The harness measures against the post-correction
+  zero-neighbor baseline of the held-out genes; with the dose prior's
+  ladder cleaning that baseline, residual contamination it used to hide
+  becomes countable, which is where the harness number sits below the
+  0.974 of a single-stratum dose — against the audit's ambient
+  reference, the exposed-cell excess removed rises from 0.942 to 0.974.
+- **Production behavior**: 0.969 weighted removal on the harness, taking
+  out 1.27M of the dataset's 6.19M cell-assigned molecules (the ensemble
+  removes 1.99M for the same downstream benefit), including the
+  contamination the audit measures in cells with no source among their
+  15 nearest, which a single-stratum dose leaves in place. The flagged
+  genes retain 81% of their exposure-linked excess in aggregate — for
+  CFTR, 90k of its 111k excess molecules stay in the ductal cells —
+  while unflagged marker content is removed at 96–99%.
 - **Spike-in test**: with four classes of molecules planted in one
   pair's exposed cells, the model removes 81–85% of in-plane fragments,
   out-of-plane fragments, and ambient singletons, at every setting of the
@@ -293,11 +312,12 @@ exposure-linked excess removed on the held-out half, weighted across the
   markers are shared between source and target on a panel this large —
   content the model deliberately attributes to the target's own
   expression rather than remove.
-- **Controls**: permuting each pair's exposure values collapses removal
-  to 0.018 (the dose prior, not a downstream threshold, carries the
-  control); own-marker false removal is 0.000 pooled and for the worst
-  type; downstream cell-type k-nearest-neighbor purity rises from 0.804
-  to 0.963, within half a point of the ensemble's 0.968.
+- **Controls**: permuting every cell's spatial covariates together
+  collapses removal to 0.012 (the dose prior, not a downstream
+  threshold, carries the control); own-marker false removal is 0.000
+  pooled and for the worst type; downstream cell-type
+  k-nearest-neighbor purity rises from 0.804 to 0.966, within a quarter
+  point of the ensemble's 0.968.
 
 ## The identifiability limit
 
@@ -492,10 +512,20 @@ without refitting: `model$correct()` keeps the induced expression,
 `model$correct(retain_induced = FALSE)` removes the fitted induced
 share along with the contamination — the direct demonstration of what
 retention protects. `correct_generative()` remains as the one-call
-convenience. The fit reproduces the reference implementation exactly
-(the removed-molecule totals agree to the last count on all three
-datasets) and runs in 20 seconds on the pancreas dataset, 50 seconds on
-NSCLC, and about four minutes on breast 5K.
+convenience. The dose prior's estimation is set by three options —
+`dose_mode` (`"joint"`, or `"marginal"` for one source at a time),
+`dose_ladder` (the rungs stratifying unexposed cells; empty for a single
+unexposed stratum) and `dose_min_z` (the significance a dose–response
+must reach to enter the prior; 0 to disable) — and a built-in control,
+`permute_covariates_seed`, which permutes every cell's spatial
+covariates together. With the marginal mode, no ladder and no guard the
+fit reproduces the reference implementation to the last molecule on all
+three datasets; the defaults are the joint fit, the ladder of 30, 60,
+120 and 240 neighbors, and a three-standard-error guard, the
+configuration whose evaluation is recorded in
+`analysis/generative_model/REPORT.md`. The fit runs in about 20 seconds
+on the pancreas dataset, under a minute on NSCLC, and a few minutes on
+breast 5K.
 
 The expression programs that represent each type's own states are an
 initialization, selected by the `init` argument: an NMF fit supplies

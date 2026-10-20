@@ -5025,6 +5025,18 @@ extern "C" SEXP _cellAdmixCore_celladmix_fit_generative(
     if (options.containsElementNamed("init_mode")) {
       opt.init_mode = as<std::string>(options["init_mode"]);
     }
+    if (options.containsElementNamed("dose_mode")) {
+      opt.dose_mode = as<std::string>(options["dose_mode"]);
+    }
+    if (options.containsElementNamed("dose_ladder")) {
+      opt.dose_ladder = as<std::vector<int>>(options["dose_ladder"]);
+    }
+    set_double("dose_reference_min_molecules", opt.dose_reference_min_molecules);
+    set_double("dose_min_z", opt.dose_min_z);
+    if (options.containsElementNamed("permute_covariates_seed")) {
+      opt.permute_covariates_seed =
+          static_cast<unsigned int>(as<int>(options["permute_covariates_seed"]));
+    }
     if (options.containsElementNamed("seed")) {
       opt.seed = static_cast<unsigned int>(as<int>(options["seed"]));
     }
@@ -5076,12 +5088,16 @@ extern "C" SEXP _cellAdmixCore_celladmix_fit_generative(
     std::vector<double> sum_post;
     std::vector<double> sum_ind;
     std::vector<double> sum_dose;
+    std::vector<double> sum_unexposed;
+    std::vector<double> sum_cross;
     for (const auto& row : res.pairs) {
       sum_pair.push_back(row.pair);
       sum_prior.push_back(row.prior_molecules);
       sum_post.push_back(row.posterior_molecules);
       sum_ind.push_back(row.induced_molecules);
       sum_dose.push_back(row.mean_dose_exposed);
+      sum_unexposed.push_back(row.prior_unexposed_molecules);
+      sum_cross.push_back(row.cross_attributed_molecules);
     }
     return List::create(
         Named("removed") = wrap(res.removed),
@@ -5106,7 +5122,9 @@ extern "C" SEXP _cellAdmixCore_celladmix_fit_generative(
             Named("prior_molecules") = wrap(sum_prior),
             Named("posterior_molecules") = wrap(sum_post),
             Named("induced_molecules") = wrap(sum_ind),
-            Named("mean_dose_exposed") = wrap(sum_dose)));
+            Named("mean_dose_exposed") = wrap(sum_dose),
+            Named("prior_unexposed_molecules") = wrap(sum_unexposed),
+            Named("cross_attributed_molecules") = wrap(sum_cross)));
   } catch (std::exception& ex) {
     forward_exception_to_r(ex);
   } catch (...) {

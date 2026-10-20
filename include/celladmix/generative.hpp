@@ -83,6 +83,31 @@ struct GenerativeOptions {
   std::string init_mode = "factors";
   int n_programs = 4;
   unsigned int seed = 1;
+  // Dose prior estimation. "marginal" fits each pair's guide-gene content
+  // on that source's exposure alone; "joint" fits all pairs of a target
+  // type additively on every source's exposure (backfitting of monotone
+  // components), so content that a co-located source explains is not
+  // credited to the pair. dose_ladder lists neighbor counts (ascending, all
+  // above neighbor_k) by which unexposed cells are stratified according to
+  // how many nearest neighbors must be inspected before a source cell
+  // appears; empty keeps the single unexposed stratum. With a ladder the
+  // prior is anchored at the deepest stratum that accumulates
+  // dose_reference_min_molecules, as the audit's ambient reference is; when
+  // the unexposed strata together fall short of that minimum, all of them
+  // pooled serve as the reference, as without a ladder.
+  std::string dose_mode = "joint";
+  std::vector<int> dose_ladder{30, 60, 120, 240};
+  double dose_reference_min_molecules = 20000.0;
+  // A dose-response enters the prior only when the guide-gene content of
+  // the cells above the reference stratum exceeds the reference cells' by
+  // this many standard errors (cell-to-cell variation, so heterogeneity
+  // beyond Poisson counting widens the error); a monotone fit of a
+  // covariate carrying no signal otherwise drifts upward. 0 disables.
+  double dose_min_z = 3.0;
+  // Control: permute each target cell's spatial covariates (all sources'
+  // exposures and ladder strata together) across the type's cells with this
+  // seed; 0 leaves them in place.
+  unsigned int permute_covariates_seed = 0;
 };
 
 // One source -> target pair, from the admixture audit. Gene sets are indices
@@ -114,6 +139,12 @@ struct GenerativePairSummary {
   double posterior_molecules = 0.0;
   double induced_molecules = 0.0;
   double mean_dose_exposed = 0.0;
+  // Prior contamination molecules in cells with no source among their
+  // neighbor_k nearest (nonzero only with a dose ladder).
+  double prior_unexposed_molecules = 0.0;
+  // Guide-gene molecules of the pair explained by other sources' exposures
+  // under the joint dose fit (zero under the marginal fit).
+  double cross_attributed_molecules = 0.0;
 };
 
 struct GenerativeResult {
@@ -181,5 +212,26 @@ GenerativeResult fit_generative(
 // weights w. Exposed for tests.
 std::vector<double> pava_increasing(
     const std::vector<double>& y, const std::vector<double>& w);
+
+// Additive model of a rate on several ordered covariates, each entering
+// through a monotone non-decreasing component anchored at zero at its
+// reference level (values below the reference are clipped to zero), fitted
+// by backfitting with weighted pool-adjacent-violators steps. y and w are
+// per-row rates and weights; strata[c][i] is row i's level index on
+// covariate c (0 .. n_levels[c]-1); reference[c] is covariate c's reference
+// level. Exposed for tests.
+struct AdditiveIsotonicFit {
+  double intercept = 0.0;
+  std::vector<std::vector<double>> components;  // per covariate, per level
+  int cycles = 0;
+};
+AdditiveIsotonicFit additive_isotonic_fit(
+    const std::vector<double>& y,
+    const std::vector<double>& w,
+    const std::vector<std::vector<int>>& strata,
+    const std::vector<int>& n_levels,
+    const std::vector<int>& reference,
+    int max_cycles = 100,
+    double tol = 1e-10);
 
 }  // namespace celladmix

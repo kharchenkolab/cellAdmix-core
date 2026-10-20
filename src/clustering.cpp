@@ -1386,6 +1386,54 @@ DenseMatrix cell_neighbor_type_counts(
   return counts;
 }
 
+DenseMatrix cell_nearest_type_rank(
+    const std::vector<double>& x,
+    const std::vector<double>& y,
+    const std::vector<int>& type_codes,
+    int n_types,
+    int max_k) {
+  const std::size_t n = x.size();
+  if (y.size() != n || type_codes.size() != n) {
+    throw std::runtime_error("cell_nearest_type_rank inputs must have equal length");
+  }
+  if (n_types <= 0 || max_k <= 0) {
+    throw std::runtime_error("cell_nearest_type_rank requires positive n_types and max_k");
+  }
+  DenseMatrix rank(static_cast<int>(n), n_types, static_cast<double>(max_k + 1));
+  if (n < 2) {
+    return rank;
+  }
+
+  CellPointAdaptor adaptor;
+  adaptor.x = &x;
+  adaptor.y = &y;
+  CellKdTree tree(2, adaptor, nanoflann::KDTreeSingleIndexAdaptorParams(10));
+  tree.buildIndex();
+
+  const std::size_t request = std::min(n, static_cast<std::size_t>(max_k) + 1);
+  std::vector<int> hit_indices(request);
+  std::vector<double> hit_distances(request);
+  for (std::size_t i = 0; i < n; ++i) {
+    const double query[2] = {x[i], y[i]};
+    const std::size_t found =
+        tree.knnSearch(query, request, hit_indices.data(), hit_distances.data());
+    int used = 0;
+    for (std::size_t h = 0; h < found && used < max_k; ++h) {
+      const std::size_t neighbor = static_cast<std::size_t>(hit_indices[h]);
+      if (neighbor == i) {
+        continue;
+      }
+      ++used;
+      const int code = type_codes[neighbor];
+      if (code >= 0 && code < n_types &&
+          rank(static_cast<int>(i), code) > static_cast<double>(max_k)) {
+        rank(static_cast<int>(i), code) = static_cast<double>(used);
+      }
+    }
+  }
+  return rank;
+}
+
 DenseMatrix cell_nearest_type_distance(
     const std::vector<double>& x,
     const std::vector<double>& y,

@@ -10,6 +10,7 @@ output:
 ```{r setup, include=FALSE}
 library(cellAdmixCore)
 library(ggplot2)
+source("../../analysis/generative_model/tools/generative_plots.R")
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = TRUE,
   fig.align = "center", dpi = 96, fig.retina = 2)
 ```
@@ -77,37 +78,22 @@ model
 correction <- model$correct()
 ```
 
-The per-cell contamination fractions for the largest pair, by exposure
-and in space:
+The per-cell decomposition of the largest pair's target type, averaged
+by exposure to the source, and the pair's contamination fraction in
+space (the figure helpers are those of the model documentation, in
+[analysis/generative_model/tools/generative_plots.R](../../analysis/generative_model/tools/generative_plots.R)):
 
 ```{r composition, fig.width=6, fig.height=3.6}
 top_pair <- pairs[order(-pairs$admixed_molecules), ][1, ]
-comp <- model$composition(top_pair$source, top_pair$target)
 cells_xy <- ds$cells()
-expo <- setNames(
-  cellAdmixCore:::.celladmix_source_exposure_counts(
-    cells_xy, cell_annotation, 15L)$counts[, top_pair$source],
-  as.character(cells_xy$cell_id))
-comp$exposure <- pmin(expo[comp$cell_id], 4)
-ggplot(comp, aes(factor(exposure), contamination)) +
-  geom_boxplot(outlier.size = 0.3, fill = "#f4a582") +
-  labs(x = sprintf("%s cells among 15 nearest neighbors", top_pair$source),
-    y = sprintf("fraction of the %s cell's molecules\nattributed to %s contamination",
-      top_pair$target, top_pair$source)) +
-  theme_classic(base_size = 11)
+expo <- generative_exposure(cells_xy, cell_annotation, top_pair$source)
+generative_plot_composition(model, top_pair$target, expo,
+  sprintf("%s cells among 15 nearest neighbors", top_pair$source))
 ```
 
 ```{r composition-map, fig.width=7.5, fig.height=5}
-xy <- cells_xy[match(comp$cell_id, as.character(cells_xy$cell_id)), ]
-ggplot(cbind(comp, x = xy$x, y = xy$y), aes(x, y,
-    color = pmin(contamination, 0.5))) +
-  geom_point(size = 0.2) +
-  scale_color_viridis_c(option = "inferno",
-    name = sprintf("%s share\nof %s content",
-      top_pair$source, top_pair$target)) +
-  coord_equal() +
-  labs(x = NULL, y = NULL) +
-  theme_void(base_size = 11)
+generative_plot_composition_map(model, top_pair$source, top_pair$target,
+  cells_xy, cap = 0.5)
 ```
 
 ## The induction pattern
@@ -133,33 +119,26 @@ transfer_gene <- setdiff(mk$pool, induced$gene)[1]
 before <- ds$counts()
 after <- correction$counts()
 t_cells <- model$composition(ind_top$source, ind_top$target)$cell_id
-expo_t <- setNames(
-  cellAdmixCore:::.celladmix_source_exposure_counts(
-    cells_xy, cell_annotation, 15L)$counts[, ind_top$source],
-  as.character(cells_xy$cell_id))[t_cells]
-tot <- Matrix::colSums(before[, t_cells])
-bins <- pmin(expo_t, 3)
-rate_by_bin <- function(m, gene) {
-  tapply(m[gene, t_cells], bins, sum) / tapply(tot, bins, sum) * 1e3
-}
-df <- do.call(rbind, lapply(c(transfer_gene, ind_top$gene), function(g) {
-  rbind(
-    data.frame(gene = g, counts = "observed", bin = 0:3,
-      rate = as.numeric(rate_by_bin(before, g))),
-    data.frame(gene = g, counts = "corrected", bin = 0:3,
-      rate = as.numeric(rate_by_bin(after, g))))
-}))
-df$gene <- factor(df$gene, levels = c(transfer_gene, ind_top$gene),
-  labels = c(sprintf("%s (transferred)", transfer_gene),
-    sprintf("%s (induced)", ind_top$gene)))
-ggplot(df, aes(bin, rate, color = counts)) +
-  geom_line() + geom_point() +
-  facet_wrap(~gene, scales = "free_y") +
-  scale_color_manual(values = c(observed = "#c0392b",
-    corrected = "#2980b9")) +
-  labs(x = sprintf("%s cells among 15 nearest neighbors", ind_top$source),
-    y = sprintf("rate in %s cells (per 1,000 molecules)", ind_top$target)) +
-  theme_classic(base_size = 11)
+expo_t <- generative_exposure(cells_xy, cell_annotation, ind_top$source)
+generative_plot_gene_contrast(before, after, t_cells, expo_t,
+  c(transfer_gene, ind_top$gene),
+  sprintf("%s cells among 15 nearest neighbors", ind_top$source),
+  sprintf("rate in %s cells (per 1,000 molecules)", ind_top$target))
+```
+
+Beyond the genes the model retains by its own screen, the corrected
+counts support the general question of which genes — of any ownership,
+in either direction — change in the target cells with the source's
+proximity, tested jointly across all sources
+([docs/generative.md](../../docs/generative.md), Figure 4). Filled points
+are genes with essentially none of their content removed as transfer and
+no meaningful share of the source's transfer profile; open grey points
+are entangled with the transfer split:
+
+```{r volcano, fig.width=6.8, fig.height=5}
+changes <- generative_induced_changes(before, after, model, cells_xy,
+  cell_annotation, ind_top$target)
+generative_plot_volcano(changes, ind_top$source)
 ```
 
 ## Verification

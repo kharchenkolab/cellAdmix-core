@@ -279,6 +279,32 @@ test_that("the generative correction removes planted admixture", {
   expect_gt(ab$sensitivity, 0.5)
 })
 
+test_that("dose options run and the covariate control collapses", {
+  fit <- make_audit_fit()
+  audit <- fit$audit_admixture(neighbor_k = 6L, min_target_cells = 50L,
+    min_reference_cells = 20L, min_excess = 50)
+  before <- fit$counts()
+  ann <- fit$dataset$annotation(fit$annotation_name, as_vector = TRUE)
+  b_cells <- colnames(before)[!is.na(ann[colnames(before)]) &
+    ann[colnames(before)] == "B"]
+  genes_a <- paste0("a", 1:3)
+  removed_a <- function(model) {
+    after <- model$correct()$counts()
+    sum(before[genes_a, b_cells]) - sum(after[genes_a, b_cells])
+  }
+  plain <- audit$fit_generative(num_threads = 2L)
+  joint <- audit$fit_generative(num_threads = 2L, dose_mode = "joint",
+    dose_ladder = c(12L, 24L), dose_reference_min_molecules = 500)
+  expect_true(all(c("prior_unexposed_molecules", "cross_attributed_molecules")
+    %in% names(joint$pairs)))
+  expect_gt(removed_a(joint), 0.5 * removed_a(plain))
+  control <- audit$fit_generative(num_threads = 2L, dose_mode = "joint",
+    dose_ladder = c(12L, 24L), dose_reference_min_molecules = 500,
+    use_ambient = FALSE, permute_covariates_seed = 3L)
+  expect_lt(removed_a(control), 0.1 * removed_a(plain))
+  expect_error(audit$fit_generative(num_threads = 2L, dose_mode = "bogus"))
+})
+
 test_that("the dataset-level audit matches the fit-level audit and runs NMF-free", {
   fit <- make_audit_fit()
   audit_fit <- fit$audit_admixture(neighbor_k = 6L, min_target_cells = 50L,

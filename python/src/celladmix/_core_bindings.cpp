@@ -762,6 +762,17 @@ PYBIND11_MODULE(_core, m) {
           opt.seed = options["seed"].cast<unsigned int>();
         }
         set_int("n_programs", opt.n_programs);
+        if (options.contains("dose_mode")) {
+          opt.dose_mode = options["dose_mode"].cast<std::string>();
+        }
+        if (options.contains("dose_ladder")) {
+          opt.dose_ladder = options["dose_ladder"].cast<std::vector<int>>();
+        }
+        set_double("dose_reference_min_molecules", opt.dose_reference_min_molecules);
+        set_double("dose_min_z", opt.dose_min_z);
+        if (options.contains("permute_covariates_seed")) {
+          opt.permute_covariates_seed = options["permute_covariates_seed"].cast<unsigned int>();
+        }
         set_double("alpha_prior_strength", opt.alpha_prior_strength);
         set_double("alpha_cap", opt.alpha_cap);
         set_double("lambda_max", opt.lambda_max);
@@ -825,6 +836,8 @@ PYBIND11_MODULE(_core, m) {
           r["posterior_molecules"] = row.posterior_molecules;
           r["induced_molecules"] = row.induced_molecules;
           r["mean_dose_exposed"] = row.mean_dose_exposed;
+          r["prior_unexposed_molecules"] = row.prior_unexposed_molecules;
+          r["cross_attributed_molecules"] = row.cross_attributed_molecules;
           summaries.append(r);
         }
         out["pairs"] = summaries;

@@ -111,6 +111,29 @@ class GenerativeCorrectionTests(unittest.TestCase):
         self.assertGreater(float(self.audit._matrix.sum() - mi.sum()),
                            0.5 * removed_default)
 
+    def test_dose_options_run_and_the_covariate_control_collapses(self):
+        before, genes, cells = self.fit.counts()
+        b_cells = np.array([self.audit._ctypes.get(c) == "B" for c in cells])
+        a_genes = [i for i, g in enumerate(genes) if str(g).startswith("a")]
+        def removed_a(model):
+            after, _, _ = model.correct().counts()
+            return float(before[a_genes][:, b_cells].sum()
+                         - after[a_genes][:, b_cells].sum())
+        plain = self.audit.fit_generative(num_threads=2)
+        joint = self.audit.fit_generative(
+            num_threads=2, dose_mode="joint", dose_ladder=[12, 24],
+            dose_reference_min_molecules=500.0)
+        self.assertIn("prior_unexposed_molecules", joint.pairs.columns)
+        self.assertIn("cross_attributed_molecules", joint.pairs.columns)
+        self.assertGreater(removed_a(joint), 0.5 * removed_a(plain))
+        control = self.audit.fit_generative(
+            num_threads=2, dose_mode="joint", dose_ladder=[12, 24],
+            dose_reference_min_molecules=500.0, use_ambient=False,
+            permute_covariates_seed=3)
+        self.assertLess(removed_a(control), 0.1 * removed_a(plain))
+        with self.assertRaises(Exception):
+            self.audit.fit_generative(num_threads=2, dose_mode="bogus")
+
     def test_correct_generative_removes_planted_admixture(self):
         correction = self.audit.correct_generative(num_threads=2)
         before, genes, cells = self.fit.counts()

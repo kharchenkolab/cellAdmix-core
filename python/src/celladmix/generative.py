@@ -269,7 +269,9 @@ def fit_generative(audit, *, init=None, n_programs=4, num_threads=None,
              estimated_dose_molecules=r["prior_molecules"],
              removed_molecules_expected=r["posterior_molecules"],
              induced_molecules=r["induced_molecules"],
-             mean_dose_exposed=r["mean_dose_exposed"])
+             mean_dose_exposed=r["mean_dose_exposed"],
+             prior_unexposed_molecules=r["prior_unexposed_molecules"],
+             cross_attributed_molecules=r["cross_attributed_molecules"])
         for r in res["pairs"]])
 
     n_programs_used = pd.Series(res["n_programs_used"], index=types)

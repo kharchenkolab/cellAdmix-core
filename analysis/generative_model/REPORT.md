@@ -374,13 +374,16 @@ sparse EM, top-up, profile refinement) behind audit$correct_generative()
 in R and audit.correct_generative() in Python - both bindings marshal
 identical inputs to the same code. Verified against this directory's
 Python implementation on identical problem specifications
-(08_cpp_parity.py): removed-molecule totals agree exactly on all three
-datasets (pancreas 1,206,425; NSCLC 2,726,671; breast 6,663,604), entry
-correlation 1.000000, per-pair posteriors identical. Runtime: pancreas
-22 s, NSCLC 51 s, breast 5K 4.4 min at 12 threads (thread scaling
-saturates around 4 threads; the serial molecule-table read dominates
-beyond). 01_model.py remains as the reference implementation for the
-evaluation arms.
+(08_cpp_parity.py): with the dose prior in the reference configuration
+(`dose_mode = "marginal"`, no ladder, `dose_min_z = 0`) removed-molecule
+totals agree exactly on all three datasets (pancreas 1,206,425; NSCLC
+2,726,671; breast 6,663,604), entry correlation 1.000000, per-pair
+posteriors identical. Runtime in that configuration: pancreas 22 s,
+NSCLC 51 s, breast 5K 4.4 min at 12 threads (thread scaling saturates
+around 4 threads; the serial molecule-table read dominates beyond); the
+shipped defaults (joint fit, ladder, guard; see the dose-prior section
+below) add a few seconds on pancreas. 01_model.py remains as the
+reference implementation for the evaluation arms.
 
 ## Expression-program initialization comparison (09_init_comparison.py)
 
@@ -420,3 +423,215 @@ program learning), not the starting programs, determine where the fit
 converges; the NMF factorization is the model's most convenient
 initializer, not a requirement. (Breast 5K rows are appended to the CSV
 by the same script.)
+
+## Dose priors: joint estimation and the distance ladder (10_dose_truth.R, 11_dose_modes.py)
+
+The dose prior - the per-cell contamination fraction each pair's
+exposure predicts, and the only way contamination enters the fit - had
+two known weaknesses. It was measured *marginally*: each pair's
+guide-gene content was fitted on that source's exposure alone, so where
+two sources co-locate, content one of them delivered was credited to the
+other (07_robustness.py: joint/marginal ratio median 0.88, mural ->
+ductal 0.58). And its baseline was the zero-exposure stratum, which the
+audit's reference ladder showed is itself contaminated: a cell with no
+source among its 15 nearest can sit 20 um from source tissue, yet it got
+a prior of exactly zero, so nothing profile-shaped was ever removed from
+it - only the ambient tier reached such cells, and only on strict genes.
+
+Both are addressed by one change to the covariate the dose is measured
+on, and one change to how several pairs' doses are measured together:
+
+- **The stratum axis.** Each (cell, source) is placed on an ordered axis:
+  exposed cells by their source-neighbor count as before; unexposed cells
+  by how many nearest neighbors must be inspected before a source cell
+  appears (rungs of 30, 60, 120, 240 cells - the audit's ladder), with
+  "none within 240" as the deepest stratum. Contamination is monotone
+  along this axis, so the same isotonic fit yields the exposure gradient
+  and the distance decay, anchored at zero at the deepest stratum that
+  accumulates 20,000 molecules (the audit's reference rule). The ambient
+  tier keeps its role: it removes the level *at* the reference; the
+  ladder removes the excess above it in cells short of the reference.
+- **Joint estimation.** For a target type with sources S_1..S_m, pair j's
+  guide-gene rate is fitted additively on every source's stratum axis -
+  rho_0 + sum_S f_jS(stratum_S), each f monotone and zero at its
+  reference - by backfitting with weighted pool-adjacent-violators steps.
+  Pair j's prior is its own component f_jj only; the content its other
+  components explain is reported per pair as `cross_attributed_molecules`.
+- **A trend guard.** A monotone fit of a covariate that carries no signal
+  drifts upward (it is a maximum-type statistic), and with more strata
+  the drift grows; in a permutation control on a small synthetic tissue
+  it reached a tenth of the real prior. A dose-response therefore enters
+  the prior only when the guide content of the cells above the reference
+  exceeds the reference cells' by three standard errors of the
+  cell-to-cell variation (`dose_min_z`, applied to the partial residual
+  under the joint fit, and in every top-up pass). Under this guard the
+  permutation control collapses to exactly zero in every configuration.
+  On the pancreas production run the guard changes the removed total by
+  0.17% (1,204,374 against the reference's 1,206,425; entry correlation
+  0.999997); with it off, the C++ fit reproduces the reference exactly,
+  as before.
+
+The estimator ships behind three options of the packaged model -
+`dose_mode` ("marginal" | "joint"), `dose_ladder` (rung list; empty for
+the single unexposed stratum), `dose_min_z` - plus a built-in control,
+`permute_covariates_seed`, which permutes each cell's whole covariate
+vector (every source's exposure and stratum together) across the type's
+cells. The pair summaries gain `prior_unexposed_molecules` (prior
+contamination in unexposed cells, nonzero only with a ladder) and the
+cross-attributed molecules. Unit tests (tests/test_generative.cpp) cover
+the neighbor-rank covariate, the additive isotonic fit on a correlated
+two-covariate problem (the marginal fit of one covariate absorbs part of
+the other's effect; the joint fit recovers both), a confounded
+three-type fixture (the marginal fit credits the non-transferring source
+with 15% of the real source's dose; the joint fit cuts that by 85%), a
+ladder fixture (unexposed prior appears, removal reaches the planted
+transfer in cells beyond the exposure window, own genes untouched), and
+the covariate control.
+
+### Synthetic truth
+
+Two scenarios with planted contamination, run through the package path
+(tabular input, dataset audit, `fit_generative(init = "clusters")`,
+correction) under the four combinations of mode and ladder
+(results/dose_truth_A_summary.csv, dose_truth_B.csv; Figure D1).
+
+*Hidden contamination beyond the exposure window.* Source A on the left,
+target B elsewhere; B cells receive A-gene molecules as contact admixture
+(adjacent to the boundary), as hidden contamination decaying over eight
+columns (the analogue of out-of-section neighbors, present in cells with
+no A cell among their 15 nearest), and as a uniform ambient background.
+Two of A's four genes are also expressed natively by B at a low level,
+so they are pool genes but not strict ones - the realistic case the
+ambient tier cannot reach. On the strict genes every arm removes 96-99%
+of the planted contamination in the hidden zone: the ambient tier's
+bounded per-cell update covers it. On the shared genes the ladder is the
+difference: 0.4% of the hidden-zone contamination removed without it,
+53% with it (72% -> 75% in the exposed cells), at 0.1% removal of the
+genes' native content in the deep reference cells and zero removal of
+B's own genes. The ladder reaches out to the rung-240 extent (about
+eight columns here) and, by construction, nothing beyond it. The
+covariate-permutation control removes nothing.
+
+*A co-located source sharing genes with A.* Pure A on the left, a mixed
+zone in which each cell is A or C at random, targets B on the right; C
+transfers its profile in proportion to its exposure, A a smaller genuine
+amount of its own. Across columns both exposures rise toward the zone.
+When C shares a single A gene, all arms credit A -> B close to its
+planted truth (marginal 0.93x, joint 0.88x) and C -> B at 1.07-1.15x.
+When C's profile carries a proportional slice of A's - nothing for the
+audit's disproportionality screen to flag - the marginal fit credits
+A -> B with 1.97x its planted transfer (2.28x with the ladder), while the
+joint fit credits it with 0.75x and reports the difference (133
+molecules) as cross-attributed to C; C -> B moves from 1.14x to 1.07x.
+The joint fit's error is a moderate shrinkage of the smaller pair where
+the two exposures are collinear; the marginal fit's error is a
+near-doubling. Removal itself hardly differs between the two
+(contamination is removed under either attribution), so the practical
+stakes of the attribution are the per-pair accounting and the own-program
+learning weights, not the corrected counts.
+
+![Figure D1](figures/dose_truth.png)
+
+**Figure D1. Synthetic truth for the dose prior's estimation modes.**
+**(a)** Fraction of planted A-gene contamination removed from B cells,
+by distance from the A boundary (dashed line: the exposure window of 15
+nearest cells), for strict genes (never native in B) and for shared
+genes (natively expressed by B at a low level). Marginal and joint
+coincide here (one source), as do the two ladder arms. The ladder
+reaches shared-gene contamination the exposure window misses, out to
+its deepest rung. **(b)** Contamination molecules attributed to each
+pair, relative to the pair's planted transfer, when the co-located
+source C shares one A gene (top) or a proportional slice of A's profile
+(bottom). The marginal fit credits A with content C delivered when the
+profiles overlap; the joint fit removes that inflation at the cost of a
+moderate shrinkage of the smaller pair.
+
+### Pancreas
+
+All arms fit the harness problem specification (the same counts, pools,
+strict tiers and factor alignment as the recorded reference arms), in
+the production configuration (dose guided by the full pools) and the
+validation configuration (guided by the A halves; scored on the held-out
+B halves), and are scored three ways: the gene-split gate harness
+(02_eval_gates.R), the audit's own evaluation against the ambient
+reference, and the downstream same-label kNN purity (12_dose_purity.R).
+Tables: results/gm_dose_arms_summary.csv, gm_dose_gate_summaries.csv,
+gm_dose_purity.csv; per pair: gm_dose_arms_pairs.csv,
+gm_dose_arms_audit_pairs.csv, gm_dose_<arm>_pairs.csv.
+
+| arm (production) | removed | held-out power (harness) | leakage removed (audit) | unexposed-bin excess removed | flagged retention | own-marker removal | kNN purity | seconds |
+|---|---|---|---|---|---|---|---|---|
+| marginal, guard off (= reference) | 1,206,425 | 0.982 | 0.942 | 0.985 | 0.795 | 0 | 0.963 | 12 |
+| marginal | 1,204,401 | 0.980 | 0.941 | 0.985 | 0.796 | 0 | 0.962 | 12 |
+| joint | 1,202,284 | 0.978 | 0.939 | 0.985 | 0.803 | 0 | 0.962 | 14 |
+| ladder | 1,283,300 | 0.973 | 0.983 | 1.000 | 0.806 | 0 | 0.967 | 15 |
+| joint + ladder | 1,267,095 | 0.969 | 0.974 | 1.000 | 0.814 | 0 | 0.966 | 17 |
+| joint + ladder, covariates permuted | 15,086 | 0.021 | 0.012 | 0.029 | - | 0 | - | 12 |
+
+| arm (validation, A-half guided) | removed | held-out power | leakage removed (audit) | unexposed-bin excess removed | flagged retention |
+|---|---|---|---|---|---|
+| marginal, guard off (= reference) | 1,216,356 | 0.975 | 0.942 | 0.985 | 0.793 |
+| marginal | 1,210,316 | 0.972 | 0.940 | 0.985 | 0.795 |
+| joint | 1,213,351 | 0.973 | 0.940 | 0.985 | 0.800 |
+| ladder | 1,295,204 | 0.968 | 0.977 | 1.000 | 0.805 |
+| joint + ladder | 1,291,891 | 0.967 | 0.973 | 1.000 | 0.808 |
+
+Reading the table:
+
+- **The ladder removes the contamination the audit measures in unexposed
+  cells.** Before correction the audit finds 55,718 pool-gene molecules
+  above the ambient reference in the zero-neighbor bin of the 39 pairs;
+  the marginal fit leaves 1.5% of that, the ladder none. Whole-profile,
+  the ladder's prior in unexposed cells totals 122,503 molecules (per pair
+  it tracks the audit's measurement, Figure D2b), and the removed total
+  rises by 6.4% to 1.28M - toward the audit's ladder-referenced estimate
+  for this tissue (1.57M). The audit's headline leakage removal rises
+  from 0.942 to 0.983, flagged-gene retention from 0.795 to 0.806,
+  own-marker removal stays at zero, and the downstream purity rises from
+  0.963 to 0.967, the value of the membrane ensemble (0.968). The sparse
+  mural/pericyte source gains most: most target cells have no mural cell
+  among their 15 nearest but one close by, and its pairs' attributed
+  contamination rises 2.7- to 6.7-fold.
+- **The harness's held-out power moves the other way, by one point, and
+  that is its reference.** The harness measures exposure-linked excess
+  against the post-correction zero-neighbor baseline of the held-out
+  genes. The ladder cleans that bin, so residual contamination in the
+  exposed cells that the old baseline hid becomes countable. Six pairs
+  lose more than 0.02 of power under the ladder; for five of them the
+  audit, which measures against the ambient reference, finds the
+  exposed-cell excess fully removed in every arm (endothelial -> immune:
+  harness 1.00 -> 0.81, audit 0 residual). The exception is fibroblast ->
+  mural, where the ladder arms leave 7-11% of the exposed excess
+  (results/gm_dose_arms_audit_pairs.csv) - a genuine, small cost. The
+  harness's baseline-depth metric rises (median 0.58 -> 0.65), which is
+  the zero-bin cleanup registering as depth, as the audit document
+  anticipates for a non-native baseline.
+- **The joint fit changes attribution, not removal.** Across the 39 pairs
+  the ratio of joint to marginal attributed molecules has median 0.97;
+  the pairs the robustness check had singled out move most - mural ->
+  ductal 0.58 (11,172 molecules cross-attributed to the co-located
+  sources), immune -> endocrine 0.71, endothelial -> ductal 0.76, mural
+  -> exocrine 0.79, immune -> ductal 0.82 - while large pairs are
+  essentially unchanged (exocrine -> ductal 0.98; Figure D2a). The
+  removed total differs by 0.2%, held-out power by 0.3 points in
+  production and 0.1 the other way in validation, purity by 0.0003. Its
+  one visible per-pair cost is fibroblast -> mural (held-out power 0.91
+  -> 0.84 under the joint fit alone), the co-located, profile-sharing
+  pair in which the synthetic test showed the joint fit shrinks the
+  smaller partner.
+- **The guard** costs 0.2 points of held-out power (0.982 -> 0.980) for
+  an exactly collapsing control; the previous shuffled arm removed 1.8%
+  of the planted excess, the new control 1.2% (harness 0.021).
+
+![Figure D2](figures/dose_modes_pancreas.png)
+
+**Figure D2. The dose prior's modes on pancreas.** **(a)** Contamination
+molecules attributed to each of the 39 pairs by the marginal and the
+joint fit; the pairs below the diagonal are those whose exposure
+co-varies with a source that shares their genes. **(b)** The ladder's
+prior contamination in unexposed cells, per pair, against the audit's
+own measurement of the zero-neighbor bin's excess above the ambient
+reference (pool genes; the prior is whole-profile, hence above the
+diagonal). **(c)** Per-pair sensitivity on the exposed cells under the
+audit's reference, by estimation mode: the ladder arms reach the
+reference for every pair but fibroblast -> mural.

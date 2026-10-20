@@ -1,0 +1,12 @@
+"tag","n_pairs","power_B_weighted","power_B_median","false_removal_pooled","worst_false_removal"
+"gm_dose_marginal_z0",39,0.981993369606516,1,0,0
+"gm_dose_marginal",39,0.980263441340783,1,0,0
+"gm_dose_joint",39,0.977736187703911,0.99838443977289,0,0
+"gm_dose_ladder",39,0.972783244052063,0.998818336043316,0,0
+"gm_dose_joint_ladder",39,0.968646889854162,0.997823987797746,0,0
+"gm_dose_joint_ladder_control",39,0.0213336103554984,0,0,0
+"gm_dose_v_marginal_z0",39,0.974960473821546,1,0,0
+"gm_dose_v_marginal",39,0.972344444372662,1,0,0
+"gm_dose_v_joint",39,0.972956183016538,0.997935202288009,0,0
+"gm_dose_v_ladder",39,0.967654356861686,0.99907666998556,0,0
+"gm_dose_v_joint_ladder",39,0.967410754135544,0.992857998531889,0,0

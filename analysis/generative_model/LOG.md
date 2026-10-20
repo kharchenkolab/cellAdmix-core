@@ -254,3 +254,69 @@ patches) is the only discriminator. Actions:
   0.803/0.821, ambient 0.749/0.694 - the retention machinery passes all
   gate-3 targets in the regime where induction is statistically
   detectable at all.
+
+## Loop 8 - the dose prior: joint estimation and the distance ladder
+
+- Observe: two recorded weaknesses of the dose prior - marginal per-pair
+  estimation (joint/marginal ratio median 0.88, mural -> ductal 0.58 in
+  07_robustness) and a prior of exactly zero in unexposed cells, where
+  the audit's ladder shows contamination persists.
+- Orient: both are properties of the covariate and of the fitting, not
+  of the model's components. An ordered stratum axis (exposure count for
+  exposed cells; ladder depth of the nearest source cell for unexposed
+  ones, deepest first) makes one isotonic fit yield gradient and decay,
+  anchored at the audit's reference rule. Backfitting of monotone
+  components across all sources of a target gives each pair its own
+  component only.
+- Decide/act: implemented in C++ behind `dose_mode`, `dose_ladder`,
+  `dose_min_z`, with a built-in covariate-permutation control
+  (`permute_covariates_seed`); both bindings pass the options through
+  and the pair summaries report `prior_unexposed_molecules` and
+  `cross_attributed_molecules`. Default options reproduce the previous
+  behavior except for the guard (below).
+- Observe (tests): the confounded fixture failed first because the
+  "pure A behind a B stripe" geometry left A beyond the 14-neighbor
+  window (A exposure zero everywhere) - redesigned as a randomly mixed
+  A/C zone so the exposures co-vary across columns yet vary independently
+  within one. The joint+ladder permutation control removed 17% of the
+  planted transfer: with ~12 strata and a bimodal cell population, the
+  isotonic fit of a permuted covariate drifts upward (prior at a tenth
+  of the real fit's) and the top-up passes ratchet it. Orient: a
+  maximum-type bias, not a bug; the audit guards pair detection with a
+  significance test, the model had none. Act: `dose_min_z` - the pooled
+  above-reference versus reference comparison on cell-level rates with an
+  empirical standard error, applied to the partial residual under the
+  joint fit and in every top-up pass. The control then collapses to
+  exactly zero; real-data default removal changes by 0.17%, and the exact
+  parity with the Python reference is recovered with the guard off.
+- Observe (synthetic truth, first design): uninformative - all planted
+  genes were strict, and the ambient tier's bounded per-cell update
+  already removed 98% of the hidden-zone content in every arm; and the
+  confounded A -> B pair was never detected because its only A-marker
+  content in B was the shared gene, which the audit's screen flagged as
+  disproportionate. Act: give B a low native level of two A genes (pool
+  but not strict - the ambient tier cannot reach them), plant a small
+  genuine A transfer so the pair exists, and add the variant in which C
+  shares a proportional slice of A's profile (nothing to flag).
+- Observe (final synthetic): shared-gene hidden-zone contamination 0.4%
+  removed without the ladder, 53% with it, 0.1% of native content
+  removed in reference cells; the joint fit turns a 1.97x over-credit of
+  the small pair (shared profile) into 0.75x, and 0.93x -> 0.88x where
+  only one gene is shared. Collinearity shrinkage is the joint fit's
+  cost; it never inflates.
+- Next: the real-data 2x2 on pancreas through the gate harness and the
+  audit (11_dose_modes.py, 02_eval_gates.R, 12_dose_purity.R).
+- Observe (pancreas, three yardsticks): the ladder removes all of the
+  audit-measured unexposed-bin excess (55.7k pool molecules; 1.5% left
+  by the marginal fit), raises leakage removal 0.942 -> 0.983, retention
+  0.795 -> 0.806, purity 0.963 -> 0.967, own-marker removal 0; the
+  harness's held-out power falls 0.980 -> 0.973. Orient: the harness
+  references the post-correction zero-neighbor bin; cleaning that bin
+  exposes residuals it hid. Checked per pair: of six pairs losing > 0.02,
+  five show zero residual against the ambient reference; fibroblast ->
+  mural keeps 7-11%. The joint fit is neutral on every aggregate
+  (removal -0.2%, power -0.3/+0.1 points, purity -0.0003) and moves the
+  attribution of the robustness check's pairs (mural -> ductal 0.58);
+  its cost concentrates on fibroblast -> mural (0.91 -> 0.84).
+- Decide: both on by default, pending the NSCLC and breast replication
+  (same arms through the harness; audit scoring where the matrix fits).

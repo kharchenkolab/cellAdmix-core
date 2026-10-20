@@ -100,46 +100,31 @@ model
     ## cellAdmix generative model
     ##   pairs: 27 
     ##   induced genes retained: 88 
-    ##   removed molecules (expected): 2,645,086 
+    ##   removed molecules (expected): 3,240,920 
     ##   initialization: nmf_factors
 
 ``` r
 correction <- model$correct()
 ```
 
-The per-cell contamination fractions for the largest pair, by exposure
-and in space:
+The per-cell decomposition of the largest pair’s target type, averaged
+by exposure to the source, and the pair’s contamination fraction in
+space (the figure helpers are those of the model documentation, in
+[analysis/generative_model/tools/generative_plots.R](../../analysis/generative_model/tools/generative_plots.R)):
 
 ``` r
 top_pair <- pairs[order(-pairs$admixed_molecules), ][1, ]
-comp <- model$composition(top_pair$source, top_pair$target)
 cells_xy <- ds$cells()
-expo <- setNames(
-  cellAdmixCore:::.celladmix_source_exposure_counts(
-    cells_xy, cell_annotation, 15L)$counts[, top_pair$source],
-  as.character(cells_xy$cell_id))
-comp$exposure <- pmin(expo[comp$cell_id], 4)
-ggplot(comp, aes(factor(exposure), contamination)) +
-  geom_boxplot(outlier.size = 0.3, fill = "#f4a582") +
-  labs(x = sprintf("%s cells among 15 nearest neighbors", top_pair$source),
-    y = sprintf("fraction of the %s cell's molecules\nattributed to %s contamination",
-      top_pair$target, top_pair$source)) +
-  theme_classic(base_size = 11)
+expo <- generative_exposure(cells_xy, cell_annotation, top_pair$source)
+generative_plot_composition(model, top_pair$target, expo,
+  sprintf("%s cells among 15 nearest neighbors", top_pair$source))
 ```
 
 <img src="nsclc_generative_files/figure-gfm/composition-1.png" alt="" width="576" style="display: block; margin: auto;" />
 
 ``` r
-xy <- cells_xy[match(comp$cell_id, as.character(cells_xy$cell_id)), ]
-ggplot(cbind(comp, x = xy$x, y = xy$y), aes(x, y,
-    color = pmin(contamination, 0.5))) +
-  geom_point(size = 0.2) +
-  scale_color_viridis_c(option = "inferno",
-    name = sprintf("%s share\nof %s content",
-      top_pair$source, top_pair$target)) +
-  coord_equal() +
-  labs(x = NULL, y = NULL) +
-  theme_void(base_size = 11)
+generative_plot_composition_map(model, top_pair$source, top_pair$target,
+  cells_xy, cap = 0.5)
 ```
 
 <img src="nsclc_generative_files/figure-gfm/composition-map-1.png" alt="" width="720" style="display: block; margin: auto;" />
@@ -156,16 +141,16 @@ head(induced[order(-induced$excess),
 ```
 
     ##         source       target   gene    excess     fold         z
-    ## 36 endothelial immune other HSPA1A 10822.071 4.115105 17.490821
-    ## 37 endothelial immune other HSPA1B  9197.786 4.069366 16.709907
-    ## 43  macrophage immune other   GLUL  7484.991 2.531702  9.664467
-    ## 46  macrophage immune other   SRGN  7152.531 5.427598 20.806512
-    ## 41  macrophage immune other   NPPC  6637.024 2.434140  8.265147
-    ## 84  macrophage    malignant  DUSP5  5885.255 7.805123 24.148229
-    ## 20 endothelial   fibroblast COL4A2  5441.595 4.089343 15.346516
-    ## 5   macrophage  endothelial  DUSP5  5257.256 6.922895 16.729088
-    ## 28  macrophage   fibroblast  DUSP5  5209.542 3.296002 10.064301
-    ## 16 endothelial   fibroblast COL4A1  4278.497 3.739423 14.421736
+    ## 36 endothelial immune other HSPA1A 10822.071 4.115142 17.490983
+    ## 37 endothelial immune other HSPA1B  9197.786 4.069397 16.710036
+    ## 43  macrophage immune other   GLUL  7484.991 2.531711  9.664515
+    ## 46  macrophage immune other   SRGN  7152.531 5.427594 20.806501
+    ## 41  macrophage immune other   NPPC  6637.024 2.434151  8.265204
+    ## 84  macrophage    malignant  DUSP5  5885.255 7.805134 24.148244
+    ## 20 endothelial   fibroblast COL4A2  5441.595 4.089366 15.346591
+    ## 5   macrophage  endothelial  DUSP5  5257.256 6.922914 16.729104
+    ## 28  macrophage   fibroblast  DUSP5  5209.542 3.296014 10.064332
+    ## 16 endothelial   fibroblast COL4A1  4278.497 3.739442 14.421809
 
 The contrast between a transferred and an induced gene, for the pair
 with the strongest induced signal — the observed rise of the transferred
@@ -179,36 +164,31 @@ transfer_gene <- setdiff(mk$pool, induced$gene)[1]
 before <- ds$counts()
 after <- correction$counts()
 t_cells <- model$composition(ind_top$source, ind_top$target)$cell_id
-expo_t <- setNames(
-  cellAdmixCore:::.celladmix_source_exposure_counts(
-    cells_xy, cell_annotation, 15L)$counts[, ind_top$source],
-  as.character(cells_xy$cell_id))[t_cells]
-tot <- Matrix::colSums(before[, t_cells])
-bins <- pmin(expo_t, 3)
-rate_by_bin <- function(m, gene) {
-  tapply(m[gene, t_cells], bins, sum) / tapply(tot, bins, sum) * 1e3
-}
-df <- do.call(rbind, lapply(c(transfer_gene, ind_top$gene), function(g) {
-  rbind(
-    data.frame(gene = g, counts = "observed", bin = 0:3,
-      rate = as.numeric(rate_by_bin(before, g))),
-    data.frame(gene = g, counts = "corrected", bin = 0:3,
-      rate = as.numeric(rate_by_bin(after, g))))
-}))
-df$gene <- factor(df$gene, levels = c(transfer_gene, ind_top$gene),
-  labels = c(sprintf("%s (transferred)", transfer_gene),
-    sprintf("%s (induced)", ind_top$gene)))
-ggplot(df, aes(bin, rate, color = counts)) +
-  geom_line() + geom_point() +
-  facet_wrap(~gene, scales = "free_y") +
-  scale_color_manual(values = c(observed = "#c0392b",
-    corrected = "#2980b9")) +
-  labs(x = sprintf("%s cells among 15 nearest neighbors", ind_top$source),
-    y = sprintf("rate in %s cells (per 1,000 molecules)", ind_top$target)) +
-  theme_classic(base_size = 11)
+expo_t <- generative_exposure(cells_xy, cell_annotation, ind_top$source)
+generative_plot_gene_contrast(before, after, t_cells, expo_t,
+  c(transfer_gene, ind_top$gene),
+  sprintf("%s cells among 15 nearest neighbors", ind_top$source),
+  sprintf("rate in %s cells (per 1,000 molecules)", ind_top$target))
 ```
 
 <img src="nsclc_generative_files/figure-gfm/gene-contrast-1.png" alt="" width="816" style="display: block; margin: auto;" />
+
+Beyond the genes the model retains by its own screen, the corrected
+counts support the general question of which genes — of any ownership,
+in either direction — change in the target cells with the source’s
+proximity, tested jointly across all sources
+([docs/generative.md](../../docs/generative.md), Figure 4). Filled
+points are genes with essentially none of their content removed as
+transfer and no meaningful share of the source’s transfer profile; open
+grey points are entangled with the transfer split:
+
+``` r
+changes <- generative_induced_changes(before, after, model, cells_xy,
+  cell_annotation, ind_top$target)
+generative_plot_volcano(changes, ind_top$source)
+```
+
+<img src="nsclc_generative_files/figure-gfm/volcano-1.png" alt="" width="652.8" style="display: block; margin: auto;" />
 
 ## Verification
 
@@ -224,10 +204,10 @@ report$summary()
     ## [1] 4381180
     ## 
     ## $leakage_removed_overall
-    ## [1] 0.7833605
+    ## [1] 0.9495482
     ## 
     ## $median_pair_sensitivity
-    ## [1] 0.928304
+    ## [1] 0.9886518
     ## 
     ## $own_marker_false_removal
     ## [1] 0

@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <functional>
 #include <limits>
+#include <numeric>
 #include <stdexcept>
 #include <random>
 #include <thread>
@@ -134,7 +135,9 @@ struct PairState {
   std::vector<double> psi;      // G, decontaminated, zeroed on target genes
   std::vector<int> guide;
   double share_guide = 0.0;
+  std::vector<double> stratum;  // ordered dose covariate per row
   std::vector<double> lam_cell; // dose prior per row of the block
+  double cross_attributed = 0.0; // guide molecules explained by other sources
 };
 
 }  // namespace
@@ -169,6 +172,85 @@ std::vector<double> pava_increasing(
     for (const std::size_t i : idx[j]) out[i] = val[j];
   }
   return out;
+}
+
+AdditiveIsotonicFit additive_isotonic_fit(
+    const std::vector<double>& y,
+    const std::vector<double>& w,
+    const std::vector<std::vector<int>>& strata,
+    const std::vector<int>& n_levels,
+    const std::vector<int>& reference,
+    int max_cycles,
+    double tol) {
+  const std::size_t n = y.size();
+  const int C = static_cast<int>(strata.size());
+  if (w.size() != n || static_cast<int>(n_levels.size()) != C ||
+      static_cast<int>(reference.size()) != C) {
+    throw std::runtime_error("additive_isotonic_fit: inconsistent inputs");
+  }
+  AdditiveIsotonicFit fit;
+  fit.components.resize(static_cast<std::size_t>(C));
+  for (int c = 0; c < C; ++c) {
+    if (strata[static_cast<std::size_t>(c)].size() != n) {
+      throw std::runtime_error("additive_isotonic_fit: strata do not match rows");
+    }
+    fit.components[static_cast<std::size_t>(c)].assign(
+        static_cast<std::size_t>(std::max(n_levels[static_cast<std::size_t>(c)], 1)), 0.0);
+  }
+  double wsum = 0.0;
+  for (std::size_t i = 0; i < n; ++i) wsum += w[i];
+  if (n == 0 || wsum <= 0.0) return fit;
+  const auto predict = [&](std::size_t i, int skip) {
+    double s = 0.0;
+    for (int c = 0; c < C; ++c) {
+      if (c == skip) continue;
+      s += fit.components[static_cast<std::size_t>(c)][static_cast<std::size_t>(
+          strata[static_cast<std::size_t>(c)][i])];
+    }
+    return s;
+  };
+  {
+    double acc = 0.0;
+    for (std::size_t i = 0; i < n; ++i) acc += w[i] * y[i];
+    fit.intercept = acc / wsum;
+  }
+  for (int cycle = 0; cycle < max_cycles; ++cycle) {
+    double max_change = 0.0;
+    for (int c = 0; c < C; ++c) {
+      auto& comp = fit.components[static_cast<std::size_t>(c)];
+      const std::size_t nl = comp.size();
+      std::vector<double> m(nl, 0.0);
+      std::vector<double> ww(nl, 0.0);
+      for (std::size_t i = 0; i < n; ++i) {
+        const double r = y[i] - fit.intercept - predict(i, c);
+        const auto s = static_cast<std::size_t>(strata[static_cast<std::size_t>(c)][i]);
+        m[s] += w[i] * r;
+        ww[s] += w[i];
+      }
+      std::vector<double> rate(nl, 0.0);
+      std::vector<double> wt(nl, 1e-12);
+      for (std::size_t l = 0; l < nl; ++l) {
+        if (ww[l] > 0.0) {
+          rate[l] = m[l] / ww[l];
+          wt[l] = ww[l];
+        }
+      }
+      const auto fitted = pava_increasing(rate, wt);
+      const double base = fitted[static_cast<std::size_t>(
+          std::min(std::max(reference[static_cast<std::size_t>(c)], 0), static_cast<int>(nl) - 1))];
+      for (std::size_t l = 0; l < nl; ++l) {
+        const double v = std::max(fitted[l] - base, 0.0);
+        max_change = std::max(max_change, std::fabs(v - comp[l]));
+        comp[l] = v;
+      }
+    }
+    double acc = 0.0;
+    for (std::size_t i = 0; i < n; ++i) acc += w[i] * (y[i] - predict(i, -1));
+    fit.intercept = acc / wsum;
+    fit.cycles = cycle + 1;
+    if (max_change < tol) break;
+  }
+  return fit;
 }
 
 // ---- the fit -----------------------------------------------------------------
@@ -245,10 +327,27 @@ GenerativeResult fit_generative(
     }
   }
 
-  // Spatial covariates: exposure counts and nearest-type distances.
+  // Spatial covariates: exposure counts, nearest-type distances, and (with
+  // a dose ladder) the rank of the nearest cell of each type.
+  if (opt.dose_mode != "marginal" && opt.dose_mode != "joint") {
+    throw std::runtime_error("generative: dose_mode must be \"marginal\" or \"joint\"");
+  }
+  const int ladder_n = static_cast<int>(opt.dose_ladder.size());
+  for (int l = 0; l < ladder_n; ++l) {
+    const int k = opt.dose_ladder[static_cast<std::size_t>(l)];
+    const int prev = l == 0 ? opt.neighbor_k : opt.dose_ladder[static_cast<std::size_t>(l - 1)];
+    if (k <= prev) {
+      throw std::runtime_error("generative: dose_ladder must ascend and exceed neighbor_k");
+    }
+  }
+  const bool joint_dose = opt.dose_mode == "joint";
   const DenseMatrix exposure_counts =
       cell_neighbor_type_counts(x, y, type_codes, n_types, opt.neighbor_k);
   const DenseMatrix nearest_dist = cell_nearest_type_distance(x, y, type_codes, n_types);
+  const DenseMatrix nearest_rank = ladder_n > 0
+      ? cell_nearest_type_rank(x, y, type_codes, n_types,
+                               opt.dose_ladder[static_cast<std::size_t>(ladder_n - 1)])
+      : DenseMatrix(1, 1, 0.0);
 
   // Cells of each type in column order.
   std::vector<std::vector<int>> type_cols(static_cast<std::size_t>(n_types));
@@ -600,14 +699,53 @@ GenerativeResult fit_generative(
         for (const int g : ps.guide) ps.share_guide += ps.psi[static_cast<std::size_t>(g)];
       }
 
-      // Isotonic dose-response of guide-gene content on exposure, converted
-      // to a whole-profile contamination fraction per exposure stratum.
-      // values: current per-entry kept counts (raw counts on the first call).
-      const auto dose_response = [&](const PairState& ps, const std::vector<double>& kept,
-                                     const std::vector<int>& guide) {
+      // Ordered dose covariate per pair: the exposure count for exposed
+      // cells; with a ladder, unexposed cells are placed by how many nearest
+      // neighbors must be inspected before a source cell appears, deepest
+      // stratum first, so contamination is monotone along the axis.
+      for (auto& ps : plist) {
+        ps.stratum.resize(static_cast<std::size_t>(n));
+        for (int i = 0; i < n; ++i) {
+          const double e = ps.exposure[static_cast<std::size_t>(i)];
+          if (ladder_n == 0) {
+            ps.stratum[static_cast<std::size_t>(i)] = e;
+            continue;
+          }
+          if (e > 0.0) {
+            ps.stratum[static_cast<std::size_t>(i)] = ladder_n + e;
+            continue;
+          }
+          const double r = nearest_rank(blk.cols[static_cast<std::size_t>(i)], ps.spec->source_type);
+          int d = ladder_n;
+          for (int l = 0; l < ladder_n; ++l) {
+            if (r <= opt.dose_ladder[static_cast<std::size_t>(l)]) {
+              d = l;
+              break;
+            }
+          }
+          ps.stratum[static_cast<std::size_t>(i)] = d == ladder_n ? 0.0 : static_cast<double>(ladder_n - d);
+        }
+      }
+      if (opt.permute_covariates_seed != 0) {
+        std::vector<int> perm(static_cast<std::size_t>(n));
+        std::iota(perm.begin(), perm.end(), 0);
+        std::mt19937 rng(opt.permute_covariates_seed + static_cast<unsigned int>(T));
+        std::shuffle(perm.begin(), perm.end(), rng);
+        for (auto& ps : plist) {
+          const auto e = ps.exposure;
+          const auto s = ps.stratum;
+          for (int i = 0; i < n; ++i) {
+            ps.exposure[static_cast<std::size_t>(i)] = e[static_cast<std::size_t>(perm[static_cast<std::size_t>(i)])];
+            ps.stratum[static_cast<std::size_t>(i)] = s[static_cast<std::size_t>(perm[static_cast<std::size_t>(i)])];
+          }
+        }
+      }
+
+      // Guide-gene content per row from the current kept counts.
+      const auto row_guide_content = [&](const std::vector<double>& kept,
+                                         const std::vector<int>& guide) {
         std::vector<char> in_guide(static_cast<std::size_t>(G), 0);
         for (const int g : guide) in_guide[static_cast<std::size_t>(g)] = 1;
-        std::unordered_map<double, std::pair<double, double>> strata;  // e -> (m, t)
         std::vector<double> row_guide(static_cast<std::size_t>(n), 0.0);
         parallel_rows(n, opt.num_threads, [&](int begin, int end, int) {
           for (int i = begin; i < end; ++i) {
@@ -620,17 +758,81 @@ GenerativeResult fit_generative(
             row_guide[static_cast<std::size_t>(i)] = s;
           }
         });
+        return row_guide;
+      };
+
+      // Reference stratum of a sorted level list with per-level molecule
+      // weights: without a ladder, the unexposed stratum (which must be
+      // present); with one, the deepest stratum at which the accumulated
+      // molecules reach the reference minimum - the audit's rule - and, when
+      // the unexposed strata together fall short of it, the last unexposed
+      // stratum (all of them pooled, as without a ladder).
+      const auto reference_index = [&](const std::vector<double>& levels,
+                                       const std::vector<double>& weight) -> int {
+        if (levels.empty()) return -1;
+        if (ladder_n == 0) return levels.front() == 0.0 ? 0 : -1;
+        if (levels.front() > ladder_n) return -1;  // no unexposed cells at all
+        double cum = 0.0;
+        int last_unexposed = 0;
+        for (std::size_t s = 0; s < levels.size(); ++s) {
+          if (levels[s] > ladder_n) break;
+          last_unexposed = static_cast<int>(s);
+          cum += weight[s];
+          if (cum >= opt.dose_reference_min_molecules) return static_cast<int>(s);
+        }
+        return last_unexposed;
+      };
+
+      // Trend test for a dose covariate: the weighted mean rate of the rows
+      // above the reference level against that of the rows at or below it,
+      // in standard errors from the between-row variation.
+      const auto trend_z = [&](const std::vector<double>& rate_rows,
+                               const std::vector<int>& level_rows, int s0) {
+        double w1 = 0.0, w0 = 0.0, m1 = 0.0, m0 = 0.0;
+        int n1 = 0, n0 = 0;
         for (int i = 0; i < n; ++i) {
-          auto& slot = strata[ps.exposure[static_cast<std::size_t>(i)]];
+          const double w = blk.totals[static_cast<std::size_t>(i)];
+          const double r = rate_rows[static_cast<std::size_t>(i)];
+          if (level_rows[static_cast<std::size_t>(i)] > s0) {
+            w1 += w; m1 += w * r; ++n1;
+          } else {
+            w0 += w; m0 += w * r; ++n0;
+          }
+        }
+        if (n1 < 2 || n0 < 2 || w1 <= 0.0 || w0 <= 0.0) return -std::numeric_limits<double>::infinity();
+        m1 /= w1;
+        m0 /= w0;
+        double v1 = 0.0, v0 = 0.0;
+        for (int i = 0; i < n; ++i) {
+          const double w = blk.totals[static_cast<std::size_t>(i)];
+          const double r = rate_rows[static_cast<std::size_t>(i)];
+          if (level_rows[static_cast<std::size_t>(i)] > s0) {
+            v1 += w * (r - m1) * (r - m1);
+          } else {
+            v0 += w * (r - m0) * (r - m0);
+          }
+        }
+        const double se2 = v1 / w1 / n1 + v0 / w0 / n0;
+        if (se2 <= 0.0) return m1 > m0 ? std::numeric_limits<double>::infinity() : 0.0;
+        return (m1 - m0) / std::sqrt(se2);
+      };
+
+      // Marginal dose-response: isotonic fit of a pair's guide-gene content
+      // on its own stratum axis, converted to a whole-profile contamination
+      // fraction per stratum. kept: current per-entry kept counts (raw
+      // counts on the first call).
+      const auto dose_response = [&](const PairState& ps, const std::vector<double>& kept,
+                                     const std::vector<int>& guide) {
+        const auto row_guide = row_guide_content(kept, guide);
+        std::unordered_map<double, std::pair<double, double>> strata;  // level -> (m, t)
+        for (int i = 0; i < n; ++i) {
+          auto& slot = strata[ps.stratum[static_cast<std::size_t>(i)]];
           slot.first += row_guide[static_cast<std::size_t>(i)];
           slot.second += blk.totals[static_cast<std::size_t>(i)];
         }
         std::vector<double> levels;
         for (const auto& [e, mt] : strata) levels.push_back(e);
         std::sort(levels.begin(), levels.end());
-        if (levels.empty() || levels.front() != 0.0) {
-          return std::unordered_map<double, double>{};
-        }
         std::vector<double> rate;
         std::vector<double> weight;
         for (const double e : levels) {
@@ -638,21 +840,145 @@ GenerativeResult fit_generative(
           rate.push_back(mt.first / std::max(mt.second, 1.0));
           weight.push_back(mt.second);
         }
+        const int s0 = reference_index(levels, weight);
+        if (s0 < 0) {
+          return std::unordered_map<double, double>{};
+        }
+        if (opt.dose_min_z > 0.0) {
+          std::vector<double> rate_rows(static_cast<std::size_t>(n));
+          std::vector<int> level_rows(static_cast<std::size_t>(n));
+          for (int i = 0; i < n; ++i) {
+            rate_rows[static_cast<std::size_t>(i)] = row_guide[static_cast<std::size_t>(i)] /
+                std::max(blk.totals[static_cast<std::size_t>(i)], 1.0);
+            level_rows[static_cast<std::size_t>(i)] = static_cast<int>(
+                std::lower_bound(levels.begin(), levels.end(), ps.stratum[static_cast<std::size_t>(i)]) -
+                levels.begin());
+          }
+          if (trend_z(rate_rows, level_rows, s0) < opt.dose_min_z) {
+            return std::unordered_map<double, double>{};
+          }
+        }
         const auto fitted = pava_increasing(rate, weight);
         std::unordered_map<double, double> lam;
         const double share = std::max(ps.share_guide, 1e-6);
         for (std::size_t s = 0; s < levels.size(); ++s) {
-          lam[levels[s]] = std::min(std::max(fitted[s] - fitted[0], 0.0) / share, opt.lambda_max);
+          lam[levels[s]] = std::min(
+              std::max(fitted[s] - fitted[static_cast<std::size_t>(s0)], 0.0) / share, opt.lambda_max);
         }
         return lam;
       };
 
-      for (auto& ps : plist) {
-        const auto lam = dose_response(ps, blk.value, ps.guide);
-        ps.lam_cell.assign(static_cast<std::size_t>(n), 0.0);
-        for (int i = 0; i < n; ++i) {
-          const auto it = lam.find(ps.exposure[static_cast<std::size_t>(i)]);
-          if (it != lam.end()) ps.lam_cell[static_cast<std::size_t>(i)] = it->second;
+      // Joint dose: every pair's guide-gene rate is fitted additively on all
+      // sources' stratum axes; a pair's prior is its own-source component,
+      // and the content its other components explain is reported as
+      // cross-attributed.
+      const auto dose_joint = [&](const std::vector<double>& kept,
+                                  const std::vector<std::vector<int>>& guides,
+                                  const std::vector<double>& shares,
+                                  std::vector<std::vector<double>>& lam_rows,
+                                  std::vector<double>& cross) {
+        std::vector<std::vector<int>> strata(static_cast<std::size_t>(S_n),
+                                             std::vector<int>(static_cast<std::size_t>(n), 0));
+        std::vector<int> n_levels(static_cast<std::size_t>(S_n), 1);
+        std::vector<int> ref(static_cast<std::size_t>(S_n), -1);
+        std::vector<int> ref_clipped(static_cast<std::size_t>(S_n), 0);
+        for (int j = 0; j < S_n; ++j) {
+          const auto& ps = plist[static_cast<std::size_t>(j)];
+          std::vector<double> levels = ps.stratum;
+          std::sort(levels.begin(), levels.end());
+          levels.erase(std::unique(levels.begin(), levels.end()), levels.end());
+          std::vector<double> wl(levels.size(), 0.0);
+          for (int i = 0; i < n; ++i) {
+            const auto idx = static_cast<int>(
+                std::lower_bound(levels.begin(), levels.end(), ps.stratum[static_cast<std::size_t>(i)]) -
+                levels.begin());
+            strata[static_cast<std::size_t>(j)][static_cast<std::size_t>(i)] = idx;
+            wl[static_cast<std::size_t>(idx)] += blk.totals[static_cast<std::size_t>(i)];
+          }
+          n_levels[static_cast<std::size_t>(j)] = static_cast<int>(levels.size());
+          ref[static_cast<std::size_t>(j)] = reference_index(levels, wl);
+          ref_clipped[static_cast<std::size_t>(j)] = std::max(ref[static_cast<std::size_t>(j)], 0);
+        }
+        std::vector<double> wrow(blk.totals.begin(), blk.totals.end());
+        for (int j = 0; j < S_n; ++j) {
+          if (ref[static_cast<std::size_t>(j)] < 0) continue;
+          const auto row_guide = row_guide_content(kept, guides[static_cast<std::size_t>(j)]);
+          std::vector<double> yrate(static_cast<std::size_t>(n), 0.0);
+          for (int i = 0; i < n; ++i) {
+            yrate[static_cast<std::size_t>(i)] = row_guide[static_cast<std::size_t>(i)] /
+                std::max(blk.totals[static_cast<std::size_t>(i)], 1.0);
+          }
+          const auto fit = additive_isotonic_fit(yrate, wrow, strata, n_levels, ref_clipped);
+          const double share = std::max(shares[static_cast<std::size_t>(j)], 1e-6);
+          const auto& own = fit.components[static_cast<std::size_t>(j)];
+          bool accept = true;
+          if (opt.dose_min_z > 0.0) {
+            // partial residual: the rate net of the other sources' components
+            std::vector<double> partial(static_cast<std::size_t>(n));
+            for (int i = 0; i < n; ++i) {
+              double others = 0.0;
+              for (int s = 0; s < S_n; ++s) {
+                if (s == j) continue;
+                others += fit.components[static_cast<std::size_t>(s)][static_cast<std::size_t>(
+                    strata[static_cast<std::size_t>(s)][static_cast<std::size_t>(i)])];
+              }
+              partial[static_cast<std::size_t>(i)] = yrate[static_cast<std::size_t>(i)] - others;
+            }
+            accept = trend_z(partial, strata[static_cast<std::size_t>(j)],
+                             ref[static_cast<std::size_t>(j)]) >= opt.dose_min_z;
+          }
+          double other = 0.0;
+          for (int i = 0; i < n; ++i) {
+            lam_rows[static_cast<std::size_t>(j)][static_cast<std::size_t>(i)] = !accept ? 0.0 : std::min(
+                own[static_cast<std::size_t>(strata[static_cast<std::size_t>(j)][static_cast<std::size_t>(i)])] / share,
+                opt.lambda_max);
+            for (int s = 0; s < S_n; ++s) {
+              if (s == j) continue;
+              other += blk.totals[static_cast<std::size_t>(i)] *
+                  fit.components[static_cast<std::size_t>(s)][static_cast<std::size_t>(
+                      strata[static_cast<std::size_t>(s)][static_cast<std::size_t>(i)])];
+            }
+          }
+          cross[static_cast<std::size_t>(j)] = other;
+        }
+      };
+
+      // Dose prior per pair from the current kept counts and guide sets.
+      const auto dose_all = [&](const std::vector<double>& kept,
+                                const std::vector<std::vector<int>>& guides,
+                                const std::vector<double>& shares,
+                                std::vector<std::vector<double>>& lam_rows,
+                                std::vector<double>& cross) {
+        lam_rows.assign(static_cast<std::size_t>(S_n), std::vector<double>(static_cast<std::size_t>(n), 0.0));
+        cross.assign(static_cast<std::size_t>(S_n), 0.0);
+        if (joint_dose) {
+          dose_joint(kept, guides, shares, lam_rows, cross);
+          return;
+        }
+        for (int j = 0; j < S_n; ++j) {
+          PairState tmp = plist[static_cast<std::size_t>(j)];
+          tmp.share_guide = shares[static_cast<std::size_t>(j)];
+          const auto lam = dose_response(tmp, kept, guides[static_cast<std::size_t>(j)]);
+          for (int i = 0; i < n; ++i) {
+            const auto it = lam.find(tmp.stratum[static_cast<std::size_t>(i)]);
+            if (it != lam.end()) lam_rows[static_cast<std::size_t>(j)][static_cast<std::size_t>(i)] = it->second;
+          }
+        }
+      };
+
+      {
+        std::vector<std::vector<int>> guides(static_cast<std::size_t>(S_n));
+        std::vector<double> shares(static_cast<std::size_t>(S_n));
+        for (int j = 0; j < S_n; ++j) {
+          guides[static_cast<std::size_t>(j)] = plist[static_cast<std::size_t>(j)].guide;
+          shares[static_cast<std::size_t>(j)] = plist[static_cast<std::size_t>(j)].share_guide;
+        }
+        std::vector<std::vector<double>> lam_rows;
+        std::vector<double> cross;
+        dose_all(blk.value, guides, shares, lam_rows, cross);
+        for (int j = 0; j < S_n; ++j) {
+          plist[static_cast<std::size_t>(j)].lam_cell = lam_rows[static_cast<std::size_t>(j)];
+          plist[static_cast<std::size_t>(j)].cross_attributed = cross[static_cast<std::size_t>(j)];
         }
       }
 
@@ -1260,23 +1586,34 @@ GenerativeResult fit_generative(
       for (int i = 0; i < n; ++i) t_all += blk.totals[static_cast<std::size_t>(i)];
       for (int topup = 0; topup < opt.topup_passes; ++topup) {
         compute_kept();
-        double added = 0.0;
+        std::vector<std::vector<int>> guides(static_cast<std::size_t>(S_n));
+        std::vector<double> shares(static_cast<std::size_t>(S_n));
+        std::vector<char> valid(static_cast<std::size_t>(S_n), 0);
         for (int j = 0; j < S_n; ++j) {
-          auto& ps = plist[static_cast<std::size_t>(j)];
+          const auto& ps = plist[static_cast<std::size_t>(j)];
           std::vector<int> guide2;
           for (const int g : ps.guide) {
             if (M(j, g) <= 0.0) guide2.push_back(g);
           }
-          if (static_cast<int>(guide2.size()) < 3) continue;
           double share2 = 0.0;
           for (const int g : guide2) share2 += ps.psi[static_cast<std::size_t>(g)];
-          if (share2 <= 1e-6) continue;
-          PairState tmp = ps;
-          tmp.share_guide = share2;
-          const auto lam = dose_response(tmp, kept, guide2);
+          if (static_cast<int>(guide2.size()) >= 3 && share2 > 1e-6) {
+            guides[static_cast<std::size_t>(j)] = guide2;
+            shares[static_cast<std::size_t>(j)] = share2;
+            valid[static_cast<std::size_t>(j)] = 1;
+          } else {
+            guides[static_cast<std::size_t>(j)] = ps.guide;
+            shares[static_cast<std::size_t>(j)] = ps.share_guide;
+          }
+        }
+        std::vector<std::vector<double>> lam_rows;
+        std::vector<double> cross;
+        dose_all(kept, guides, shares, lam_rows, cross);
+        double added = 0.0;
+        for (int j = 0; j < S_n; ++j) {
+          if (!valid[static_cast<std::size_t>(j)]) continue;
           for (int i = 0; i < n; ++i) {
-            const auto it = lam.find(ps.exposure[static_cast<std::size_t>(i)]);
-            const double extra = it == lam.end() ? 0.0 : it->second;
+            const double extra = lam_rows[static_cast<std::size_t>(j)][static_cast<std::size_t>(i)];
             double& l = Lam[static_cast<std::size_t>(i) * S_n + j];
             l = std::min(l + extra, opt.lambda_max);
             added += extra * blk.totals[static_cast<std::size_t>(i)];
@@ -1365,9 +1702,12 @@ GenerativeResult fit_generative(
             if (ps.exposure[static_cast<std::size_t>(i)] > 0.0) {
               dose_sum += Lam[static_cast<std::size_t>(i) * S_n + j];
               ++n_exposed;
+            } else {
+              summary.prior_unexposed_molecules += Lam[static_cast<std::size_t>(i) * S_n + j] * ti;
             }
           }
           summary.mean_dose_exposed = n_exposed > 0 ? dose_sum / n_exposed : 0.0;
+          summary.cross_attributed_molecules = ps.cross_attributed;
           result.pairs.push_back(summary);
         }
         for (const auto& row : induced_rows) result.induced.push_back(row);

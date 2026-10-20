@@ -92,6 +92,17 @@ DenseMatrix cell_neighbor_type_counts(
     int n_types,
     int k);
 
+// Rank of the nearest cell of each type among a cell's max_k nearest
+// neighbor cells (1 = the closest neighbor), excluding the cell itself;
+// max_k + 1 when no cell of the type is among them. Returns a dense cells x
+// n_types matrix.
+DenseMatrix cell_nearest_type_rank(
+    const std::vector<double>& x,
+    const std::vector<double>& y,
+    const std::vector<int>& type_codes,
+    int n_types,
+    int max_k);
+
 // Distance from every cell to the nearest cell of each type, excluding the
 // cell itself. Returns a dense cells x n_types matrix; infinity for types
 // with no cells.

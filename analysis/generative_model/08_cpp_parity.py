@@ -2,6 +2,8 @@
 implementation, celladmix._core.fit_generative) versus the Python
 implementation's pancreas production run, on the identical problem
 specification (same pools, strict tiers, factor alignment, counts)."""
+import json
+import os
 import time
 
 import numpy as np
@@ -61,7 +63,9 @@ res = _core.fit_generative(
     molecules_parquet=f"{RUN}/molecules.parquet",
     cells_parquet=f"{RUN}/cells.parquet",
     pair_specs=pair_specs, factor_to_type=alignment,
-    options=dict(num_threads=12, neighbor_k=15),
+    programs_flat=[], program_type=[],
+    options=dict(num_threads=12, neighbor_k=15,
+                 **json.loads(os.environ.get("GM_OPTS", "{}"))),
 )
 t_cpp = time.time() - t0
 removed_cpp = np.asarray(res["removed"])
