@@ -50,11 +50,14 @@ def generative_bin_rates(matrix, gene_index, cols, bins, totals):
 
 
 def _short(name, lower=True):
-    """Short display name of a cell type: the part before a slash, lowercased,
-    unless that part is too short to stand alone (e.g. "T / NK")."""
+    """Short display name of a cell type: the part before a slash, lowercased
+    unless it starts with a short token that is a name in itself ("T / NK",
+    "T cell, CD8", "B cell")."""
     s = str(name).split("/")[0].strip()
     if len(s) < 3:
         return str(name)
+    if len(s.split()[0]) <= 2:
+        return s
     return s.lower() if lower else s
 
 

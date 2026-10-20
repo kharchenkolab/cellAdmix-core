@@ -17,7 +17,8 @@
 # unless that part is too short to stand alone (e.g. "T / NK").
 generative_short_label <- function(x, lower = TRUE) {
   s <- trimws(sub("/.*", "", x))
-  s <- if (lower) tolower(s) else s
+  keep_case <- nchar(sub(" .*", "", s)) <= 2
+  s <- ifelse(lower & !keep_case, tolower(s), s)
   ifelse(nchar(s) < 3, as.character(x), s)
 }
 
