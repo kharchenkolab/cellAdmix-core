@@ -7,9 +7,15 @@
 #include <limits>
 #include <numeric>
 #include <stdexcept>
+#include <string>
 #include <random>
 #include <thread>
 #include <unordered_map>
+
+// Largest number of contamination sources, and of own-expression programs,
+// a target type may carry: the per-entry weight buffers of the inner loop
+// are stack arrays of this size.
+constexpr int kMaxComponents = 32;
 
 #include <arrow/api.h>
 #include <arrow/io/api.h>
@@ -673,8 +679,9 @@ GenerativeResult fit_generative(
       for (int i = 0; i < n; ++i) row_of_col[static_cast<std::size_t>(blk.cols[static_cast<std::size_t>(i)])] = i;
 
       const int S_n = static_cast<int>(plist.size());
-      if (S_n > 16 || program_init[static_cast<std::size_t>(T)].rows() > 16) {
-        throw std::runtime_error("generative: more than 16 sources or programs per type");
+      if (S_n > kMaxComponents || program_init[static_cast<std::size_t>(T)].rows() > kMaxComponents) {
+        throw std::runtime_error("generative: more than " + std::to_string(kMaxComponents) +
+                                 " sources or programs per type");
       }
 
       // Decontaminated transfer profiles, zeroed on target-owned genes.
@@ -1465,9 +1472,9 @@ GenerativeResult fit_generative(
               double* uu = &U[static_cast<std::size_t>(i) * S_n];
               double* rr = &Rho[static_cast<std::size_t>(i) * S_n];
               // row-level dot products with the gene-side factors
-              double wf[16];
-              double wp[16];
-              double wm[16];
+              double wf[kMaxComponents];
+              double wp[kMaxComponents];
+              double wm[kMaxComponents];
               double wa = 0.0;
               for (int k = 0; k < K; ++k) wf[k] = 0.0;
               for (int j = 0; j < S_n; ++j) {
