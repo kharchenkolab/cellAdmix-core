@@ -49,8 +49,13 @@ def generative_bin_rates(matrix, gene_index, cols, bins, totals):
     return pd.DataFrame(rows)
 
 
-def _short(name):
-    return str(name).split("/")[0].strip().lower()
+def _short(name, lower=True):
+    """Short display name of a cell type: the part before a slash, lowercased,
+    unless that part is too short to stand alone (e.g. "T / NK")."""
+    s = str(name).split("/")[0].strip()
+    if len(s) < 3:
+        return str(name)
+    return s.lower() if lower else s
 
 
 # ---- admixture pattern ----------------------------------------------------------
@@ -109,7 +114,7 @@ def generative_plot_composition_map(model, source, target, cells_xy, cap=0.6, ax
     sc = ax.scatter(xy["x"], xy["y"], c=np.minimum(comp["contamination"], cap), s=0.5,
                     cmap="inferno", rasterized=True)
     ax.set_aspect("equal"); ax.axis("off")
-    ax.set_title(f"{str(source).split('/')[0].strip()} contamination of {_short(target)} cells",
+    ax.set_title(f"{_short(source, lower=False)} contamination of {_short(target)} cells",
                  fontsize=10, loc="left")
     ax.figure.colorbar(sc, ax=ax, fraction=0.04,
                        label=f"{_short(source)} share of\n{_short(target)} content")

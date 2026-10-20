@@ -1,0 +1,30 @@
+"pair","source","target","excess_pool","excess_B","power_A","power_B","power_strictB","depth_B"
+"B / plasma -> Endothelial","B / plasma","Endothelial",1644,1124,0,0,0,0
+"B / plasma -> Epithelial","B / plasma","Epithelial",9956,4575,0,0,0,0
+"B / plasma -> Fibroblast / CAF","B / plasma","Fibroblast / CAF",1061,505,0,0,0,0
+"B / plasma -> Myeloid","B / plasma","Myeloid",7130,2680,0,0,0,0
+"B / plasma -> T / NK","B / plasma","T / NK",9001,3772,0,0,0,0
+"Endothelial -> B / plasma","Endothelial","B / plasma",621,203,0,0,NA,0
+"Endothelial -> Epithelial","Endothelial","Epithelial",19950,19920,0,0,NA,0
+"Endothelial -> Myeloid","Endothelial","Myeloid",1784,1477,0,0,NA,0
+"Endothelial -> T / NK","Endothelial","T / NK",1683,568,0,0,NA,0
+"Epithelial -> B / plasma","Epithelial","B / plasma",3179,1394,0,0,0,0
+"Epithelial -> Endothelial","Epithelial","Endothelial",9608,4401,0,0,NA,0
+"Epithelial -> Fibroblast / CAF","Epithelial","Fibroblast / CAF",5225,2510,0,0,0,0
+"Epithelial -> Myeloid","Epithelial","Myeloid",11131,7711,0,0,0,0
+"Epithelial -> T / NK","Epithelial","T / NK",19293,7308,0,0,0,0
+"Fibroblast / CAF -> B / plasma","Fibroblast / CAF","B / plasma",474,24,0,0,NA,0
+"Fibroblast / CAF -> Endothelial","Fibroblast / CAF","Endothelial",232,22,0,0,NA,0
+"Fibroblast / CAF -> Epithelial","Fibroblast / CAF","Epithelial",1886,720,0,0,NA,0
+"Fibroblast / CAF -> Myeloid","Fibroblast / CAF","Myeloid",2835,2692,0,0,NA,0
+"Fibroblast / CAF -> T / NK","Fibroblast / CAF","T / NK",2513,175,0,0,NA,0
+"Myeloid -> B / plasma","Myeloid","B / plasma",5977,3755,0,0,0,0
+"Myeloid -> Endothelial","Myeloid","Endothelial",7326,4642,0,0,0,0
+"Myeloid -> Epithelial","Myeloid","Epithelial",51818,31512,0,0,0,0
+"Myeloid -> Fibroblast / CAF","Myeloid","Fibroblast / CAF",1921,1218,0,0,0,0
+"Myeloid -> T / NK","Myeloid","T / NK",20197,12650,0,0,0,0
+"T / NK -> B / plasma","T / NK","B / plasma",10595,6028,0,0,0,0
+"T / NK -> Endothelial","T / NK","Endothelial",7989,3760,0,0,NA,0
+"T / NK -> Epithelial","T / NK","Epithelial",100294,49617,0,0,0,0
+"T / NK -> Fibroblast / CAF","T / NK","Fibroblast / CAF",4321,2023,0,0,NA,0
+"T / NK -> Myeloid","T / NK","Myeloid",46729,34436,0,0,NA,0

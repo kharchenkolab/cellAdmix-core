@@ -13,6 +13,14 @@
 # (cell_id, x, y); `exposure` is a named integer vector of source-type
 # neighbor counts per cell id (generative_exposure()).
 
+# Short display name of a cell type: the part before a slash, lowercased,
+# unless that part is too short to stand alone (e.g. "T / NK").
+generative_short_label <- function(x, lower = TRUE) {
+  s <- trimws(sub("/.*", "", x))
+  s <- if (lower) tolower(s) else s
+  ifelse(nchar(s) < 3, as.character(x), s)
+}
+
 suppressPackageStartupMessages({
   library(ggplot2)
   library(Matrix)
@@ -97,7 +105,7 @@ generative_plot_composition <- function(model, target, exposure, x_label) {
     geom_col(width = 0.72) +
     scale_fill_manual(values = generative_palette, name = NULL,
       breaks = names(generative_palette)) +
-    labs(x = x_label, y = sprintf("mean share of %s content", tolower(sub("/.*", "", target)))) +
+    labs(x = x_label, y = sprintf("mean share of %s content", generative_short_label(target))) +
     theme_classic(base_size = 11)
 }
 
@@ -109,11 +117,11 @@ generative_plot_composition_map <- function(model, source, target, cells_xy,
   ggplot(cbind(comp, x = xy$x, y = xy$y), aes(x, y, color = pmin(contamination, cap))) +
     geom_point(size = 0.25) +
     scale_color_viridis_c(option = "inferno",
-      name = legend %||% sprintf("%s share\nof %s\ncontent", tolower(sub("/.*", "", source)),
-        tolower(sub("/.*", "", target)))) +
+      name = legend %||% sprintf("%s share\nof %s\ncontent", generative_short_label(source),
+        generative_short_label(target))) +
     coord_equal() +
     labs(x = NULL, y = NULL, title = title %||% sprintf("%s contamination of %s cells",
-      sub("/.*", "", source), tolower(sub("/.*", "", target)))) +
+      generative_short_label(source, lower = FALSE), generative_short_label(target))) +
     theme_void(base_size = 11)
 }
 
@@ -248,7 +256,7 @@ generative_induced_changes <- function(before, after, model, cells_xy, annotatio
 generative_plot_volcano <- function(changes, source, z_cap = 60, label_n = 7,
                                     source_label = NULL) {
   d <- changes[changes$source == source & is.finite(changes$z), ]
-  src <- source_label %||% tolower(sub("/.*", "", source))
+  src <- source_label %||% generative_short_label(source)
   d$lfc <- d$log_fold_per_neighbor / log(2)
   d$zc <- pmin(abs(d$z), z_cap)
   d$tier <- ifelse(!d$clean, "transfer-entangled",
@@ -306,7 +314,7 @@ generative_plot_transfer_screen <- function(before, model, cells_xy, annotation,
   bound <- data.frame(expected = xg,
     excess = xg + z * sqrt(exp(predict(vfit, data.frame(lx = log(xg)))) + (profile_cv * xg)^2))
   flag <- scr[scr$flagged, ]
-  src <- tolower(sub("/.*", "", source)); tgt <- tolower(sub("/.*", "", target))
+  src <- generative_short_label(source); tgt <- generative_short_label(target)
   ggplot(scr, aes(expected, excess)) +
     geom_abline(color = "grey40", linewidth = 0.4) +
     geom_line(data = bound, linetype = "22", color = "grey50", linewidth = 0.4) +
@@ -406,7 +414,7 @@ generative_plot_induced_pairs <- function(before, after, model, cells_xy, annota
     tc <- model$composition(r$source, r$target)$cell_id
     bins <- generative_bins(generative_exposure(cells_xy, annotation, r$source)[tc])
     tot <- Matrix::colSums(before[, tc])
-    lab <- sprintf("%s\n(%s → %s)", r$gene, sub("/.*", "", r$source), sub("/.*", "", r$target))
+    lab <- sprintf("%s\n(%s → %s)", r$gene, generative_short_label(r$source, lower = FALSE), generative_short_label(r$target, lower = FALSE))
     rbind(cbind(panel = lab, counts = "observed", generative_bin_rates(before, r$gene, tc, bins, tot)),
       cbind(panel = lab, counts = "corrected", generative_bin_rates(after, r$gene, tc, bins, tot)))
   }))
@@ -442,7 +450,7 @@ generative_plot_gene_map <- function(after, model, source, target, cells_xy, gen
     scale_color_viridis_c(name = sprintf("corrected %s\n(per 1,000\nmolecules)", gene)) +
     coord_equal() +
     labs(x = NULL, y = NULL, title = title %||%
-      sprintf("The retained %s program in %s cells", gene, tolower(sub("/.*", "", target)))) +
+      sprintf("The retained %s program in %s cells", gene, generative_short_label(target))) +
     theme_void(base_size = 11)
 }
 

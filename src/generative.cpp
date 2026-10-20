@@ -181,7 +181,8 @@ AdditiveIsotonicFit additive_isotonic_fit(
     const std::vector<int>& n_levels,
     const std::vector<int>& reference,
     int max_cycles,
-    double tol) {
+    double tol,
+    const std::vector<int>& cap_upto) {
   const std::size_t n = y.size();
   const int C = static_cast<int>(strata.size());
   if (w.size() != n || static_cast<int>(n_levels.size()) != C ||
@@ -236,8 +237,17 @@ AdditiveIsotonicFit additive_isotonic_fit(
         }
       }
       const auto fitted = pava_increasing(rate, wt);
-      const double base = fitted[static_cast<std::size_t>(
+      double base = fitted[static_cast<std::size_t>(
           std::min(std::max(reference[static_cast<std::size_t>(c)], 0), static_cast<int>(nl) - 1))];
+      if (c < static_cast<int>(cap_upto.size()) && cap_upto[static_cast<std::size_t>(c)] >= 0) {
+        double num = 0.0, den = 0.0;
+        const int upto = std::min(cap_upto[static_cast<std::size_t>(c)], static_cast<int>(nl) - 1);
+        for (int l = 0; l <= upto; ++l) {
+          num += wt[static_cast<std::size_t>(l)] * fitted[static_cast<std::size_t>(l)];
+          den += wt[static_cast<std::size_t>(l)];
+        }
+        if (den > 0.0) base = std::min(base, num / den);
+      }
       for (std::size_t l = 0; l < nl; ++l) {
         const double v = std::max(fitted[l] - base, 0.0);
         max_change = std::max(max_change, std::fabs(v - comp[l]));
@@ -784,8 +794,11 @@ GenerativeResult fit_generative(
       };
 
       // Trend test for a dose covariate: the weighted mean rate of the rows
-      // above the reference level against that of the rows at or below it,
-      // in standard errors from the between-row variation.
+      // above the split level against that of the rows at or below it, in
+      // standard errors from the between-row variation. The split is the
+      // last unexposed level (exposed against all unexposed cells, as the
+      // audit detects pairs), so a deep stratum whose cells differ
+      // biologically neither dilutes nor carries the test.
       const auto trend_z = [&](const std::vector<double>& rate_rows,
                                const std::vector<int>& level_rows, int s0) {
         double w1 = 0.0, w0 = 0.0, m1 = 0.0, m0 = 0.0;
@@ -802,17 +815,21 @@ GenerativeResult fit_generative(
         if (n1 < 2 || n0 < 2 || w1 <= 0.0 || w0 <= 0.0) return -std::numeric_limits<double>::infinity();
         m1 /= w1;
         m0 /= w0;
+        // variance of a weighted mean: sum of w^2 (r - m)^2 over the
+        // squared total weight (cells with large totals carry the mean
+        // and its uncertainty alike; a per-cell variance over n would
+        // overstate the effective sample size)
         double v1 = 0.0, v0 = 0.0;
         for (int i = 0; i < n; ++i) {
           const double w = blk.totals[static_cast<std::size_t>(i)];
           const double r = rate_rows[static_cast<std::size_t>(i)];
           if (level_rows[static_cast<std::size_t>(i)] > s0) {
-            v1 += w * (r - m1) * (r - m1);
+            v1 += w * w * (r - m1) * (r - m1);
           } else {
-            v0 += w * (r - m0) * (r - m0);
+            v0 += w * w * (r - m0) * (r - m0);
           }
         }
-        const double se2 = v1 / w1 / n1 + v0 / w0 / n0;
+        const double se2 = v1 / (w1 * w1) + v0 / (w0 * w0);
         if (se2 <= 0.0) return m1 > m0 ? std::numeric_limits<double>::infinity() : 0.0;
         return (m1 - m0) / std::sqrt(se2);
       };
@@ -854,16 +871,33 @@ GenerativeResult fit_generative(
                 std::lower_bound(levels.begin(), levels.end(), ps.stratum[static_cast<std::size_t>(i)]) -
                 levels.begin());
           }
-          if (trend_z(rate_rows, level_rows, s0) < opt.dose_min_z) {
+          int split = s0;
+          if (ladder_n > 0) {
+            for (std::size_t s = 0; s < levels.size(); ++s) {
+              if (levels[s] <= ladder_n) split = static_cast<int>(s);
+            }
+          }
+          if (trend_z(rate_rows, level_rows, split) < opt.dose_min_z) {
             return std::unordered_map<double, double>{};
           }
         }
         const auto fitted = pava_increasing(rate, weight);
+        double base = fitted[static_cast<std::size_t>(s0)];
+        if (ladder_n > 0) {
+          // never above the pooled unexposed rate (the audit's cap on its
+          // reference): a deep stratum whose cells differ biologically
+          // cannot raise the reference level
+          double m = 0.0, w = 0.0;
+          for (std::size_t s = 0; s < levels.size() && levels[s] <= ladder_n; ++s) {
+            m += rate[s] * weight[s];
+            w += weight[s];
+          }
+          if (w > 0.0) base = std::min(base, m / w);
+        }
         std::unordered_map<double, double> lam;
         const double share = std::max(ps.share_guide, 1e-6);
         for (std::size_t s = 0; s < levels.size(); ++s) {
-          lam[levels[s]] = std::min(
-              std::max(fitted[s] - fitted[static_cast<std::size_t>(s0)], 0.0) / share, opt.lambda_max);
+          lam[levels[s]] = std::min(std::max(fitted[s] - base, 0.0) / share, opt.lambda_max);
         }
         return lam;
       };
@@ -882,11 +916,17 @@ GenerativeResult fit_generative(
         std::vector<int> n_levels(static_cast<std::size_t>(S_n), 1);
         std::vector<int> ref(static_cast<std::size_t>(S_n), -1);
         std::vector<int> ref_clipped(static_cast<std::size_t>(S_n), 0);
+        std::vector<int> cap_upto(static_cast<std::size_t>(S_n), -1);
         for (int j = 0; j < S_n; ++j) {
           const auto& ps = plist[static_cast<std::size_t>(j)];
           std::vector<double> levels = ps.stratum;
           std::sort(levels.begin(), levels.end());
           levels.erase(std::unique(levels.begin(), levels.end()), levels.end());
+          if (ladder_n > 0) {
+            for (std::size_t s = 0; s < levels.size(); ++s) {
+              if (levels[s] <= ladder_n) cap_upto[static_cast<std::size_t>(j)] = static_cast<int>(s);
+            }
+          }
           std::vector<double> wl(levels.size(), 0.0);
           for (int i = 0; i < n; ++i) {
             const auto idx = static_cast<int>(
@@ -908,7 +948,8 @@ GenerativeResult fit_generative(
             yrate[static_cast<std::size_t>(i)] = row_guide[static_cast<std::size_t>(i)] /
                 std::max(blk.totals[static_cast<std::size_t>(i)], 1.0);
           }
-          const auto fit = additive_isotonic_fit(yrate, wrow, strata, n_levels, ref_clipped);
+          const auto fit = additive_isotonic_fit(yrate, wrow, strata, n_levels, ref_clipped,
+                                                 100, 1e-10, cap_upto);
           const double share = std::max(shares[static_cast<std::size_t>(j)], 1e-6);
           const auto& own = fit.components[static_cast<std::size_t>(j)];
           bool accept = true;
@@ -924,8 +965,9 @@ GenerativeResult fit_generative(
               }
               partial[static_cast<std::size_t>(i)] = yrate[static_cast<std::size_t>(i)] - others;
             }
-            accept = trend_z(partial, strata[static_cast<std::size_t>(j)],
-                             ref[static_cast<std::size_t>(j)]) >= opt.dose_min_z;
+            const int split = cap_upto[static_cast<std::size_t>(j)] >= 0
+                ? cap_upto[static_cast<std::size_t>(j)] : ref[static_cast<std::size_t>(j)];
+            accept = trend_z(partial, strata[static_cast<std::size_t>(j)], split) >= opt.dose_min_z;
           }
           double other = 0.0;
           for (int i = 0; i < n; ++i) {

@@ -87,18 +87,20 @@ def pair_specs(validation):
     return out
 
 
+# every arm sets the three dose options explicitly, so the table does not
+# depend on the package defaults
 ARMS = {
-    "marginal_z0": dict(dose_min_z=0.0),
-    "marginal": dict(),
-    "joint": dict(dose_mode="joint"),
-    "ladder": dict(dose_ladder=LADDER),
+    "marginal_z0": dict(dose_mode="marginal", dose_ladder=[], dose_min_z=0.0),
+    "marginal": dict(dose_mode="marginal", dose_ladder=[]),
+    "joint": dict(dose_mode="joint", dose_ladder=[]),
+    "ladder": dict(dose_mode="marginal", dose_ladder=LADDER),
     "joint_ladder": dict(dose_mode="joint", dose_ladder=LADDER),
     "joint_ladder_control": dict(dose_mode="joint", dose_ladder=LADDER,
                                  use_ambient=False, permute_covariates_seed=11),
-    "v_marginal_z0": dict(dose_min_z=0.0),
-    "v_marginal": dict(),
-    "v_joint": dict(dose_mode="joint"),
-    "v_ladder": dict(dose_ladder=LADDER),
+    "v_marginal_z0": dict(dose_mode="marginal", dose_ladder=[], dose_min_z=0.0),
+    "v_marginal": dict(dose_mode="marginal", dose_ladder=[]),
+    "v_joint": dict(dose_mode="joint", dose_ladder=[]),
+    "v_ladder": dict(dose_mode="marginal", dose_ladder=LADDER),
     "v_joint_ladder": dict(dose_mode="joint", dose_ladder=LADDER),
 }
 only = sys.argv[1:]
@@ -196,7 +198,8 @@ csc_before = audit._matrix.tocsc()
 tt_all = np.asarray(csc_before.sum(axis=0)).ravel()
 ctypes = audit._ctypes
 
-ref_induced = fits.get("marginal_z0", fits.get("marginal"))["induced"] if fits else []
+ref_fit = fits.get("marginal_z0") or fits.get("marginal") or (next(iter(fits.values())) if fits else None)
+ref_induced = ref_fit["induced"] if ref_fit else []
 flagged = [(pairs_df.iloc[r["pair"]].source, pairs_df.iloc[r["pair"]].target,
             genes[r["gene"]]) for r in ref_induced]
 

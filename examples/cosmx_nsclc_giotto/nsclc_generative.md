@@ -100,7 +100,7 @@ model
     ## cellAdmix generative model
     ##   pairs: 27 
     ##   induced genes retained: 88 
-    ##   removed molecules (expected): 3,240,920 
+    ##   removed molecules (expected): 3,390,467 
     ##   initialization: nmf_factors
 
 ``` r
@@ -141,16 +141,16 @@ head(induced[order(-induced$excess),
 ```
 
     ##         source       target   gene    excess     fold         z
-    ## 36 endothelial immune other HSPA1A 10822.071 4.115142 17.490983
-    ## 37 endothelial immune other HSPA1B  9197.786 4.069397 16.710036
-    ## 43  macrophage immune other   GLUL  7484.991 2.531711  9.664515
-    ## 46  macrophage immune other   SRGN  7152.531 5.427594 20.806501
-    ## 41  macrophage immune other   NPPC  6637.024 2.434151  8.265204
-    ## 84  macrophage    malignant  DUSP5  5885.255 7.805134 24.148244
+    ## 36 endothelial immune other HSPA1A 10822.071 4.115143 17.490986
+    ## 37 endothelial immune other HSPA1B  9197.786 4.069398 16.710038
+    ## 43  macrophage immune other   GLUL  7484.991 2.531707  9.664492
+    ## 46  macrophage immune other   SRGN  7152.531 5.427592 20.806496
+    ## 41  macrophage immune other   NPPC  6637.024 2.434147  8.265181
+    ## 84  macrophage    malignant  DUSP5  5885.255 7.805129 24.148237
     ## 20 endothelial   fibroblast COL4A2  5441.595 4.089366 15.346591
-    ## 5   macrophage  endothelial  DUSP5  5257.256 6.922914 16.729104
-    ## 28  macrophage   fibroblast  DUSP5  5209.542 3.296014 10.064332
-    ## 16 endothelial   fibroblast COL4A1  4278.497 3.739442 14.421809
+    ## 5   macrophage  endothelial  DUSP5  5257.256 6.922909 16.729099
+    ## 28  macrophage   fibroblast  DUSP5  5209.542 3.296008 10.064316
+    ## 16 endothelial   fibroblast COL4A1  4278.497 3.739442 14.421808
 
 The contrast between a transferred and an induced gene, for the pair
 with the strongest induced signal — the observed rise of the transferred
@@ -204,10 +204,10 @@ report$summary()
     ## [1] 4381180
     ## 
     ## $leakage_removed_overall
-    ## [1] 0.9495482
+    ## [1] 0.9688949
     ## 
     ## $median_pair_sensitivity
-    ## [1] 0.9886518
+    ## [1] 0.997736
     ## 
     ## $own_marker_false_removal
     ## [1] 0

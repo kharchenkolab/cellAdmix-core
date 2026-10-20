@@ -1,0 +1,204 @@
+arm,pair,source,target,prior,posterior,induced,prior_unexposed,cross_attributed
+marginal,Endothelial -> B / plasma,Endothelial,B / plasma,7518.356780412387,7382.407108204631,0.0,0.0,0.0
+marginal,Epithelial -> B / plasma,Epithelial,B / plasma,93390.6585756889,90984.49961700234,0.0,0.0,0.0
+marginal,Fibroblast / CAF -> B / plasma,Fibroblast / CAF,B / plasma,4679.258664300892,4521.622065174921,0.0,0.0,0.0
+marginal,Myeloid -> B / plasma,Myeloid,B / plasma,95985.29595705136,96113.90598186814,26385.183879147644,0.0,0.0
+marginal,T / NK -> B / plasma,T / NK,B / plasma,431718.28187845356,399851.5817337845,5.248958897671302,0.0,0.0
+marginal,B / plasma -> Endothelial,B / plasma,Endothelial,63932.9889045446,60462.27880750779,324.10602091006524,0.0,0.0
+marginal,Epithelial -> Endothelial,Epithelial,Endothelial,469688.5454872039,449911.69172420603,0.0,0.0,0.0
+marginal,Fibroblast / CAF -> Endothelial,Fibroblast / CAF,Endothelial,2739.67275419515,2590.3092683880127,0.0,0.0,0.0
+marginal,Myeloid -> Endothelial,Myeloid,Endothelial,129384.77423459142,121343.52489282572,44.44420315022767,0.0,0.0
+marginal,T / NK -> Endothelial,T / NK,Endothelial,326693.74605143163,308412.7382444998,248.9584489638545,0.0,0.0
+marginal,B / plasma -> Epithelial,B / plasma,Epithelial,158657.66343663036,149641.54516020906,43489.25571339283,0.0,0.0
+marginal,Endothelial -> Epithelial,Endothelial,Epithelial,319546.7683434153,302542.71431176586,12237.159659973164,0.0,0.0
+marginal,Fibroblast / CAF -> Epithelial,Fibroblast / CAF,Epithelial,19988.19909333481,19561.016787473778,0.0,0.0,0.0
+marginal,Myeloid -> Epithelial,Myeloid,Epithelial,449009.7651712711,427831.89175455365,84114.89879696092,0.0,0.0
+marginal,T / NK -> Epithelial,T / NK,Epithelial,1914479.9208835405,1700260.32842877,21401.30587619495,0.0,0.0
+marginal,B / plasma -> Fibroblast / CAF,B / plasma,Fibroblast / CAF,24167.74556909445,23024.771526159144,0.0,0.0,0.0
+marginal,Epithelial -> Fibroblast / CAF,Epithelial,Fibroblast / CAF,240416.4956321845,229642.85994394455,0.0,0.0,0.0
+marginal,Myeloid -> Fibroblast / CAF,Myeloid,Fibroblast / CAF,28794.514478369936,27437.006449962126,0.03591190549696982,0.0,0.0
+marginal,T / NK -> Fibroblast / CAF,T / NK,Fibroblast / CAF,395735.805091291,375343.07743104425,228.79022402105912,0.0,0.0
+marginal,B / plasma -> Myeloid,B / plasma,Myeloid,200809.48205281168,197997.60791088437,20225.913820926056,0.0,0.0
+marginal,Endothelial -> Myeloid,Endothelial,Myeloid,28382.891909160495,27983.286944875093,0.0,0.0,0.0
+marginal,Epithelial -> Myeloid,Epithelial,Myeloid,273928.4945597642,269903.1404286433,5235.804266238887,0.0,0.0
+marginal,Fibroblast / CAF -> Myeloid,Fibroblast / CAF,Myeloid,28665.51311573416,27752.86356354794,0.0,0.0,0.0
+marginal,T / NK -> Myeloid,T / NK,Myeloid,1946734.5466152905,1851850.3690775887,18145.92844125914,0.0,0.0
+marginal,B / plasma -> T / NK,B / plasma,T / NK,193908.63302125022,190060.82056175615,0.0,0.0,0.0
+marginal,Endothelial -> T / NK,Endothelial,T / NK,23248.30111389046,23059.923406762075,137.63701124991798,0.0,0.0
+marginal,Epithelial -> T / NK,Epithelial,T / NK,556222.3314510116,535598.6475525633,0.0,0.0,0.0
+marginal,Fibroblast / CAF -> T / NK,Fibroblast / CAF,T / NK,26929.34681684127,26467.379472451943,0.0,0.0,0.0
+marginal,Myeloid -> T / NK,Myeloid,T / NK,300725.98668402486,292283.7830714194,2804.031992750491,0.0,0.0
+joint,Endothelial -> B / plasma,Endothelial,B / plasma,7652.768666770338,7513.023505716806,0.0,0.0,2284.293327208691
+joint,Epithelial -> B / plasma,Epithelial,B / plasma,94454.62609016888,91988.91873776783,0.0,0.0,1528.7503048383048
+joint,Fibroblast / CAF -> B / plasma,Fibroblast / CAF,B / plasma,0.0,0.0,0.0,0.0,4777.852702424112
+joint,Myeloid -> B / plasma,Myeloid,B / plasma,101164.14680123326,101086.29599322636,26296.61940726854,0.0,757.4698476375925
+joint,T / NK -> B / plasma,T / NK,B / plasma,433522.3527080898,401458.2129604934,6.009713243754725,0.0,2662.348594077877
+joint,B / plasma -> Endothelial,B / plasma,Endothelial,53595.44383507263,50972.146908114046,324.4795930284992,0.0,1518.7674577916143
+joint,Epithelial -> Endothelial,Epithelial,Endothelial,464589.9600693842,445548.4129386632,0.0,0.0,799.3168920454295
+joint,Fibroblast / CAF -> Endothelial,Fibroblast / CAF,Endothelial,2464.388628710807,2333.6495182556864,0.0,0.0,2923.751639811741
+joint,Myeloid -> Endothelial,Myeloid,Endothelial,126559.34891136129,118890.78861612838,69.73537359370178,0.0,1769.967643157288
+joint,T / NK -> Endothelial,T / NK,Endothelial,312328.8096763355,295374.402789088,244.3404210559244,0.0,3097.099936907387
+joint,B / plasma -> Epithelial,B / plasma,Epithelial,117109.5630539855,114796.29105036035,43164.97842658753,0.0,16096.02916333217
+joint,Endothelial -> Epithelial,Endothelial,Epithelial,316176.78317692614,300723.8775309562,12414.527846133042,0.0,6742.845221269137
+joint,Fibroblast / CAF -> Epithelial,Fibroblast / CAF,Epithelial,0.0,0.0,0.0,0.0,33426.91079353733
+joint,Myeloid -> Epithelial,Myeloid,Epithelial,365786.3199580551,360109.2059292608,82390.09289044801,0.0,27040.368980475316
+joint,T / NK -> Epithelial,T / NK,Epithelial,1641308.5689639454,1467661.6904176192,20253.261485409825,0.0,40556.124967230724
+joint,B / plasma -> Fibroblast / CAF,B / plasma,Fibroblast / CAF,22541.845768545027,21511.3843853552,0.0,0.0,720.743840604962
+joint,Epithelial -> Fibroblast / CAF,Epithelial,Fibroblast / CAF,241099.2359708824,230384.4276796144,0.0,0.0,2.2270591847451184
+joint,Myeloid -> Fibroblast / CAF,Myeloid,Fibroblast / CAF,27348.837282787536,26089.500464357257,0.045484410301845794,0.0,350.896646744509
+joint,T / NK -> Fibroblast / CAF,T / NK,Fibroblast / CAF,388736.06559928175,368967.56822199404,232.29109843266988,0.0,879.7344342211791
+joint,B / plasma -> Myeloid,B / plasma,Myeloid,201263.82080595964,198398.73810279084,20218.326128697587,0.0,587.5306193909448
+joint,Endothelial -> Myeloid,Endothelial,Myeloid,29275.083096261696,28850.58454019907,0.0,0.0,3299.7389441626387
+joint,Epithelial -> Myeloid,Epithelial,Myeloid,273570.71439196035,269387.4921355058,5210.184399116462,0.0,2349.322959509487
+joint,Fibroblast / CAF -> Myeloid,Fibroblast / CAF,Myeloid,19361.029564168737,18823.98750278571,0.0,0.0,31470.405261371587
+joint,T / NK -> Myeloid,T / NK,Myeloid,1944238.6142056982,1849342.71586395,18071.019680295023,0.0,9192.496145927716
+joint,B / plasma -> T / NK,B / plasma,T / NK,192017.38804965166,188272.04780278602,0.0,0.0,4323.389414436912
+joint,Endothelial -> T / NK,Endothelial,T / NK,21618.628656837976,21474.284925724965,140.96344802028761,0.0,3055.6706172609215
+joint,Epithelial -> T / NK,Epithelial,T / NK,539282.6953589356,520290.98644822364,0.0,0.0,6900.431374052305
+joint,Fibroblast / CAF -> T / NK,Fibroblast / CAF,T / NK,27604.064556220117,27138.718969743404,0.0,0.0,2196.5817233359676
+joint,Myeloid -> T / NK,Myeloid,T / NK,302773.82737279055,294311.22977320873,2820.767132452229,0.0,3049.319927088632
+ladder,Endothelial -> B / plasma,Endothelial,B / plasma,24702.736111367758,24198.140562450186,0.0,12499.242620474823,0.0
+ladder,Epithelial -> B / plasma,Epithelial,B / plasma,95373.52960751884,92935.26847191501,0.0,1728.2030570112697,0.0
+ladder,Fibroblast / CAF -> B / plasma,Fibroblast / CAF,B / plasma,35281.28675979492,33917.96621098145,0.0,23652.409249598448,0.0
+ladder,Myeloid -> B / plasma,Myeloid,B / plasma,99155.42259665167,99927.01928301282,33488.78246074168,2231.5250473301885,0.0
+ladder,T / NK -> B / plasma,T / NK,B / plasma,414309.99027004064,382566.59637492604,0.04731103468566991,5002.557139454915,0.0
+ladder,B / plasma -> Endothelial,B / plasma,Endothelial,106984.04331016375,100533.65545061586,407.7010627192445,30561.75418253107,0.0
+ladder,Epithelial -> Endothelial,Epithelial,Endothelial,493601.1580721882,471013.9133884312,0.0,7774.655707279166,0.0
+ladder,Fibroblast / CAF -> Endothelial,Fibroblast / CAF,Endothelial,8131.866670738961,7642.4762146891935,0.0,3898.520667880647,0.0
+ladder,Myeloid -> Endothelial,Myeloid,Endothelial,149273.71898107883,138722.41396002917,76.93877436971069,12965.911847575155,0.0
+ladder,T / NK -> Endothelial,T / NK,Endothelial,313717.87047127757,294964.56276065315,249.61056781269164,3738.8807682640304,0.0
+ladder,B / plasma -> Epithelial,B / plasma,Epithelial,239949.46109278259,227363.5329169835,115565.0700723738,73355.55565896005,0.0
+ladder,Endothelial -> Epithelial,Endothelial,Epithelial,1216212.318524594,1163161.321186216,60535.35384664951,640504.7650622118,0.0
+ladder,Fibroblast / CAF -> Epithelial,Fibroblast / CAF,Epithelial,356813.4000441625,340815.8012114687,0.0,271216.19739782205,0.0
+ladder,Myeloid -> Epithelial,Myeloid,Epithelial,514757.6245678584,481063.53459301806,138184.92485776788,77440.80120328326,0.0
+ladder,T / NK -> Epithelial,T / NK,Epithelial,1838292.7694249614,1632366.542862763,21508.55840128046,52575.49230735422,0.0
+ladder,B / plasma -> Fibroblast / CAF,B / plasma,Fibroblast / CAF,34730.958868928814,33022.644005088936,0.0,7526.822505968749,0.0
+ladder,Epithelial -> Fibroblast / CAF,Epithelial,Fibroblast / CAF,244885.8823501053,233840.2640412064,0.0,2295.3887291576534,0.0
+ladder,Myeloid -> Fibroblast / CAF,Myeloid,Fibroblast / CAF,36302.41376522669,34356.05889209007,0.0005192116415437312,2994.830833016513,0.0
+ladder,T / NK -> Fibroblast / CAF,T / NK,Fibroblast / CAF,384638.8187446942,363754.23194519,252.49103236599314,2239.628294958803,0.0
+ladder,B / plasma -> Myeloid,B / plasma,Myeloid,218399.25643108774,215566.5284537871,24754.97733666857,16070.224990706132,0.0
+ladder,Endothelial -> Myeloid,Endothelial,Myeloid,131493.7570051367,129228.50477806843,0.0,74775.50431581643,0.0
+ladder,Epithelial -> Myeloid,Epithelial,Myeloid,336305.8166811373,331015.5940083295,7037.246683387694,18760.308749742067,0.0
+ladder,Fibroblast / CAF -> Myeloid,Fibroblast / CAF,Myeloid,249562.90869840878,240477.5546649572,0.0,171693.53467285962,0.0
+ladder,T / NK -> Myeloid,T / NK,Myeloid,1907611.19253134,1807653.5921234991,19715.464873501387,32267.584369804426,0.0
+ladder,B / plasma -> T / NK,B / plasma,T / NK,204964.52696374225,200289.97803312805,0.0,13869.173211592064,0.0
+ladder,Endothelial -> T / NK,Endothelial,T / NK,94565.27320726101,91926.61179483368,321.71321453501747,35693.712493218976,0.0
+ladder,Epithelial -> T / NK,Epithelial,T / NK,528440.5814129303,507004.2228491107,0.0,0.0,0.0
+ladder,Fibroblast / CAF -> T / NK,Fibroblast / CAF,T / NK,401197.59448902705,390359.548980615,0.0,270309.0570508051,0.0
+ladder,Myeloid -> T / NK,Myeloid,T / NK,429644.27268091077,411226.3249129427,10960.307088172884,32553.594530933267,0.0
+joint_ladder,Endothelial -> B / plasma,Endothelial,B / plasma,22641.520599804655,22207.036849978034,0.0,10718.427353783889,2231.7262967578386
+joint_ladder,Epithelial -> B / plasma,Epithelial,B / plasma,96338.73133209647,93904.55368086284,0.0,1373.5391726680866,1894.717621215898
+joint_ladder,Fibroblast / CAF -> B / plasma,Fibroblast / CAF,B / plasma,0.0,0.0,0.0,0.0,13264.446761285946
+joint_ladder,Myeloid -> B / plasma,Myeloid,B / plasma,112274.52905340077,112630.29234045472,33760.12749834309,3017.643196108685,2096.8240779298617
+joint_ladder,T / NK -> B / plasma,T / NK,B / plasma,416319.7845940838,384718.8250930574,0.35878834362997536,4703.847338707154,3347.4870365431248
+joint_ladder,B / plasma -> Endothelial,B / plasma,Endothelial,69764.86941227109,66093.28059331219,354.0464309375757,10693.699264846633,1473.328720298153
+joint_ladder,Epithelial -> Endothelial,Epithelial,Endothelial,485677.21049585036,464968.184055101,0.0,6762.80342056712,1156.726906557561
+joint_ladder,Fibroblast / CAF -> Endothelial,Fibroblast / CAF,Endothelial,4385.867085354387,4141.117030831259,0.0,1393.4907506608638,3788.8615917919356
+joint_ladder,Myeloid -> Endothelial,Myeloid,Endothelial,149891.09659645805,139882.33191470496,89.07177050143673,12101.917304452763,2266.884184508473
+joint_ladder,T / NK -> Endothelial,T / NK,Endothelial,287123.8569395474,271132.26073575305,245.69460138370872,1195.089790381106,5276.534662053839
+joint_ladder,B / plasma -> Epithelial,B / plasma,Epithelial,112437.31298396156,109688.07295034734,43568.52911049939,0.0,16096.02915128316
+joint_ladder,Endothelial -> Epithelial,Endothelial,Epithelial,1165171.9876573496,1126052.6188972017,61123.14474666854,601573.2622847835,32096.271216737325
+joint_ladder,Fibroblast / CAF -> Epithelial,Fibroblast / CAF,Epithelial,0.0,0.0,0.0,0.0,76281.68741586265
+joint_ladder,Myeloid -> Epithelial,Myeloid,Epithelial,372567.54478922265,365552.37739266315,106731.9333918747,27589.668599118562,27446.68710491943
+joint_ladder,T / NK -> Epithelial,T / NK,Epithelial,1490535.6445460236,1333012.1900094033,19553.957147138604,0.0,40556.124983711445
+joint_ladder,B / plasma -> Fibroblast / CAF,B / plasma,Fibroblast / CAF,28346.430829838897,27048.86076317043,0.0,4081.317208463019,659.8593258433564
+joint_ladder,Epithelial -> Fibroblast / CAF,Epithelial,Fibroblast / CAF,247825.974521168,237102.76232892467,0.0,2329.425257315823,108.26815719075707
+joint_ladder,Myeloid -> Fibroblast / CAF,Myeloid,Fibroblast / CAF,32862.905662960686,31233.901718947673,0.0016561912002725947,2302.4036417963607,612.7899488355836
+joint_ladder,T / NK -> Fibroblast / CAF,T / NK,Fibroblast / CAF,369718.379285907,350236.8456010053,248.38451480779284,12.643613393005717,1946.716144832558
+joint_ladder,B / plasma -> Myeloid,B / plasma,Myeloid,224002.54785110816,220785.5930152514,24743.890952010563,16351.922728046577,586.4184811181697
+joint_ladder,Endothelial -> Myeloid,Endothelial,Myeloid,131304.46886753358,129098.97678735672,0.0,72921.10369162612,6026.442105004399
+joint_ladder,Epithelial -> Myeloid,Epithelial,Myeloid,375907.6312826077,369490.3932709867,7954.03151015543,27203.081789605945,5077.706296128856
+joint_ladder,Fibroblast / CAF -> Myeloid,Fibroblast / CAF,Myeloid,113504.63141811026,109931.49341947687,0.0,72848.49883276818,55023.78723417632
+joint_ladder,T / NK -> Myeloid,T / NK,Myeloid,1933570.0471109862,1829792.235379387,18755.422418810238,30484.994295907574,20769.44888627207
+joint_ladder,B / plasma -> T / NK,B / plasma,T / NK,200781.3392691209,196184.47679517342,0.0,9865.78865034608,4745.250461794212
+joint_ladder,Endothelial -> T / NK,Endothelial,T / NK,97589.07615499565,95011.56947564309,340.2304778032727,35423.983492158746,2975.2261695695124
+joint_ladder,Epithelial -> T / NK,Epithelial,T / NK,522679.7670986262,502306.69301656855,0.0,0.0,8617.23083189753
+joint_ladder,Fibroblast / CAF -> T / NK,Fibroblast / CAF,T / NK,382702.8045559009,372741.3918375817,0.0,256595.18778560119,91119.6912214684
+joint_ladder,Myeloid -> T / NK,Myeloid,T / NK,446618.92805740755,427995.3729848493,11262.322820402193,33502.17823459613,6972.609999508315
+joint_ladder_control,Endothelial -> B / plasma,Endothelial,B / plasma,0.0,0.0,0.0,0.0,2564.3650436255807
+joint_ladder_control,Epithelial -> B / plasma,Epithelial,B / plasma,0.0,0.0,0.0,0.0,2360.6446336982954
+joint_ladder_control,Fibroblast / CAF -> B / plasma,Fibroblast / CAF,B / plasma,0.0,0.0,0.0,0.0,4109.34826557181
+joint_ladder_control,Myeloid -> B / plasma,Myeloid,B / plasma,0.0,0.0,0.0,0.0,5939.487572943074
+joint_ladder_control,T / NK -> B / plasma,T / NK,B / plasma,0.0,0.0,0.0,0.0,1958.2645252906868
+joint_ladder_control,B / plasma -> Endothelial,B / plasma,Endothelial,0.0,0.0,0.0,0.0,2471.9035044188554
+joint_ladder_control,Epithelial -> Endothelial,Epithelial,Endothelial,0.0,0.0,0.0,0.0,2996.319216800084
+joint_ladder_control,Fibroblast / CAF -> Endothelial,Fibroblast / CAF,Endothelial,0.0,0.0,0.0,0.0,2143.8061339657093
+joint_ladder_control,Myeloid -> Endothelial,Myeloid,Endothelial,0.0,0.0,0.0,0.0,1964.4210310563858
+joint_ladder_control,T / NK -> Endothelial,T / NK,Endothelial,0.0,0.0,0.0,0.0,1476.528457014984
+joint_ladder_control,B / plasma -> Epithelial,B / plasma,Epithelial,0.0,0.0,0.0,0.0,1868.1057847751736
+joint_ladder_control,Endothelial -> Epithelial,Endothelial,Epithelial,0.0,0.0,0.0,0.0,10360.566298945898
+joint_ladder_control,Fibroblast / CAF -> Epithelial,Fibroblast / CAF,Epithelial,0.0,0.0,0.0,0.0,3252.8439893161562
+joint_ladder_control,Myeloid -> Epithelial,Myeloid,Epithelial,0.0,0.0,0.0,0.0,193.46817925847407
+joint_ladder_control,T / NK -> Epithelial,T / NK,Epithelial,0.0,0.0,0.0,0.0,8138.561479888123
+joint_ladder_control,B / plasma -> Fibroblast / CAF,B / plasma,Fibroblast / CAF,0.0,0.0,0.0,0.0,320.1389828019806
+joint_ladder_control,Epithelial -> Fibroblast / CAF,Epithelial,Fibroblast / CAF,0.0,0.0,0.0,0.0,984.6884332946078
+joint_ladder_control,Myeloid -> Fibroblast / CAF,Myeloid,Fibroblast / CAF,0.0,0.0,0.0,0.0,846.930988353879
+joint_ladder_control,T / NK -> Fibroblast / CAF,T / NK,Fibroblast / CAF,0.0,0.0,0.0,0.0,1001.1051388396937
+joint_ladder_control,B / plasma -> Myeloid,B / plasma,Myeloid,0.0,0.0,0.0,0.0,402.33479217188244
+joint_ladder_control,Endothelial -> Myeloid,Endothelial,Myeloid,0.0,0.0,0.0,0.0,1404.3828526054638
+joint_ladder_control,Epithelial -> Myeloid,Epithelial,Myeloid,0.0,0.0,0.0,0.0,4791.011557467568
+joint_ladder_control,Fibroblast / CAF -> Myeloid,Fibroblast / CAF,Myeloid,0.0,0.0,0.0,0.0,5695.324334973367
+joint_ladder_control,T / NK -> Myeloid,T / NK,Myeloid,0.0,0.0,0.0,0.0,9208.06484769731
+joint_ladder_control,B / plasma -> T / NK,B / plasma,T / NK,0.0,0.0,0.0,0.0,2492.528500640998
+joint_ladder_control,Endothelial -> T / NK,Endothelial,T / NK,0.0,0.0,0.0,0.0,2757.0133518893317
+joint_ladder_control,Epithelial -> T / NK,Epithelial,T / NK,0.0,0.0,0.0,0.0,7115.385677138616
+joint_ladder_control,Fibroblast / CAF -> T / NK,Fibroblast / CAF,T / NK,0.0,0.0,0.0,0.0,13438.363874302655
+joint_ladder_control,Myeloid -> T / NK,Myeloid,T / NK,0.0,0.0,0.0,0.0,5451.044497709406
+v_marginal,Endothelial -> B / plasma,Endothelial,B / plasma,6919.02047781835,6768.258106788676,0.0,0.0,0.0
+v_marginal,Epithelial -> B / plasma,Epithelial,B / plasma,87008.37402101929,84822.84203383712,0.0,0.0,0.0
+v_marginal,Fibroblast / CAF -> B / plasma,Fibroblast / CAF,B / plasma,4697.498424428492,4513.486695905845,0.0,0.0,0.0
+v_marginal,Myeloid -> B / plasma,Myeloid,B / plasma,122701.19402376533,120311.58584341418,26355.753469660543,0.0,0.0
+v_marginal,T / NK -> B / plasma,T / NK,B / plasma,488219.54007683694,448617.7298922354,0.2322886207530298,0.0,0.0
+v_marginal,B / plasma -> Endothelial,B / plasma,Endothelial,61394.262923763796,58217.81528366497,314.12419912273015,0.0,0.0
+v_marginal,Epithelial -> Endothelial,Epithelial,Endothelial,485632.4793920464,465347.25070916326,0.0,0.0,0.0
+v_marginal,Fibroblast / CAF -> Endothelial,Fibroblast / CAF,Endothelial,2510.225531598865,2376.1381724338166,0.0,0.0,0.0
+v_marginal,Myeloid -> Endothelial,Myeloid,Endothelial,99701.05760609027,94013.39195253905,195.38576718080458,0.0,0.0
+v_marginal,T / NK -> Endothelial,T / NK,Endothelial,314159.7215442028,297196.96758642927,249.0076754758086,0.0,0.0
+v_marginal,B / plasma -> Epithelial,B / plasma,Epithelial,150986.8290505248,143148.19230362834,43339.558605283375,0.0,0.0
+v_marginal,Endothelial -> Epithelial,Endothelial,Epithelial,0.0,0.0,0.0,0.0,0.0
+v_marginal,Fibroblast / CAF -> Epithelial,Fibroblast / CAF,Epithelial,0.0,0.0,0.0,0.0,0.0
+v_marginal,Myeloid -> Epithelial,Myeloid,Epithelial,468862.5914311607,444792.50365233904,83425.53669773482,0.0,0.0
+v_marginal,T / NK -> Epithelial,T / NK,Epithelial,1915080.8477518777,1700203.1648902926,21259.482526491785,0.0,0.0
+v_marginal,B / plasma -> Fibroblast / CAF,B / plasma,Fibroblast / CAF,26371.4333858983,25083.26024495469,0.0,0.0,0.0
+v_marginal,Epithelial -> Fibroblast / CAF,Epithelial,Fibroblast / CAF,242535.43996463218,231819.62717085445,0.0,0.0,0.0
+v_marginal,Myeloid -> Fibroblast / CAF,Myeloid,Fibroblast / CAF,29583.986518079735,28215.739518348386,0.0261006117993869,0.0,0.0
+v_marginal,T / NK -> Fibroblast / CAF,T / NK,Fibroblast / CAF,387714.82793724013,368191.08297570236,229.77415354720952,0.0,0.0
+v_marginal,B / plasma -> Myeloid,B / plasma,Myeloid,181701.8343588687,179651.1473060854,20110.057396179687,0.0,0.0
+v_marginal,Endothelial -> Myeloid,Endothelial,Myeloid,26806.63028692436,26317.234222619678,0.0,0.0,0.0
+v_marginal,Epithelial -> Myeloid,Epithelial,Myeloid,280997.6754316603,274852.0527109175,4977.313795695412,0.0,0.0
+v_marginal,Fibroblast / CAF -> Myeloid,Fibroblast / CAF,Myeloid,0.0,0.0,0.0,0.0,0.0
+v_marginal,T / NK -> Myeloid,T / NK,Myeloid,2094915.0371340492,1984572.5374755687,17828.818680121487,0.0,0.0
+v_marginal,B / plasma -> T / NK,B / plasma,T / NK,177873.6049381964,174524.14340808193,0.0,0.0,0.0
+v_marginal,Endothelial -> T / NK,Endothelial,T / NK,16916.11978739761,16790.577695741405,129.39170131900315,0.0,0.0
+v_marginal,Epithelial -> T / NK,Epithelial,T / NK,589687.2206800234,567619.1438716791,0.0,0.0,0.0
+v_marginal,Fibroblast / CAF -> T / NK,Fibroblast / CAF,T / NK,25701.98967978336,25226.865908326025,0.0,0.0,0.0
+v_marginal,Myeloid -> T / NK,Myeloid,T / NK,438209.911796346,421394.4068238405,2559.1314303315626,0.0,0.0
+v_joint_ladder,Endothelial -> B / plasma,Endothelial,B / plasma,33821.66617399817,32947.76386814846,0.0,18657.498579875224,3105.454902258996
+v_joint_ladder,Epithelial -> B / plasma,Epithelial,B / plasma,95876.43621438823,93414.31161650596,0.0,1746.950270116314,1054.8129290077152
+v_joint_ladder,Fibroblast / CAF -> B / plasma,Fibroblast / CAF,B / plasma,0.0,0.0,0.0,0.0,12080.979116129205
+v_joint_ladder,Myeloid -> B / plasma,Myeloid,B / plasma,123618.8238091885,121419.84708925923,29202.68703723301,681.3752031938576,1475.4949793404473
+v_joint_ladder,T / NK -> B / plasma,T / NK,B / plasma,510565.73171398824,467719.55925780936,0.0005240765207800537,9275.168149354864,1350.2136622830892
+v_joint_ladder,B / plasma -> Endothelial,B / plasma,Endothelial,66779.36029825012,63371.26704147425,341.742953349653,9762.914414348208,496.58067258746837
+v_joint_ladder,Epithelial -> Endothelial,Epithelial,Endothelial,507771.2494160962,486094.5013584572,0.0,8206.33898384509,826.3295396027736
+v_joint_ladder,Fibroblast / CAF -> Endothelial,Fibroblast / CAF,Endothelial,0.0,0.0,0.0,0.0,3815.466036015477
+v_joint_ladder,Myeloid -> Endothelial,Myeloid,Endothelial,123862.06676820006,116204.7076868824,122.658520246799,9974.53262407888,713.1354397662311
+v_joint_ladder,T / NK -> Endothelial,T / NK,Endothelial,279276.0106032809,264075.8672786252,244.16498754827862,1791.4012667935692,3256.509540975615
+v_joint_ladder,B / plasma -> Epithelial,B / plasma,Epithelial,111638.02707403275,110022.7923453932,44277.15061977605,1044.544135794874,8278.547024936028
+v_joint_ladder,Endothelial -> Epithelial,Endothelial,Epithelial,0.0,0.0,0.0,0.0,3206.4589780631504
+v_joint_ladder,Fibroblast / CAF -> Epithelial,Fibroblast / CAF,Epithelial,0.0,0.0,0.0,0.0,73604.63039455969
+v_joint_ladder,Myeloid -> Epithelial,Myeloid,Epithelial,403629.7881360981,398531.58494907117,106557.25113233225,30902.449380637645,11792.07878122668
+v_joint_ladder,T / NK -> Epithelial,T / NK,Epithelial,1493271.4892946186,1334700.5314613443,19325.461900743492,6.480845809388335,20376.215890419022
+v_joint_ladder,B / plasma -> Fibroblast / CAF,B / plasma,Fibroblast / CAF,28612.477556681602,27239.362799152583,0.0,3256.930605343734,530.5243210840688
+v_joint_ladder,Epithelial -> Fibroblast / CAF,Epithelial,Fibroblast / CAF,249099.12900615108,238348.15711916724,0.0,1862.9479441471344,76.78629006128537
+v_joint_ladder,Myeloid -> Fibroblast / CAF,Myeloid,Fibroblast / CAF,45958.114030047036,43474.74802721977,0.0006311473081253652,3878.5075238665677,121.98918288791936
+v_joint_ladder,T / NK -> Fibroblast / CAF,T / NK,Fibroblast / CAF,364918.28296554927,345557.9349064727,251.04671075833645,7.633427804701724,1265.8381680886946
+v_joint_ladder,B / plasma -> Myeloid,B / plasma,Myeloid,203988.78049066852,201887.53593288525,25074.21238448942,15536.845233725953,454.6779373894078
+v_joint_ladder,Endothelial -> Myeloid,Endothelial,Myeloid,25049.78135563155,24627.85622965562,0.0,1291.369267781727,4785.084717395995
+v_joint_ladder,Epithelial -> Myeloid,Epithelial,Myeloid,391833.59672302817,383579.87331914564,7527.151383846362,27215.80935935286,955.496587062016
+v_joint_ladder,Fibroblast / CAF -> Myeloid,Fibroblast / CAF,Myeloid,0.0,0.0,0.0,0.0,6664.8927950627685
+v_joint_ladder,T / NK -> Myeloid,T / NK,Myeloid,2133204.896131512,2007267.2296710145,18171.571331873907,26805.29918363937,4394.194908090816
+v_joint_ladder,B / plasma -> T / NK,B / plasma,T / NK,196523.1509650313,192011.76039866355,0.0,16696.248955032203,3470.191540440971
+v_joint_ladder,Endothelial -> T / NK,Endothelial,T / NK,74608.71412203342,72587.945531668,208.44697329516737,28036.67898424754,4948.743284642511
+v_joint_ladder,Epithelial -> T / NK,Epithelial,T / NK,586246.6871494695,563058.4874445854,0.0,3585.552708082417,5295.69349511631
+v_joint_ladder,Fibroblast / CAF -> T / NK,Fibroblast / CAF,T / NK,381506.5337366181,370628.3448178555,0.0,256709.06601922648,98311.84542966088
+v_joint_ladder,Myeloid -> T / NK,Myeloid,T / NK,618300.6194167682,587476.0549692113,8713.252535216932,38389.255289533816,2740.091150992511

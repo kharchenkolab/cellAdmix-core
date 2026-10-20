@@ -61,17 +61,21 @@ components, and where each one's parameters come from:
   nearest neighbors must be inspected before a source cell appears (the
   rungs of the audit's reference ladder), so a cell near but not
   adjacent to source tissue receives the contamination the audit
-  measures in such cells, and the prior is anchored at zero at the
-  deepest, source-free stratum. The dose–responses of all of a target
+  measures in such cells, and the prior is zero at the deepest,
+  source-free stratum (whose level is never taken above the pooled rate
+  of all unexposed cells, the rule the audit applies to its own
+  reference). The
+  dose–responses of all of a target
   type's sources are fitted jointly, each pair keeping only its own
   component, so material a co-located source delivered is not credited
   to the pair (the content its other components explain is reported per
-  pair); and a response enters the prior only when its rise above the
-  reference is significant against the cell-to-cell variation, since a
-  monotone fit of a covariate carrying no signal drifts upward. The
+  pair); and a response enters the prior only when the exposed cells'
+  content rises significantly above the unexposed cells' against the
+  cell-to-cell variation, since a monotone fit of a covariate carrying
+  no signal drifts upward. The
   posterior update from the cell's own expression is bounded — at most
   five-fold the prior, exactly zero where the prior is zero — so removal
-  stays anchored to the demonstrated spatial signal (with an unbounded
+  stays tied to the demonstrated spatial signal (with an unbounded
   update, the model keeps finding the true contamination even after the
   spatial covariates are scrambled, and the permutation control fails).
 - **Ambient background** ($\beta_c$, $a_g$): restricted to the strict
@@ -268,25 +272,24 @@ sees only the guide half, and performance is the fraction of
 exposure-linked excess removed on the held-out half, weighted across the
 39 detected pancreas pairs.
 
-- **Held-out-gene generalization**: 0.967 (median 0.993), versus 0.906
+- **Held-out-gene generalization**: 0.971 (median 0.995), versus 0.906
   for an exposure-regression corrector guided by the same genes and
   0.961 for the default molecule-vote ensemble — the ensemble reaching
   its number at 7.5% own-marker false removal, the model at 0.000. A
   dose measured on half the markers generalizes to the other half best
   when delivered through a full source profile with per-cell posterior
   updates. The harness measures against the post-correction
-  zero-neighbor baseline of the held-out genes; with the dose prior's
-  ladder cleaning that baseline, residual contamination it used to hide
-  becomes countable, which is where the harness number sits below the
-  0.974 of a single-stratum dose — against the audit's ambient
-  reference, the exposed-cell excess removed rises from 0.942 to 0.974.
-- **Production behavior**: 0.969 weighted removal on the harness, taking
-  out 1.27M of the dataset's 6.19M cell-assigned molecules (the ensemble
+  zero-neighbor baseline of the held-out genes, which the dose prior's
+  ladder cleans, so no hidden residual flatters the number; against the
+  audit's ambient reference, the exposed-cell excess removed rises from
+  0.940 with a single-stratum dose to 0.975.
+- **Production behavior**: 0.975 weighted removal on the harness, taking
+  out 1.28M of the dataset's 6.19M cell-assigned molecules (the ensemble
   removes 1.99M for the same downstream benefit), including the
   contamination the audit measures in cells with no source among their
   15 nearest, which a single-stratum dose leaves in place. The flagged
   genes retain 81% of their exposure-linked excess in aggregate — for
-  CFTR, 90k of its 111k excess molecules stay in the ductal cells —
+  CFTR, 95k of its 111k excess molecules stay in the ductal cells —
   while unflagged marker content is removed at 96–99%.
 - **Spike-in test**: with four classes of molecules planted in one
   pair's exposed cells, the model removes 81–85% of in-plane fragments,
@@ -296,28 +299,32 @@ exposure-linked excess removed on the held-out half, weighted across the
   the full sweep over gene ranks and planted amounts is shown in
   Figure 3 and discussed under the identifiability limit below.
 - **Replication**: on the CosMx NSCLC dataset (98,002 cells, 960-gene
-  panel, 27 detected pairs) the same configuration reaches 0.964 on
-  held-out genes, removes 9.0% of the molecules, keeps own-marker
-  removal at zero and the permutation control at 0.013 — and its screen
-  flags the same kind of interface biology: heat-shock and
-  immediate-early programs (HSPA1A/B, DUSP5, RGS2), macrophage
-  activation (GLUL, SRGN), and collagen programs at
-  endothelial–fibroblast borders. On the breast 5K dataset (688,099
-  cells, 5,101-gene panel, 29 detected pairs) held-out accuracy is
-  0.863 with 8.1% of molecules removed, the permutation control at
-  0.008 and own-marker removal at zero. The lower figure has a specific
-  anatomy: wherever a pair has strict-tier genes (essentially absent
-  from the target), their leakage is removed completely (0.9996), and
-  the shortfall concentrates in immune and stromal pairs whose held-out
-  markers are shared between source and target on a panel this large —
-  content the model deliberately attributes to the target's own
-  expression rather than remove.
+  panel, 27 detected pairs) the same configuration reaches 0.942 on
+  held-out genes, removes 11.6% of the molecules, keeps own-marker
+  removal at zero and the permutation control at exactly zero; against
+  the audit's ambient reference it removes 0.976 of the leakage, where a
+  single-stratum dose removes 0.785 (on this denser tissue nearly half of
+  the contamination sits in cells with no source among their 15 nearest),
+  and downstream purity rises from 0.811 to 0.902. Its screen flags the
+  same kind of interface biology: heat-shock and immediate-early programs
+  (HSPA1A/B, DUSP5, RGS2), macrophage activation (GLUL, SRGN), and
+  collagen programs at endothelial–fibroblast borders. On the breast 5K
+  dataset (688,099 cells, 5,101-gene panel, 29 detected pairs) held-out
+  accuracy is 0.850 with 9.1% of molecules removed, the permutation
+  control at exactly zero, own-marker removal at zero, and purity rising
+  from 0.702 to 0.822. The lower figure has a specific anatomy: wherever
+  a pair has strict-tier genes (essentially absent from the target),
+  their leakage is removed at 0.96, and the shortfall concentrates in
+  immune and stromal pairs whose held-out markers are shared between
+  source and target on a panel this large — content the model
+  deliberately attributes to the target's own expression rather than
+  remove.
 - **Controls**: permuting every cell's spatial covariates together
-  collapses removal to 0.012 (the dose prior, not a downstream
-  threshold, carries the control); own-marker false removal is 0.000
-  pooled and for the worst type; downstream cell-type
-  k-nearest-neighbor purity rises from 0.804 to 0.966, within a quarter
-  point of the ensemble's 0.968.
+  collapses removal to 0.025 on the harness and 0.011 against the
+  audit's reference (the dose prior, not a downstream threshold, carries
+  the control); own-marker false removal is 0.000 pooled and for the
+  worst type; downstream cell-type k-nearest-neighbor purity rises from
+  0.804 to 0.966, within a quarter point of the ensemble's 0.968.
 
 ## The identifiability limit
 

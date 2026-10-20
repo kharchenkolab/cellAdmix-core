@@ -119,7 +119,7 @@ model
     ## cellAdmix generative model
     ##   pairs: 39 
     ##   induced genes retained: 28 
-    ##   removed molecules (expected): 1,253,319 
+    ##   removed molecules (expected): 1,267,446 
     ##   initialization: nmf_factors
 
 ``` r
@@ -258,10 +258,10 @@ head(data.frame(gene = names(sort(removed_g, decreasing = TRUE)),
     ##          gene removed
     ## AMY2A   AMY2A  150613
     ## GATM     GATM   64326
-    ## CFTR     CFTR   16732
+    ## CFTR     CFTR   16457
     ## AQP8     AQP8   11748
-    ## ANPEP   ANPEP    8108
-    ## VCAN     VCAN    7722
+    ## VCAN     VCAN    8218
+    ## ANPEP   ANPEP    8034
     ## FBN1     FBN1    5240
     ## COL5A2 COL5A2    4804
 
@@ -279,23 +279,23 @@ head(induced[order(-induced$excess),
 ```
 
     ##                 source                  target    gene     excess     fold
-    ## 4  Exocrine epithelial Ductal/tumor epithelial    CFTR 110866.738 4.640903
-    ## 6  Exocrine epithelial Ductal/tumor epithelial   PROX1  11709.747 3.320363
-    ## 8     Fibroblast / CAF Ductal/tumor epithelial  SEMA3C   4181.181 7.741105
-    ## 25    Fibroblast / CAF                  Immune   PMP22   3183.480 3.092250
-    ## 9     Fibroblast / CAF Ductal/tumor epithelial   BASP1   2750.508 2.332770
-    ## 19    Mural / pericyte             Endothelial ADAMTS1   2045.614 3.725197
-    ## 7     Fibroblast / CAF Ductal/tumor epithelial  APCDD1   2035.355 3.465730
-    ## 5  Exocrine epithelial Ductal/tumor epithelial     CA4   1681.018 4.159023
+    ## 4  Exocrine epithelial Ductal/tumor epithelial    CFTR 110866.738 4.640906
+    ## 6  Exocrine epithelial Ductal/tumor epithelial   PROX1  11709.747 3.320385
+    ## 8     Fibroblast / CAF Ductal/tumor epithelial  SEMA3C   4181.181 7.741087
+    ## 25    Fibroblast / CAF                  Immune   PMP22   3183.480 3.092241
+    ## 9     Fibroblast / CAF Ductal/tumor epithelial   BASP1   2750.508 2.332766
+    ## 19    Mural / pericyte             Endothelial ADAMTS1   2045.614 3.725196
+    ## 7     Fibroblast / CAF Ductal/tumor epithelial  APCDD1   2035.355 3.465712
+    ## 5  Exocrine epithelial Ductal/tumor epithelial     CA4   1681.018 4.159249
     ##            z
-    ## 4  24.154513
-    ## 6  15.121189
-    ## 8  22.477162
-    ## 25 10.279818
-    ## 9   8.124358
-    ## 19 15.015962
-    ## 7  12.000228
-    ## 5  16.953810
+    ## 4  24.154536
+    ## 6  15.121326
+    ## 8  22.477142
+    ## 25 10.279787
+    ## 9   8.124338
+    ## 19 15.015958
+    ## 7  12.000170
+    ## 5  16.954700
 
 What this means for downstream analysis is best seen the way
 [docs/generative.md](../../docs/generative.md) (Figure 4) shows it: on
@@ -420,10 +420,10 @@ report$summary()
     ## [1] 1574854
     ## 
     ## $leakage_removed_overall
-    ## [1] 0.9724715
+    ## [1] 0.974216
     ## 
     ## $median_pair_sensitivity
-    ## [1] 0.9904802
+    ## [1] 0.9933523
     ## 
     ## $own_marker_false_removal
     ## [1] 0

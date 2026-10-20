@@ -265,7 +265,7 @@ patches) is the only discriminator. Actions:
   of the model's components. An ordered stratum axis (exposure count for
   exposed cells; ladder depth of the nearest source cell for unexposed
   ones, deepest first) makes one isotonic fit yield gradient and decay,
-  anchored at the audit's reference rule. Backfitting of monotone
+  with its reference level set by the audit's rule. Backfitting of monotone
   components across all sources of a target gives each pair its own
   component only.
 - Decide/act: implemented in C++ behind `dose_mode`, `dose_ladder`,
@@ -320,3 +320,85 @@ patches) is the only discriminator. Actions:
   its cost concentrates on fibroblast -> mural (0.91 -> 0.84).
 - Decide: both on by default, pending the NSCLC and breast replication
   (same arms through the harness; audit scoring where the matrix fits).
+- Observe (NSCLC, same arms, before the reference cap): the ladder lifts the
+  audit's leakage removal 0.785 -> 0.970 and the unexposed-bin excess
+  removed 0.55 -> 1.00 (removal +24%), purity 0.893 -> 0.902, own-marker
+  0; the harness's held-out power falls 0.964 -> 0.919. Per pair, most of
+  the drop is the reference artifact again (endothelial -> macrophage,
+  endothelial -> malignant, immune other -> malignant: harness drops of
+  0.15-0.18 with zero residual against the ambient reference), but
+  endothelial -> immune other is a genuine regression: harness 0.999 ->
+  0.405, audit residual 0 -> 12% of the exposed excess.
+- Orient: endothelium is everywhere, so "no endothelial cell among the
+  240 nearest" selects a biologically distinct population (immune
+  aggregates without vessels) whose marker rate exceeds the pooled
+  unexposed rate; the monotone fit then pools it with the next rungs,
+  the reference level rises, and the exposed strata's prior shrinks. The audit
+  guards its reference against exactly this by never letting it exceed
+  the pooled unexposed rate; the model's reference level lacked the cap.
+- Act: the reference level is now the smaller of the fit at the reference stratum
+  and the pooled rate of all unexposed strata, in both the marginal and
+  the joint path (the joint fit takes the cap as the weighted mean of its
+  component over the unexposed levels). Synthetic and unit results
+  unchanged (the cap never binds there); all arms rerun on the three
+  datasets, with every arm's options set explicitly - the breast arms of
+  the first pass had silently run one configuration after the package
+  defaults changed mid-run.
+- Observe (rerun with the cap): NSCLC unchanged - the four pairs that lose
+  the most held-out power under the ladder (endothelial -> immune other,
+  macrophage, malignant; immune other -> malignant) have a prior of
+  exactly zero in the ladder arms. Per-stratum rates for endothelial ->
+  immune other: deep stratum 7.3 per 1,000, the near-unexposed rungs
+  5.7-6.2, exposed cells 7.3 (one neighbor) to 13.7 (six). The cap
+  bounds the reference level, but the trend guard compared the rows above the
+  reference stratum (near-unexposed rungs and exposed cells together)
+  against the deep stratum alone - whose distinct population sits at the
+  exposed level - and rejected the whole dose-response.
+- Act: the guard now compares the exposed cells against all unexposed
+  cells pooled (the split is the last unexposed stratum), which is how
+  the audit detects a pair; without a ladder the split is the unexposed
+  stratum, as before. The reference level keeps the cap. Rerun from the start.
+- Observe (rerun with the cap and the exposed-vs-unexposed guard): the
+  NSCLC regression is gone (endothelial -> immune other: harness 1.00 ->
+  0.97 under the default, prior in unexposed cells 8.6k, zero residual
+  against the ambient reference), and on all three datasets the ladder
+  removes the whole audit-measured unexposed-bin excess at zero
+  own-marker removal, with purity up (pancreas 0.962 -> 0.966, NSCLC
+  0.893 -> 0.902, breast 0.810 -> 0.822). But the covariate-permutation
+  control is not clean: it keeps 1.6% of the production removal on
+  pancreas (three pairs), 6% on NSCLC (two pairs, fibroblast -> immune
+  other alone 112k molecules), 0 on breast.
+- Orient: the trend guard's standard error was the per-cell variance
+  divided by the number of cells, which is the error of an unweighted
+  mean; the guard compares molecule-weighted mean rates, whose error is
+  the sum of squared weights times squared residuals over the squared
+  total weight. With cell totals of coefficient of variation 0.6-0.7
+  (effective sample size 0.67-0.76 of n) the z statistic of a permuted
+  covariate had standard deviation 1.1-1.6 instead of 1.0 (300 random
+  permutations per pair, 8 pairs on NSCLC and pancreas), so a threshold
+  of 3 let through 0.7-2% of null tests per pair and pass - enough, over
+  27-39 pairs and the top-up passes, for the survivors seen. With the
+  weighted-mean error the permuted z has standard deviation 0.95-1.1;
+  the real pairs' z falls (e.g. 92 -> 64) but stays far above 3.
+- Act: the guard uses the weighted-mean standard error. Unit, Python and
+  R suites rerun; all three datasets and the example notebooks rerun from
+  the start.
+- Observe (rerun with the weighted-mean error): production arms unchanged
+  to three decimals on all three datasets; the control keeps 1.1% of the
+  default's removal on pancreas (two endothelial-target pairs; harness
+  0.025, audit 0.011) and exactly nothing on NSCLC and breast. NSCLC:
+  the ladder lifts the audit's leakage removal 0.785 -> 0.976 under the
+  default, purity 0.893 -> 0.902, retention 0.887 -> 0.923, with the
+  harness at 0.950 against 0.976 and eight of the nine pairs losing
+  more than 0.02 showing zero residual against the ambient reference;
+  endothelial -> immune other is ordinary (187k against 196k marginal).
+  Breast: no audit scoring; the ladder raises purity 0.810 -> 0.828 and
+  removal 25%; the joint fit costs most on this dataset (removal -4%,
+  harness -0.5, two small fibroblast pairs dropped where co-located
+  T/NK and myeloid components explain the fibroblast content); the
+  default stands at 0.927 against 0.942 on the harness and 0.822 against
+  0.810 on purity.
+- Decide: joint + ladder + guard confirmed as the defaults; the costs are
+  recorded per pair in REPORT.md. Open question for the user: whether the
+  joint fit, whose benefit shows only on the synthetic truth, should stay
+  the default or ship as an option.

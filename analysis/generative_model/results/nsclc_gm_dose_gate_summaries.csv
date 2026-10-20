@@ -1,0 +1,8 @@
+"tag","n_pairs","power_B_weighted","power_B_median","false_removal_pooled","worst_false_removal"
+"gm_dose_marginal",27,0.975971650427975,1,0,0
+"gm_dose_joint",27,0.979784422936689,1,0,0
+"gm_dose_ladder",27,0.953068373808825,1,0,0
+"gm_dose_joint_ladder",27,0.949976036584574,0.992702098713515,0,0
+"gm_dose_joint_ladder_control",27,0,0,0,0
+"gm_dose_v_marginal",27,0.963859197157641,0.992303386924224,0,0
+"gm_dose_v_joint_ladder",27,0.941634053081697,0.979837712258967,0,0

@@ -447,8 +447,14 @@ on, and one change to how several pairs' doses are measured together:
   appears (rungs of 30, 60, 120, 240 cells - the audit's ladder), with
   "none within 240" as the deepest stratum. Contamination is monotone
   along this axis, so the same isotonic fit yields the exposure gradient
-  and the distance decay, anchored at zero at the deepest stratum that
-  accumulates 20,000 molecules (the audit's reference rule). The ambient
+  and the distance decay, with its zero at the deepest stratum that
+  accumulates 20,000 molecules (the audit's reference rule) and never
+  above the pooled rate of all unexposed strata (the audit's cap on its
+  reference: for a source present everywhere, the cells with none of it
+  among 240 neighbors can be a biologically distinct population whose
+  rate exceeds the pooled unexposed rate, and without the cap that
+  population would raise the reference level and shrink the exposed cells'
+  prior - observed on NSCLC's endothelial -> immune pair). The ambient
   tier keeps its role: it removes the level *at* the reference; the
   ladder removes the excess above it in cells short of the reference.
 - **Joint estimation.** For a target type with sources S_1..S_m, pair j's
@@ -461,15 +467,23 @@ on, and one change to how several pairs' doses are measured together:
   drifts upward (it is a maximum-type statistic), and with more strata
   the drift grows; in a permutation control on a small synthetic tissue
   it reached a tenth of the real prior. A dose-response therefore enters
-  the prior only when the guide content of the cells above the reference
-  exceeds the reference cells' by three standard errors of the
-  cell-to-cell variation (`dose_min_z`, applied to the partial residual
-  under the joint fit, and in every top-up pass). Under this guard the
-  permutation control collapses to exactly zero in every configuration.
-  On the pancreas production run the guard changes the removed total by
-  0.17% (1,204,374 against the reference's 1,206,425; entry correlation
-  0.999997); with it off, the C++ fit reproduces the reference exactly,
-  as before.
+  the prior only when the guide content of the exposed cells exceeds the
+  unexposed cells' by three standard errors (`dose_min_z`; applied to the
+  partial residual under the joint fit, and in every top-up pass) - the
+  split the audit uses to detect a pair, so a deep stratum whose
+  population differs biologically neither carries nor dilutes the test.
+  The compared quantities are molecule-weighted mean rates, and the error
+  is that of a weighted mean (squared weights times squared residuals
+  over the squared total weight, from the cell-to-cell variation); the
+  per-cell variance over the cell count, the error of an unweighted mean,
+  overstates the effective sample size when cell totals vary and let one
+  null test in a hundred through (LOG.md, Loop 8). Under this guard the
+  permutation control removes nothing on the synthetic tissues and in the
+  unit fixtures; on the real datasets it keeps 0-1% of the production
+  removal (below). On the pancreas production run the guard changes the
+  removed total by 0.17% (1,204,400 against the reference's 1,206,424;
+  entry correlation 0.999997); with it off, the C++ fit reproduces the
+  reference exactly, as before.
 
 The estimator ships behind three options of the packaged model -
 `dose_mode` ("marginal" | "joint"), `dose_ladder` (rung list; empty for
@@ -561,20 +575,20 @@ gm_dose_arms_audit_pairs.csv, gm_dose_<arm>_pairs.csv.
 
 | arm (production) | removed | held-out power (harness) | leakage removed (audit) | unexposed-bin excess removed | flagged retention | own-marker removal | kNN purity | seconds |
 |---|---|---|---|---|---|---|---|---|
-| marginal, guard off (= reference) | 1,206,425 | 0.982 | 0.942 | 0.985 | 0.795 | 0 | 0.963 | 12 |
-| marginal | 1,204,401 | 0.980 | 0.941 | 0.985 | 0.796 | 0 | 0.962 | 12 |
-| joint | 1,202,284 | 0.978 | 0.939 | 0.985 | 0.803 | 0 | 0.962 | 14 |
-| ladder | 1,283,300 | 0.973 | 0.983 | 1.000 | 0.806 | 0 | 0.967 | 15 |
-| joint + ladder | 1,267,095 | 0.969 | 0.974 | 1.000 | 0.814 | 0 | 0.966 | 17 |
-| joint + ladder, covariates permuted | 15,086 | 0.021 | 0.012 | 0.029 | - | 0 | - | 12 |
+| marginal, guard off (= reference) | 1,206,424 | 0.982 | 0.942 | 0.985 | 0.795 | 0 | 0.963 | 13 |
+| marginal | 1,204,400 | 0.980 | 0.941 | 0.985 | 0.796 | 0 | 0.962 | 12 |
+| joint | 1,202,283 | 0.978 | 0.939 | 0.985 | 0.803 | 0 | 0.962 | 14 |
+| ladder | 1,299,422 | 0.979 | 0.986 | 1.000 | 0.805 | 0 | 0.967 | 15 |
+| joint + ladder (default) | 1,282,838 | 0.975 | 0.977 | 1.000 | 0.811 | 0 | 0.966 | 18 |
+| joint + ladder, covariates permuted | 13,716 | 0.025 | 0.011 | 0.016 | - | 0 | - | 12 |
 
 | arm (validation, A-half guided) | removed | held-out power | leakage removed (audit) | unexposed-bin excess removed | flagged retention |
 |---|---|---|---|---|---|
-| marginal, guard off (= reference) | 1,216,356 | 0.975 | 0.942 | 0.985 | 0.793 |
-| marginal | 1,210,316 | 0.972 | 0.940 | 0.985 | 0.795 |
-| joint | 1,213,351 | 0.973 | 0.940 | 0.985 | 0.800 |
-| ladder | 1,295,204 | 0.968 | 0.977 | 1.000 | 0.805 |
-| joint + ladder | 1,291,891 | 0.967 | 0.973 | 1.000 | 0.808 |
+| marginal, guard off (= reference) | 1,216,355 | 0.975 | 0.942 | 0.985 | 0.793 |
+| marginal | 1,209,976 | 0.972 | 0.940 | 0.985 | 0.795 |
+| joint | 1,213,350 | 0.973 | 0.940 | 0.985 | 0.800 |
+| ladder | 1,299,913 | 0.973 | 0.980 | 1.000 | 0.804 |
+| joint + ladder (default) | 1,295,752 | 0.971 | 0.975 | 1.000 | 0.808 |
 
 Reading the table:
 
@@ -582,30 +596,29 @@ Reading the table:
   cells.** Before correction the audit finds 55,718 pool-gene molecules
   above the ambient reference in the zero-neighbor bin of the 39 pairs;
   the marginal fit leaves 1.5% of that, the ladder none. Whole-profile,
-  the ladder's prior in unexposed cells totals 122,503 molecules (per pair
-  it tracks the audit's measurement, Figure D2b), and the removed total
-  rises by 6.4% to 1.28M - toward the audit's ladder-referenced estimate
-  for this tissue (1.57M). The audit's headline leakage removal rises
-  from 0.942 to 0.983, flagged-gene retention from 0.795 to 0.806,
+  the ladder's prior in unexposed cells totals 117,636 molecules (88,778
+  under the joint fit; per pair it tracks the audit's measurement, Figure
+  D2b), and the removed total rises by 7.9% to 1.30M (6.5%, 1.28M, with
+  the joint fit) - toward the audit's ladder-referenced estimate for this
+  tissue (1.57M). The audit's headline leakage removal rises from 0.941
+  to 0.986 (0.977), flagged-gene retention from 0.796 to 0.805 (0.811),
   own-marker removal stays at zero, and the downstream purity rises from
-  0.963 to 0.967, the value of the membrane ensemble (0.968). The sparse
-  mural/pericyte source gains most: most target cells have no mural cell
-  among their 15 nearest but one close by, and its pairs' attributed
-  contamination rises 2.7- to 6.7-fold.
-- **The harness's held-out power moves the other way, by one point, and
-  that is its reference.** The harness measures exposure-linked excess
-  against the post-correction zero-neighbor baseline of the held-out
-  genes. The ladder cleans that bin, so residual contamination in the
-  exposed cells that the old baseline hid becomes countable. Six pairs
-  lose more than 0.02 of power under the ladder; for five of them the
-  audit, which measures against the ambient reference, finds the
-  exposed-cell excess fully removed in every arm (endothelial -> immune:
-  harness 1.00 -> 0.81, audit 0 residual). The exception is fibroblast ->
-  mural, where the ladder arms leave 7-11% of the exposed excess
-  (results/gm_dose_arms_audit_pairs.csv) - a genuine, small cost. The
-  harness's baseline-depth metric rises (median 0.58 -> 0.65), which is
-  the zero-bin cleanup registering as depth, as the audit document
-  anticipates for a non-native baseline.
+  0.962 to 0.967 (0.966), the value of the membrane ensemble (0.968).
+  The sparse mural/pericyte source gains most: most target cells have no
+  mural cell among their 15 nearest but one close by, and its pairs'
+  attributed contamination rises 1.7- to 5.7-fold (1.3- to 3.1-fold
+  under the joint fit).
+- **The harness agrees with the audit on the ladder.** Its held-out power
+  is unchanged by the ladder alone (0.980 -> 0.979). The harness
+  measures exposure-linked excess against the post-correction
+  zero-neighbor baseline of the held-out genes, and the ladder cleans
+  that bin (its baseline-depth metric rises, median 0.58 -> 0.66), so
+  residual contamination the old baseline hid becomes countable - which
+  is where the two pairs that lose more than 0.02 sit: endothelial ->
+  ductal (0.735 -> 0.682) with zero residual against the ambient
+  reference, and fibroblast -> endothelial (0.960 -> 0.938) with 1.8% of
+  the exposed excess left. One pair gains (mural -> immune, 0.97 ->
+  1.00).
 - **The joint fit changes attribution, not removal.** Across the 39 pairs
   the ratio of joint to marginal attributed molecules has median 0.97;
   the pairs the robustness check had singled out move most - mural ->
@@ -615,13 +628,21 @@ Reading the table:
   essentially unchanged (exocrine -> ductal 0.98; Figure D2a). The
   removed total differs by 0.2%, held-out power by 0.3 points in
   production and 0.1 the other way in validation, purity by 0.0003. Its
-  one visible per-pair cost is fibroblast -> mural (held-out power 0.91
-  -> 0.84 under the joint fit alone), the co-located, profile-sharing
-  pair in which the synthetic test showed the joint fit shrinks the
-  smaller partner.
-- **The guard** costs 0.2 points of held-out power (0.982 -> 0.980) for
-  an exactly collapsing control; the previous shuffled arm removed 1.8%
-  of the planted excess, the new control 1.2% (harness 0.021).
+  per-pair costs are two: fibroblast -> mural (held-out power 0.91 ->
+  0.84 under the joint fit, 0.82 with the ladder), where the audit finds
+  the exposed-cell excess fully removed in every arm - the co-located,
+  profile-sharing pair in which the synthetic test showed the joint fit
+  shrinks the smaller partner, counted here against a baseline the
+  ladder lowers - and fibroblast -> endothelial (0.96 -> 0.91, 0.88
+  with the ladder), where the audit itself sees 13% (9.5%) of the
+  exposed excess left: the one genuine residual on this dataset.
+- **The guard** costs 0.2 points of held-out power (0.982 -> 0.980). The
+  control keeps 13,716 molecules, 1.1% of the default's removal (harness
+  0.025, audit 0.011), in two pairs with the endothelial target
+  (exocrine -> endothelial 6.4k, ductal -> endothelial 5.5k): chance
+  passes of a three-standard-error test over 39 pairs and their top-up
+  passes, on rates whose cell-to-cell distribution is heavier-tailed
+  than normal. The reference's shuffled-exposure control removed 1.8%.
 
 ![Figure D2](figures/dose_modes_pancreas.png)
 
@@ -634,4 +655,167 @@ own measurement of the zero-neighbor bin's excess above the ambient
 reference (pool genes; the prior is whole-profile, hence above the
 diagonal). **(c)** Per-pair sensitivity on the exposed cells under the
 audit's reference, by estimation mode: the ladder arms reach the
-reference for every pair but fibroblast -> mural.
+reference for every pair but fibroblast -> endothelial, where the joint
+fit leaves a tenth of the exposed excess.
+
+### NSCLC (CosMx, 98,002 cells, 960-gene panel, 27 pairs)
+
+The same arms, through the same three yardsticks (tables:
+results/nsclc_gm_dose_arms_summary.csv, nsclc_gm_dose_gate_summaries.csv,
+nsclc_gm_dose_purity.csv; per pair: nsclc_gm_dose_arms_pairs.csv,
+nsclc_gm_dose_arms_audit_pairs.csv, nsclc_gm_dose_<arm>_pairs.csv).
+
+| arm (production) | removed | held-out power (harness) | leakage removed (audit) | unexposed-bin excess removed | flagged retention | own-marker removal | kNN purity | seconds |
+|---|---|---|---|---|---|---|---|---|
+| marginal | 2,709,204 | 0.976 | 0.785 | 0.550 | 0.887 | 0 | 0.893 | 23 |
+| joint | 2,715,408 | 0.980 | 0.787 | 0.547 | 0.890 | 0 | 0.894 | 25 |
+| ladder | 3,762,979 | 0.953 | 0.988 | 1.000 | 0.920 | 0 | 0.904 | 31 |
+| joint + ladder (default) | 3,508,000 | 0.950 | 0.976 | 1.000 | 0.923 | 0 | 0.902 | 34 |
+| joint + ladder, covariates permuted | 0 | 0 | 0 | 0 | - | 0 | - | 23 |
+
+| arm (validation, A-half guided) | removed | held-out power | leakage removed (audit) | unexposed-bin excess removed | flagged retention |
+|---|---|---|---|---|---|
+| marginal | 2,679,150 | 0.964 | 0.775 | 0.547 | 0.893 |
+| joint + ladder (default) | 3,447,935 | 0.942 | 0.970 | 1.000 | 0.925 |
+
+The uncorrected purity is 0.811. Reading the table:
+
+- **The unexposed cells carry far more contamination here than on
+  pancreas, and the ladder is what reaches it.** The audit finds 131,334
+  pool-gene molecules above the ambient reference in the zero-neighbor
+  bin of the 27 pairs, and the single-stratum prior removes only 55% of
+  it (98.5% on pancreas): on this denser tissue a cell with no source
+  among its 15 nearest is routinely a few cells from one. The ladder
+  removes all of it; the whole-profile prior in unexposed cells totals
+  773k molecules (542k under the joint fit), and the removed total rises
+  by 39% (29% with the joint fit). The audit's leakage removal rises from
+  0.785 to 0.988 (0.976), flagged-gene retention from 0.887 to 0.920
+  (0.923), purity from 0.893 to 0.904 (0.902), own-marker removal stays
+  at zero. The macrophage source gains most, 2.7- to 4.6-fold per pair:
+  macrophages are everywhere in this tissue, so most target cells have
+  none among their 15 nearest but one close by.
+- **The harness's held-out power falls (0.976 -> 0.953 -> 0.950), and
+  the per-pair table says why.** Of the four pairs losing more than 0.02
+  under the ladder, three (macrophage -> immune other 0.90 -> 0.81,
+  malignant -> immune other, fibroblast -> immune other) show zero
+  residual against the ambient reference, and the harness's
+  baseline-depth metric rises (median 0.34 -> 0.41): the ladder cleans
+  the zero-neighbor bin the harness references, and the contamination
+  that bin hid - nearly half of the unexposed-bin excess, against 1.5% on
+  pancreas - becomes countable, which is why the disagreement between
+  the two yardsticks is larger here. The fourth, fibroblast ->
+  endothelial (0.92 -> 0.90), keeps 6.5% of its exposed excess under the
+  marginal ladder and reaches 1.00 under the joint fit. Under the
+  default, nine pairs lose more than 0.02, eight of them with zero audit
+  residual and fibroblast -> immune other with 1.3%.
+- **The pair that failed under the earlier guard is now ordinary.**
+  Endothelial -> immune other, whose dose-response the first guard
+  rejected outright (prior exactly zero; LOG.md), is attributed 187k
+  molecules under the default against 196k marginal, with 8.6k in
+  unexposed cells, held-out power 0.999 -> 0.968 and zero residual
+  against the ambient reference.
+- **The joint fit** moves attribution where sources co-locate
+  (macrophage -> malignant 0.46 of the marginal estimate, endothelial ->
+  malignant 0.56, endothelial -> macrophage 0.72; median 0.97) and on
+  its own raises held-out power by 0.4 points (fibroblast -> endothelial
+  0.92 -> 1.00, macrophage -> immune other 0.90 -> 0.93) at the same
+  removal and purity.
+- **The control** removes nothing: with the weighted-mean standard error
+  every permuted dose-response fails the guard.
+
+![Figure D3](figures/dose_modes_nsclc.png)
+
+**Figure D3. The dose prior's modes on NSCLC** (panels as in Figure D2).
+**(a)** Attribution per pair, marginal against joint; the pairs below
+the diagonal have the ubiquitous macrophage or endothelial source as a
+co-located competitor. **(b)** The ladder's prior in unexposed cells
+against the audit's unexposed-bin excess: the prior sits above the
+diagonal for every pair, the single-stratum prior having left nearly
+half of this excess in place. **(c)** Per-pair sensitivity on the
+exposed cells: the ladder arms reach the reference for every pair, the
+single-stratum arms fall short on the immune-other targets and on
+fibroblast -> endothelial.
+
+### Breast 5K (Xenium Prime, 688,099 cells, 5,001-gene panel, 29 pairs)
+
+The audit's own scoring needs the dense cell-by-gene matrix and is
+skipped on this dataset; the arms are scored by the harness and by
+purity (tables: results/breast_gm_dose_arms_summary.csv,
+breast_gm_dose_gate_summaries.csv, breast_gm_dose_purity.csv; per pair:
+breast_gm_dose_arms_pairs.csv, breast_gm_dose_<arm>_pairs.csv).
+
+| arm (production) | removed | held-out power (harness) | kNN purity | seconds |
+|---|---|---|---|---|
+| marginal | 6,647,282 | 0.942 | 0.810 | 122 |
+| joint | 6,366,835 | 0.937 | 0.808 | 138 |
+| ladder | 8,291,136 | 0.939 | 0.828 | 183 |
+| joint + ladder (default) | 7,507,941 | 0.927 | 0.822 | 301 |
+| joint + ladder, covariates permuted | 0 | 0 | - | 170 |
+
+| arm (validation, A-half guided) | removed | held-out power |
+|---|---|---|
+| marginal | 6,648,915 | 0.854 |
+| joint + ladder (default) | 6,971,412 | 0.850 |
+
+The uncorrected purity is 0.702. Reading the table:
+
+- **The ladder** raises the removed total by 25%, with 1.90M molecules of
+  whole-profile prior in unexposed cells (1.25M under the joint fit),
+  and purity from 0.810 to 0.828 (0.822), at a 0.3-point cost on the
+  harness whose baseline-depth metric rises from 0.44 to 0.64, the
+  signature of the cleaned zero-neighbor bin seen on the other two
+  datasets (the audit's per-pair check is not available here). The pairs
+  it changes most are those of the pervasive sources: endothelial ->
+  epithelial (303k -> 1.13M, 602k of it in unexposed cells), fibroblast
+  -> T/NK (26k -> 373k), endothelial -> myeloid and -> T/NK (4-fold),
+  fibroblast -> myeloid (4-fold). Four pairs gain more than 0.02 of
+  held-out power, all of them pairs the single-stratum prior under-served
+  (endothelial -> T/NK 0.33 -> 0.45, fibroblast -> T/NK 0.41 -> 0.48,
+  T/NK -> fibroblast 0.62 -> 0.68, endothelial -> B/plasma 0.40 ->
+  0.45); six lose more than 0.02, endothelial -> epithelial (0.98 ->
+  0.94) the only one of weight.
+- **The joint fit costs most here.** On its own it removes 4% less,
+  loses 0.5 points on the harness (0.942 -> 0.937) and 0.002 of purity,
+  and drops two fibroblast pairs entirely: fibroblast -> epithelial
+  (19.6k molecules marginal, 341k under the marginal ladder, zero under
+  either joint arm; held-out power 0.94 -> 0.77 on 720 held-out
+  molecules) and fibroblast -> B/plasma (4.5k; 24 held-out molecules).
+  In both, the fibroblast-gene content of the target is explained by the
+  components of the co-located T/NK and myeloid sources, and the
+  fibroblast partial residual fails the guard. The large epithelial
+  pairs shrink (T/NK -> epithelial 1.70M -> 1.47M, 1.33M with the ladder;
+  myeloid -> epithelial 428k -> 360k) at unchanged held-out power on
+  their own markers. This is the collinearity shrinkage the synthetic
+  test showed, on the dataset with the most co-located sources.
+- **The default** stands at 0.927 against the marginal 0.942 on the
+  harness, 0.822 against 0.810 on purity, 13% more removed; in the
+  validation configuration 0.850 against 0.854.
+- **The control** removes nothing.
+
+![Figure D4](figures/dose_modes_breast.png)
+
+**Figure D4. The dose prior's modes on breast 5K.** **(a)** Attribution
+per pair, marginal against joint; the two fibroblast pairs the joint fit
+drops sit at the floor. **(b)** Attribution per pair with and without the
+ladder (marginal fit); the pairs far above the diagonal have a source
+present throughout the tissue (endothelium, fibroblasts), so most of
+their target cells are unexposed by the neighbor-count definition yet
+close to a source cell.
+
+### Across the three datasets
+
+The ladder is the larger of the two changes and the better supported:
+on every dataset it removes the contamination the audit measures in
+unexposed cells, raises purity and retention, and leaves own-marker
+removal at zero; its cost on the harness is the reference artifact,
+confirmed pair by pair wherever the audit's measurement is available,
+plus one genuine residual of 2-10% on one fibroblast pair per dataset.
+The joint fit is a change of attribution that the real-data yardsticks
+cannot adjudicate (they reward removal, and over-attributed content is
+still removed), costs 0.3-1.5 points of held-out power, and is kept as
+the default on the strength of the synthetic truth: where two sources
+co-locate and share genes, the marginal fit near-doubles the smaller
+pair, the joint fit shrinks it moderately, and the per-pair accounting
+and the induced-gene learning weights follow the attribution. The
+guard, with the standard error of a weighted mean, holds the permutation
+control at 0-1% of the production removal on all three datasets.

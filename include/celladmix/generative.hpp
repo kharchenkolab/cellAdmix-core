@@ -3,7 +3,7 @@
 // For each annotated target cell type, the observed molecule counts of each
 // cell are modeled as a mixture of the cell's own expression programs,
 // contamination from each detected source type (proportional to the source's
-// interface-local expression profile, with a per-cell fraction anchored to
+// interface-local expression profile, with a per-cell fraction tied to
 // the measured exposure dose), an ambient background on the strict genes,
 // a sparse induced-expression term on genes whose exposure-linked excess is
 // disproportionate to the transfer expectation, and a small uniform floor.
@@ -91,18 +91,20 @@ struct GenerativeOptions {
   // above neighbor_k) by which unexposed cells are stratified according to
   // how many nearest neighbors must be inspected before a source cell
   // appears; empty keeps the single unexposed stratum. With a ladder the
-  // prior is anchored at the deepest stratum that accumulates
-  // dose_reference_min_molecules, as the audit's ambient reference is; when
-  // the unexposed strata together fall short of that minimum, all of them
-  // pooled serve as the reference, as without a ladder.
+  // prior's reference level (where the prior is zero) is the deepest
+  // stratum that accumulates dose_reference_min_molecules, as for the
+  // audit's ambient reference, and never above the pooled rate of all
+  // unexposed strata (the audit's cap);
+  // when the unexposed strata together fall short of that minimum, all of
+  // them pooled serve as the reference, as without a ladder.
   std::string dose_mode = "joint";
   std::vector<int> dose_ladder{30, 60, 120, 240};
   double dose_reference_min_molecules = 20000.0;
   // A dose-response enters the prior only when the guide-gene content of
-  // the cells above the reference stratum exceeds the reference cells' by
-  // this many standard errors (cell-to-cell variation, so heterogeneity
-  // beyond Poisson counting widens the error); a monotone fit of a
-  // covariate carrying no signal otherwise drifts upward. 0 disables.
+  // the exposed cells exceeds the unexposed cells' by this many standard
+  // errors (cell-to-cell variation, so heterogeneity beyond Poisson
+  // counting widens the error); a monotone fit of a covariate carrying no
+  // signal otherwise drifts upward. 0 disables.
   double dose_min_z = 3.0;
   // Control: permute each target cell's spatial covariates (all sources'
   // exposures and ladder strata together) across the type's cells with this
@@ -214,7 +216,7 @@ std::vector<double> pava_increasing(
     const std::vector<double>& y, const std::vector<double>& w);
 
 // Additive model of a rate on several ordered covariates, each entering
-// through a monotone non-decreasing component anchored at zero at its
+// through a monotone non-decreasing component that is zero at its
 // reference level (values below the reference are clipped to zero), fitted
 // by backfitting with weighted pool-adjacent-violators steps. y and w are
 // per-row rates and weights; strata[c][i] is row i's level index on
@@ -225,6 +227,11 @@ struct AdditiveIsotonicFit {
   std::vector<std::vector<double>> components;  // per covariate, per level
   int cycles = 0;
 };
+// cap_upto[c] (optional; -1 to skip) names the last level of a span of
+// low levels whose weighted mean fit also bounds the reference level from
+// above: the component is zero at the smaller of the fit at the reference
+// level and that mean, so a reference level whose rate exceeds its span's pooled
+// rate cannot lower the component (the audit's rule for its reference).
 AdditiveIsotonicFit additive_isotonic_fit(
     const std::vector<double>& y,
     const std::vector<double>& w,
@@ -232,6 +239,7 @@ AdditiveIsotonicFit additive_isotonic_fit(
     const std::vector<int>& n_levels,
     const std::vector<int>& reference,
     int max_cycles = 100,
-    double tol = 1e-10);
+    double tol = 1e-10,
+    const std::vector<int>& cap_upto = {});
 
 }  // namespace celladmix

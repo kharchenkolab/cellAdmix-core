@@ -1,0 +1,190 @@
+arm,pair,source,target,prior,posterior,induced,prior_unexposed,cross_attributed
+marginal,epithelial -> endothelial,epithelial,endothelial,46324.80258613006,46652.03911602812,2979.582171922307,0.0,0.0
+marginal,fibroblast -> endothelial,fibroblast,endothelial,75464.33614408763,75369.32596371976,2732.369535082236,0.0,0.0
+marginal,immune other -> endothelial,immune other,endothelial,170537.2996971243,171829.4540673589,0.0,0.0,0.0
+marginal,macrophage -> endothelial,macrophage,endothelial,12261.962766893032,13745.157841779072,13773.311966663727,0.0,0.0
+marginal,malignant -> endothelial,malignant,endothelial,9133.60925132589,9726.16389616939,0.0,0.0,0.0
+marginal,endothelial -> epithelial,endothelial,epithelial,42929.67392614598,43142.948056547684,14834.534263663138,0.0,0.0
+marginal,fibroblast -> epithelial,fibroblast,epithelial,32483.07455014457,34646.562868619556,0.0,0.0,0.0
+marginal,malignant -> epithelial,malignant,epithelial,34960.931818423596,37181.87530780328,0.0,0.0,0.0
+marginal,endothelial -> fibroblast,endothelial,fibroblast,125493.46024194351,124301.88962597014,26320.211667225984,0.0,0.0
+marginal,epithelial -> fibroblast,epithelial,fibroblast,33739.85792913307,35380.78947462833,1865.957593792802,0.0,0.0
+marginal,immune other -> fibroblast,immune other,fibroblast,376292.2148757986,385693.60406699637,5222.701799082276,0.0,0.0
+marginal,macrophage -> fibroblast,macrophage,fibroblast,31876.866552920692,37563.18718100503,17618.31076977356,0.0,0.0
+marginal,malignant -> fibroblast,malignant,fibroblast,52648.11092676302,53139.33846960603,4954.308763634112,0.0,0.0
+marginal,endothelial -> immune other,endothelial,immune other,190276.96729605622,196387.82408808023,51197.07746557068,0.0,0.0
+marginal,epithelial -> immune other,epithelial,immune other,128195.18229321374,132573.44100888734,4267.223398138739,0.0,0.0
+marginal,fibroblast -> immune other,fibroblast,immune other,674147.7481038673,687511.7752103388,0.0,0.0,0.0
+marginal,macrophage -> immune other,macrophage,immune other,274178.9985928507,294952.47579143784,64764.844015495204,0.0,0.0
+marginal,malignant -> immune other,malignant,immune other,56192.05904407064,58262.23781778119,6671.32370768353,0.0,0.0
+marginal,endothelial -> macrophage,endothelial,macrophage,15567.776299414902,15665.139864113346,0.0,0.0,0.0
+marginal,epithelial -> macrophage,epithelial,macrophage,13817.10183176855,15111.14644679864,0.0,0.0,0.0
+marginal,fibroblast -> macrophage,fibroblast,macrophage,31041.39524620783,30544.728522723824,1892.5191679967738,0.0,0.0
+marginal,malignant -> macrophage,malignant,macrophage,8571.94105168107,9788.459093558864,0.0,0.0,0.0
+marginal,endothelial -> malignant,endothelial,malignant,15731.062986440658,16191.51577510765,7007.816576013919,0.0,0.0
+marginal,epithelial -> malignant,epithelial,malignant,62241.3460190438,66713.73706381605,3071.264776260153,0.0,0.0
+marginal,fibroblast -> malignant,fibroblast,malignant,48618.705000580165,47806.44602631825,4560.980260454613,0.0,0.0
+marginal,immune other -> malignant,immune other,malignant,40703.449342668784,46772.57777041175,0.0,0.0,0.0
+marginal,macrophage -> malignant,macrophage,malignant,10157.413945819455,10849.283689849506,18370.4832418495,0.0,0.0
+joint,epithelial -> endothelial,epithelial,endothelial,44146.245330788144,44696.50756462201,2941.3514404346574,0.0,2985.39190271141
+joint,fibroblast -> endothelial,fibroblast,endothelial,98685.11434471192,97016.41372336877,2698.2448118925254,0.0,19037.641758731068
+joint,immune other -> endothelial,immune other,endothelial,188212.03725289527,187775.44828167313,0.0,0.0,3233.796925384227
+joint,macrophage -> endothelial,macrophage,endothelial,11054.59798636714,12496.28613776298,13796.221085563897,0.0,10630.115774069527
+joint,malignant -> endothelial,malignant,endothelial,9415.779636724326,9889.362052726383,0.0,0.0,4827.407649697697
+joint,endothelial -> epithelial,endothelial,epithelial,41901.02629603604,42166.7963307599,14830.972959298877,0.0,519.8481569445806
+joint,fibroblast -> epithelial,fibroblast,epithelial,31302.443639436126,33601.530969419466,0.0,0.0,3416.0348750815742
+joint,malignant -> epithelial,malignant,epithelial,34828.944569646366,37067.28528708583,0.0,0.0,491.4864870709233
+joint,endothelial -> fibroblast,endothelial,fibroblast,127768.96312188187,126433.94536198038,26074.701498209593,0.0,4416.585240171135
+joint,epithelial -> fibroblast,epithelial,fibroblast,33966.381182004756,35623.39301243287,1834.850882398335,0.0,6076.207225201538
+joint,immune other -> fibroblast,immune other,fibroblast,399737.3527478853,407906.28775741725,5187.68654954545,0.0,5342.904902637479
+joint,macrophage -> fibroblast,macrophage,fibroblast,29036.586965087332,34711.450095712346,17551.196516091262,0.0,42366.67038122553
+joint,malignant -> fibroblast,malignant,fibroblast,54002.30016071599,54114.03274379,4875.612539571333,0.0,3483.672532002512
+joint,endothelial -> immune other,endothelial,immune other,184462.2692830468,190869.91223307222,51254.19525410704,0.0,7244.578013307813
+joint,epithelial -> immune other,epithelial,immune other,120857.40199651461,125704.01905565227,3960.8981664272646,0.0,9051.742381082351
+joint,fibroblast -> immune other,fibroblast,immune other,652026.7762384971,666632.0964813789,0.0,0.0,25050.256786513415
+joint,macrophage -> immune other,macrophage,immune other,299127.37477647746,318357.14452678803,63191.59706318003,0.0,59461.710045695996
+joint,malignant -> immune other,malignant,immune other,50816.31348475937,53420.67007669931,6357.044182289885,0.0,15932.374944284038
+joint,endothelial -> macrophage,endothelial,macrophage,10817.969663002756,11224.4444613928,0.0,0.0,1485.528245398594
+joint,epithelial -> macrophage,epithelial,macrophage,12839.234497224012,14143.774683444719,0.0,0.0,989.5681624637596
+joint,fibroblast -> macrophage,fibroblast,macrophage,30232.703911203367,29962.657982830464,1893.4936765639586,0.0,692.596193004105
+joint,malignant -> macrophage,malignant,macrophage,8897.581984542678,10105.796722080697,0.0,0.0,1501.9941563576199
+joint,endothelial -> malignant,endothelial,malignant,8151.511701089776,9133.710409570767,6949.340313536827,0.0,5969.437675043149
+joint,epithelial -> malignant,epithelial,malignant,48842.004026698465,55297.90509458449,3017.82106511227,0.0,10428.05324846867
+joint,fibroblast -> malignant,fibroblast,malignant,43103.48116240993,43536.603411766,4264.731408656276,0.0,5385.9262649004995
+joint,immune other -> malignant,immune other,malignant,32266.556700992467,38296.63912103358,0.0,0.0,2766.499513854705
+joint,macrophage -> malignant,macrophage,malignant,4008.4419635324575,4982.451398620547,18963.14104562381,0.0,9405.968179553513
+ladder,epithelial -> endothelial,epithelial,endothelial,55920.6489236976,55159.54242290519,4352.908677608655,7283.406820020044,0.0
+ladder,fibroblast -> endothelial,fibroblast,endothelial,79051.79634788632,79347.9125903805,3147.6140253280814,1427.6297075892503,0.0
+ladder,immune other -> endothelial,immune other,endothelial,148493.6810508487,149569.35252543262,0.0,81.99776067991966,0.0
+ladder,macrophage -> endothelial,macrophage,endothelial,46962.13256245151,50100.02400459814,50828.977311232244,21119.82375907637,0.0
+ladder,malignant -> endothelial,malignant,endothelial,24785.922882775194,24994.760454495205,0.0,13326.724966628331,0.0
+ladder,endothelial -> epithelial,endothelial,epithelial,50526.552035747234,50280.68834078777,23849.32762361489,4168.246565333635,0.0
+ladder,fibroblast -> epithelial,fibroblast,epithelial,47139.74467612181,48370.55010467559,0.0,5301.634235110412,0.0
+ladder,malignant -> epithelial,malignant,epithelial,51314.19486554962,52753.218406029824,0.0,12966.096397945921,0.0
+ladder,endothelial -> fibroblast,endothelial,fibroblast,121887.17195377106,120595.43158821826,27071.29578368672,1536.5052829689262,0.0
+ladder,epithelial -> fibroblast,epithelial,fibroblast,36584.05571325546,38044.381377103484,2218.915890718062,3200.4861991295734,0.0
+ladder,immune other -> fibroblast,immune other,fibroblast,329234.5603338757,336255.21368030855,5273.380812980331,95.80086782607978,0.0
+ladder,macrophage -> fibroblast,macrophage,fibroblast,126075.13480442733,142769.75207398093,75364.97882246731,61414.72997036762,0.0
+ladder,malignant -> fibroblast,malignant,fibroblast,64577.82970240144,64843.02368023913,6821.080943862592,10098.044247803657,0.0
+ladder,endothelial -> immune other,endothelial,immune other,197401.6651545832,197321.63671990926,66024.05146794677,9267.502206860876,0.0
+ladder,epithelial -> immune other,epithelial,immune other,202939.6671218184,204531.41552138294,12149.712999485118,60780.636669051426,0.0
+ladder,fibroblast -> immune other,fibroblast,immune other,1126193.4780438922,1082781.4714581866,0.0,115325.40158642552,0.0
+ladder,macrophage -> immune other,macrophage,immune other,739737.4363540224,806098.5506690001,156980.49019861134,281759.5964068634,0.0
+ladder,malignant -> immune other,malignant,immune other,97961.19214980086,97616.25228998584,16239.420055963665,36952.25711267811,0.0
+ladder,endothelial -> macrophage,endothelial,macrophage,15420.675006066867,15508.323819748983,0.0,496.7293905608431,0.0
+ladder,epithelial -> macrophage,epithelial,macrophage,21509.28533801238,22968.981298607603,0.0,5406.887225972024,0.0
+ladder,fibroblast -> macrophage,fibroblast,macrophage,31922.69220533335,31208.47350499411,2218.620113958089,1697.879133891844,0.0
+ladder,malignant -> macrophage,malignant,macrophage,16743.51310144524,18370.927059576363,0.0,6051.403108445979,0.0
+ladder,endothelial -> malignant,endothelial,malignant,26878.71233324413,27923.26020966708,22566.315710091894,10194.464061235672,0.0
+ladder,epithelial -> malignant,epithelial,malignant,124971.83557230329,132187.17504712337,19827.740565542772,57027.38924037018,0.0
+ladder,fibroblast -> malignant,fibroblast,malignant,49768.883615093575,49122.46070106359,5275.53125834509,2481.9359199983896,0.0
+ladder,immune other -> malignant,immune other,malignant,48947.40184358818,55128.9222310133,0.0,8851.842068318821,0.0
+ladder,macrophage -> malignant,macrophage,malignant,47825.26725642499,50433.58802037698,113768.63337401586,34942.33516939486,0.0
+joint_ladder,epithelial -> endothelial,epithelial,endothelial,46676.54245687437,46881.56742286352,3778.235405971568,3489.5188542097185,4197.103844110383
+joint_ladder,fibroblast -> endothelial,fibroblast,endothelial,105028.10188149837,103831.3824902858,3112.7855772458647,1822.3531565015458,19275.25331940426
+joint_ladder,immune other -> endothelial,immune other,endothelial,160191.29225579504,160011.95197332083,0.0,58.48704214251219,15378.230682456668
+joint_ladder,macrophage -> endothelial,macrophage,endothelial,34388.37086805661,37795.128887842286,52249.322560332555,14619.464951506996,15941.615333510783
+joint_ladder,malignant -> endothelial,malignant,endothelial,14628.537851096942,15528.705620592702,0.0,4447.435464927586,7120.961542745949
+joint_ladder,endothelial -> epithelial,endothelial,epithelial,50079.157097862444,50316.66387885714,26423.144234277042,4978.899788473049,2007.0508999404924
+joint_ladder,fibroblast -> epithelial,fibroblast,epithelial,39410.722931849516,41591.66939723021,0.0,3103.8325859382944,4444.211331200714
+joint_ladder,malignant -> epithelial,malignant,epithelial,51089.77894273021,52541.687496330946,0.0,12652.379510948384,1393.4210658854415
+joint_ladder,endothelial -> fibroblast,endothelial,fibroblast,125817.09485445808,124452.27557544356,27396.465397682354,1844.847115579738,8473.432090724238
+joint_ladder,epithelial -> fibroblast,epithelial,fibroblast,34514.86977086723,36094.87358130817,2037.1511150700205,1839.690285780457,9116.178124847342
+joint_ladder,immune other -> fibroblast,immune other,fibroblast,345346.2617113383,350555.1065402929,5156.417412615489,0.0,31655.7811042899
+joint_ladder,macrophage -> fibroblast,macrophage,fibroblast,78308.04697345216,92914.06754798527,75086.97711567495,32462.67829324765,44134.10049860891
+joint_ladder,malignant -> fibroblast,malignant,fibroblast,61365.257624522674,61312.7724364996,6051.6284267606,5418.286721379765,13219.201104809856
+joint_ladder,endothelial -> immune other,endothelial,immune other,187133.68466437227,187215.57825658456,66020.34353119793,8627.643542668822,12593.96751964128
+joint_ladder,epithelial -> immune other,epithelial,immune other,154543.21489259027,158848.01663529815,7228.1544281911665,29537.18273106586,9276.344804219107
+joint_ladder,fibroblast -> immune other,fibroblast,immune other,1165871.8824521555,1102407.688515949,0.0,121900.61538089579,64348.5877007185
+joint_ladder,macrophage -> immune other,macrophage,immune other,667087.996609924,729680.9498741671,155488.53767058888,221011.82141159126,104214.55190454732
+joint_ladder,malignant -> immune other,malignant,immune other,63100.06554762451,65232.20043129983,10968.2720057964,11927.821878109602,20384.542580589892
+joint_ladder,endothelial -> macrophage,endothelial,macrophage,10059.380109616424,10454.38843537594,0.0,0.0,3267.6546615292364
+joint_ladder,epithelial -> macrophage,epithelial,macrophage,26992.27440645991,28317.993748704546,0.0,9608.656685138829,1516.1059117668972
+joint_ladder,fibroblast -> macrophage,fibroblast,macrophage,31927.42423386735,31474.822159668423,2236.4790711802902,1780.349179715285,672.6528410041257
+joint_ladder,malignant -> macrophage,malignant,macrophage,19220.72909241805,20627.188894182007,0.0,7579.014444553275,4495.368968932887
+joint_ladder,endothelial -> malignant,endothelial,malignant,9880.555475142077,11195.826878772723,10883.792975601335,1651.5857127520585,6704.545831204288
+joint_ladder,epithelial -> malignant,epithelial,malignant,64032.5592951474,73051.63846264729,19051.94572792031,18507.66246940457,32073.19515314036
+joint_ladder,fibroblast -> malignant,fibroblast,malignant,45026.88954055108,45758.25980104556,4907.174673423598,2231.3290827903,6311.365992323928
+joint_ladder,immune other -> malignant,immune other,malignant,28323.473645689424,33338.76907884903,0.0,899.0608394620308,6490.552428349831
+joint_ladder,macrophage -> malignant,macrophage,malignant,25443.03765274944,30067.046666210998,122251.8565568303,19986.698219439077,16098.752295398484
+joint_ladder_control,epithelial -> endothelial,epithelial,endothelial,0.0,0.0,0.0,0.0,3983.860075602436
+joint_ladder_control,fibroblast -> endothelial,fibroblast,endothelial,0.0,0.0,0.0,0.0,6316.699351009343
+joint_ladder_control,immune other -> endothelial,immune other,endothelial,0.0,0.0,0.0,0.0,7656.354074641251
+joint_ladder_control,macrophage -> endothelial,macrophage,endothelial,0.0,0.0,0.0,0.0,6468.713775464705
+joint_ladder_control,malignant -> endothelial,malignant,endothelial,0.0,0.0,0.0,0.0,3139.2916015275796
+joint_ladder_control,endothelial -> epithelial,endothelial,epithelial,0.0,0.0,0.0,0.0,1203.738393584858
+joint_ladder_control,fibroblast -> epithelial,fibroblast,epithelial,0.0,0.0,0.0,0.0,2160.9803585878803
+joint_ladder_control,malignant -> epithelial,malignant,epithelial,0.0,0.0,0.0,0.0,5260.1349083659625
+joint_ladder_control,endothelial -> fibroblast,endothelial,fibroblast,0.0,0.0,0.0,0.0,5100.394562512874
+joint_ladder_control,epithelial -> fibroblast,epithelial,fibroblast,0.0,0.0,0.0,0.0,2384.7264636133855
+joint_ladder_control,immune other -> fibroblast,immune other,fibroblast,0.0,0.0,0.0,0.0,14915.79484601166
+joint_ladder_control,macrophage -> fibroblast,macrophage,fibroblast,0.0,0.0,0.0,0.0,12597.442117162265
+joint_ladder_control,malignant -> fibroblast,malignant,fibroblast,0.0,0.0,0.0,0.0,6066.307207750594
+joint_ladder_control,endothelial -> immune other,endothelial,immune other,0.0,0.0,0.0,0.0,11745.325426307243
+joint_ladder_control,epithelial -> immune other,epithelial,immune other,0.0,0.0,0.0,0.0,6100.305371645359
+joint_ladder_control,fibroblast -> immune other,fibroblast,immune other,0.0,0.0,0.0,0.0,6739.217797675795
+joint_ladder_control,macrophage -> immune other,macrophage,immune other,0.0,0.0,0.0,0.0,9465.528457813247
+joint_ladder_control,malignant -> immune other,malignant,immune other,0.0,0.0,0.0,0.0,8063.988717044108
+joint_ladder_control,endothelial -> macrophage,endothelial,macrophage,0.0,0.0,0.0,0.0,314.2870969872809
+joint_ladder_control,epithelial -> macrophage,epithelial,macrophage,0.0,0.0,0.0,0.0,1517.6510944901909
+joint_ladder_control,fibroblast -> macrophage,fibroblast,macrophage,0.0,0.0,0.0,0.0,1602.419767829258
+joint_ladder_control,malignant -> macrophage,malignant,macrophage,0.0,0.0,0.0,0.0,1812.3631073616164
+joint_ladder_control,endothelial -> malignant,endothelial,malignant,0.0,0.0,0.0,0.0,5694.950786440175
+joint_ladder_control,epithelial -> malignant,epithelial,malignant,0.0,0.0,0.0,0.0,14580.1274665723
+joint_ladder_control,fibroblast -> malignant,fibroblast,malignant,0.0,0.0,0.0,0.0,16370.9440905595
+joint_ladder_control,immune other -> malignant,immune other,malignant,0.0,0.0,0.0,0.0,693.7813667106583
+joint_ladder_control,macrophage -> malignant,macrophage,malignant,0.0,0.0,0.0,0.0,21978.598523166987
+v_marginal,epithelial -> endothelial,epithelial,endothelial,39604.69679864352,40594.913069447335,2971.3793158419535,0.0,0.0
+v_marginal,fibroblast -> endothelial,fibroblast,endothelial,77804.46583802764,77385.2294774921,2722.0484311781106,0.0,0.0
+v_marginal,immune other -> endothelial,immune other,endothelial,198206.81108065016,197867.7683608935,0.0,0.0,0.0
+v_marginal,macrophage -> endothelial,macrophage,endothelial,11655.514539765092,13063.209942763482,13812.222306475285,0.0,0.0
+v_marginal,malignant -> endothelial,malignant,endothelial,9102.865510625243,9690.96303381409,0.0,0.0,0.0
+v_marginal,endothelial -> epithelial,endothelial,epithelial,23271.82300651716,25040.102261544966,15598.68540034329,0.0,0.0
+v_marginal,fibroblast -> epithelial,fibroblast,epithelial,29815.71346412448,32463.745528662315,0.0,0.0,0.0
+v_marginal,malignant -> epithelial,malignant,epithelial,34191.8236099367,36503.2309801719,0.0,0.0,0.0
+v_marginal,endothelial -> fibroblast,endothelial,fibroblast,175221.34645257707,168603.54446149257,25206.294154524236,0.0,0.0
+v_marginal,epithelial -> fibroblast,epithelial,fibroblast,35096.0249347405,36261.965239724836,1837.3995764708227,0.0,0.0
+v_marginal,immune other -> fibroblast,immune other,fibroblast,362961.8797724451,372120.34249444143,5327.618296159564,0.0,0.0
+v_marginal,macrophage -> fibroblast,macrophage,fibroblast,30689.274259106103,36053.867115562774,17742.031748370093,0.0,0.0
+v_marginal,malignant -> fibroblast,malignant,fibroblast,56944.45562095917,56532.49431087492,5040.153365691653,0.0,0.0
+v_marginal,endothelial -> immune other,endothelial,immune other,182923.32280946072,189859.5289362336,51532.814655826856,0.0,0.0
+v_marginal,epithelial -> immune other,epithelial,immune other,124580.56414994941,128525.67093038377,3915.099505879653,0.0,0.0
+v_marginal,fibroblast -> immune other,fibroblast,immune other,660313.9884977742,674121.0038746161,0.0,0.0,0.0
+v_marginal,macrophage -> immune other,macrophage,immune other,245690.00608750095,267557.0588393474,65103.95573376449,0.0,0.0
+v_marginal,malignant -> immune other,malignant,immune other,46491.921225907274,49767.724691204254,6662.9657757167815,0.0,0.0
+v_marginal,endothelial -> macrophage,endothelial,macrophage,11997.809005132434,12412.482440289128,0.0,0.0,0.0
+v_marginal,epithelial -> macrophage,epithelial,macrophage,11459.535416189708,12706.054377847104,0.0,0.0,0.0
+v_marginal,fibroblast -> macrophage,fibroblast,macrophage,27036.448451388642,27440.78007563664,1909.0005610960397,0.0,0.0
+v_marginal,malignant -> macrophage,malignant,macrophage,9928.93292437153,10916.694564454192,0.0,0.0,0.0
+v_marginal,endothelial -> malignant,endothelial,malignant,10380.370441229414,11168.881075297504,7116.057904504966,0.0,0.0
+v_marginal,epithelial -> malignant,epithelial,malignant,73125.23812655847,75685.07832250989,3027.1903372509496,0.0,0.0
+v_marginal,fibroblast -> malignant,fibroblast,malignant,51468.25225965433,49859.57879911823,4564.272635738595,0.0,0.0
+v_marginal,immune other -> malignant,immune other,malignant,34315.36361931337,40219.643543478436,0.0,0.0,0.0
+v_marginal,macrophage -> malignant,macrophage,malignant,10110.368279916489,10727.327416428829,18097.557509617523,0.0,0.0
+v_joint_ladder,epithelial -> endothelial,epithelial,endothelial,38394.81452856068,39322.47567725621,3409.9065441604516,1472.5815539314383,1435.6486385293665
+v_joint_ladder,fibroblast -> endothelial,fibroblast,endothelial,100182.36805610004,98748.57029227792,3010.1539853266167,1184.3717919492397,10471.750996552553
+v_joint_ladder,immune other -> endothelial,immune other,endothelial,171418.5404968822,170841.81207504388,0.0,75.22388800909597,5797.679748827757
+v_joint_ladder,macrophage -> endothelial,macrophage,endothelial,31769.16036060026,35083.98542248953,52438.56957321315,13336.075155489716,5371.5111891128545
+v_joint_ladder,malignant -> endothelial,malignant,endothelial,12889.446275072307,13822.46762284081,0.0,2975.6758258299346,3382.248757860605
+v_joint_ladder,endothelial -> epithelial,endothelial,epithelial,27090.81550405764,28906.68965763677,23223.393513702606,2234.2117607571427,803.8029446913023
+v_joint_ladder,fibroblast -> epithelial,fibroblast,epithelial,30195.431073007934,33303.47147760502,0.0,1448.5889520721396,1640.4340850948922
+v_joint_ladder,malignant -> epithelial,malignant,epithelial,50948.79062874969,52485.92969006393,0.0,13013.428617117424,1649.6742236768255
+v_joint_ladder,endothelial -> fibroblast,endothelial,fibroblast,183736.59552944312,176166.97662953107,26554.33749843536,3563.17856959749,5009.748528687933
+v_joint_ladder,epithelial -> fibroblast,epithelial,fibroblast,40999.24630255177,42218.175724121,2351.633360813537,5084.811121690666,4709.021026750555
+v_joint_ladder,immune other -> fibroblast,immune other,fibroblast,350070.048269715,355697.4764891545,5264.995963790635,0.0,16547.321412746544
+v_joint_ladder,macrophage -> fibroblast,macrophage,fibroblast,80656.95741848597,94930.98813246128,75555.53980472275,34387.40097522717,26050.731328313595
+v_joint_ladder,malignant -> fibroblast,malignant,fibroblast,68020.73859193195,66373.64793611407,6015.023117105409,6059.481805408083,10445.838102845477
+v_joint_ladder,endothelial -> immune other,endothelial,immune other,189418.8492616377,192412.68221466112,68607.60320116463,11600.296147195062,8967.997286445625
+v_joint_ladder,epithelial -> immune other,epithelial,immune other,167318.37126962995,170418.76170005722,8152.421795513317,35547.60396975447,810.988892647856
+v_joint_ladder,fibroblast -> immune other,fibroblast,immune other,1118992.6048753108,1085065.1376826768,0.0,118104.6409580998,44779.180887172995
+v_joint_ladder,macrophage -> immune other,macrophage,immune other,591835.3387959992,632558.5985992658,157075.40545883068,194727.56446269876,60989.993194961935
+v_joint_ladder,malignant -> immune other,malignant,immune other,53588.94790661992,56840.07724114476,11246.708024942753,10277.783976463958,7853.659556094757
+v_joint_ladder,endothelial -> macrophage,endothelial,macrophage,10096.578038454525,10591.92902320519,0.0,1278.556961816821,2189.593337328987
+v_joint_ladder,epithelial -> macrophage,epithelial,macrophage,25862.30223853009,27172.187719983554,0.0,9855.325386595958,214.3634178186751
+v_joint_ladder,fibroblast -> macrophage,fibroblast,macrophage,26249.094467765495,26758.608823112278,2115.54124943666,890.6887487810584,416.2265423432582
+v_joint_ladder,malignant -> macrophage,malignant,macrophage,19206.64353459742,20381.144882375593,0.0,6623.714848576983,3775.82874106423
+v_joint_ladder,endothelial -> malignant,endothelial,malignant,0.0,0.0,0.0,0.0,1420.4150114149936
+v_joint_ladder,epithelial -> malignant,epithelial,malignant,86149.44709271612,96269.45241745116,20086.71514150913,31976.875380046546,29754.926514690942
+v_joint_ladder,fibroblast -> malignant,fibroblast,malignant,43167.13467750851,43599.56650019554,4406.8357102944965,890.844520996329,5116.638520034856
+v_joint_ladder,immune other -> malignant,immune other,malignant,22310.565048530636,26556.29718090225,0.0,0.0,2466.09257161404
+v_joint_ladder,macrophage -> malignant,macrophage,malignant,11134.275206535382,13525.49738732163,100846.02922108304,4013.9547862324944,1859.1906954490694

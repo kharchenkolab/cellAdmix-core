@@ -1,0 +1,28 @@
+"pair","source","target","excess_pool","excess_B","power_A","power_B","power_strictB","depth_B"
+"endothelial -> epithelial","endothelial","epithelial",3591,2743,1,0.678115991259411,NA,0.209397189865988
+"endothelial -> fibroblast","endothelial","fibroblast",7400,2083,0.604478401291974,1,NA,0.252614000507696
+"endothelial -> immune other","endothelial","immune other",16290,7443,1,0.988225198507829,NA,0.252571378818949
+"endothelial -> macrophage","endothelial","macrophage",1603,1007,1,1,1,0.340517684541512
+"endothelial -> malignant","endothelial","malignant",1805,1399,1,0.972273662202348,1,0.530273725063956
+"epithelial -> endothelial","epithelial","endothelial",4496,2528,0.853710981431294,0.731597798594041,0.999919303914165,0.297300537457295
+"epithelial -> fibroblast","epithelial","fibroblast",3562,1810,0.880523884249874,1,1,0.404206194373474
+"epithelial -> immune other","epithelial","immune other",13697,7164,1,0.992303386924224,1,0.251704170256889
+"epithelial -> macrophage","epithelial","macrophage",1443,926,1,0.964074247590872,0.999822501285274,0.141162981363678
+"epithelial -> malignant","epithelial","malignant",4300,730,1,1,NA,0.0948912843862338
+"fibroblast -> endothelial","fibroblast","endothelial",15456,6103,0.923719914972018,0.938766685987879,NA,0.0783333140199706
+"fibroblast -> epithelial","fibroblast","epithelial",8283,5251,1,1,0.999997930461456,0.51428272016866
+"fibroblast -> immune other","fibroblast","immune other",176703,71952,0.996732754429967,1,NA,0.187792702553978
+"fibroblast -> macrophage","fibroblast","macrophage",8703,4994,1,1,0.999887983502749,0.890736484473718
+"fibroblast -> malignant","fibroblast","malignant",13721,6095,1,0.820556228971686,0.801492896065517,0.911927815811811
+"immune other -> endothelial","immune other","endothelial",22171,13010,0.931306825047844,1,0.99987148992864,0.333137475797584
+"immune other -> fibroblast","immune other","fibroblast",52200,28410,1,1,0.998522924155421,0.127052582605824
+"immune other -> malignant","immune other","malignant",4635,2930,1,0.981638834973227,1,0.747058862615005
+"macrophage -> endothelial","macrophage","endothelial",2173,1332,0.944311529080543,1,0.999929750805835,0.414174431257658
+"macrophage -> fibroblast","macrophage","fibroblast",8018,3843,1,1,1,0.386973907135262
+"macrophage -> immune other","macrophage","immune other",47041,21198,1,0.828058497448375,NA,0.0392722924236217
+"macrophage -> malignant","macrophage","malignant",2019,1318,0.976454868950486,0.966598403471671,1,0.747077877655745
+"malignant -> endothelial","malignant","endothelial",1654,756,0.982137641462062,0.970430717425285,1,0.56912363354535
+"malignant -> epithelial","malignant","epithelial",4949,1834,0.97917835886586,0.97981371029255,NA,0.0591207030147893
+"malignant -> fibroblast","malignant","fibroblast",9762,4513,0.60150156555453,1,1,0.655387845090858
+"malignant -> immune other","malignant","immune other",11695,6745,1,0.926983110984412,0.999681561877921,0.339285785831854
+"malignant -> macrophage","malignant","macrophage",1742,462,1,1,1,0.674131830606014
