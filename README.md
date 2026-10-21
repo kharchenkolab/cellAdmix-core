@@ -20,7 +20,7 @@ peak RSS about 42 GB; the default ensemble correction repeats the
 molecule-assignment and scoring stages once per ensemble member. (The
 breast tutorials run the same dataset with curated annotations and
 stricter cell QC, which keeps 82.1M molecules across 688K cells at
-rank 8.)
+rank 12.)
 
 The quickest way to see the workflow end to end is the
 [pancreas quickstart notebook](examples/xenium_pancreas_membrane_377_full/pancreas_quickstart.md):

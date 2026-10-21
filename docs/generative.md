@@ -243,10 +243,12 @@ exposure but not the source-side composition shift, at 2.3- to 22-fold
 their transfer expectation (on pancreas, led by CFTR — the canonical
 duct gene, peaking in duct cells at acinar interfaces — with interface
 programs of fibroblasts, immune and endothelial/mural cells behind it).
-The same screen applied across datasets flags inflammatory and
-myoepithelial contractile programs on breast 5K (CCL2, IL6, LIF; MYH11,
-MYLK, CNN1) and the classic stress and chemokine programs on NSCLC
-(FOS, JUNB, HSPA1A/B, CCL3/4, CXCL2/3).
+The same screen applied across datasets flags, on breast 5K, the
+myoepithelial contractile and matrix-interface programs of epithelial
+cells at stromal and vascular borders (MYH11, MYLK, CNN1, MYL9, DST;
+THBS1, COL4A1, LTBP2) together with chemokine and immediate-early genes
+(CCL19, CXCL9, CXCL10, CXCL2; ATF3, FOSL1), and the classic stress and
+chemokine programs on NSCLC (FOS, JUNB, HSPA1A/B, CCL3/4, CXCL2/3).
 
 ## Validation
 
