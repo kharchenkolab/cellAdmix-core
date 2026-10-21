@@ -43,11 +43,19 @@ membrane_correction <- membrane_score$correct(rules = membrane_rules)
 ## Inputs
 
 Place the Xenium output bundle in a local folder named `data` (this
-example uses a Xenium Prime 5K breast cancer run). The curated
-annotations ship with this example under `annotations`: cell-type labels
-in `annotation.csv.gz` and coarse tissue-domain labels in
-`domain_annotation.csv.gz`, produced by a clustering/marker annotation
-workflow on the same bundle.
+example uses a Xenium Prime 5K breast cancer run). The cell-type
+annotation ships with this example under `annotations`:
+`annotation.csv.gz` holds one label per cell and
+`domain_annotation.csv.gz` the coarse tissue domains inferred from the
+local cell-type composition. The labels come from a cellAdmixCore
+clustering of the bundle’s cells at resolution 3 (cells with at least 30
+molecules and 15 detected genes, 15-nearest-neighbor graph), with the
+lymphoid clusters sub-clustered separately to resolve T cells, B cells,
+and plasma cells. Each cluster was labelled from its top detection-AUC
+marker genes and the per-cluster rates of canonical lineage markers
+(`cluster_annotation.csv` lists the label and marker rationale of every
+cluster); clusters with no dominant lineage signal are labelled
+`Ambiguous / low-quality`.
 
 This 5K panel uses higher cell-complexity QC thresholds in the
 annotation and cell-state diagnostic steps than the smaller pancreas
@@ -69,20 +77,26 @@ table(annotation$merged_annotation)
 ```
 
     ## 
-    ## Ambiguous / low-quality              B / plasma             Endothelial 
-    ##                   47874                   25711                   18016 
-    ##              Epithelial        Fibroblast / CAF                 Myeloid 
-    ##                  166396                   11279                   82470 
-    ##                  T / NK 
-    ##                  118803
+    ##         Ambiguous / low-quality                          B cell 
+    ##                           76811                           24723 
+    ##                     Endothelial                      Epithelial 
+    ##                           15539                          144214 
+    ##         Inflammatory fibroblast                      Macrophage 
+    ##                           54230                           24603 
+    ##               Matrix fibroblast           Mature dendritic cell 
+    ##                           31849                            4224 
+    ## Monocyte / inflammatory myeloid                     Plasma cell 
+    ##                           23979                           12886 
+    ##                          T cell 
+    ##                           57491
 
 ``` r
 table(domain_annotation$domain_label)
 ```
 
     ## 
-    ##      immune_rich tumor_epithelial 
-    ##           353299           117250
+    ##      immune_rich    immune_stroma     mixed_region tumor_epithelial 
+    ##           110069           123249            90356           146875
 
 The cell-type annotation is passed as a named vector. Cells labeled
 `Ambiguous / low-quality` are retained in the side plots, but are
@@ -107,30 +121,30 @@ ds
     ##   threads: 10 
     ##   molecules: transcripts.parquet 
     ##   cells: cells.parquet 
-    ##   annotation:manual (422675 cells, 6 labels)
+    ##   annotation:manual (393738 cells, 10 labels)
 
 ## Fit Factors
 
 The fit uses the `invsqrt_kl` NMF variant — the recommended pairing for
 membrane scoring on stained data (see
-[docs/audit.md](../../docs/audit.md)) — with automatic rank
-based on the number of annotated cell types, multiple NMF restarts, and
-gene-loading molecule scoring.
+[docs/audit.md](../../docs/audit.md)) — with automatic rank based on the
+number of annotated cell types, multiple NMF restarts, and gene-loading
+molecule scoring.
 
 ``` r
 fit <- ds$fit(nmf_variant = "invsqrt_kl", verbose = TRUE)
 ```
 
-    ## Reusing cached run fit_manual_rank8_invsqrt_kl (parameters match)
+    ## Reusing cached run fit_manual_rank12_invsqrt_kl (parameters match)
 
 ``` r
 fit
 ```
 
     ## cellAdmix fit
-    ##   run: fit_manual_rank8_invsqrt_kl 
+    ##   run: fit_manual_rank12_invsqrt_kl 
     ##   annotation: manual 
-    ##   rank: 8 
+    ##   rank: 12 
     ##   NMF: invsqrt_kl 
     ##   molecule scoring: gene_loadings 
     ##   cells: 688099 
@@ -173,7 +187,7 @@ audit object verifies the correction afterwards.
 audit <- fit$audit_admixture()
 ```
 
-    ## Excluded 53 likely induced genes from marker panels (exposure-linked excess far above the source-profile expectation): ADAMTS4, ADIPOQ, AGTR1, AKT3, ALPL, AVPR1A, BIRC3, C1QTNF1
+    ## Excluded 52 likely induced genes from marker panels (exposure-linked excess far above the source-profile expectation): ADIPOQ, ALPL, ATF3, CAV2, CCDC102B, CCL19, CD52, CDC14A
 
 ``` r
 audit$plot_map()
@@ -195,7 +209,7 @@ cell_spatial <- merge(cell_spatial,
   domain_annotation[, c("cell_id", "domain_label")],
   by = "cell_id", all.x = FALSE, sort = FALSE)
 cell_spatial$domain_label <- factor(cell_spatial$domain_label,
-  levels = c("immune_rich", "tumor_epithelial"))
+  levels = c("tumor_epithelial", "immune_rich", "immune_stroma", "mixed_region"))
 ```
 
 ``` r
@@ -222,17 +236,17 @@ cowplot::plot_grid(plotlist = list(
 ## Diagnostic Setup
 
 Correction is run for all annotated cell types. To keep the follow-up
-plots readable, the diagnostic DE panels focus on the two large
-populations whose dominant admixture sources membrane scoring calls well
-— epithelial cells (which receive heavy immune leakage) and myeloid
-cells (which receive epithelial leakage). The stain-weak
-stromal/vascular types, whose admixture the current corrections cannot
-handle safely, are examined separately in the bridge section below. The
-marker sets highlight likely source signatures that may appear as
-admixture in the target cells.
+plots readable, the diagnostic DE panels focus on the two largest
+populations, for which membrane scoring issues correction rules against
+their dominant admixture sources — epithelial cells (which receive
+immune leakage) and T cells (which receive epithelial, macrophage, and
+endothelial leakage). The stain-weak stromal/vascular types, whose
+admixture the current corrections cannot handle safely, are examined
+separately in the bridge section below. The marker sets highlight likely
+source signatures that may appear as admixture in the target cells.
 
 ``` r
-diagnostic_cell_types <- c("Epithelial", "Myeloid")
+diagnostic_cell_types <- c("Epithelial", "T cell")
 
 epithelial_tumor_markers <- c("EPCAM", "KRT8", "KRT18", "KRT19", "MUC1",
   "GATA3", "CA12", "XBP1", "ERBB2")
@@ -296,13 +310,13 @@ membrane_rules <- membrane_score$rules(p_thresh = p_thresh)
 head(membrane_rules[, c("factor", "source_cell_type", "target_cell_type", "p_value")])
 ```
 
-    ##   factor source_cell_type target_cell_type      p_value
-    ## 1      1       Epithelial       B / plasma 0.0112455893
-    ## 2      1       Epithelial          Myeloid 0.0013268278
-    ## 3      1       Epithelial           T / NK 0.0516748007
-    ## 4      2           T / NK       B / plasma 0.0001398496
-    ## 5      2           T / NK      Endothelial 0.0929827433
-    ## 6      2           T / NK       Epithelial 0.0435733040
+    ##   factor source_cell_type        target_cell_type      p_value
+    ## 1      1       Epithelial                  B cell 3.310551e-02
+    ## 2      1       Epithelial             Endothelial 2.392963e-04
+    ## 3      1       Epithelial Inflammatory fibroblast 3.543994e-03
+    ## 4      1       Epithelial              Macrophage 4.312782e-02
+    ## 5      1       Epithelial       Matrix fibroblast 6.685384e-05
+    ## 6      1       Epithelial   Mature dendritic cell 4.191718e-02
 
 The heatmap shows factor-by-cell-type evidence, with symbols marking
 inferred source and cleanup target calls.
@@ -360,7 +374,7 @@ membrane_correction <- membrane_score$correct(rules = membrane_rules,
   name = "membrane_clean")
 ```
 
-    ## Ensemble correction over 10 members: molecules removed by >= 3 members (vote >= 0.30) are dropped (14,239,573 molecules).
+    ## Ensemble correction over 10 members: molecules removed by >= 3 members (vote >= 0.30) are dropped (11,590,385 molecules).
 
 ``` r
 membrane_counts <- membrane_correction$counts()
@@ -368,33 +382,58 @@ membrane_counts <- membrane_correction$counts()
 membrane_correction$summary()
 ```
 
-    ##          cell_type n_cells n_modified_cells fraction_cells_modified
-    ## 1              all  688099           411726               0.5983529
-    ## 2       B / plasma   25711            25242               0.9817588
-    ## 3      Endothelial   18016            17848               0.9906750
-    ## 4       Epithelial  166396           166309               0.9994772
-    ## 5 Fibroblast / CAF   11279            11160               0.9894494
-    ## 6          Myeloid   82470            81074               0.9830726
-    ## 7           T / NK  118803           110093               0.9266854
-    ## 8          unknown  265424                0               0.0000000
-    ##   molecules_before molecules_after molecules_removed fraction_molecules_removed
-    ## 1         82144903        67905330          14239573                  0.1733470
-    ## 2          3831465         3224021            607444                  0.1585409
-    ## 3          1275509          677674            597835                  0.4687031
-    ## 4         50582711        42750224           7832487                  0.1548451
-    ## 5           851651          400294            451357                  0.5299788
-    ## 6          9109012         5790325           3318687                  0.3643301
-    ## 7          8530598         7098835           1431763                  0.1678385
-    ## 8          7963957         7963957                 0                  0.0000000
-    ##   median_removed_per_modified_cell median_fraction_removed_per_modified_cell
-    ## 1                               27                                0.12536443
-    ## 2                               17                                0.10256410
-    ## 3                               27                                0.47826087
-    ## 4                               41                                0.11674009
-    ## 5                               37                                0.64556962
-    ## 6                               32                                0.39461530
-    ## 7                                5                                0.07843137
-    ## 8                                0                                0.00000000
+    ##                          cell_type n_cells n_modified_cells
+    ## 1                              all  688099           389397
+    ## 2                           B cell   24723            24620
+    ## 3                      Endothelial   15539            15504
+    ## 4                       Epithelial  144214           143838
+    ## 5          Inflammatory fibroblast   54230            54077
+    ## 6                       Macrophage   24603            23813
+    ## 7                Matrix fibroblast   31849            31370
+    ## 8            Mature dendritic cell    4224             4224
+    ## 9  Monocyte / inflammatory myeloid   23979            21979
+    ## 10                     Plasma cell   12886            12783
+    ## 11                          T cell   57491            57189
+    ## 12                         unknown  294361                0
+    ##    fraction_cells_modified molecules_before molecules_after molecules_removed
+    ## 1                0.5659026         82144903        70554518          11590385
+    ## 2                0.9958338          1786962         1070130            716832
+    ## 3                0.9977476          3063402         2647402            416000
+    ## 4                0.9973928         49027051        43902164           5124887
+    ## 5                0.9971787          4248030         2232226           2015804
+    ## 6                0.9678901          3559087         3314914            244173
+    ## 7                0.9849603          5026410         4092724            933686
+    ## 8                1.0000000           408087          217913            190174
+    ## 9                0.9165937          1793419         1320149            473270
+    ## 10               0.9920068           996170          807000            189170
+    ## 11               0.9947470          4596360         3309971           1286389
+    ## 12               0.0000000          7639925         7639925                 0
+    ##    fraction_molecules_removed median_removed_per_modified_cell
+    ## 1                  0.14109682                               22
+    ## 2                  0.40114563                               21
+    ## 3                  0.13579674                               20
+    ## 4                  0.10453182                               30
+    ## 5                  0.47452678                               31
+    ## 6                  0.06860552                                8
+    ## 7                  0.18575604                               18
+    ## 8                  0.46601337                               37
+    ## 9                  0.26389260                               12
+    ## 10                 0.18989731                               10
+    ## 11                 0.27987125                               16
+    ## 12                 0.00000000                                0
+    ##    median_fraction_removed_per_modified_cell
+    ## 1                                 0.12351544
+    ## 2                                 0.32926829
+    ## 3                                 0.10784314
+    ## 4                                 0.09581882
+    ## 5                                 0.45544554
+    ## 6                                 0.05913978
+    ## 7                                 0.11976048
+    ## 8                                 0.42443952
+    ## 9                                 0.18181818
+    ## 10                                0.14388489
+    ## 11                                0.21739130
+    ## 12                                0.00000000
 
 ``` r
 membrane_de <- celladmix_de_by_group(membrane_counts, cell_spatial,
@@ -417,66 +456,158 @@ The audit verifies the cleanup against the same exposure measurements:
 the report gives per-pair sensitivity and the own-marker false-removal
 rate, and the panels show the estimated admixture remaining and the
 pooled exposure profile before and after cleanup. The evaluation warns
-that the correction removed about half of Fibroblast / CAF’s own-marker
-molecules, and that several pairs remain uncovered — both are early
-signs of the stain-weak-type problem examined in the bridge section
-below.
+that the correction removed about half of the own-marker molecules of
+the monocyte / inflammatory myeloid class — a class whose expression
+overlaps the macrophage factors that the rules remove from it — and that
+many pairs remain largely uncovered, above all those in which the two
+fibroblast states are the source. The uncovered stromal pairs are the
+stain-weak-type problem examined in the bridge section below.
 
 ``` r
 report <- audit$evaluate(membrane_correction)
 ```
 
-    ## Warning: Correction removed 52% of Fibroblast / CAF's own-marker molecules -
-    ## severe over-removal of near-surely-genuine expression
+    ## Warning: Correction removed 53% of Monocyte / inflammatory myeloid's own-marker
+    ## molecules - severe over-removal of near-surely-genuine expression
 
-    ## Warning: Correction removed only 8% of the estimated ~246,255 admixed molecules
-    ## from B / plasma into Myeloid
+    ## Warning: Correction removed only 18% of the estimated ~243,384 admixed
+    ## molecules from B cell into Macrophage
 
-    ## Warning: Correction removed only 0% of the estimated ~79,398 admixed molecules
-    ## from Endothelial into B / plasma
+    ## Warning: Correction removed only 2% of the estimated ~237,007 admixed molecules
+    ## from B cell into Monocyte / inflammatory myeloid
 
-    ## Warning: Correction removed only 0% of the estimated ~3,874,529 admixed
-    ## molecules from Endothelial into Epithelial
+    ## Warning: Correction removed only 0% of the estimated ~676,221 admixed molecules
+    ## from B cell into T cell
 
-    ## Warning: Correction removed only 0% of the estimated ~102,150 admixed molecules
-    ## from Epithelial into B / plasma
+    ## Warning: Correction removed only 1% of the estimated ~237,270 admixed molecules
+    ## from Endothelial into Inflammatory fibroblast
 
-    ## Warning: Correction removed only 2% of the estimated ~386,562 admixed molecules
+    ## Warning: Correction removed only 9% of the estimated ~64,704 admixed molecules
+    ## from Endothelial into Matrix fibroblast
+
+    ## Warning: Correction removed only 0% of the estimated ~63,137 admixed molecules
     ## from Epithelial into Endothelial
 
-    ## Warning: Correction removed only 0% of the estimated ~201,107 admixed molecules
-    ## from Epithelial into Fibroblast / CAF
+    ## Warning: Correction removed only 0% of the estimated ~245,615 admixed molecules
+    ## from Epithelial into Macrophage
 
-    ## Warning: Correction removed only 1% of the estimated ~600,305 admixed molecules
-    ## from Epithelial into T / NK
+    ## Warning: Correction removed only 0% of the estimated ~242,352 admixed molecules
+    ## from Epithelial into Matrix fibroblast
 
-    ## Warning: Correction removed only 0% of the estimated ~1,426,783 admixed
-    ## molecules from Fibroblast / CAF into T / NK
+    ## Warning: Correction removed only 0% of the estimated ~45,295 admixed molecules
+    ## from Epithelial into Monocyte / inflammatory myeloid
 
-    ## Warning: Correction removed only 2% of the estimated ~187,128 admixed molecules
-    ## from Myeloid into B / plasma
+    ## Warning: Correction removed only 0% of the estimated ~279,752 admixed molecules
+    ## from Epithelial into Plasma cell
+
+    ## Warning: Correction removed only 9% of the estimated ~112,860 admixed molecules
+    ## from Inflammatory fibroblast into B cell
+
+    ## Warning: Correction removed only 3% of the estimated ~363,054 admixed molecules
+    ## from Inflammatory fibroblast into Endothelial
+
+    ## Warning: Correction removed only 12% of the estimated ~301,060 admixed
+    ## molecules from Inflammatory fibroblast into Macrophage
+
+    ## Warning: Correction removed only 11% of the estimated ~1,137,803 admixed
+    ## molecules from Inflammatory fibroblast into Matrix fibroblast
+
+    ## Warning: Correction removed only 12% of the estimated ~647,610 admixed
+    ## molecules from Inflammatory fibroblast into Monocyte / inflammatory myeloid
+
+    ## Warning: Correction removed only 18% of the estimated ~92,267 admixed molecules
+    ## from Inflammatory fibroblast into Plasma cell
+
+    ## Warning: Correction removed only 16% of the estimated ~229,741 admixed
+    ## molecules from Inflammatory fibroblast into T cell
+
+    ## Warning: Correction removed only 8% of the estimated ~43,901 admixed molecules
+    ## from Matrix fibroblast into B cell
+
+    ## Warning: Correction removed only 5% of the estimated ~59,136 admixed molecules
+    ## from Matrix fibroblast into Endothelial
+
+    ## Warning: Correction removed only 4% of the estimated ~453,761 admixed molecules
+    ## from Matrix fibroblast into Epithelial
+
+    ## Warning: Correction removed only 6% of the estimated ~321,205 admixed molecules
+    ## from Matrix fibroblast into Inflammatory fibroblast
+
+    ## Warning: Correction removed only 2% of the estimated ~111,912 admixed molecules
+    ## from Matrix fibroblast into Macrophage
+
+    ## Warning: Correction removed only 0% of the estimated ~85,326 admixed molecules
+    ## from Matrix fibroblast into Monocyte / inflammatory myeloid
+
+    ## Warning: Correction removed only 0% of the estimated ~27,296 admixed molecules
+    ## from Matrix fibroblast into Plasma cell
+
+    ## Warning: Correction removed only 4% of the estimated ~113,863 admixed molecules
+    ## from Matrix fibroblast into T cell
+
+    ## Warning: Correction removed only 17% of the estimated ~46,853 admixed molecules
+    ## from Mature dendritic cell into B cell
+
+    ## Warning: Correction removed only 10% of the estimated ~73,277 admixed molecules
+    ## from Mature dendritic cell into Macrophage
+
+    ## Warning: Correction removed only 8% of the estimated ~63,395 admixed molecules
+    ## from Mature dendritic cell into Monocyte / inflammatory myeloid
+
+    ## Warning: Correction removed only 15% of the estimated ~115,394 admixed
+    ## molecules from Mature dendritic cell into T cell
+
+    ## Warning: Correction removed only 13% of the estimated ~287,909 admixed
+    ## molecules from Monocyte / inflammatory myeloid into Macrophage
+
+    ## Warning: Correction removed only 20% of the estimated ~151,078 admixed
+    ## molecules from Monocyte / inflammatory myeloid into T cell
+
+    ## Warning: Correction removed only 11% of the estimated ~100,218 admixed
+    ## molecules from Plasma cell into Macrophage
+
+    ## Warning: Correction removed only 0% of the estimated ~54,336 admixed molecules
+    ## from Plasma cell into Monocyte / inflammatory myeloid
+
+    ## Warning: Correction removed only 1% of the estimated ~157,748 admixed molecules
+    ## from T cell into B cell
+
+    ## Warning: Correction removed only 13% of the estimated ~351,318 admixed
+    ## molecules from T cell into Inflammatory fibroblast
+
+    ## Warning: Correction removed only 2% of the estimated ~205,808 admixed molecules
+    ## from T cell into Macrophage
+
+    ## Warning: Correction removed only 9% of the estimated ~53,554 admixed molecules
+    ## from T cell into Mature dendritic cell
+
+    ## Warning: Correction removed only 2% of the estimated ~332,663 admixed molecules
+    ## from T cell into Monocyte / inflammatory myeloid
+
+    ## Warning: Correction removed only 2% of the estimated ~80,627 admixed molecules
+    ## from T cell into Plasma cell
 
 ``` r
 report$summary()
 ```
 
     ## $detected_pairs
-    ## [1] 29
+    ## [1] 88
     ## 
     ## $estimated_admixed_molecules
-    ## [1] 18430537
+    ## [1] 16219949
     ## 
     ## $leakage_removed_overall
-    ## [1] 0.5551028
+    ## [1] 0.3805345
     ## 
     ## $median_pair_sensitivity
-    ## [1] 0.6976384
+    ## [1] 0.3603507
     ## 
     ## $own_marker_false_removal
-    ## [1] 0.01857293
+    ## [1] 0.02981779
     ## 
     ## $worst_false_removal
-    ## [1] "Fibroblast / CAF"
+    ## [1] "Monocyte / inflammatory myeloid"
 
 ``` r
 cowplot::plot_grid(
@@ -534,23 +665,24 @@ cowplot::plot_grid(plotlist = plots, ncol = length(plots), align = "hv", axis = 
 
 ## Bridge Scoring and Its Limits on Stain-Weak Targets
 
-The audit warnings above flag large pairs that membrane scoring issued
-no rule for — most prominently endothelial leakage into epithelial cells
-(\~888k estimated molecules) and the reciprocal epithelial leakage into
-endothelial and fibroblast cells. Membrane scoring depends on stain-path
-contrast along molecule-to-centroid lines, which is weak for thin,
-elongated cell types such as endothelium and fibroblasts. Bridge scoring
-uses molecule adjacency instead of the stain image and pairs best with
-the `ls_nmf` factorization (see
-[docs/audit.md](../../docs/audit.md)). It detects these pairs
-decisively — but, as shown below, it cannot correct them safely on this
-dataset, and the reason is instructive.
+The audit warnings above flag large pairs that membrane scoring left
+largely uncorrected — most prominently the leakage from inflammatory
+fibroblasts into matrix fibroblasts (\~1.1M estimated molecules) and
+into the monocyte / inflammatory myeloid class (\~650k), and the leakage
+from matrix fibroblasts into epithelial cells (\~450k). Membrane scoring
+depends on stain-path contrast along molecule-to-centroid lines, which
+is weak for thin, elongated cell types such as fibroblasts and
+endothelium. Bridge scoring uses molecule adjacency instead of the stain
+image and pairs best with the `ls_nmf` factorization (see
+[docs/audit.md](../../docs/audit.md)). It detects these pairs decisively
+— but, as shown below, it cannot correct them safely on this dataset,
+and the reason is instructive.
 
 ``` r
 fit_ls <- ds$fit()
 ```
 
-    ## Reusing cached run fit_manual_rank8_ls_nmf (parameters match)
+    ## Reusing cached run fit_manual_rank12_ls_nmf (parameters match)
 
 ``` r
 bridge_score <- fit_ls$score_bridge()
@@ -559,33 +691,36 @@ bridge_rules <- bridge_score$rules(p_thresh = p_thresh)
 
 Applying the bridge rules, however, exposes a factorization-level
 failure mode: the over-removal guardrails fire, reporting that
-endothelial and fibroblast cells lose essentially *all* of their
-molecules:
+inflammatory fibroblasts and the monocyte / inflammatory myeloid class
+lose most of their molecules:
 
 ``` r
 bridge_correction <- bridge_score$correct(rules = bridge_rules,
   name = "bridge_clean")
 ```
 
-    ## Ensemble correction over 10 members: molecules removed by >= 3 members (vote >= 0.30) are dropped (10,770,358 molecules).
+    ## Ensemble correction over 10 members: molecules removed by >= 3 members (vote >= 0.30) are dropped (10,660,595 molecules).
 
-    ## Warning: Correction removed 100% of all molecules from Endothelial - this is
-    ## likely erasing native expression (does the factorization have a native factor
-    ## for this type?)
-
-    ## Warning: Correction removed 100% of all molecules from Fibroblast / CAF - this
-    ## is likely erasing native expression (does the factorization have a native
+    ## Warning: Correction removed 81% of all molecules from Inflammatory fibroblast -
+    ## this is likely erasing native expression (does the factorization have a native
     ## factor for this type?)
 
-The mechanism: the rank-8 `ls_nmf` fit collapses to a few active
-factors, none of them native to the small endothelial and fibroblast
-populations. Each bridge rule is individually legitimate — endothelial
-cells genuinely carry heavy epithelial and immune leakage, and each rule
-passes the native-factor check against cells distant from *its own*
-source — but with no native factor to hold the genuinely endothelial
-molecules, the union of the rules covers the type’s entire factor
-spectrum, and the correction erases the cell type instead of cleaning
-it.
+    ## Warning: Correction removed 72% of all molecules from Monocyte / inflammatory
+    ## myeloid - this is likely erasing native expression (does the factorization have
+    ## a native factor for this type?)
+
+The mechanism: the rank-12 `ls_nmf` fit collapses to seven active
+factors, sourced by epithelial, T, B, macrophage, endothelial, and
+matrix fibroblast cells plus a negligible inflammatory-fibroblast
+factor; the monocyte / inflammatory myeloid and plasma-cell populations
+have no native factor at all. Each bridge rule is individually
+legitimate — inflammatory fibroblasts genuinely carry heavy leakage from
+the lymphoid, myeloid, endothelial, and matrix-fibroblast cells around
+them, and each rule passes the native-factor check against cells distant
+from *its own* source — but with no substantial native factor to hold
+the genuinely own molecules, the union of the rules covers the type’s
+entire factor spectrum, and the correction erases the cell type instead
+of cleaning it.
 
 The per-pair diagnostics make the trade-off visible. On the leakage side
 the bridge correction looks competitive — sensitivity is blind to
@@ -603,9 +738,11 @@ cowplot::plot_grid(
 <img src="breast_5k_membrane_scoring_files/figure-gfm/bridge-vs-membrane-pairs-1.png" alt="" width="1200" style="display: block; margin: auto;" />
 
 The difference shows in how much near-surely-genuine expression each
-correction retains per cell type (left) — the bridge correction’s
-erasure of the stain-weak types — while the overall admixture burden
-removed (right) stays similar:
+correction retains per cell type (left): the bridge correction erases
+the inflammatory fibroblasts and most of the monocyte / inflammatory
+myeloid and plasma cells. That erasure is also why it appears to remove
+far more of the admixture burden (right) — a target type’s deleted
+native expression leaves no exposure gradient to measure:
 
 ``` r
 retention <- rbind(
@@ -631,16 +768,18 @@ cowplot::plot_grid(
 
 <img src="breast_5k_membrane_scoring_files/figure-gfm/bridge-vs-membrane-retention-1.png" alt="" width="1056" style="display: block; margin: auto;" />
 
-The bottom line for this dataset: membrane scoring cannot see the
-epithelial leakage into these thin, stain-weak cell types, and bridge
-scoring sees it but cannot separate it, because the factorization never
-formed native endothelial or fibroblast factors. Correcting these pairs
-safely requires factorization-level remedies (a rank that resolves the
-small types, or anchor-based factor recovery — see
-[docs/audit.md](../../docs/audit.md)). Downstream analysis in
-this notebook therefore proceeds with the membrane correction, and the
-endothelial and fibroblast admixture flagged by the audit should be kept
-in mind when interpreting those cell types.
+The bottom line for this dataset: membrane scoring cannot see most of
+the leakage that the thin, stain-weak fibroblast states shed into their
+neighbours and into each other, and bridge scoring sees it but cannot
+separate it, because the factorization never formed a native factor for
+the inflammatory fibroblasts, the monocyte / inflammatory myeloid class,
+or the plasma cells. Correcting these pairs safely requires
+factorization-level remedies (a rank that resolves these types, or
+anchor-based factor recovery — see
+[docs/audit.md](../../docs/audit.md)). Downstream analysis in this
+notebook therefore proceeds with the membrane correction, and the
+stromal admixture flagged by the audit should be kept in mind when
+interpreting the fibroblast and inflammatory myeloid classes.
 
 ## Cell-State UMAP Before and After Cleanup
 
@@ -658,43 +797,43 @@ original_state <- ds$cell_state_umap(cells_max = state_cells_max,
   min_molecules = 30, min_genes = 15, verbose = TRUE)
 ```
 
-    ## [INFO 12:57:50 +0.016s] Reused compatible Xenium input store (0.000s)
-    ## [INFO 12:57:50 +0.016s] Built Xenium input store: 82144903 molecules, 688099 cells (0.016s)
-    ## [INFO 12:57:52 +2.557s] Loaded input-store cell-gene counts: 688099 cells (2.556s)
-    ## [INFO 12:57:52 +2.624s] Indexed cell counts: 470549 eligible cells (min_molecules=30, min_genes=15) (0.067s)
-    ## [INFO 12:57:52 +2.721s] Selected clustering cells: 5000 cells (0.098s)
-    ## [INFO 12:57:52 +2.732s] Loaded sparse cell-gene counts: 776043 non-zero entries (0.011s)
-    ## [INFO 12:57:52 +2.746s] Selected variable genes: 1000 genes (0.013s)
-    ## [INFO 12:57:53 +2.778s] Materialized dense clustering matrix: 1000 x 5000 (0.032s)
-    ## [INFO 12:57:53 +3.322s] Computed cell PCA: 30 x 5000 (0.545s)
-    ## [INFO 12:57:53 +3.465s] Built HNSW cell KNN graph: 75000 directed edges using 10 thread(s); reusing 15 cosine-distance neighbors for UMAP (0.142s)
-    ## [INFO 12:57:53 +3.474s] Ran Louvain clustering (0.010s)
-    ## [INFO 12:57:53 +3.502s] Initialized UMAP layout (0.028s)
-    ## [INFO 12:57:55 +5.385s] Optimized UMAP layout with parallel optimization (1.883s)
-    ## [INFO 12:57:55 +5.385s] Computed cell UMAP (1.910s)
-    ## [INFO 12:57:55 +5.386s] Assembled cell clustering result (0.001s)
-    ## [INFO 12:57:55 +5.386s] Finished store-backed cell clustering (2.829s)
-    ## [INFO 12:57:55 +5.395s] Wrote cell clustering outputs (0.009s)
+    ## [INFO 09:37:21 +0.118s] Reused compatible Xenium input store (0.000s)
+    ## [INFO 09:37:21 +0.118s] Built Xenium input store: 82144903 molecules, 688099 cells (0.118s)
+    ## [INFO 09:37:24 +3.258s] Loaded input-store cell-gene counts: 688099 cells (3.258s)
+    ## [INFO 09:37:24 +3.409s] Indexed cell counts: 470549 eligible cells (min_molecules=30, min_genes=15) (0.141s)
+    ## [INFO 09:37:25 +3.628s] Selected clustering cells: 5000 cells (0.219s)
+    ## [INFO 09:37:25 +3.647s] Loaded sparse cell-gene counts: 776043 non-zero entries (0.019s)
+    ## [INFO 09:37:25 +3.672s] Selected variable genes: 1000 genes (0.024s)
+    ## [INFO 09:37:25 +3.733s] Materialized dense clustering matrix: 1000 x 5000 (0.061s)
+    ## [INFO 09:37:26 +4.800s] Computed cell PCA: 30 x 5000 (1.068s)
+    ## [INFO 09:37:26 +5.138s] Built HNSW cell KNN graph: 75000 directed edges using 10 thread(s); reusing 15 cosine-distance neighbors for UMAP (0.337s)
+    ## [INFO 09:37:26 +5.148s] Ran Louvain clustering (0.010s)
+    ## [INFO 09:37:26 +5.190s] Initialized UMAP layout (0.042s)
+    ## [INFO 09:37:29 +8.022s] Optimized UMAP layout with parallel optimization (2.831s)
+    ## [INFO 09:37:29 +8.022s] Computed cell UMAP (2.874s)
+    ## [INFO 09:37:29 +8.023s] Assembled cell clustering result (0.002s)
+    ## [INFO 09:37:29 +8.024s] Finished store-backed cell clustering (4.766s)
+    ## [INFO 09:37:29 +8.034s] Wrote cell clustering outputs (0.010s)
 
 ``` r
 corrected_state <- membrane_correction$cell_state_umap(cells_max = state_cells_max,
   min_molecules = 30, min_genes = 15, verbose = TRUE)
 ```
 
-    ## [INFO 12:58:07 +11.743s] Loaded run cell-gene counts: 688099 cells (11.743s)
-    ## [INFO 12:58:07 +11.800s] Indexed cell counts: 368117 eligible cells (min_molecules=30, min_genes=15) (0.056s)
-    ## [INFO 12:58:07 +11.882s] Selected clustering cells: 5000 cells (0.082s)
-    ## [INFO 12:58:07 +11.900s] Loaded sparse cell-gene counts: 761964 non-zero entries (0.018s)
-    ## [INFO 12:58:07 +11.914s] Selected variable genes: 1000 genes (0.014s)
-    ## [INFO 12:58:07 +11.946s] Materialized dense clustering matrix: 1000 x 5000 (0.032s)
-    ## [INFO 12:58:08 +12.531s] Computed cell PCA: 30 x 5000 (0.585s)
-    ## [INFO 12:58:08 +12.702s] Built HNSW cell KNN graph: 75000 directed edges using 10 thread(s); reusing 15 cosine-distance neighbors for UMAP (0.171s)
-    ## [INFO 12:58:08 +12.750s] Ran Louvain clustering (0.047s)
-    ## [INFO 12:58:08 +12.775s] Initialized UMAP layout (0.025s)
-    ## [INFO 12:58:10 +14.857s] Optimized UMAP layout with parallel optimization (2.082s)
-    ## [INFO 12:58:10 +14.857s] Computed cell UMAP (2.107s)
-    ## [INFO 12:58:10 +14.858s] Assembled cell clustering result (0.001s)
-    ## [INFO 12:58:10 +14.858s] Finished run-count cell-state embedding (3.115s)
+    ## [INFO 09:37:50 +20.824s] Loaded run cell-gene counts: 688099 cells (20.824s)
+    ## [INFO 09:37:50 +20.957s] Indexed cell counts: 416951 eligible cells (min_molecules=30, min_genes=15) (0.133s)
+    ## [INFO 09:37:50 +21.141s] Selected clustering cells: 5000 cells (0.184s)
+    ## [INFO 09:37:50 +21.168s] Loaded sparse cell-gene counts: 732256 non-zero entries (0.027s)
+    ## [INFO 09:37:50 +21.181s] Selected variable genes: 1000 genes (0.013s)
+    ## [INFO 09:37:50 +21.234s] Materialized dense clustering matrix: 1000 x 5000 (0.053s)
+    ## [INFO 09:37:51 +22.231s] Computed cell PCA: 30 x 5000 (0.997s)
+    ## [INFO 09:37:52 +22.602s] Built HNSW cell KNN graph: 75000 directed edges using 10 thread(s); reusing 15 cosine-distance neighbors for UMAP (0.371s)
+    ## [INFO 09:37:52 +22.612s] Ran Louvain clustering (0.010s)
+    ## [INFO 09:37:52 +22.654s] Initialized UMAP layout (0.042s)
+    ## [INFO 09:37:55 +26.321s] Optimized UMAP layout with parallel optimization (3.666s)
+    ## [INFO 09:37:55 +26.321s] Computed cell UMAP (3.709s)
+    ## [INFO 09:37:55 +26.322s] Assembled cell clustering result (0.001s)
+    ## [INFO 09:37:55 +26.322s] Finished run-count cell-state embedding (5.498s)
 
 ``` r
 cell_type_levels <- sort(unique(cell_annotation))
