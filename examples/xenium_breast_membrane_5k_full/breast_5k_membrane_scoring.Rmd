@@ -44,10 +44,18 @@ membrane_correction <- membrane_score$correct(rules = membrane_rules)
 ## Inputs
 
 Place the Xenium output bundle in a local folder named `data` (this example
-uses a Xenium Prime 5K breast cancer run). The curated annotations ship with
-this example under `annotations`: cell-type labels in `annotation.csv.gz`
-and coarse tissue-domain labels in `domain_annotation.csv.gz`, produced by a
-clustering/marker annotation workflow on the same bundle.
+uses a Xenium Prime 5K breast cancer run). The cell-type annotation ships with
+this example under `annotations`: `annotation.csv.gz` holds one label per
+cell and `domain_annotation.csv.gz` the coarse tissue domains inferred from
+the local cell-type composition. The labels come from a cellAdmixCore
+clustering of the bundle's cells at resolution 3 (cells with at least 30
+molecules and 15 detected genes, 15-nearest-neighbor graph), with the
+lymphoid clusters sub-clustered separately to resolve T cells, B cells, and
+plasma cells. Each cluster was labelled from its top detection-AUC marker
+genes and the per-cluster rates of canonical lineage markers
+(`cluster_annotation.csv` lists the label and marker rationale of every
+cluster); clusters with no dominant lineage signal are labelled
+`Ambiguous / low-quality`.
 
 This 5K panel uses higher cell-complexity QC thresholds in the annotation and
 cell-state diagnostic steps than the smaller pancreas 377-gene example:
@@ -143,7 +151,7 @@ cell_spatial <- merge(cell_spatial,
   domain_annotation[, c("cell_id", "domain_label")],
   by = "cell_id", all.x = FALSE, sort = FALSE)
 cell_spatial$domain_label <- factor(cell_spatial$domain_label,
-  levels = c("immune_rich", "tumor_epithelial"))
+  levels = c("tumor_epithelial", "immune_rich", "immune_stroma", "mixed_region"))
 ```
 
 ```{r spatial-celltypes, fig.width=6.8, fig.height=5.4}
@@ -166,16 +174,17 @@ cowplot::plot_grid(plotlist = list(
 ## Diagnostic Setup
 
 Correction is run for all annotated cell types. To keep the follow-up plots
-readable, the diagnostic DE panels focus on the two large populations whose
-dominant admixture sources membrane scoring calls well — epithelial cells (which
-receive heavy immune leakage) and myeloid cells (which receive epithelial
-leakage). The stain-weak stromal/vascular types, whose admixture the
-current corrections cannot handle safely, are examined separately in the
-bridge section below. The marker sets highlight likely source signatures
-that may appear as admixture in the target cells.
+readable, the diagnostic DE panels focus on the two largest populations, for
+which membrane scoring issues correction rules against their dominant
+admixture sources — epithelial cells (which receive immune leakage) and T
+cells (which receive epithelial, macrophage, and endothelial leakage). The
+stain-weak stromal/vascular types, whose admixture the current corrections
+cannot handle safely, are examined separately in the bridge section below.
+The marker sets highlight likely source signatures that may appear as
+admixture in the target cells.
 
 ```{r diagnostic-marker-sets}
-diagnostic_cell_types <- c("Epithelial", "Myeloid")
+diagnostic_cell_types <- c("Epithelial", "T cell")
 
 epithelial_tumor_markers <- c("EPCAM", "KRT8", "KRT18", "KRT19", "MUC1",
   "GATA3", "CA12", "XBP1", "ERBB2")
@@ -305,8 +314,11 @@ The audit verifies the cleanup against the same exposure measurements: the
 report gives per-pair sensitivity and the own-marker false-removal rate,
 and the panels show the estimated admixture remaining and the pooled
 exposure profile before and after cleanup. The evaluation warns that the
-correction removed about half of Fibroblast / CAF's own-marker molecules,
-and that several pairs remain uncovered — both are early signs of the
+correction removed about half of the own-marker molecules of the
+monocyte / inflammatory myeloid class — a class whose expression overlaps
+the macrophage factors that the rules remove from it — and that many
+pairs remain largely uncovered, above all those in which the two
+fibroblast states are the source. The uncovered stromal pairs are the
 stain-weak-type problem examined in the bridge section below.
 
 ```{r audit-verify, warning=TRUE, fig.width=9.6, fig.height=4.0}
@@ -359,12 +371,14 @@ cowplot::plot_grid(plotlist = plots, ncol = length(plots), align = "hv", axis = 
 
 ## Bridge Scoring and Its Limits on Stain-Weak Targets
 
-The audit warnings above flag large pairs that membrane scoring issued no
-rule for — most prominently endothelial leakage into epithelial cells
-(~888k estimated molecules) and the reciprocal epithelial leakage into
-endothelial and fibroblast cells. Membrane scoring depends on stain-path contrast along
-molecule-to-centroid lines, which is weak for thin, elongated cell types
-such as endothelium and fibroblasts. Bridge scoring uses molecule
+The audit warnings above flag large pairs that membrane scoring left
+largely uncorrected — most prominently the leakage from inflammatory
+fibroblasts into matrix fibroblasts (~1.1M estimated molecules) and into
+the monocyte / inflammatory myeloid class (~650k), and the leakage from
+matrix fibroblasts into epithelial cells (~450k). Membrane scoring
+depends on stain-path contrast along molecule-to-centroid lines, which is
+weak for thin, elongated cell types such as fibroblasts and endothelium.
+Bridge scoring uses molecule
 adjacency instead of the stain image and pairs best with the `ls_nmf`
 factorization (see [docs/audit.md](../../docs/audit.md)). It
 detects these pairs decisively — but, as shown below, it cannot correct
@@ -377,28 +391,32 @@ bridge_rules <- bridge_score$rules(p_thresh = p_thresh)
 ```
 
 Applying the bridge rules, however, exposes a factorization-level failure
-mode: the over-removal guardrails fire, reporting that endothelial and
-fibroblast cells lose essentially *all* of their molecules:
+mode: the over-removal guardrails fire, reporting that inflammatory
+fibroblasts and the monocyte / inflammatory myeloid class lose most of
+their molecules:
 
 ```{r bridge-cleanup, warning=TRUE}
 bridge_correction <- bridge_score$correct(rules = bridge_rules,
   name = "bridge_clean")
 ```
 
-The mechanism: the rank-8 `ls_nmf` fit collapses to a few active factors,
-none of them native to the small endothelial and fibroblast populations.
-Each bridge rule is individually legitimate — endothelial cells genuinely
-carry heavy epithelial and immune leakage, and each rule passes the
-native-factor check against cells distant from *its own* source — but with
-no native factor to hold the genuinely endothelial molecules, the union of
-the rules covers the type's entire factor spectrum, and the correction
-erases the cell type instead of cleaning it.
+The mechanism: the rank-12 `ls_nmf` fit collapses to seven active
+factors, sourced by epithelial, T, B, macrophage, endothelial, and matrix
+fibroblast cells plus a negligible inflammatory-fibroblast factor; the
+monocyte / inflammatory myeloid and plasma-cell populations have no native
+factor at all. Each bridge rule is individually legitimate — inflammatory
+fibroblasts genuinely carry heavy leakage from the lymphoid, myeloid,
+endothelial, and matrix-fibroblast cells around them, and each rule passes
+the native-factor check against cells distant from *its own* source — but
+with no substantial native factor to hold the genuinely own molecules, the
+union of the rules covers the type's entire factor spectrum, and the
+correction erases the cell type instead of cleaning it.
 
 The per-pair diagnostics make the trade-off visible. On the leakage side
 the bridge correction looks competitive — sensitivity is blind to
 over-removal by construction:
 
-```{r bridge-vs-membrane-pairs, fig.width=12.5, fig.height=5.6, warning=FALSE}
+```{r bridge-vs-membrane-pairs, fig.width=12.5, fig.height=13.0, warning=FALSE}
 bridge_report <- audit$evaluate(bridge_correction)
 
 cowplot::plot_grid(
@@ -408,9 +426,11 @@ cowplot::plot_grid(
 ```
 
 The difference shows in how much near-surely-genuine expression each
-correction retains per cell type (left) — the bridge correction's erasure
-of the stain-weak types — while the overall admixture burden removed
-(right) stays similar:
+correction retains per cell type (left): the bridge correction erases the
+inflammatory fibroblasts and most of the monocyte / inflammatory myeloid
+and plasma cells. That erasure is also why it appears to remove far more
+of the admixture burden (right) — a target type's deleted native
+expression leaves no exposure gradient to measure:
 
 ```{r bridge-vs-membrane-retention, fig.width=11.0, fig.height=4.2}
 retention <- rbind(
@@ -434,16 +454,17 @@ cowplot::plot_grid(
   ncol = 2, rel_widths = c(1.45, 1), align = "hv", axis = "tblr")
 ```
 
-The bottom line for this dataset: membrane scoring cannot see the
-epithelial leakage into these thin, stain-weak cell types, and bridge
-scoring sees it but cannot separate it, because the factorization never
-formed native endothelial or fibroblast factors. Correcting these pairs
-safely requires factorization-level remedies (a rank that resolves the
-small types, or anchor-based factor recovery — see
-[docs/audit.md](../../docs/audit.md)). Downstream analysis in
-this notebook therefore proceeds with the membrane correction, and the
-endothelial and fibroblast admixture flagged by the audit should be kept
-in mind when interpreting those cell types.
+The bottom line for this dataset: membrane scoring cannot see most of the
+leakage that the thin, stain-weak fibroblast states shed into their
+neighbours and into each other, and bridge scoring sees it but cannot
+separate it, because the factorization never formed a native factor for
+the inflammatory fibroblasts, the monocyte / inflammatory myeloid class,
+or the plasma cells. Correcting these pairs safely requires
+factorization-level remedies (a rank that resolves these types, or
+anchor-based factor recovery — see [docs/audit.md](../../docs/audit.md)).
+Downstream analysis in this notebook therefore proceeds with the membrane
+correction, and the stromal admixture flagged by the audit should be kept
+in mind when interpreting the fibroblast and inflammatory myeloid classes.
 
 ## Cell-State UMAP Before and After Cleanup
 
