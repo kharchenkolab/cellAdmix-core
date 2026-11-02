@@ -48,6 +48,15 @@ test_that("fixed-profile fits keep the given factor order and carry a member poo
   expect_true(all(fit$run$nmf_diagnostics$selected_factor_stability > 0.99))
 })
 
+test_that("the weighted median reduces to the median for equal weights", {
+  wm <- cellAdmixCore:::.celladmix_weighted_median
+  expect_equal(wm(c(3, 1, 4, 2), rep(1, 4)), 2.5)
+  expect_equal(wm(c(3, 1, 4), rep(1, 3)), 3)
+  expect_equal(wm(c(5, 1), rep(1, 2)), 3)
+  expect_equal(wm(c(1, 2, 10), c(1, 1, 5)), 10)
+  expect_equal(wm(c(1, 2, 10), c(5, 1, 1)), 1)
+})
+
 test_that("factor matching and training loss are reachable from R", {
   ds <- make_sample_dataset(41L, "loss")
   fit <- do.call(ds$fit, c(list(annotation = "cell_type", run_id = "base", overwrite = TRUE), fit_args))
@@ -80,7 +89,8 @@ test_that("a consensus factorization pools two samples end to end", {
   factors <- consensus$factors
   expect_equal(nrow(factors), nrow(profiles))
   expect_true(all(c("consensus_factor", "samples", "coverage", "restarts", "components",
-    "agreement") %in% names(factors)))
+    "max_recurrence", "agreement") %in% names(factors)))
+  expect_true(all(factors$max_recurrence > 0 & factors$max_recurrence <= 1))
   # one factorization contributes at most one component to a shared factor
   expect_true(all(factors$components == factors$restarts))
   expect_true(all(factors$restarts >= 2L))

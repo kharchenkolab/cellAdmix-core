@@ -41,7 +41,12 @@ built from every restart of every sample.
 3. **Consensus profiles.** A cluster becomes a shared factor when its
    members come from at least `min_restarts` distinct restarts (default
    2), of any samples: a program found by a single random start is not
-   reproducible and is reported rather than used. The shared profile is
+   reproducible and is reported rather than used. `min_recurrence`
+   (default 0) additionally requires the program in at least that fraction
+   of the restarts of some sample; at 0.5 only programs that are the
+   majority solution of at least one sample enter, which keeps the shared
+   space close to the per-sample rank when restarts find many
+   low-recurrence programs. The shared profile is
    the per-gene median of the cluster's components after each is
    normalized to unit sum, every component weighted by its sample's weight
    (molecule count, or equal, by `sample_allocation`) divided among that
@@ -121,8 +126,9 @@ sample:
 - **Factors** (`factors`): one row per shared factor with the number and
   fraction of samples contributing to its cluster (`samples`, `coverage`),
   the number of restarts carrying it (`restarts`, equal to the number of
-  components since each restart contributes at most one), and the mean
-  within-cluster ownership correlation (`agreement`). A factor whose
+  components since each restart contributes at most one), the largest
+  fraction of any one sample's restarts carrying it (`max_recurrence`),
+  and the mean within-cluster ownership correlation (`agreement`). A factor whose
   coverage is one sample's share is carried by that sample alone.
 - **Recurrence** (`recurrence()`): per factor and sample, the number of
   that sample's restarts containing the program and the fraction of its

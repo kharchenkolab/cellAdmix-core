@@ -86,6 +86,15 @@ class CollectionTests(unittest.TestCase):
         self.assertEqual(_core.ensemble_prepare(str(fixed.run_path), 1), 3)
         self.assertEqual(fixed.manifest["nmf_diagnostics"]["stability_comparison_runs"], 2)
 
+    def test_weighted_median_matches_the_median_for_equal_weights(self):
+        from celladmix.collection import _weighted_median
+
+        values = np.array([[3.0, 1.0], [1.0, 2.0], [4.0, 10.0], [2.0, 0.0]])
+        np.testing.assert_allclose(_weighted_median(values, np.ones(4)), np.median(values, axis=0))
+        np.testing.assert_allclose(_weighted_median(values[:3], np.ones(3)), np.median(values[:3], axis=0))
+        np.testing.assert_allclose(_weighted_median(np.array([[1.0], [2.0], [10.0]]), np.array([1.0, 1.0, 5.0])), [10.0])
+        np.testing.assert_allclose(_weighted_median(np.array([[1.0], [2.0], [10.0]]), np.array([5.0, 1.0, 1.0])), [1.0])
+
     def test_matching_and_training_loss(self):
         from celladmix.collection import _fit_profiles_raw, _match_factors, _training_loss
 
@@ -113,7 +122,8 @@ class CollectionTests(unittest.TestCase):
         factors = consensus.factors
         self.assertEqual(len(factors), len(profiles))
         self.assertTrue({"consensus_factor", "samples", "coverage", "restarts", "components",
-                         "agreement"} <= set(factors.columns))
+                         "max_recurrence", "agreement"} <= set(factors.columns))
+        self.assertTrue(((factors["max_recurrence"] > 0) & (factors["max_recurrence"] <= 1)).all())
         # one factorization contributes at most one component to a shared factor
         self.assertTrue((factors["components"] == factors["restarts"]).all())
         self.assertTrue((factors["restarts"] >= 2).all())

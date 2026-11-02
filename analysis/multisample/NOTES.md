@@ -706,3 +706,32 @@ of its unit-sum components (each sample's weight divided among its
 components in the cluster), renormalized and rescaled as before; both
 bindings, documented. The three consensus arms are rerun with the
 constrained clustering and the median construction.
+
+Observed, breast shared-factor structure with the one-to-one constraint
+(scratch script on the cached fits): 37 shared factors from rank-23 fits,
+11 carried by all 20 restarts, then 19, 19, 18, 18, 17, 17, 16, 15, 13,
+12, 10, 8, 8, 5, 4, 3 covering both replicates, and 7, 6, 4, 4, 3, 2, 2,
+2, 2, 2 from one replicate only; 4 unreproduced components. Loss gaps
+−4.3% and −4.1%, that is an over-complete basis. Only 8 pairs of shared
+factors have ownership correlation at or above 0.3, and 6 of those
+co-occur in the same restarts (distinct programs found side by side), so
+duplication is not the issue; the per-restart factor sets simply vary:
+every restart finds the 11 core programs plus a varying dozen from a pool
+of about 26 less recurrent ones. Removing the two true alternatives
+changes little (35 factors, −3.8% and −3.6%).
+
+Also observed: the first weighted-median implementation took the lower
+middle value for even component counts, which for two-component clusters
+is the per-gene minimum of the pair; the membrane median arm projected
+with loss gaps of +31% and +26% where the experiment's ordinary median
+gave −0.4% and +1.6%. Fixed (midpoint of the lower and upper weighted
+medians, equal to the ordinary median for equal weights; tested in both
+bindings); the three median arms were stopped and are relaunched.
+
+Act. A per-sample recurrence threshold, `min_recurrence` (default 0,
+off), requires a program in at least that fraction of some sample's
+restarts; at 0.5 only programs that are the majority solution of at least
+one sample enter, which on breast would give about 24 shared factors for
+rank 23. The arms run both ways (`min_recurrence` 0 and 0.5) so that the
+choice of default rests on cleanup and concordance, not on the loss gap
+alone (which favors over-completeness).
