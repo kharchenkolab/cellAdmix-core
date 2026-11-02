@@ -187,15 +187,20 @@ flags that report rather than gate:
   `false_removal_flag` when a sample's false removal exceeds twice the
   median across samples.
 
-A sample that trips the representation or shared-factor flag is one the
-pooled profiles describe poorly. This happens when a sample's own
-restarts disagree among themselves (low within-sample stability): the
-clusters then hold loosely related components whose average is a blurred
-profile, and neither a tighter nor a looser clustering cut repairs it.
-The remedies are projecting every sample onto one coherent decomposition,
-such as one sample's own profiles through `fit_profiles()`, choosing a
-more stable NMF variant or rank for the per-sample fits, or a joint
-factorization.
+A sample that trips the shared-factor flag has many primary factors that
+no other restart reproduces, which happens when its own restarts disagree
+among themselves (low within-sample stability); the shared space then
+holds fewer programs than the sample's own fit, and admixture programs
+among the lost ones are not cleaned. Lowering `min_recurrence` admits the
+less reproducible programs and recovers sensitivity, at the price of a
+larger shared space and more own-marker removal; on an unstable variant
+neither threshold matches the balance of a stable one, and the better
+remedy is a more stable NMF variant or more restarts for the per-sample
+fits. On the breast replicates, `ls_nmf` with bridge scoring under the
+default consensus cleaned better on every audit measure than
+`invsqrt_kl` with membrane scoring under any threshold. Projecting every
+sample onto one coherent decomposition through `fit_profiles()`, or a
+joint factorization, are the remaining options.
 
 ## Usage
 

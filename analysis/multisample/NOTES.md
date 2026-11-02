@@ -988,3 +988,17 @@ The per-sample `diagnostics()` tables already show coverage per factor
 and the removed fraction attributable to rules without local evidence;
 a column for the removed fraction attributable to programs the sample
 does not carry would make this visible directly.
+
+Observed, with the new correction diagnostic computed on the cohort: each
+tile's own restarts carry 28 to 32 of the 37 shared programs; the rules on
+the programs a tile does not carry number 5 to 46 per tile and account for
+0.2% to 18% of its removed molecules (rep2_t3 18%, rep1_t4 14%, rep2_t4
+11%); across tiles this fraction correlates only weakly with own-marker
+false removal (r = 0.24). So rules on absent programs explain part of the
+extra removal in some tiles but not the general rise; the rest comes with
+the larger rule set itself (246 pooled rules against 95 to 135 per
+separate tile; B cells, stromal, and T cells lose 10 to 20 points more of
+their molecules than under separate processing). Whether a cohort of
+regional tiles should be cleaned this much more thoroughly, at 4% own-
+marker loss, is a question for the user; the diagnostics now make both
+components visible per sample.

@@ -55,8 +55,9 @@ collection$fit(nmf_variant = nmf_variant, nmf_n_runs = 10L)
 log_line("per-sample fits ready in", round(as.numeric(difftime(Sys.time(), t0, units = "mins")), 1), "min")
 
 t0 <- Sys.time()
+min_recurrence <- as.numeric(Sys.getenv("CELLADMIX_MIN_RECURRENCE", "0"))
 cfit <- if (identical(mode, "consensus")) {
-  collection$fit_consensus(num_threads = threads)
+  collection$fit_consensus(min_recurrence = min_recurrence, num_threads = threads)
 } else if (identical(mode, "reference")) {
   own <- collection$fits[[mode_arg]]
   collection$fit_profiles(
