@@ -409,13 +409,17 @@ class CellAdmixCollectionScore:
 
     def correct(self, rules=None, *, name: Optional[str] = None, p_thresh: float = 0.1,
                 adjust_p: bool = False, targets=None, ensemble: Optional[int] = None,
-                vote: float = 0.3):
+                vote: float = 0.3, num_threads: Optional[int] = None):
         """Apply the pooled rules to every sample.
 
         The molecule-vote ensemble is shared across samples: the member pool
         is the same in every sample's run, each member is scored in every
         sample, its evidence pooled like the primary evidence, and one member
-        rule set votes in every sample.
+        rule set votes in every sample. The member scorings run concurrently,
+        one (sample, member) job per worker process, with as many workers as
+        fit the thread budget given each dataset's ``num_threads``;
+        ``num_threads`` sets the budget (default: the number of available
+        cores).
         """
         import math
 
@@ -445,7 +449,8 @@ class CellAdmixCollectionScore:
                 members = [selected] + [m for m in range(available) if m != selected]
                 members = members[: min(ensemble, len(members))]
                 member_rules = self._pooled_member_rules(members, selected, kept, p_thresh=p_thresh,
-                                                         adjust_p=adjust_p, targets=targets)
+                                                         adjust_p=adjust_p, targets=targets,
+                                                         num_threads=num_threads)
         min_votes = max(1, math.ceil(vote * len(members))) if members else 1
         corrections = {}
         for s in samples:
@@ -504,13 +509,43 @@ class CellAdmixCollectionScore:
         return cells.drop(columns=[c for c in cells.columns if c.endswith("_fraction")]).merge(
             frame, on="cell_id", how="left")
 
-    def _pooled_member_rules(self, members, selected, primary_rules, *, p_thresh, adjust_p, targets) -> dict:
+    def _score_members(self, members, num_threads: Optional[int] = None) -> None:
+        """Score the given ensemble members in every sample. The (sample,
+        member) jobs are independent and run in forked worker processes, as
+        many as the thread budget allows given each dataset's own thread
+        count; each worker writes its summary to the run's cache, which the
+        parent then reads."""
+        global _FORKED_SCORE
+
+        jobs = [(s, int(m)) for m in members for s in self.sample_scores]
+        if not jobs:
+            return
+        per_job = max(int(getattr(fit.dataset, "num_threads", 1) or 1) for fit in self.consensus.fits.values())
+        workers = _parallel_workers(num_threads, per_job, len(jobs))
+        if workers <= 1:
+            for s, m in jobs:
+                self._member_summary(s, m)
+            return
+        import multiprocessing
+
+        context = multiprocessing.get_context("fork")
+        _FORKED_SCORE = self
+        try:
+            with context.Pool(workers, maxtasksperchild=1) as pool:
+                pool.map(_score_member_job, jobs, chunksize=1)
+        finally:
+            _FORKED_SCORE = None
+
+    def _pooled_member_rules(self, members, selected, primary_rules, *, p_thresh, adjust_p, targets,
+                             num_threads: Optional[int] = None) -> dict:
         """Per-member rule sets for the shared molecule-vote ensemble: each
         member's summaries from every sample are pooled like the primary
         summaries, thresholded, vetted by the pooled native-factor check on
         the member's own cell factor fractions, and restricted to the primary
         rules' source -> target pairs."""
         from ._score_utils import rules_from_annotation, score_annotation
+
+        self._score_members([m for m in members if m != selected], num_threads)
 
         def pair_keys(df):
             return set(zip(df["source_cell_type"].astype(str), df["target_cell_type"].astype(str)))
@@ -855,6 +890,29 @@ def _training_loss(run_path: str, profiles: pd.DataFrame, num_threads: int = 1) 
     return float(_core.training_loss(
         run_path, profiles.to_numpy(dtype=float).ravel(order="C").tolist(),
         int(profiles.shape[0]), [str(g) for g in profiles.columns], int(num_threads)))
+
+
+_FORKED_SCORE = None  # the score object a forked scoring worker inherits
+
+
+def _score_member_job(job) -> None:
+    sample, member = job
+    _FORKED_SCORE._member_summary(sample, member)
+
+
+def _parallel_workers(num_threads: Optional[int], per_job: int, n_jobs: int) -> int:
+    """Number of concurrent worker processes for independent jobs that each
+    use ``per_job`` threads, within a total thread budget (default: all cores)."""
+    import os
+    import sys
+
+    if sys.platform.startswith("win"):
+        return 1
+    if num_threads is None:
+        budget = os.cpu_count() or 1
+    else:
+        budget = max(1, int(num_threads))
+    return max(1, min(n_jobs, budget // max(1, per_job)))
 
 
 def _interleave(lists: list) -> list:

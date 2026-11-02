@@ -87,8 +87,12 @@ native-factor check on the member's own cell factor fractions and
 restricted to the primary rules' source → target pairs), and that one
 member rule set votes in every sample. The vote threshold is the same as
 for a single sample, and the returned rules carry `support`, the fraction
-of members keeping each pair. The audit runs per sample, with a pooled
-per-pair table and per-sample cleanup verification.
+of members keeping each pair. The member scorings are independent jobs,
+one per sample and member, and run concurrently in worker processes: as
+many as fit the thread budget given each dataset's `num_threads`, with
+`num_threads` on `correct()` setting the budget (default: the number of
+available cores). The audit runs per sample, with a pooled per-pair table
+and per-sample cleanup verification.
 
 ## Diagnostics
 

@@ -12,3 +12,12 @@ count. Rules derived from the pooled summary carry the fraction of samples
 whose own evidence supports them (\code{sample_support}), as a report, never a
 gate.
 }
+\details{
+\code{correct()} applies the rules with a molecule-vote ensemble shared across
+samples: every ensemble member is scored in every sample, its evidence is
+pooled like the primary evidence, and one member rule set votes in every
+sample. The member scorings run concurrently, one (sample, member) job per
+worker process, with as many workers as fit the thread budget given each
+dataset's \code{num_threads}; \code{num_threads} sets the budget (default: the number
+of available cores).
+}

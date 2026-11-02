@@ -443,6 +443,14 @@ CellAdmixConsensusFit <- R6::R6Class(
 #' count. Rules derived from the pooled summary carry the fraction of samples
 #' whose own evidence supports them (`sample_support`), as a report, never a
 #' gate.
+#'
+#' `correct()` applies the rules with a molecule-vote ensemble shared across
+#' samples: every ensemble member is scored in every sample, its evidence is
+#' pooled like the primary evidence, and one member rule set votes in every
+#' sample. The member scorings run concurrently, one (sample, member) job per
+#' worker process, with as many workers as fit the thread budget given each
+#' dataset's `num_threads`; `num_threads` sets the budget (default: the number
+#' of available cores).
 #' @export
 CellAdmixCollectionScore <- R6::R6Class(
   "CellAdmixCollectionScore",
@@ -509,7 +517,7 @@ CellAdmixCollectionScore <- R6::R6Class(
     },
 
     correct = function(rules = NULL, name = NULL, p_thresh = 0.1, adjust_p = FALSE,
-                       targets = NULL, ensemble = NULL, vote = 0.3, ...) {
+                       targets = NULL, ensemble = NULL, vote = 0.3, num_threads = NULL, ...) {
       if (is.null(rules)) {
         rules <- self$rules(p_thresh = p_thresh, adjust_p = adjust_p, targets = targets)
       }
@@ -542,7 +550,8 @@ CellAdmixCollectionScore <- R6::R6Class(
           members <- unique(c(selected, setdiff(seq_len(available) - 1L, selected)))
           members <- members[seq_len(min(ensemble, length(members)))]
           member_rules <- private$pooled_member_rules(members, selected, kept,
-            p_thresh = p_thresh, adjust_p = adjust_p, targets = targets)
+            p_thresh = p_thresh, adjust_p = adjust_p, targets = targets,
+            num_threads = num_threads)
         }
       }
       min_votes <- max(1L, as.integer(ceiling(vote * length(members))))
@@ -606,6 +615,39 @@ CellAdmixCollectionScore <- R6::R6Class(
       rules
     },
 
+    # Score the given ensemble members in every sample. The (sample, member)
+    # jobs are independent and run in forked worker processes, as many as the
+    # thread budget allows given each dataset's own thread count; each worker
+    # writes its summary to the run's cache, which the parent then reads.
+    score_members = function(members, num_threads = NULL) {
+      samples <- names(self$sample_scores)
+      jobs <- expand.grid(sample = samples, member = members, stringsAsFactors = FALSE)
+      if (!nrow(jobs)) {
+        return(invisible(NULL))
+      }
+      per_job <- max(vapply(self$consensus$fits, function(fit) {
+        as.integer(fit$dataset$num_threads %||% 1L)
+      }, integer(1)))
+      workers <- .celladmix_parallel_workers(num_threads, per_job, nrow(jobs))
+      run_job <- function(i) {
+        private$member_summary(jobs$sample[[i]], jobs$member[[i]])
+        NULL
+      }
+      if (workers <= 1L) {
+        for (i in seq_len(nrow(jobs))) run_job(i)
+        return(invisible(NULL))
+      }
+      results <- parallel::mclapply(seq_len(nrow(jobs)), run_job,
+        mc.cores = workers, mc.preschedule = FALSE)
+      failed <- vapply(results, inherits, logical(1), "try-error")
+      if (any(failed)) {
+        first <- results[[which(failed)[[1]]]]
+        stop("scoring of ensemble members failed: ",
+          conditionMessage(attr(first, "condition")), call. = FALSE)
+      }
+      invisible(NULL)
+    },
+
     # One ensemble member's score summary in one sample, with the same method
     # and parameters as the primary score; persisted in the sample's run so
     # re-corrections reuse it.
@@ -635,7 +677,8 @@ CellAdmixCollectionScore <- R6::R6Class(
     # rules' source -> target pairs. Returns the stacked (factor, target)
     # rows with their member indices and each member's kept pair set.
     pooled_member_rules = function(members, selected, primary_rules, p_thresh,
-                                   adjust_p, targets) {
+                                   adjust_p, targets, num_threads = NULL) {
+      private$score_members(setdiff(members, selected), num_threads)
       pair_key <- function(df) paste(df$source_cell_type, df$target_cell_type, sep = "\r")
       restrict <- unique(pair_key(primary_rules))
       frames <- list()
@@ -1022,6 +1065,19 @@ CellAdmixCollectionCleanupReport <- R6::R6Class(
     }
     aligned
   })
+}
+
+# Number of concurrent worker processes for independent jobs that each use
+# `per_job` threads, within a total thread budget (default: all cores).
+.celladmix_parallel_workers <- function(num_threads, per_job, n_jobs) {
+  if (identical(.Platform$OS.type, "windows")) {
+    return(1L)
+  }
+  budget <- if (is.null(num_threads)) parallel::detectCores() else as.integer(num_threads)
+  if (is.na(budget) || budget < 1L) {
+    budget <- 1L
+  }
+  max(1L, min(as.integer(n_jobs), budget %/% max(1L, as.integer(per_job))))
 }
 
 # Round-robin interleaving of several lists (a list per sample) into one.
