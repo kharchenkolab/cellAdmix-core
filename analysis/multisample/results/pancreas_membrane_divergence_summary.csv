@@ -1,5 +1,5 @@
 "arm","n_types","mean_correlation","total_de_genes","types_with_de_test"
-"consensus",7,0.738823367541421,549,7
-"reference_left",7,0.794342398564946,534,7
+"consensus",7,0.938958343749695,338,7
+"reference_left",7,0.946863859181459,446,7
 "separate",7,0.489267912019165,910,7
 "uncorrected",7,0.923919476481446,389,7

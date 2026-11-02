@@ -386,3 +386,147 @@ they recur across restarts rather than appended blindly (to be designed
 without gating on the stability metric). (3) The per-sample caps under
 proportional allocation gave the smaller replicate fewer candidate pairs;
 with shared members this should be revisited.
+
+## Loop 8 (2026-11-01): shared ensemble across samples
+
+Orient. The user's correction: scoring and rule derivation are the most
+seed-dependent steps of the pipeline, so leaving the ensemble members'
+scoring and rules per sample (Loop 7) left the least stable step
+un-pooled; pooling the primary rules alone was cosmetic.
+
+Act. The collection layer now shares the whole molecule-vote ensemble
+(commit 55ded96, both bindings): one member pool per consensus (the
+aligned restarts of all samples, interleaved sample by sample, consensus
+as member 0) carried by every sample's fixed-profile run; every member
+scored in every sample with the primary method and parameters, its
+summaries pooled by the same Stouffer combination, one member rule set
+derived once (pooled native check on the member's own cell factor
+fractions, restricted to the primary rules' source → target pairs), the
+same member rules voting in every sample; rules carry `support` (fraction
+of members keeping a pair). The run id hashes profiles plus member pool,
+so the earlier projections are not reused. The consensus and reference
+arms of pancreas (bridge), pancreas (membrane, `invsqrt_kl`) and breast
+are rerunning (23:17); separate and joint arms stand.
+
+Expected if the diagnosis is right: breast consensus replicate
+concordance moves from 0.862 / 1069 DE genes toward the joint stand-in's
+0.991 / 117, with removal fractions agreeing between replicates per type.
+If it does not, the residual divergence is in the factor space or the
+per-sample candidate caps, not in the ensemble.
+
+Observed, pancreas membrane (`invsqrt_kl`, shared ensemble;
+`results/pancreas_membrane_*.csv`; earlier per-sample-ensemble consensus
+in parentheses):
+
+| arm | sample | leakage removed | median pair sensitivity | false removal | removed |
+|---|---|---|---|---|---|
+| separate | left | 0.73 | 0.97 | 2.3% | 25% |
+| separate | right | 0.85 | 0.99 | 3.6% | 33% |
+| consensus | left | 0.81 (0.75) | 0.97 (0.96) | 1.9% (2.2%) | 26% |
+| consensus | right | 0.78 (0.77) | 0.98 (0.96) | 3.0% (2.8%) | 33% |
+| reference (left) | left | 0.78 | 0.98 | 2.2% | 27% |
+| reference (left) | right | 0.74 | 0.95 | 3.6% | 33% |
+
+Concordance between halves (cell-weighted per-type pseudobulk correlation;
+DE genes between 1 mm block pseudobulks): uncorrected 0.924 / 389,
+separate 0.489 / 910, consensus 0.939 / 338 (was 0.74 / 549 with
+per-sample ensembles), reference 0.947 / 446. Every type's correlation
+except exocrine (0.971 → 0.952) is now above its uncorrected value, and
+the DE count falls below uncorrected for six of seven types. Rule
+support: 41 of 43 pooled rules kept, median member support 1.0 (lower
+quartile 0.9). The halves are different regions, so removal fractions
+still differ by type (ductal 28% left vs 87% right, the right half being
+exocrine-dominated with ductal cells embedded in acinar tissue; the audit
+keeps false removal at 3.0% and the ductal pseudobulk correlation rises
+from 0.85 to 0.89, so the removed material is exocrine contamination).
+The shared ensemble restored the aim on this variant even though its
+factor matching is weak (4 of 9 left factors matched); the vote now
+decides uniformly over the same voters in both halves.
+
+Observed, pancreas bridge (`ls_nmf`, shared ensemble;
+`results/pancreas_*.csv`; earlier per-sample-ensemble consensus in
+parentheses):
+
+| arm | sample | leakage removed | median pair sensitivity | false removal | removed |
+|---|---|---|---|---|---|
+| separate | left | 0.38 | 0.03 | 0.5% | 6.6% |
+| separate | right | 0.51 | 0.38 | 0.3% | 6.4% |
+| consensus | left | 0.43 (0.53) | 0.66 (0.54) | 3.2% (1.8%) | 11.9% |
+| consensus | right | 0.35 (0.24) | 0.56 (0.46) | 3.4% (1.6%) | 13.2% |
+| reference (left) | left | 0.41 | 0.55 | 3.0% | 12.5% |
+| reference (left) | right | 0.31 | 0.48 | 1.6% | 11.2% |
+| joint stand-in | left | 0.38 | 0.55 | 0.7% | 8.5% |
+| joint stand-in | right | 0.17 | 0.15 | 0.2% | 5.7% |
+
+Concordance between halves: uncorrected 0.924 / 389, separate 0.846 /
+540, consensus 0.914 / 573 (was 0.861 / 501), reference 0.907 / 548,
+joint 0.918 / 387. The correlation recovers to near the uncorrected level
+for every type, but the DE count rises through one type: exocrine cells
+lose 34% of their molecules in the left half against 17% in the right
+(exocrine DE 84 → 238, correlation 0.971 → 0.952), while the joint
+stand-in removes 7.5% and 5.3%. The five pooled rules that target
+exocrine cells (ductal, fibroblast, endothelial, immune, and endocrine
+source factors) all carry member support ≥ 0.8, and two of them rest on
+right-half evidence alone (`samples_significant = right`); with the
+shared ensemble they are applied in the left half, where the few
+exocrine cells sit inside tumor tissue, whereas the earlier per-sample
+voters effectively withheld them there. Own-marker false removal rises
+to 3.2% and 3.4% with exocrine the worst type on the left. The halves are
+different regions, so this is uniform rules acting on unequal contexts
+rather than a replicate divergence; the breast replicates decide. Pooled
+rules with low member support (0.1 to 0.3: fibroblast ← immune factor 5,
+endocrine ← immune, mural ← endothelial) are kept but remove little,
+because the vote threshold (3 of 10) is not reached from the primary
+member alone; this is the single-sample behavior.
+
+Observed, breast replicates (`ls_nmf`, bridge, shared ensemble;
+`results/breast_*.csv`; Loop 7 per-sample-ensemble consensus in
+parentheses):
+
+| arm | sample | leakage removed | median pair sensitivity | false removal | removed |
+|---|---|---|---|---|---|
+| separate | rep1 | 0.62 | 0.86 | 1.6% | 22.2% |
+| separate | rep2 | 0.68 | 0.89 | 1.5% | 24.1% |
+| consensus | rep1 | 0.61 (0.60) | 0.86 (0.85) | 1.3% (1.4%) | 23.1% (21.6%) |
+| consensus | rep2 | 0.67 (0.54) | 0.86 (0.71) | 1.9% (1.3%) | 24.4% (18.0%) |
+| reference (rep1) | rep1 | 0.61 | 0.85 | 1.4% | 22.8% |
+| reference (rep1) | rep2 | 0.68 | 0.86 | 1.9% | 24.4% |
+| joint stand-in | rep1 | 0.62 | 0.88 | 1.2% | 22.7% |
+| joint stand-in | rep2 | 0.68 | 0.88 | 1.5% | 24.0% |
+
+Replicate concordance (cell-weighted per-type pseudobulk correlation; DE
+genes between the replicates' 1 mm block pseudobulks):
+
+| arm | correlation | DE genes |
+|---|---|---|
+| uncorrected | 0.988 | 242 |
+| separate | 0.902 | 1066 |
+| consensus, shared ensemble | 0.992 (0.862) | 141 (1069) |
+| reference (rep1), shared ensemble | 0.991 (0.901) | 137 (638) |
+| joint stand-in | 0.991 | 117 |
+
+The shared ensemble closes the gap completely. Every type's correlation
+is at or above its uncorrected value (stromal 0.990 → 0.995, B cells
+0.992 → 0.995), the immune, endothelial, myoepithelial, and tumor types
+have 0 or 1 DE genes between replicates, and the residual DE genes are
+in the three types where the uncorrected replicates already differed
+(DCIS 1 and 2, stromal: 138 of 141). Removal fractions now agree between
+replicates to within about two points per type (stromal 45% / 41%,
+macrophages 45% / 44%, endothelial 42% / 42%, myoepithelial KRT15+ 7% /
+8% against 26% / 6% under separate processing), and cleanup per
+replicate equals separate processing. 250 of 298 pooled rules kept,
+median member support 1.0, lower quartile 0.8. The second replicate's
+under-correction in Loop 7 was entirely the per-sample ensemble.
+
+Decided. (1) The consensus route with the shared ensemble meets the aim
+on true replicates as well as the joint stand-in does, so the combined-
+store joint factorization is not required for replicate concordance; it
+stays specified as a later option (one factorization, no matching step)
+rather than scheduled. (2) The consensus layer as committed (55ded96) is
+the deliverable of this branch. (3) Open for the user: whether unmatched
+factors that do not recur across a sample's restarts should be dropped
+rather than appended (breast appended four, three of them restart noise);
+whether the per-voter scoring across samples should run samples in
+parallel (it doubled the correction time, 93 min on breast); and the
+pancreas bridge observation that pooled rules resting on one sample's
+evidence are applied in the other sample by design.
