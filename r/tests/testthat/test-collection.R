@@ -139,6 +139,20 @@ test_that("a consensus factorization pools two samples end to end", {
   expect_equal(correction$samples(), c("a", "b"))
   expect_true("support" %in% names(correction$rules))
   expect_true(all(correction$rules$support >= 0 & correction$rules$support <= 1))
+  diagnostics <- consensus$diagnostics()
+  expect_equal(diagnostics$sample, c("a", "b"))
+  expect_true(all(c("loss_gap", "restart_spread", "representation_flag", "shared_fraction",
+    "shared_factors_flag", "within_sample_stability", "consensus_agreement",
+    "max_usage_divergence", "divergent_cell_type") %in% names(diagnostics)))
+  expect_true(all(diagnostics$shared_fraction >= 0 & diagnostics$shared_fraction <= 1))
+  by_sample <- consensus$usage_divergence(by_sample = TRUE)
+  expect_true(all(c("cell_type", "sample", "divergence") %in% names(by_sample)))
+  correction_diagnostics <- correction$diagnostics()
+  expect_equal(correction_diagnostics$sample, c("a", "b"))
+  expect_true(all(correction_diagnostics$rules_without_local_evidence >= 0))
+  expect_true(all(is.na(correction_diagnostics$removed_without_local_evidence) |
+    (correction_diagnostics$removed_without_local_evidence >= 0 &
+      correction_diagnostics$removed_without_local_evidence <= 1)))
   per_sample_summary <- correction$summary()
   expect_true("sample" %in% names(per_sample_summary))
   pooled_summary <- correction$summary(by_sample = FALSE)

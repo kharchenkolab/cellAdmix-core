@@ -135,9 +135,38 @@ sample:
 - **Factor usage** (`sample_usage()`, `usage_divergence()`): the share of
   each cell type's molecules labeled with each factor, per sample, and
   per type half the L1 distance between a sample's usage and the pooled
-  usage, maximized over samples. A factor used by one sample only, or a
-  type whose usage differs between samples, points to a sample effect in
-  the factorization.
+  usage, maximized over samples (or per type and sample with
+  `by_sample = TRUE`). A factor used by one sample only, or a type whose
+  usage differs between samples, points to a sample effect in the
+  factorization.
+
+Two per-sample summaries gather these into one row per sample, with
+flags that report rather than gate:
+
+- **Consensus fit** (`diagnostics()`): the loss gap and restart spread
+  with `representation_flag` when the gap exceeds the spread (the shared
+  space fits the sample worse than one of its own restarts would); the
+  number and fraction of the sample's primary factors that entered the
+  shared space with `shared_factors_flag` below one half; within-sample
+  stability next to consensus agreement; and the largest usage divergence
+  of any cell type with that type's name.
+- **Correction** (`diagnostics(report)`): the number of applied rules
+  that lack evidence from the sample itself (the sample is absent from the
+  rule's `samples_significant`) and the fraction of the sample's removed
+  molecules attributable to those rules, a removed molecule being
+  attributed to the rule of its cell's type and primary factor label. A
+  high fraction means the sample's cleanup rests on other samples'
+  evidence, which is the intended uniform treatment of replicates but a
+  point to examine when the samples are not replicates. Given the cleanup
+  report of the audit, the audit's leakage removed, median pair
+  sensitivity, and own-marker false removal are added per sample, with
+  `false_removal_flag` when a sample's false removal exceeds twice the
+  median across samples.
+
+A sample that trips the representation or shared-factor flag is one the
+consensus describes poorly; the remedies are, in order, a lower
+`match_min`, separate processing of that sample against the shared rules
+through `fit_profiles()`, or a joint factorization.
 
 ## Usage
 
@@ -160,7 +189,10 @@ correction$summary()                                 # removal per cell type per
 correction$counts()                                  # combined; columns "<sample>_<cell_id>"
 correction$counts(sample = "rep1")                   # one sample, original cell ids
 audit <- consensus$audit_admixture()
-audit$evaluate(correction)$summary()                 # per-sample cleanup verification
+report <- audit$evaluate(correction)
+report$summary()                                     # per-sample cleanup verification
+consensus$diagnostics()                              # per-sample representation flags
+correction$diagnostics(report)                       # rules without local evidence, audit per sample
 ```
 
 Python:

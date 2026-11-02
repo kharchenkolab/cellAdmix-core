@@ -6,8 +6,8 @@
 - Xenium bundles
 - generic tabular molecule tables
 
-The constructor also accepts Seurat objects and prepared-project/store
-directories directly (see [r-bindings.md](r-bindings.md)).
+The constructor also accepts Seurat objects and the result of
+`celladmix_prepare_tabular()` (see [r-bindings.md](r-bindings.md)).
 
 The normal workflow is object-oriented:
 
@@ -237,7 +237,7 @@ ds <- cellAdmix(
   format = "tabular",
   molecules = "/path/to/molecules.csv",
   output_dir = "/path/to/output",
-  schema = celladmix_schema(x = "x", y = "y", gene = "gene",
+  schema = celladmix_schema(x = "x", y = "y", gene = "gene", cell = NULL,
     segmentation_mask = "/path/to/segmentation_mask.tif")
 )
 ```

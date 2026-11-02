@@ -557,3 +557,24 @@ concordance as Loop 8, the breast consensus without restart-noise factors
 components or as low-coverage factors with recurrence across restarts),
 and the pancreas membrane configuration (weak pairwise matching, 4 of 9)
 with higher coverage now that restarts enter the construction.
+
+## Loop 10 (2026-11-02): per-sample diagnostics
+
+Act. Two per-sample tables, both bindings. `consensus$diagnostics()`: loss
+gap against restart spread with `representation_flag`, the number and
+fraction of the sample's primary factors in the shared space with
+`shared_factors_flag` (below one half), within-sample stability against
+consensus agreement, and the largest factor-usage divergence of any cell
+type with its name (`usage_divergence(by_sample = TRUE)` gives the full
+per-type-and-sample table). `correction$diagnostics(report)`: the applied
+rules lacking evidence from the sample and the fraction of its removed
+molecules attributable to them (a removed molecule is attributed to the
+rule of its cell's type and primary factor label, computed from each
+cell's per-factor molecule mass before and after the correction, which
+reproduces the removed total exactly and never goes negative on the
+breast data), plus the audit's leakage removed, median pair sensitivity,
+and own-marker false removal with `false_removal_flag` above twice the
+median. All flags report; none gates. Documented with the remedies in
+order (lower `match_min`, `fit_profiles()` for the sample, joint
+factorization). Positive control (a rank-10 profile set projected onto
+the rank-23 breast data) pending the end of the regression arms.

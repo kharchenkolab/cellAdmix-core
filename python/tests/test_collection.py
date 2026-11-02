@@ -163,6 +163,19 @@ class CollectionTests(unittest.TestCase):
         self.assertEqual(correction.samples(), ["a", "b"])
         self.assertIn("support", correction.rules.columns)
         self.assertTrue(correction.rules["support"].between(0, 1).all())
+        diagnostics = consensus.diagnostics()
+        self.assertEqual(list(diagnostics["sample"]), ["a", "b"])
+        self.assertTrue({"loss_gap", "restart_spread", "representation_flag", "shared_fraction",
+                         "shared_factors_flag", "within_sample_stability", "consensus_agreement",
+                         "max_usage_divergence", "divergent_cell_type"} <= set(diagnostics.columns))
+        self.assertTrue(diagnostics["shared_fraction"].between(0, 1).all())
+        by_sample = consensus.usage_divergence(by_sample=True)
+        self.assertTrue({"cell_type", "sample", "divergence"} <= set(by_sample.columns))
+        correction_diagnostics = correction.diagnostics()
+        self.assertEqual(list(correction_diagnostics["sample"]), ["a", "b"])
+        self.assertTrue((correction_diagnostics["rules_without_local_evidence"] >= 0).all())
+        fraction = correction_diagnostics["removed_without_local_evidence"]
+        self.assertTrue((fraction.isna() | fraction.between(0, 1)).all())
         self.assertIn("sample", correction.summary().columns)
         self.assertIn("fraction_molecules_removed", correction.summary(by_sample=False).columns)
         corrected, _, corrected_cells = correction.counts()

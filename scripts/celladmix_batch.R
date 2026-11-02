@@ -59,7 +59,7 @@ Fit:
   --rank-multiplier X                  Auto-rank multiplier [1.2]
   --rank-cap N                         Auto-rank cap [30]
   --nmf-variant invsqrt_kl|kl|sqrt_kl|ls_nmf
-                                      NMF variant [invsqrt_kl]
+                                      NMF variant [ls_nmf]
   --nmf-init auto|random|cluster       NMF initialization [auto]
   --nmf-runs auto|N                    NMF random starts [auto = max(10, threads)]
   --nmf-iterations N                   NMF iterations [package default]

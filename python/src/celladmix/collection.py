@@ -306,9 +306,10 @@ class CellAdmixConsensusFit:
             frames.append(long)
         return pd.concat(frames, ignore_index=True)
 
-    def usage_divergence(self) -> pd.DataFrame:
+    def usage_divergence(self, *, by_sample: bool = False) -> pd.DataFrame:
         """Per cell type: half the L1 distance between a sample's factor usage
-        and the pooled usage, maximized over samples."""
+        and the pooled usage, maximized over samples (or, with ``by_sample``,
+        one row per cell type and sample)."""
         usage = self.sample_usage()
         pooled = usage.groupby(["cell_type", "factor"], as_index=False)["molecules"].sum()
         totals = pooled.groupby("cell_type")["molecules"].sum()
@@ -316,10 +317,46 @@ class CellAdmixConsensusFit:
         merged = usage.merge(pooled[["cell_type", "factor", "pooled_share"]], on=["cell_type", "factor"])
         merged["deviation"] = (merged["share"] - merged["pooled_share"]).abs()
         per_sample = merged.groupby(["cell_type", "sample"], as_index=False)["deviation"].sum()
-        per_sample["deviation"] /= 2.0
-        out = per_sample.groupby("cell_type", as_index=False)["deviation"].max().rename(columns={"deviation": "divergence"})
+        per_sample["divergence"] = per_sample.pop("deviation") / 2.0
+        per_sample["molecules"] = per_sample["cell_type"].map(totals).to_numpy()
+        if by_sample:
+            return per_sample.sort_values(["sample", "divergence"], ascending=[True, False]).reset_index(drop=True)
+        out = per_sample.groupby("cell_type", as_index=False)["divergence"].max()
         out["molecules"] = out["cell_type"].map(totals).to_numpy()
         return out.sort_values("divergence", ascending=False).reset_index(drop=True)
+
+    def diagnostics(self) -> pd.DataFrame:
+        """One row per sample: how well the shared factor space represents it
+        (the training loss under the shared profiles relative to its own fit,
+        with the sample's restart spread as the yardstick), how many of its
+        primary factors entered the shared space, its restart stability next
+        to its agreement with the consensus, and the largest factor-usage
+        divergence of any of its cell types. Flags are reports:
+        ``representation_flag`` when the loss gap exceeds the restart spread,
+        ``shared_factors_flag`` when fewer than half of the sample's primary
+        factors are in the shared space."""
+        loss = self.loss.set_index("sample") if len(self.loss) else pd.DataFrame()
+        stability = self.stability().set_index("sample")
+        deviation = self.usage_divergence(by_sample=True)
+        rows = []
+        for s in self.fits:
+            m = self.matching[self.matching["sample"] == s]
+            gap = float(loss.loc[s, "loss_gap"]) if s in loss.index else np.nan
+            spread = float(loss.loc[s, "restart_spread"]) if s in loss.index else np.nan
+            d = deviation[deviation["sample"] == s]
+            worst = d.loc[d["divergence"].idxmax()] if len(d) else None
+            shared = int(m["matched"].sum())
+            rows.append({
+                "sample": s, "loss_gap": gap, "restart_spread": spread,
+                "representation_flag": bool(np.isfinite(gap) and np.isfinite(spread) and gap > spread),
+                "primary_factors": int(len(m)), "primary_factors_shared": shared,
+                "shared_fraction": shared / len(m) if len(m) else np.nan,
+                "shared_factors_flag": bool(len(m) and shared / len(m) < 0.5),
+                "within_sample_stability": float(stability.loc[s, "within_sample_stability"]) if s in stability.index else np.nan,
+                "consensus_agreement": float(stability.loc[s, "consensus_agreement"]) if s in stability.index else np.nan,
+                "max_usage_divergence": float(worst["divergence"]) if worst is not None else np.nan,
+                "divergent_cell_type": str(worst["cell_type"]) if worst is not None else None})
+        return pd.DataFrame(rows)
 
     def cells(self) -> pd.DataFrame:
         frames = []
@@ -696,6 +733,49 @@ class CellAdmixCollectionCorrection:
     def samples(self) -> list:
         return list(self.corrections)
 
+    def diagnostics(self, report=None) -> pd.DataFrame:
+        """One row per sample: the number of applied rules that lack local
+        evidence (the sample is absent from the rule's ``samples_significant``),
+        the fraction of the sample's removed molecules attributable to those
+        rules (a removed molecule is attributed to the rule of its cell's type
+        and its primary factor label), and, when a cleanup report is given,
+        the audit's leakage removed, median pair sensitivity, and own-marker
+        false removal, with ``false_removal_flag`` when a sample's false
+        removal exceeds twice the median across samples. Flags are reports."""
+        rules = self.rules
+        if rules is not None and "keep" in rules.columns:
+            rules = rules[rules["keep"].fillna(True).astype(bool)]
+        fits = self.score.consensus.fits
+        rows = []
+        for s, correction in self.corrections.items():
+            removed = _removed_by_type_factor(fits[s], correction)
+            total = float(removed["removed"].sum()) if len(removed) else 0.0
+            if rules is None or rules.empty:
+                rows.append({"sample": s, "rules_applied": 0, "rules_without_local_evidence": 0,
+                             "molecules_removed": total, "removed_without_local_evidence": np.nan})
+                continue
+            significant = rules["samples_significant"].fillna("").astype(str) if "samples_significant" in rules.columns \
+                else pd.Series([""] * len(rules), index=rules.index)
+            has_local = significant.map(lambda x: s in x.split(",") if x else False).to_numpy(dtype=bool)
+            without = rules[~has_local]
+            lookup = {(str(t), int(f)): float(r) for t, f, r in zip(removed["cell_type"], removed["factor"], removed["removed"])}
+            attributed = sum(lookup.get((str(t), int(f)), 0.0) for t, f in zip(without["target_cell_type"], without["factor"]))
+            rows.append({"sample": s, "rules_applied": int(len(rules)),
+                         "rules_without_local_evidence": int(len(without)), "molecules_removed": total,
+                         "removed_without_local_evidence": attributed / max(total, 1.0)})
+        out = pd.DataFrame(rows)
+        if report is not None:
+            summary = report.summary()
+            if "sample" in summary.columns:
+                summary = summary.set_index("sample")
+                for column in ("leakage_removed_overall", "median_pair_sensitivity", "own_marker_false_removal"):
+                    if column in summary.columns:
+                        out[column] = out["sample"].map(summary[column]).to_numpy()
+                if "own_marker_false_removal" in out.columns:
+                    reference = out["own_marker_false_removal"].median()
+                    out["false_removal_flag"] = (len(out) > 1) & (out["own_marker_false_removal"] > 2 * reference)
+        return out
+
     def summary(self, *, by_sample: bool = True) -> pd.DataFrame:
         frames = [c.summary().assign(sample=s) for s, c in self.corrections.items()]
         per_sample = pd.concat(frames, ignore_index=True)
@@ -797,6 +877,32 @@ class CellAdmixCollectionCleanupReport:
 
 
 # ---- consensus helpers -------------------------------------------------------
+
+def _removed_by_type_factor(fit, correction) -> pd.DataFrame:
+    """Molecules removed from a sample per annotated cell type and primary
+    factor label: each cell's per-factor molecule counts before the
+    correction (factor fractions times molecule count in the fit) minus those
+    after it."""
+    before = fit.cell_factors()
+    after = pd.read_parquet(correction.manifest["paths"]["cells_parquet"])
+    annotation = fit.dataset.annotation
+    fraction_cols = sorted([c for c in before.columns if c.startswith("factor_") and c.endswith("_fraction")],
+                           key=lambda c: int(c.split("_")[1]))
+    b = before.set_index(before["cell_id"].astype(str))
+    a = after.set_index(after["cell_id"].astype(str)).reindex(b.index)
+    mass_before = b[fraction_cols].to_numpy(dtype=float) * b["transcript_count"].to_numpy(dtype=float)[:, None]
+    mass_after = a[fraction_cols].fillna(0.0).to_numpy(dtype=float) * a["transcript_count"].fillna(0.0).to_numpy(dtype=float)[:, None]
+    removed = np.clip(mass_before - mass_after, 0.0, None)
+    types = pd.Series([annotation.get(c) for c in b.index], index=b.index)
+    keep = types.notna().to_numpy()
+    if not keep.any():
+        return pd.DataFrame(columns=["cell_type", "factor", "removed"])
+    frame = pd.DataFrame(removed[keep], columns=range(1, len(fraction_cols) + 1))
+    frame["cell_type"] = types[keep].to_numpy()
+    by_type = frame.groupby("cell_type").sum()
+    by_type.columns.name = "factor"
+    return by_type.stack().rename("removed").reset_index()
+
 
 def _fit_profiles_raw(fit, h=None) -> pd.DataFrame:
     """A fit's gene profiles (factor x gene frame) in raw gene space.

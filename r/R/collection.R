@@ -407,10 +407,11 @@ CellAdmixConsensusFit <- R6::R6Class(
       out
     },
 
-    usage_divergence = function() {
+    usage_divergence = function(by_sample = FALSE) {
       # Per cell type: half the L1 distance between a sample's factor usage
-      # and the pooled usage, maximized over samples. Zero when every sample
-      # labels the type's molecules alike.
+      # and the pooled usage, maximized over samples (or, with `by_sample`,
+      # one row per cell type and sample). Zero when every sample labels the
+      # type's molecules alike.
       usage <- self$sample_usage()
       pooled <- stats::aggregate(molecules ~ cell_type + factor, usage, sum)
       totals <- stats::aggregate(molecules ~ cell_type, pooled, sum)
@@ -419,10 +420,58 @@ CellAdmixConsensusFit <- R6::R6Class(
       usage$pooled_share <- pooled$share[match(key(usage), key(pooled))]
       usage$deviation <- abs(usage$share - usage$pooled_share)
       per_sample <- stats::aggregate(deviation ~ cell_type + sample, usage, function(x) sum(x) / 2)
-      out <- stats::aggregate(deviation ~ cell_type, per_sample, max)
-      names(out)[names(out) == "deviation"] <- "divergence"
+      names(per_sample)[names(per_sample) == "deviation"] <- "divergence"
+      per_sample$molecules <- totals$molecules[match(per_sample$cell_type, totals$cell_type)]
+      if (isTRUE(by_sample)) {
+        out <- per_sample[order(per_sample$sample, -per_sample$divergence), , drop = FALSE]
+        rownames(out) <- NULL
+        return(out)
+      }
+      out <- stats::aggregate(divergence ~ cell_type, per_sample, max)
       out$molecules <- totals$molecules[match(out$cell_type, totals$cell_type)]
       out[order(-out$divergence), , drop = FALSE]
+    },
+
+    diagnostics = function() {
+      # One row per sample: how well the shared factor space represents it
+      # (the training loss under the shared profiles relative to its own fit,
+      # with the sample's restart spread as the yardstick), how many of its
+      # primary factors entered the shared space, its restart stability next
+      # to its agreement with the consensus, and the largest factor-usage
+      # divergence of any of its cell types. Flags are reports:
+      # `representation_flag` when the loss gap exceeds the restart spread,
+      # `shared_factors_flag` when fewer than half of the sample's primary
+      # factors are in the shared space.
+      first <- function(x) if (length(x)) x[[1]] else NA
+      loss <- self$loss
+      stability <- self$stability()
+      deviation <- self$usage_divergence(by_sample = TRUE)
+      out <- do.call(rbind, lapply(names(self$fits), function(sample) {
+        m <- self$matching[self$matching$sample == sample, , drop = FALSE]
+        l <- loss[loss$sample == sample, , drop = FALSE]
+        st <- stability[stability$sample == sample, , drop = FALSE]
+        d <- deviation[deviation$sample == sample, , drop = FALSE]
+        worst <- if (nrow(d)) d[which.max(d$divergence), , drop = FALSE] else NULL
+        gap <- as.numeric(first(l$loss_gap))
+        spread <- as.numeric(first(l$restart_spread))
+        shared <- sum(m$matched)
+        data.frame(
+          sample = sample,
+          loss_gap = gap,
+          restart_spread = spread,
+          representation_flag = isTRUE(gap > spread),
+          primary_factors = nrow(m),
+          primary_factors_shared = shared,
+          shared_fraction = if (nrow(m)) shared / nrow(m) else NA_real_,
+          shared_factors_flag = nrow(m) > 0 && shared / nrow(m) < 0.5,
+          within_sample_stability = as.numeric(first(st$within_sample_stability)),
+          consensus_agreement = as.numeric(first(st$consensus_agreement)),
+          max_usage_divergence = if (is.null(worst)) NA_real_ else worst$divergence,
+          divergent_cell_type = if (is.null(worst)) NA_character_ else worst$cell_type,
+          stringsAsFactors = FALSE)
+      }))
+      rownames(out) <- NULL
+      out
     },
 
     cells = function() {
@@ -816,8 +865,11 @@ CellAdmixCollectionScore <- R6::R6Class(
 #' Per-Sample Corrections Under Shared Rules
 #'
 #' The corrections of every sample of a consensus fit under one pooled rule
-#' set, with per-sample and pooled removal summaries and combined or
-#' per-sample corrected counts.
+#' set, with per-sample and pooled removal summaries, combined or per-sample
+#' corrected counts, and per-sample diagnostics (`diagnostics()`): the rules
+#' applied to a sample without evidence from that sample, the share of its
+#' removed molecules they account for, and, given a cleanup report, the
+#' audit's leakage removed and own-marker false removal.
 #' @export
 CellAdmixCollectionCorrection <- R6::R6Class(
   "CellAdmixCollectionCorrection",
@@ -843,6 +895,55 @@ CellAdmixCollectionCorrection <- R6::R6Class(
     },
 
     samples = function() names(self$corrections),
+
+    diagnostics = function(report = NULL) {
+      # One row per sample: the number of applied rules that lack local
+      # evidence (the sample is absent from the rule's `samples_significant`),
+      # the fraction of the sample's removed molecules attributable to those
+      # rules (a removed molecule is attributed to the rule of its cell's type
+      # and its primary factor label), and, when a cleanup report is given,
+      # the audit's leakage removed, median pair sensitivity, and own-marker
+      # false removal, with `false_removal_flag` when a sample's false removal
+      # exceeds twice the median across samples. Flags are reports.
+      rules <- self$rules
+      if (!is.null(rules) && "keep" %in% names(rules)) {
+        rules <- rules[is.na(rules$keep) | rules$keep, , drop = FALSE]
+      }
+      fits <- self$score$consensus$fits
+      out <- do.call(rbind, lapply(names(self$corrections), function(sample) {
+        removed <- .celladmix_removed_by_type_factor(fits[[sample]], self$corrections[[sample]])
+        total <- sum(removed$removed)
+        if (is.null(rules) || !nrow(rules)) {
+          return(data.frame(sample = sample, rules_applied = 0L, rules_without_local_evidence = 0L,
+            molecules_removed = total, removed_without_local_evidence = NA_real_,
+            stringsAsFactors = FALSE))
+        }
+        significant <- as.character(rules$samples_significant %||% rep("", nrow(rules)))
+        significant[is.na(significant)] <- ""
+        has_local <- vapply(strsplit(significant, ",", fixed = TRUE), function(x) sample %in% x, logical(1))
+        without <- rules[!has_local, , drop = FALSE]
+        attributed <- removed$removed[match(
+          paste(without$target_cell_type, as.integer(without$factor), sep = "\r"),
+          paste(removed$cell_type, removed$factor, sep = "\r"))]
+        data.frame(sample = sample, rules_applied = nrow(rules),
+          rules_without_local_evidence = nrow(without), molecules_removed = total,
+          removed_without_local_evidence = sum(attributed, na.rm = TRUE) / max(total, 1),
+          stringsAsFactors = FALSE)
+      }))
+      if (!is.null(report)) {
+        s <- report$summary()
+        cols <- intersect(c("leakage_removed_overall", "median_pair_sensitivity",
+          "own_marker_false_removal"), names(s))
+        for (col in cols) out[[col]] <- s[[col]][match(out$sample, s$sample)]
+        if ("own_marker_false_removal" %in% cols) {
+          reference <- stats::median(out$own_marker_false_removal, na.rm = TRUE)
+          out$false_removal_flag <- nrow(out) > 1L & !is.na(out$own_marker_false_removal) &
+            out$own_marker_false_removal > 2 * reference
+        }
+      }
+      rownames(out) <- NULL
+      out
+    },
 
     summary = function(by_sample = TRUE) {
       per_sample <- .celladmix_stack_samples(
@@ -966,6 +1067,34 @@ CellAdmixCollectionCleanupReport <- R6::R6Class(
 )
 
 # ---- consensus helpers -------------------------------------------------------
+
+# Molecules removed from a sample per annotated cell type and primary factor
+# label: each cell's per-factor molecule counts before the correction (factor
+# fractions times molecule count in the fit) minus those after it.
+.celladmix_removed_by_type_factor <- function(fit, correction) {
+  before <- fit$cell_factors()
+  after <- correction$cells()
+  annotation <- fit$dataset$annotation(fit$annotation_name, as_vector = TRUE)
+  fraction_cols <- grep("^factor_[0-9]+_fraction$", names(before), value = TRUE)
+  fraction_cols <- fraction_cols[order(as.integer(sub("^factor_([0-9]+)_fraction$", "\\1", fraction_cols)))]
+  mass_before <- as.matrix(before[, fraction_cols, drop = FALSE]) * before$transcript_count
+  idx <- match(as.character(before$cell_id), as.character(after$cell_id))
+  mass_after <- as.matrix(after[idx, fraction_cols, drop = FALSE]) * after$transcript_count[idx]
+  mass_after[is.na(mass_after)] <- 0
+  removed <- pmax(mass_before - mass_after, 0)
+  type <- as.character(annotation[as.character(before$cell_id)])
+  keep <- !is.na(type)
+  if (!any(keep)) {
+    return(data.frame(cell_type = character(), factor = integer(), removed = numeric(),
+      stringsAsFactors = FALSE))
+  }
+  by_type <- rowsum(removed[keep, , drop = FALSE], type[keep])
+  data.frame(
+    cell_type = rep(rownames(by_type), ncol(by_type)),
+    factor = rep(seq_len(ncol(by_type)), each = nrow(by_type)),
+    removed = as.vector(by_type),
+    stringsAsFactors = FALSE)
+}
 
 # Stack per-sample data frames with a leading `sample` column; empty or
 # missing tables are skipped, and the result is an empty data frame with the
