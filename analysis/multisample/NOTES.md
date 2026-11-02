@@ -530,3 +530,30 @@ whether the per-voter scoring across samples should run samples in
 parallel (it doubled the correction time, 93 min on breast); and the
 pancreas bridge observation that pooled rules resting on one sample's
 evidence are applied in the other sample by design.
+
+## Loop 9 (2026-11-02): pooled-clustering consensus
+
+Act. The shared factors are now built by clustering the pooled factors of
+every restart of every sample (average linkage on gene-ownership
+correlation, cut at `match_min`, implemented once in C++ as
+`cluster_factor_profiles` and exposed in both bindings). A cluster becomes
+a shared factor when its components come from at least `min_restarts`
+(default 2) distinct restarts of any samples; the rest are reported as
+unreproduced. The shared profile is the sample-weighted mean of each
+sample's mean unit-sum component profile, rescaled to the weighted mean
+row sum. Factors are ordered by sample coverage, then restarts. New
+tables: `factors` (coverage, restarts, components, agreement, restarts
+contributing more than one component), `recurrence()` (per factor and
+sample), `unreproduced`, `components`; `matching` keeps describing each
+sample's primary factors (consensus factor, ownership correlation with it,
+within-cluster agreement, own-sample stability). The `reference` and
+`unmatched` arguments are gone; `fit_profiles()` (reference projection)
+fills the same tables from its matching. Documentation rewritten
+accordingly (`docs/multisample.md`, binding pages, README).
+
+Expected on the regression arms: the same or better cleanup and replicate
+concordance as Loop 8, the breast consensus without restart-noise factors
+(the four appended factors of Loop 7 should appear as unreproduced
+components or as low-coverage factors with recurrence across restarts),
+and the pancreas membrane configuration (weak pairwise matching, 4 of 9)
+with higher coverage now that restarts enter the construction.

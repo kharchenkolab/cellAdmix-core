@@ -704,6 +704,54 @@ PYBIND11_MODULE(_core, m) {
       py::arg("run_path"));
 
   m.def(
+      "profile_correlation",
+      [](const std::vector<double>& profiles,
+         int profile_rows,
+         const std::vector<double>& reference,
+         int reference_rows) {
+        if (profile_rows <= 0 || reference_rows <= 0 ||
+            profiles.size() % static_cast<std::size_t>(profile_rows) != 0 ||
+            reference.size() % static_cast<std::size_t>(reference_rows) != 0) {
+          throw std::invalid_argument("profiles must be row-major matrices with the given row counts");
+        }
+        const int cols = static_cast<int>(profiles.size() / static_cast<std::size_t>(profile_rows));
+        celladmix::DenseMatrix a(profile_rows, cols, 0.0);
+        std::copy(profiles.begin(), profiles.end(), a.data().begin());
+        celladmix::DenseMatrix b(reference_rows, static_cast<int>(reference.size() / static_cast<std::size_t>(reference_rows)), 0.0);
+        std::copy(reference.begin(), reference.end(), b.data().begin());
+        return dense_matrix_to_dict(celladmix::row_correlation_matrix(
+            celladmix::ownership_profiles(a), celladmix::ownership_profiles(b)));
+      },
+      py::arg("profiles"),
+      py::arg("profile_rows"),
+      py::arg("reference"),
+      py::arg("reference_rows"));
+
+  m.def(
+      "cluster_factors",
+      [](const std::vector<double>& profiles,
+         int rows,
+         const std::vector<int>& group,
+         double min_correlation) {
+        if (rows <= 0 || profiles.size() % static_cast<std::size_t>(rows) != 0) {
+          throw std::invalid_argument("profiles must be a row-major matrix with the given row count");
+        }
+        const int cols = static_cast<int>(profiles.size() / static_cast<std::size_t>(rows));
+        celladmix::DenseMatrix h(rows, cols, 0.0);
+        std::copy(profiles.begin(), profiles.end(), h.data().begin());
+        const auto result = celladmix::cluster_factor_profiles(h, group, min_correlation);
+        py::dict out;
+        out["cluster"] = result.cluster;
+        out["within_correlation"] = result.within_correlation;
+        out["n_clusters"] = result.n_clusters;
+        return out;
+      },
+      py::arg("profiles"),
+      py::arg("rows"),
+      py::arg("group"),
+      py::arg("min_correlation"));
+
+  m.def(
       "match_factors",
       [](const std::vector<double>& profiles,
          int profile_rows,

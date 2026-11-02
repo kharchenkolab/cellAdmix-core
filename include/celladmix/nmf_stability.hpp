@@ -48,6 +48,28 @@ FactorMatchResult match_factor_profiles(
     const DenseMatrix& profiles,
     const DenseMatrix& reference);
 
+struct FactorClusterResult {
+  // Cluster index per input row (0-based), numbered in order of first
+  // appearance along the rows.
+  std::vector<int> cluster;
+  // Mean ownership correlation of each row with the other rows of its
+  // cluster; NaN for a row alone in its cluster.
+  std::vector<double> within_correlation;
+  int n_clusters = 0;
+};
+
+// Average-linkage agglomerative clustering of pooled factor profiles (one row
+// per factor of one factorization) on gene-ownership correlation distance
+// (1 - correlation). `group` names, per row, the factorization the row comes
+// from; ownership shares are normalized within each group, so a gene's
+// loading is divided among the factors of one factorization. Clusters merge
+// while their average pairwise distance stays at or below
+// 1 - min_correlation. Deterministic: ties resolve by row order.
+FactorClusterResult cluster_factor_profiles(
+    const DenseMatrix& profiles,
+    const std::vector<int>& group,
+    double min_correlation);
+
 struct FactorStabilityResult {
   // Mean matched ownership correlation per selected-run factor, averaged over
   // the comparison runs. Filled with 1.0 when there are no comparison runs.

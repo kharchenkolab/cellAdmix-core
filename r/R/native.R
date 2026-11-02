@@ -312,6 +312,25 @@
 # `reference` by gene-ownership correlation; both are factor x gene matrices
 # over the same gene columns. Returns 1-based matched rows (NA when the
 # reference has fewer factors) and the matched correlations.
+.celladmix_profile_correlation <- function(profiles, reference) {
+  .Call(
+    "_cellAdmixCore_celladmix_profile_correlation",
+    as.matrix(profiles),
+    as.matrix(reference),
+    PACKAGE = "cellAdmixCore"
+  )
+}
+
+.celladmix_cluster_factors <- function(profiles, group, min_correlation) {
+  .Call(
+    "_cellAdmixCore_celladmix_cluster_factors",
+    as.matrix(profiles),
+    as.integer(group),
+    as.numeric(min_correlation),
+    PACKAGE = "cellAdmixCore"
+  )
+}
+
 .celladmix_match_factors <- function(profiles, reference) {
   .Call(
     "_cellAdmixCore_celladmix_match_factors",

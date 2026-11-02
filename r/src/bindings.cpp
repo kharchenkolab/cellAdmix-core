@@ -3937,6 +3937,54 @@ extern "C" SEXP _cellAdmixCore_celladmix_match_factors(
   return R_NilValue;
 }
 
+extern "C" SEXP _cellAdmixCore_celladmix_profile_correlation(
+    SEXP profiles_sexp,
+    SEXP reference_sexp) {
+  try {
+    const auto corr = celladmix::row_correlation_matrix(
+        celladmix::ownership_profiles(dense_matrix_from_r(Rcpp::NumericMatrix(profiles_sexp))),
+        celladmix::ownership_profiles(dense_matrix_from_r(Rcpp::NumericMatrix(reference_sexp))));
+    Rcpp::NumericMatrix out(corr.rows(), corr.cols());
+    for (int i = 0; i < corr.rows(); ++i) {
+      for (int j = 0; j < corr.cols(); ++j) {
+        out(i, j) = corr(i, j);
+      }
+    }
+    return out;
+  } catch (std::exception& ex) {
+    forward_exception_to_r(ex);
+  } catch (...) {
+    ::Rf_error("celladmix_profile_correlation: unknown C++ exception");
+  }
+  return R_NilValue;
+}
+
+extern "C" SEXP _cellAdmixCore_celladmix_cluster_factors(
+    SEXP profiles_sexp,
+    SEXP group_sexp,
+    SEXP min_correlation_sexp) {
+  try {
+    const Rcpp::IntegerVector group_in(group_sexp);
+    const std::vector<int> group(group_in.begin(), group_in.end());
+    const auto result = celladmix::cluster_factor_profiles(
+        dense_matrix_from_r(Rcpp::NumericMatrix(profiles_sexp)), group,
+        as<double>(min_correlation_sexp));
+    Rcpp::IntegerVector cluster(static_cast<R_xlen_t>(result.cluster.size()));
+    for (std::size_t i = 0; i < result.cluster.size(); ++i) {
+      cluster[static_cast<R_xlen_t>(i)] = result.cluster[i] + 1;
+    }
+    return List::create(
+        _["cluster"] = cluster,
+        _["within_correlation"] = wrap(result.within_correlation),
+        _["n_clusters"] = result.n_clusters);
+  } catch (std::exception& ex) {
+    forward_exception_to_r(ex);
+  } catch (...) {
+    ::Rf_error("celladmix_cluster_factors: unknown C++ exception");
+  }
+  return R_NilValue;
+}
+
 extern "C" SEXP _cellAdmixCore_celladmix_training_loss(
     SEXP run_path_sexp,
     SEXP profiles_sexp,

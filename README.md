@@ -52,8 +52,8 @@ short steps.
   stabilizes seed-dependent corrections, with the vote threshold as a
   sensitivity/specificity dial.
 - Multi-sample processing: a consensus factorization across samples gives
-  replicates one shared factor space and one pooled rule set, with
-  per-sample corrections and audits
+  replicates one shared factor space, one pooled rule set, and one shared
+  ensemble vote, with per-sample corrections and audits
   ([docs/multisample.md](docs/multisample.md)).
 
 ## NMF Methods

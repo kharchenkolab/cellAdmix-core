@@ -374,9 +374,14 @@ correction <- score$correct(rules = rules)
 correction$counts(sample = "rep1")
 ```
 
-The consensus factorization matches the per-sample factors, averages them
-into shared profiles, and projects every sample onto them; scoring pools
-the per-sample evidence, and correction and audit run per sample. See
+The consensus factorization pools the factors of every restart of every
+sample, clusters them into recurring programs, averages each program into
+a shared profile, and projects every sample onto the shared profiles;
+scoring pools the per-sample evidence into one rule set with per-sample
+support; correction votes with one ensemble of restarts shared by all
+samples; the audit runs per sample. Per-factor coverage and recurrence
+tables and a loss-gap table show how well the shared space represents each
+sample. See
 [multisample.md](multisample.md) for the method and the diagnostics.
 
 ## Clustering and Annotation

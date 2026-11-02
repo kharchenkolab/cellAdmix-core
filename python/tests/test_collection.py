@@ -110,6 +110,19 @@ class CollectionTests(unittest.TestCase):
         self.assertEqual(len(consensus.matching), 4)
         self.assertIn("own_stability", consensus.matching.columns)
         self.assertTrue(np.isfinite(consensus.matching["own_stability"]).all())
+        factors = consensus.factors
+        self.assertEqual(len(factors), len(profiles))
+        self.assertTrue({"consensus_factor", "samples", "coverage", "restarts", "components",
+                         "agreement", "multi_component_restarts"} <= set(factors.columns))
+        self.assertTrue((factors["restarts"] >= 2).all())
+        self.assertTrue(((factors["coverage"] > 0) & (factors["coverage"] <= 1)).all())
+        recurrence = consensus.recurrence()
+        self.assertEqual(len(recurrence), len(profiles) * 2)
+        self.assertTrue(((recurrence["recurrence"] >= 0) & (recurrence["recurrence"] <= 1)).all())
+        self.assertTrue({"sample", "restart", "factor", "cluster"} <= set(consensus.unreproduced.columns))
+        # every pooled component is either in a shared factor or unreproduced
+        self.assertEqual(int(consensus.components["consensus_factor"].notna().sum()) + len(consensus.unreproduced),
+                         len(consensus.components))
         self.assertEqual(len(consensus.loss), 2)
         self.assertTrue(np.isfinite(consensus.loss["consensus_loss"]).all())
         for fit in consensus.fits.values():

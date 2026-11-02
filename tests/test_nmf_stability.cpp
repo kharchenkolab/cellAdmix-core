@@ -316,3 +316,58 @@ TEST_CASE("Pipeline resolves the automatic ncv_k sentinel into options") {
   const auto explicit_fit = run_basic_pipeline(sim.transcripts, options);
   REQUIRE_EQ(explicit_fit.resolved_options.ncv_k, 6);
 }
+
+TEST_CASE("Profile clustering groups recurring programs across factorizations") {
+  // Three factorizations of the same three programs in different orders, with
+  // small perturbations, plus one program that appears in a single
+  // factorization only (gene 6 belongs to it alone).
+  const DenseMatrix pooled = from_rows({
+      {5.0, 4.0, 0.1, 0.0, 0.0, 0.2, 0.0},
+      {0.1, 0.0, 6.0, 5.0, 0.0, 0.1, 0.0},
+      {0.0, 0.2, 0.0, 0.1, 7.0, 6.0, 0.0},
+      {0.0, 0.3, 0.1, 0.0, 6.5, 6.5, 0.0},
+      {5.5, 3.5, 0.0, 0.1, 0.0, 0.2, 0.0},
+      {0.2, 0.0, 5.5, 5.5, 0.1, 0.0, 0.0},
+      {0.0, 0.1, 6.2, 4.8, 0.2, 0.0, 0.0},
+      {0.1, 0.0, 0.0, 0.2, 7.2, 5.8, 0.0},
+      {4.8, 4.2, 0.2, 0.0, 0.1, 0.0, 0.0},
+      {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 5.0}});
+  const std::vector<int> group = {0, 0, 0, 1, 1, 1, 2, 2, 2, 2};
+  const auto result = cluster_factor_profiles(pooled, group, 0.3);
+  REQUIRE_EQ(result.n_clusters, 4);
+  REQUIRE_EQ(result.cluster.size(), 10U);
+  // Program 1 in rows 0, 4, 8; program 2 in rows 1, 5, 6; program 3 in rows 2, 3, 7.
+  REQUIRE_EQ(result.cluster[0], result.cluster[4]);
+  REQUIRE_EQ(result.cluster[0], result.cluster[8]);
+  REQUIRE_EQ(result.cluster[1], result.cluster[5]);
+  REQUIRE_EQ(result.cluster[1], result.cluster[6]);
+  REQUIRE_EQ(result.cluster[2], result.cluster[3]);
+  REQUIRE_EQ(result.cluster[2], result.cluster[7]);
+  REQUIRE(result.cluster[0] != result.cluster[1]);
+  REQUIRE(result.cluster[0] != result.cluster[2]);
+  REQUIRE(result.cluster[1] != result.cluster[2]);
+  // Clusters are numbered by first appearance.
+  REQUIRE_EQ(result.cluster[0], 0);
+  REQUIRE_EQ(result.cluster[1], 1);
+  REQUIRE_EQ(result.cluster[2], 2);
+  REQUIRE_EQ(result.cluster[9], 3);
+  for (int i = 0; i < 9; ++i) {
+    REQUIRE(result.within_correlation[static_cast<std::size_t>(i)] > 0.8);
+  }
+  REQUIRE(std::isnan(result.within_correlation[9]));
+
+  // Ownership is normalized within each factorization, so rescaling one
+  // factorization leaves the clustering unchanged.
+  DenseMatrix scaled = pooled;
+  for (int j = 0; j < scaled.cols(); ++j) {
+    for (int i = 3; i < 6; ++i) {
+      scaled(i, j) *= 10.0;
+    }
+  }
+  const auto rescaled = cluster_factor_profiles(scaled, group, 0.3);
+  REQUIRE(rescaled.cluster == result.cluster);
+
+  // A permissive threshold merges everything; a strict one merges nothing.
+  REQUIRE_EQ(cluster_factor_profiles(pooled, group, -1.5).n_clusters, 1);
+  REQUIRE_EQ(cluster_factor_profiles(pooled, group, 1.5).n_clusters, 10);
+}

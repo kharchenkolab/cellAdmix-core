@@ -23,8 +23,8 @@ cellAdmixCollection <- function(datasets, sample_allocation = c("proportional", 
 #' R6 object holding the per-sample datasets of a multi-sample analysis and
 #' the fits made on them. Construct with [cellAdmixCollection()]. The
 #' workflow is `fit()` (per-sample factorizations, cached like any fit),
-#' `fit_consensus()` (match factors across samples, average them into
-#' shared profiles, and label every sample against those profiles), then
+#' `fit_consensus()` (cluster the pooled restart factors of all samples into
+#' shared profiles and project every sample onto them), then
 #' scoring, rules, and correction on the returned [CellAdmixConsensusFit].
 #' @export
 CellAdmixCollection <- R6::R6Class(
@@ -83,32 +83,54 @@ CellAdmixCollection <- R6::R6Class(
       invisible(self)
     },
 
-    fit_consensus = function(..., reference = NULL, match_min = 0.3,
-                             unmatched = c("append", "drop"), name = "consensus",
+    fit_consensus = function(..., match_min = 0.3, min_restarts = 2L, name = "consensus",
                              num_threads = NULL) {
-      unmatched <- match.arg(unmatched)
       state <- private$prepare_profiles(...)
-      reference <- reference %||% state$samples[[which.max(state$molecules)]]
-      if (!(reference %in% state$samples)) {
-        stop("reference must name one of the samples")
+      min_restarts <- max(1L, as.integer(min_restarts))
+      # Every restart of every sample enters the pool; each sample's primary
+      # restart is marked so the matching table can describe the sample's own
+      # factors.
+      pools <- lapply(state$samples, function(sample) {
+        pool <- .celladmix_fit_member_profiles(state$fits[[sample]])
+        lapply(pool, function(h) h[, state$genes, drop = FALSE])
+      })
+      names(pools) <- state$samples
+      selected <- vapply(state$fits, function(fit) {
+        as.integer(fit$run$nmf_diagnostics$selected_run)
+      }, integer(1))
+      consensus <- .celladmix_consensus_profiles(pools, state$weights, selected,
+        match_min = match_min, min_restarts = min_restarts)
+      if (!nrow(consensus$profiles)) {
+        stop("no factor recurs across restarts at match_min = ", match_min,
+          "; lower match_min or min_restarts")
       }
-      consensus <- .celladmix_consensus_profiles(state$profiles, state$weights, reference,
-        match_min = match_min, unmatched = unmatched)
-      # Each factor's restart stability within its own sample, next to its
-      # cross-sample match: an unmatched factor that is also unstable within
-      # its sample is restart noise rather than sample-specific structure.
-      consensus$matching$own_stability <- .celladmix_own_factor_stability(
-        state$fits, consensus$matching$sample, consensus$matching$sample_factor)
-      consensus$sample_specific$own_stability <- .celladmix_own_factor_stability(
-        state$fits, consensus$sample_specific$sample, consensus$sample_specific$sample_factor)
+      # The matching table describes each sample's primary factors: the
+      # consensus factor whose cluster they joined, their ownership correlation
+      # with that consensus profile, their within-cluster agreement, and their
+      # restart stability within the sample.
+      matching <- do.call(rbind, lapply(state$samples, function(sample) {
+        comp <- consensus$components[consensus$components$sample == sample &
+          consensus$components$selected, , drop = FALSE]
+        comp <- comp[order(comp$factor), , drop = FALSE]
+        corr <- .celladmix_profile_correlation(pools[[sample]][[selected[[sample]]]], consensus$profiles)
+        correlation <- vapply(seq_len(nrow(comp)), function(i) {
+          k <- comp$consensus_factor[[i]]
+          if (is.na(k)) NA_real_ else corr[comp$factor[[i]], k]
+        }, numeric(1))
+        data.frame(sample = sample, sample_factor = comp$factor,
+          consensus_factor = comp$consensus_factor, correlation = correlation,
+          matched = !is.na(comp$consensus_factor), agreement = comp$agreement,
+          stringsAsFactors = FALSE)
+      }))
+      rownames(matching) <- NULL
+      matching$own_stability <- .celladmix_own_factor_stability(
+        state$fits, matching$sample, matching$sample_factor)
       # One member pool shared by every sample: the restart profiles of all
       # samples aligned to the consensus factor order and interleaved, so an
       # ensemble of any size draws from each sample alike and every member
       # votes with the same decisions in every sample. The consensus itself
       # leads the pool as member 0.
-      aligned <- lapply(state$samples, function(sample) {
-        pool <- .celladmix_fit_member_profiles(state$fits[[sample]])
-        pool <- lapply(pool, function(h) h[, state$genes, drop = FALSE])
+      aligned <- lapply(pools, function(pool) {
         .celladmix_align_members(pool, consensus$profiles, match_min = match_min)
       })
       shared <- .celladmix_interleave(aligned)
@@ -120,12 +142,14 @@ CellAdmixCollection <- R6::R6Class(
         fits = private$project(consensus$profiles, members, run_id, num_threads),
         own_fits = state$fits,
         profiles = consensus$profiles,
-        matching = consensus$matching,
-        sample_specific = consensus$sample_specific,
+        matching = matching,
+        factors = consensus$factors,
+        components = consensus$components,
+        unreproduced = consensus$unreproduced,
         loss = private$loss_table(state, consensus$profiles),
-        params = list(reference = reference, match_min = match_min,
-          unmatched = unmatched, weights = state$weights, name = name, run_id = run_id,
-          source = "consensus")
+        params = list(match_min = match_min, min_restarts = min_restarts,
+          weights = state$weights, restarts_total = consensus$restarts_total,
+          name = name, run_id = run_id, source = "consensus")
       )
     },
 
@@ -169,17 +193,29 @@ CellAdmixCollection <- R6::R6Class(
       }
       member_pools <- stats::setNames(rep(list(aligned), length(state$samples)), state$samples)
       run_id <- paste0(.celladmix_clean_name(name, "run"), "_", .celladmix_profiles_hash(profiles, aligned))
+      # With given profiles the per-factor table counts the samples whose
+      # primary factors matched each profile.
+      matched <- matching[matching$matched, , drop = FALSE]
+      samples_per_factor <- tabulate(matched$consensus_factor, nbins = nrow(profiles))
+      factors <- data.frame(consensus_factor = seq_len(nrow(profiles)), cluster = NA_integer_,
+        samples = samples_per_factor, coverage = samples_per_factor / length(state$samples),
+        restarts = NA_integer_, components = NA_integer_, agreement = NA_real_,
+        multi_component_restarts = NA_integer_, stringsAsFactors = FALSE)
+      components <- data.frame(sample = matching$sample, restart = NA_integer_,
+        factor = matching$sample_factor, group = NA_integer_, selected = TRUE,
+        cluster = NA_integer_, agreement = NA_real_, consensus_factor = matching$consensus_factor,
+        stringsAsFactors = FALSE)
       CellAdmixConsensusFit$new(
         collection = self,
         fits = private$project(profiles, member_pools, run_id, num_threads),
         own_fits = state$fits,
         profiles = profiles,
         matching = matching,
-        sample_specific = data.frame(consensus_factor = integer(), sample = character(),
-          sample_factor = integer(), stringsAsFactors = FALSE),
+        factors = factors,
+        components = components,
+        unreproduced = components[0, , drop = FALSE],
         loss = private$loss_table(state, profiles),
-        params = list(reference = NA_character_, match_min = match_min, name = name,
-          run_id = run_id, source = "profiles")
+        params = list(match_min = match_min, name = name, run_id = run_id, source = "profiles")
       )
     }
   ),
@@ -253,7 +289,7 @@ CellAdmixCollection <- R6::R6Class(
 #' Consensus Factorization Across Samples
 #'
 #' Result of [CellAdmixCollection]`$fit_consensus()`: the shared gene
-#' profiles, the factor matching that produced them, one fixed-profile fit
+#' profiles, the pooled clustering that produced them, one fixed-profile fit
 #' per sample (whose molecule labels and ensemble members share the consensus
 #' factor index), and diagnostics of how well the consensus represents each
 #' sample. Scoring methods return a [CellAdmixCollectionScore] whose rules
@@ -267,18 +303,22 @@ CellAdmixConsensusFit <- R6::R6Class(
     own_fits = NULL,
     profiles = NULL,
     matching = NULL,
-    sample_specific = NULL,
+    factors = NULL,
+    components = NULL,
+    unreproduced = NULL,
     loss = NULL,
     params = NULL,
 
-    initialize = function(collection, fits, own_fits, profiles, matching,
-                          sample_specific, loss, params = list()) {
+    initialize = function(collection, fits, own_fits, profiles, matching, factors,
+                          components, unreproduced, loss, params = list()) {
       self$collection <- collection
       self$fits <- fits
       self$own_fits <- own_fits
       self$profiles <- profiles
       self$matching <- matching
-      self$sample_specific <- sample_specific
+      self$factors <- factors
+      self$components <- components
+      self$unreproduced <- unreproduced
       self$loss <- loss
       self$params <- params
     },
@@ -286,19 +326,43 @@ CellAdmixConsensusFit <- R6::R6Class(
     print = function(...) {
       cat("cellAdmix consensus fit\n")
       cat("  samples:", paste(names(self$fits), collapse = ", "), "\n")
+      single <- sum(self$factors$samples == 1L, na.rm = TRUE)
       cat("  factors:", nrow(self$profiles),
-        if (nrow(self$sample_specific)) paste0("(", nrow(self$sample_specific), " sample-specific)") else "", "\n")
-      cat("  reference sample:", self$params$reference, "\n")
-      matched <- self$matching[self$matching$sample != self$params$reference, , drop = FALSE]
-      if (nrow(matched)) {
-        cat("  matched ownership correlation (non-reference factors): median",
-          round(stats::median(matched$correlation, na.rm = TRUE), 3), "\n")
+        if (single) paste0("(", single, " from one sample only)") else "", "\n")
+      if (identical(self$params$source, "consensus")) {
+        cat("  sample coverage per factor: median",
+          round(stats::median(self$factors$coverage), 2),
+          "; unreproduced components:", nrow(self$unreproduced), "\n")
+      }
+      if (nrow(self$matching)) {
+        cat("  primary factors in the shared space:",
+          sum(self$matching$matched), "of", nrow(self$matching),
+          "; ownership correlation median",
+          round(stats::median(self$matching$correlation, na.rm = TRUE), 3), "\n")
       }
       invisible(self)
     },
 
     samples = function() names(self$fits),
     loadings = function() self$profiles,
+
+    recurrence = function() {
+      # Per consensus factor and sample: the number of that sample's restarts
+      # with a component in the factor's cluster, and that number as a
+      # fraction of the sample's restarts. Zero rows mark samples that do not
+      # carry the factor at all.
+      comp <- self$components[!is.na(self$components$consensus_factor), , drop = FALSE]
+      totals <- self$params$restarts_total
+      grid <- expand.grid(consensus_factor = seq_len(nrow(self$profiles)),
+        sample = names(self$fits), stringsAsFactors = FALSE)
+      grid$restarts <- vapply(seq_len(nrow(grid)), function(i) {
+        rows <- comp$consensus_factor == grid$consensus_factor[[i]] & comp$sample == grid$sample[[i]]
+        length(unique(comp$restart[rows]))
+      }, integer(1))
+      grid$restarts_total <- if (is.null(totals)) NA_integer_ else as.integer(totals[grid$sample])
+      grid$recurrence <- grid$restarts / grid$restarts_total
+      grid[order(grid$consensus_factor, grid$sample), , drop = FALSE]
+    },
 
     stability = function() {
       # Within-sample restart stability of each own fit next to the agreement
@@ -991,61 +1055,83 @@ CellAdmixCollectionCleanupReport <- R6::R6Class(
   h / sums
 }
 
-# Shared profiles from per-sample profile matrices (raw gene space, common
-# gene columns). The other samples' factors are matched one-to-one to the
-# reference sample's factors by gene-ownership correlation; matches at or
-# above `match_min` are averaged (each profile normalized to unit sum, the
-# average rescaled to the weighted mean of the original row sums so that
-# labeling sees the usual profile scale); unmatched factors are appended as
-# sample-specific factors or dropped.
-.celladmix_consensus_profiles <- function(profiles, weights, reference, match_min, unmatched) {
-  genes <- colnames(profiles[[reference]])
-  reference_raw <- profiles[[reference]]
-  reference_norm <- .celladmix_normalize_profiles(reference_raw)
-  n_factors <- nrow(reference_norm)
-  w_ref <- weights[[reference]]
-  sums <- reference_norm * w_ref
-  weight_total <- rep(w_ref, n_factors)
-  scale_total <- rowSums(reference_raw) * w_ref
-  matching <- data.frame(sample = reference, sample_factor = seq_len(n_factors),
-    consensus_factor = seq_len(n_factors), correlation = 1, matched = TRUE,
-    stringsAsFactors = FALSE)
-  appended <- list()
-  for (sample in setdiff(names(profiles), reference)) {
-    h_raw <- profiles[[sample]]
-    h <- .celladmix_normalize_profiles(h_raw)
-    match <- .celladmix_match_factors(h, reference_norm)
-    for (i in seq_len(nrow(h))) {
-      j <- match$match[[i]]
-      r <- match$correlation[[i]]
-      ok <- !is.na(j) && is.finite(r) && r >= match_min
-      if (ok) {
-        sums[j, ] <- sums[j, ] + weights[[sample]] * h[i, ]
-        weight_total[j] <- weight_total[j] + weights[[sample]]
-        scale_total[j] <- scale_total[j] + weights[[sample]] * sum(h_raw[i, ])
-      } else if (identical(unmatched, "append")) {
-        appended[[length(appended) + 1L]] <- list(sample = sample, factor = i,
-          profile = h_raw[i, ], correlation = r)
-      }
-      matching <- rbind(matching, data.frame(sample = sample, sample_factor = i,
-        consensus_factor = if (ok) j else NA_integer_, correlation = r, matched = ok,
-        stringsAsFactors = FALSE))
+# Shared profiles by pooled clustering of every restart of every sample.
+# `pools` is a named list (sample) of lists (restart) of raw-space profile
+# matrices over common gene columns; `selected` gives each sample's primary
+# restart (1-based). The pooled components are clustered by average linkage
+# on gene-ownership correlation, cut at `match_min`; a cluster whose
+# components come from at least `min_restarts` distinct restarts, of any
+# samples, becomes a consensus factor, and the remaining components are
+# reported as unreproduced. The consensus profile of a cluster is the
+# sample-weighted mean of each sample's mean unit-sum component profile,
+# rescaled to the weighted mean of the original row sums so that labeling
+# sees the usual profile scale. Factors are ordered by the number of samples
+# covered, then restarts, then profile mass.
+.celladmix_consensus_profiles <- function(pools, weights, selected, match_min, min_restarts) {
+  genes <- colnames(pools[[1]][[1]])
+  blocks <- list()
+  meta <- list()
+  group <- 0L
+  for (sample in names(pools)) {
+    for (r in seq_along(pools[[sample]])) {
+      h <- pools[[sample]][[r]]
+      group <- group + 1L
+      blocks[[group]] <- h
+      meta[[group]] <- data.frame(sample = sample, restart = r, factor = seq_len(nrow(h)),
+        group = group, selected = identical(as.integer(r), as.integer(selected[[sample]])),
+        stringsAsFactors = FALSE)
     }
   }
-  consensus <- (sums / weight_total) * (scale_total / weight_total)
-  sample_specific <- data.frame(consensus_factor = integer(), sample = character(),
-    sample_factor = integer(), stringsAsFactors = FALSE)
-  for (item in appended) {
-    consensus <- rbind(consensus, item$profile)
-    k <- nrow(consensus)
-    matching$consensus_factor[matching$sample == item$sample &
-      matching$sample_factor == item$factor] <- k
-    sample_specific <- rbind(sample_specific, data.frame(consensus_factor = k,
-      sample = item$sample, sample_factor = item$factor, stringsAsFactors = FALSE))
+  stacked <- do.call(rbind, blocks)
+  components <- do.call(rbind, meta)
+  rownames(components) <- NULL
+  clustering <- .celladmix_cluster_factors(stacked, components$group, match_min)
+  components$cluster <- as.integer(clustering$cluster)
+  components$agreement <- as.numeric(clustering$within_correlation)
+  row_sums <- rowSums(stacked)
+  summary <- do.call(rbind, lapply(sort(unique(components$cluster)), function(k) {
+    idx <- which(components$cluster == k)
+    per_group <- table(components$group[idx])
+    data.frame(cluster = k,
+      samples = length(unique(components$sample[idx])),
+      restarts = length(per_group),
+      components = length(idx),
+      agreement = if (length(idx) > 1L) mean(components$agreement[idx], na.rm = TRUE) else NA_real_,
+      multi_component_restarts = sum(per_group > 1L),
+      mass = mean(row_sums[idx]),
+      stringsAsFactors = FALSE)
+  }))
+  summary <- summary[order(-summary$samples, -summary$restarts, -summary$mass), , drop = FALSE]
+  reproduced <- summary[summary$restarts >= min_restarts, , drop = FALSE]
+  consensus <- matrix(0, nrow(reproduced), length(genes),
+    dimnames = list(if (nrow(reproduced)) paste0("F", seq_len(nrow(reproduced))) else NULL, genes))
+  normalized <- .celladmix_normalize_profiles(stacked)
+  for (i in seq_len(nrow(reproduced))) {
+    idx <- which(components$cluster == reproduced$cluster[[i]])
+    profile <- numeric(length(genes))
+    scale <- 0
+    total <- 0
+    for (sample in unique(components$sample[idx])) {
+      idx_s <- idx[components$sample[idx] == sample]
+      w <- weights[[sample]]
+      profile <- profile + w * colMeans(normalized[idx_s, , drop = FALSE])
+      scale <- scale + w * mean(row_sums[idx_s])
+      total <- total + w
+    }
+    consensus[i, ] <- (profile / total) * (scale / total)
   }
-  dimnames(consensus) <- list(paste0("F", seq_len(nrow(consensus))), genes)
-  rownames(matching) <- NULL
-  list(profiles = consensus, matching = matching, sample_specific = sample_specific)
+  lookup <- stats::setNames(seq_len(nrow(reproduced)), reproduced$cluster)
+  components$consensus_factor <- unname(lookup[as.character(components$cluster)])
+  factors <- data.frame(consensus_factor = seq_len(nrow(reproduced)), cluster = reproduced$cluster,
+    samples = reproduced$samples, coverage = reproduced$samples / length(pools),
+    restarts = reproduced$restarts, components = reproduced$components,
+    agreement = reproduced$agreement, multi_component_restarts = reproduced$multi_component_restarts,
+    stringsAsFactors = FALSE)
+  rownames(factors) <- NULL
+  unreproduced <- components[is.na(components$consensus_factor), , drop = FALSE]
+  rownames(unreproduced) <- NULL
+  list(profiles = consensus, components = components, factors = factors,
+    unreproduced = unreproduced, restarts_total = vapply(pools, length, integer(1)))
 }
 
 # Restart profiles of one sample reordered to the consensus factor index.

@@ -77,6 +77,19 @@ test_that("a consensus factorization pools two samples end to end", {
   expect_equal(nrow(consensus$matching), 4L)
   expect_true("own_stability" %in% names(consensus$matching))
   expect_true(all(is.finite(consensus$matching$own_stability)))
+  factors <- consensus$factors
+  expect_equal(nrow(factors), nrow(profiles))
+  expect_true(all(c("consensus_factor", "samples", "coverage", "restarts", "components",
+    "agreement", "multi_component_restarts") %in% names(factors)))
+  expect_true(all(factors$restarts >= 2L))
+  expect_true(all(factors$coverage > 0 & factors$coverage <= 1))
+  recurrence <- consensus$recurrence()
+  expect_equal(nrow(recurrence), nrow(profiles) * 2L)
+  expect_true(all(recurrence$recurrence >= 0 & recurrence$recurrence <= 1))
+  expect_true(all(c("sample", "restart", "factor", "cluster") %in% names(consensus$unreproduced)))
+  # every pooled component is either in a shared factor or unreproduced
+  expect_equal(sum(!is.na(consensus$components$consensus_factor)) + nrow(consensus$unreproduced),
+    nrow(consensus$components))
   expect_equal(nrow(consensus$loss), 2L)
   expect_true(all(is.finite(consensus$loss$own_loss)))
   expect_true(all(is.finite(consensus$loss$consensus_loss)))

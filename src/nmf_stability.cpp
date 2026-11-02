@@ -173,6 +173,160 @@ FactorMatchResult match_factor_profiles(
   return out;
 }
 
+FactorClusterResult cluster_factor_profiles(
+    const DenseMatrix& profiles,
+    const std::vector<int>& group,
+    double min_correlation) {
+  const int n = profiles.rows();
+  if (static_cast<int>(group.size()) != n) {
+    throw std::runtime_error("cluster_factor_profiles: one group per profile row is required");
+  }
+  FactorClusterResult out;
+  if (n == 0) {
+    return out;
+  }
+  // Ownership shares normalized within each factorization.
+  DenseMatrix ownership(n, profiles.cols(), 0.0);
+  std::vector<int> groups(group);
+  std::sort(groups.begin(), groups.end());
+  groups.erase(std::unique(groups.begin(), groups.end()), groups.end());
+  for (const int g : groups) {
+    std::vector<int> rows;
+    for (int i = 0; i < n; ++i) {
+      if (group[static_cast<std::size_t>(i)] == g) {
+        rows.push_back(i);
+      }
+    }
+    DenseMatrix sub(static_cast<int>(rows.size()), profiles.cols(), 0.0);
+    for (std::size_t r = 0; r < rows.size(); ++r) {
+      for (int j = 0; j < profiles.cols(); ++j) {
+        sub(static_cast<int>(r), j) = profiles(rows[r], j);
+      }
+    }
+    const DenseMatrix own = ownership_profiles(sub);
+    for (std::size_t r = 0; r < rows.size(); ++r) {
+      for (int j = 0; j < profiles.cols(); ++j) {
+        ownership(rows[r], j) = own(static_cast<int>(r), j);
+      }
+    }
+  }
+  const DenseMatrix corr = row_correlation_matrix(ownership, ownership);
+
+  // Average-linkage agglomeration with Lance-Williams distance updates and
+  // cached nearest neighbors.
+  const double max_distance = 1.0 - min_correlation;
+  const std::size_t nn_ = static_cast<std::size_t>(n);
+  std::vector<double> dist(nn_ * nn_, 0.0);
+  auto d = [&](int i, int j) -> double& { return dist[static_cast<std::size_t>(i) * nn_ + static_cast<std::size_t>(j)]; };
+  for (int i = 0; i < n; ++i) {
+    for (int j = 0; j < n; ++j) {
+      d(i, j) = 1.0 - corr(i, j);
+    }
+  }
+  std::vector<int> size(nn_, 1);
+  std::vector<bool> alive(nn_, true);
+  std::vector<int> root(nn_);
+  for (int i = 0; i < n; ++i) {
+    root[static_cast<std::size_t>(i)] = i;
+  }
+  const double inf = std::numeric_limits<double>::infinity();
+  std::vector<int> nn(nn_, -1);
+  std::vector<double> nn_dist(nn_, inf);
+  auto refresh = [&](int i) {
+    nn[static_cast<std::size_t>(i)] = -1;
+    nn_dist[static_cast<std::size_t>(i)] = inf;
+    for (int j = 0; j < n; ++j) {
+      if (j == i || !alive[static_cast<std::size_t>(j)]) {
+        continue;
+      }
+      if (d(i, j) < nn_dist[static_cast<std::size_t>(i)]) {
+        nn_dist[static_cast<std::size_t>(i)] = d(i, j);
+        nn[static_cast<std::size_t>(i)] = j;
+      }
+    }
+  };
+  for (int i = 0; i < n; ++i) {
+    refresh(i);
+  }
+  int clusters = n;
+  while (clusters > 1) {
+    int a = -1;
+    double best = inf;
+    for (int i = 0; i < n; ++i) {
+      if (alive[static_cast<std::size_t>(i)] && nn_dist[static_cast<std::size_t>(i)] < best) {
+        best = nn_dist[static_cast<std::size_t>(i)];
+        a = i;
+      }
+    }
+    if (a < 0 || best > max_distance) {
+      break;
+    }
+    int b = nn[static_cast<std::size_t>(a)];
+    if (a > b) {
+      std::swap(a, b);
+    }
+    const double wa = static_cast<double>(size[static_cast<std::size_t>(a)]);
+    const double wb = static_cast<double>(size[static_cast<std::size_t>(b)]);
+    for (int k = 0; k < n; ++k) {
+      if (k == a || k == b || !alive[static_cast<std::size_t>(k)]) {
+        continue;
+      }
+      const double merged = (wa * d(a, k) + wb * d(b, k)) / (wa + wb);
+      d(a, k) = merged;
+      d(k, a) = merged;
+    }
+    size[static_cast<std::size_t>(a)] += size[static_cast<std::size_t>(b)];
+    alive[static_cast<std::size_t>(b)] = false;
+    --clusters;
+    for (int i = 0; i < n; ++i) {
+      if (root[static_cast<std::size_t>(i)] == b) {
+        root[static_cast<std::size_t>(i)] = a;
+      }
+    }
+    refresh(a);
+    for (int k = 0; k < n; ++k) {
+      if (k == a || !alive[static_cast<std::size_t>(k)]) {
+        continue;
+      }
+      const int current = nn[static_cast<std::size_t>(k)];
+      if (current == a || current == b) {
+        refresh(k);
+      } else if (d(k, a) < nn_dist[static_cast<std::size_t>(k)]) {
+        nn_dist[static_cast<std::size_t>(k)] = d(k, a);
+        nn[static_cast<std::size_t>(k)] = a;
+      }
+    }
+  }
+
+  // Number clusters by first appearance and summarize within-cluster agreement.
+  std::vector<int> relabel(nn_, -1);
+  out.cluster.assign(nn_, -1);
+  int next = 0;
+  for (int i = 0; i < n; ++i) {
+    const int r = root[static_cast<std::size_t>(i)];
+    if (relabel[static_cast<std::size_t>(r)] < 0) {
+      relabel[static_cast<std::size_t>(r)] = next++;
+    }
+    out.cluster[static_cast<std::size_t>(i)] = relabel[static_cast<std::size_t>(r)];
+  }
+  out.n_clusters = next;
+  out.within_correlation.assign(nn_, std::numeric_limits<double>::quiet_NaN());
+  for (int i = 0; i < n; ++i) {
+    double total = 0.0;
+    int count = 0;
+    for (int j = 0; j < n; ++j) {
+      if (j != i && out.cluster[static_cast<std::size_t>(j)] == out.cluster[static_cast<std::size_t>(i)]) {
+        total += corr(i, j);
+        ++count;
+      }
+    }
+    if (count > 0) {
+      out.within_correlation[static_cast<std::size_t>(i)] = total / static_cast<double>(count);
+    }
+  }
+  return out;
+}
+
 FactorStabilityResult matched_ownership_stability(
     const std::vector<const DenseMatrix*>& candidate_h,
     int selected_run,

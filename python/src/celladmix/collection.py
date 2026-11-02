@@ -59,43 +59,58 @@ class CellAdmixCollection:
             self.fits[name] = dataset.fit(**kwargs)
         return self
 
-    def fit_consensus(self, *, reference: Optional[str] = None, match_min: float = 0.3,
-                      unmatched: str = "append", name: str = "consensus",
+    def fit_consensus(self, *, match_min: float = 0.3, min_restarts: int = 2, name: str = "consensus",
                       num_threads: Optional[int] = None, **fit_kwargs):
-        """Match the per-sample factors, average them into shared profiles,
-        and project every sample onto the fixed profiles."""
-        if unmatched not in ("append", "drop"):
-            raise ValueError("unmatched must be 'append' or 'drop'")
+        """Cluster the pooled restart factors of all samples into shared
+        profiles and project every sample onto them."""
         state = self._prepare_profiles(**fit_kwargs)
-        reference = reference or max(state["samples"], key=lambda s: state["molecules"][s])
-        if reference not in state["samples"]:
-            raise ValueError("reference must name one of the samples")
-        consensus = _consensus_profiles(state["profiles"], state["weights"], reference,
-                                        match_min=match_min, unmatched=unmatched)
-        # Each factor's restart stability within its own sample, next to its
-        # cross-sample match: an unmatched factor that is also unstable within
-        # its sample is restart noise rather than sample-specific structure.
-        for table in (consensus["matching"], consensus["sample_specific"]):
-            table["own_stability"] = _own_factor_stability(state["fits"], table["sample"], table["sample_factor"])
+        min_restarts = max(1, int(min_restarts))
+        # Every restart of every sample enters the pool; each sample's primary
+        # restart is marked so the matching table can describe its own factors.
+        pools = {s: [h[state["genes"]] for h in _fit_member_profiles(state["fits"][s])]
+                 for s in state["samples"]}
+        selected = {s: int(state["fits"][s].manifest["nmf_diagnostics"]["selected_run"])
+                    for s in state["samples"]}
+        consensus = _consensus_profiles(pools, state["weights"], selected,
+                                        match_min=match_min, min_restarts=min_restarts)
+        if consensus["profiles"].empty:
+            raise ValueError(f"no factor recurs across restarts at match_min = {match_min}; "
+                             "lower match_min or min_restarts")
+        # The matching table describes each sample's primary factors: the
+        # consensus factor whose cluster they joined, their ownership correlation
+        # with that consensus profile, their within-cluster agreement, and their
+        # restart stability within the sample.
+        rows = []
+        components = consensus["components"]
+        for s in state["samples"]:
+            comp = components[(components["sample"] == s) & components["selected"]].sort_values("factor")
+            corr = _profile_correlation(pools[s][selected[s] - 1], consensus["profiles"])
+            for _, row in comp.iterrows():
+                k = row["consensus_factor"]
+                matched = not pd.isna(k)
+                rows.append({"sample": s, "sample_factor": int(row["factor"]),
+                             "consensus_factor": int(k) if matched else pd.NA,
+                             "correlation": float(corr[int(row["factor"]) - 1, int(k) - 1]) if matched else np.nan,
+                             "matched": matched, "agreement": row["agreement"]})
+        matching = pd.DataFrame(rows)
+        matching["own_stability"] = _own_factor_stability(state["fits"], matching["sample"], matching["sample_factor"])
         # One member pool shared by every sample: the restart profiles of all
         # samples aligned to the consensus factor order and interleaved, so an
         # ensemble of any size draws from each sample alike and every member
         # votes with the same decisions in every sample. The consensus itself
         # leads the pool as member 0.
-        aligned = []
-        for s in state["samples"]:
-            pool = [h[state["genes"]] for h in _fit_member_profiles(state["fits"][s])]
-            aligned.append(_align_members(pool, consensus["profiles"], match_min=match_min))
+        aligned = [_align_members(pools[s], consensus["profiles"], match_min=match_min) for s in state["samples"]]
         shared = _interleave(aligned)
         members = {s: shared for s in state["samples"]}
         run_id = f"{name}_{_profiles_hash(consensus['profiles'], shared)}"
         return CellAdmixConsensusFit(
             self, self._project(consensus["profiles"], members, run_id, num_threads),
-            state["fits"], consensus["profiles"], consensus["matching"],
-            consensus["sample_specific"], self._loss_table(state, consensus["profiles"]),
-            params={"reference": reference, "match_min": match_min, "unmatched": unmatched,
-                    "weights": state["weights"], "name": name, "run_id": run_id,
-                    "source": "consensus"})
+            state["fits"], consensus["profiles"], matching, consensus["factors"],
+            consensus["components"], consensus["unreproduced"],
+            self._loss_table(state, consensus["profiles"]),
+            params={"match_min": match_min, "min_restarts": min_restarts,
+                    "weights": state["weights"], "restarts_total": consensus["restarts_total"],
+                    "name": name, "run_id": run_id, "source": "consensus"})
 
     def fit_profiles(self, profiles, *, members=None, name: str = "profiles",
                      match_min: float = 0.3, num_threads: Optional[int] = None, **fit_kwargs):
@@ -134,13 +149,25 @@ class CellAdmixCollection:
             aligned = _align_members(frames, profiles, match_min=match_min)
         member_pools = {s: aligned for s in state["samples"]}
         run_id = f"{name}_{_profiles_hash(profiles, aligned)}"
+        # With given profiles the per-factor table counts the samples whose
+        # primary factors matched each profile.
+        counts = matching[matching["matched"]]["consensus_factor"].astype(int).value_counts()
+        factors = pd.DataFrame({
+            "consensus_factor": range(1, len(profiles) + 1),
+            "cluster": pd.NA,
+            "samples": [int(counts.get(k, 0)) for k in range(1, len(profiles) + 1)]})
+        factors["coverage"] = factors["samples"] / len(state["samples"])
+        for column in ("restarts", "components", "agreement", "multi_component_restarts"):
+            factors[column] = pd.NA
+        components = pd.DataFrame({
+            "sample": matching["sample"], "restart": pd.NA, "factor": matching["sample_factor"],
+            "group": pd.NA, "selected": True, "cluster": pd.NA, "agreement": np.nan,
+            "consensus_factor": matching["consensus_factor"]})
         return CellAdmixConsensusFit(
             self, self._project(profiles, member_pools, run_id, num_threads),
-            state["fits"], profiles, matching,
-            pd.DataFrame(columns=["consensus_factor", "sample", "sample_factor"]),
+            state["fits"], profiles, matching, factors, components, components.iloc[0:0],
             self._loss_table(state, profiles),
-            params={"reference": None, "match_min": match_min, "name": name,
-                    "run_id": run_id, "source": "profiles"})
+            params={"match_min": match_min, "name": name, "run_id": run_id, "source": "profiles"})
 
     def _prepare_profiles(self, **fit_kwargs) -> dict:
         """Per-sample fits with their raw-space profiles over the common gene
@@ -202,23 +229,44 @@ class CellAdmixConsensusFit:
     them, one fixed-profile fit per sample (molecule labels and ensemble
     members in the consensus factor index), and representation diagnostics."""
 
-    def __init__(self, collection, fits, own_fits, profiles, matching, sample_specific,
-                 loss, params=None):
+    def __init__(self, collection, fits, own_fits, profiles, matching, factors, components,
+                 unreproduced, loss, params=None):
         self.collection = collection
         self.fits = fits
         self.own_fits = own_fits
         self.profiles = profiles
         self.matching = matching
-        self.sample_specific = sample_specific
+        self.factors = factors
+        self.components = components
+        self.unreproduced = unreproduced
         self.loss = loss
         self.params = dict(params or {})
 
     def __repr__(self) -> str:
+        single = int((self.factors["samples"] == 1).sum()) if len(self.factors) else 0
         return (f"CellAdmixConsensusFit(samples={list(self.fits)}, n_factors={len(self.profiles)}, "
-                f"sample_specific={len(self.sample_specific)}, reference={self.params.get('reference')!r})")
+                f"single_sample_factors={single}, unreproduced_components={len(self.unreproduced)})")
 
     def samples(self) -> list:
         return list(self.fits)
+
+    def recurrence(self) -> pd.DataFrame:
+        """Per consensus factor and sample: the number of that sample's restarts
+        with a component in the factor's cluster, and that number as a fraction
+        of the sample's restarts. Zero rows mark samples that do not carry the
+        factor at all."""
+        comp = self.components[self.components["consensus_factor"].notna()]
+        totals = self.params.get("restarts_total") or {}
+        rows = []
+        for k in range(1, len(self.profiles) + 1):
+            for s in self.fits:
+                sub = comp[(comp["consensus_factor"] == k) & (comp["sample"] == s)]
+                restarts = int(sub["restart"].nunique()) if len(sub) else 0
+                total = totals.get(s)
+                rows.append({"consensus_factor": k, "sample": s, "restarts": restarts,
+                             "restarts_total": total if total is not None else pd.NA,
+                             "recurrence": restarts / total if total else np.nan})
+        return pd.DataFrame(rows)
 
     def loadings(self) -> pd.DataFrame:
         """Consensus profiles, one row per factor and one column per gene."""
@@ -820,52 +868,87 @@ def _match_factors(profiles: pd.DataFrame, reference: pd.DataFrame) -> dict:
     return {"match": [int(m) for m in raw["match"]], "correlation": [float(c) for c in raw["correlation"]]}
 
 
-def _consensus_profiles(profiles: dict, weights: dict, reference: str, *, match_min: float,
-                        unmatched: str) -> dict:
-    """Shared profiles from per-sample profile frames (raw gene space, common
-    gene columns): other samples' factors are matched one-to-one to the
-    reference sample's by ownership correlation; matches at or above
-    ``match_min`` are averaged (unit-sum normalized, then rescaled to the
-    weighted mean of the original row sums so labeling sees the usual profile
-    scale); unmatched factors are appended as sample-specific or dropped."""
-    genes = list(profiles[reference].columns)
-    ref_raw = profiles[reference].to_numpy(dtype=float)
-    ref_norm = _normalize_profiles(profiles[reference]).to_numpy(dtype=float)
-    n_factors = ref_norm.shape[0]
-    w_ref = weights[reference]
-    sums = ref_norm * w_ref
-    weight_total = np.full(n_factors, w_ref, dtype=float)
-    scale_total = ref_raw.sum(axis=1) * w_ref
-    matching = [{"sample": reference, "sample_factor": i + 1, "consensus_factor": i + 1,
-                 "correlation": 1.0, "matched": True} for i in range(n_factors)]
-    appended = []
-    for s in [s for s in profiles if s != reference]:
-        h_raw = profiles[s]
-        h_norm = _normalize_profiles(h_raw)
-        match = _match_factors(h_norm, pd.DataFrame(ref_norm, columns=genes))
-        for i in range(h_norm.shape[0]):
-            j, r = match["match"][i], match["correlation"][i]
-            ok = j >= 0 and np.isfinite(r) and r >= match_min
-            if ok:
-                sums[j] += weights[s] * h_norm.iloc[i].to_numpy(dtype=float)
-                weight_total[j] += weights[s]
-                scale_total[j] += weights[s] * float(h_raw.iloc[i].sum())
-            elif unmatched == "append":
-                appended.append({"sample": s, "factor": i + 1, "profile": h_raw.iloc[i].to_numpy(dtype=float), "correlation": r})
-            matching.append({"sample": s, "sample_factor": i + 1,
-                             "consensus_factor": j + 1 if ok else pd.NA, "correlation": r, "matched": ok})
-    consensus = (sums / weight_total[:, None]) * (scale_total / weight_total)[:, None]
-    sample_specific = []
-    matching = pd.DataFrame(matching)
-    for item in appended:
-        consensus = np.vstack([consensus, item["profile"][None, :]])
-        k = consensus.shape[0]
-        mask = (matching["sample"] == item["sample"]) & (matching["sample_factor"] == item["factor"])
-        matching.loc[mask, "consensus_factor"] = k
-        sample_specific.append({"consensus_factor": k, "sample": item["sample"], "sample_factor": item["factor"]})
-    frame = pd.DataFrame(consensus, index=[f"F{i + 1}" for i in range(consensus.shape[0])], columns=genes)
-    return {"profiles": frame, "matching": matching,
-            "sample_specific": pd.DataFrame(sample_specific, columns=["consensus_factor", "sample", "sample_factor"])}
+def _profile_correlation(profiles: pd.DataFrame, reference: pd.DataFrame) -> np.ndarray:
+    """Gene-ownership correlation between every row of ``profiles`` and every
+    row of ``reference`` (each set normalized within itself)."""
+    raw = _core.profile_correlation(
+        profiles.to_numpy(dtype=float).ravel(order="C").tolist(), int(profiles.shape[0]),
+        reference.to_numpy(dtype=float).ravel(order="C").tolist(), int(reference.shape[0]))
+    return np.asarray(raw["data"], dtype=float).reshape(int(raw["rows"]), int(raw["cols"]))
+
+
+def _consensus_profiles(pools: dict, weights: dict, selected: dict, *, match_min: float,
+                        min_restarts: int) -> dict:
+    """Shared profiles by pooled clustering of every restart of every sample.
+
+    ``pools`` maps each sample to the list of its restart profile frames (raw
+    gene space, common gene columns); ``selected`` gives each sample's
+    primary restart (1-based). The pooled components are clustered by average
+    linkage on gene-ownership correlation, cut at ``match_min``; a cluster
+    whose components come from at least ``min_restarts`` distinct restarts, of
+    any samples, becomes a consensus factor, and the remaining components are
+    reported as unreproduced. The consensus profile of a cluster is the
+    sample-weighted mean of each sample's mean unit-sum component profile,
+    rescaled to the weighted mean of the original row sums so that labeling
+    sees the usual profile scale. Factors are ordered by the number of samples
+    covered, then restarts, then profile mass."""
+    genes = list(next(iter(pools.values()))[0].columns)
+    blocks, meta = [], []
+    group = 0
+    for s, pool in pools.items():
+        for r, h in enumerate(pool, start=1):
+            group += 1
+            blocks.append(h.to_numpy(dtype=float))
+            meta.append(pd.DataFrame({"sample": s, "restart": r, "factor": range(1, h.shape[0] + 1),
+                                      "group": group, "selected": r == selected[s]}))
+    stacked = np.vstack(blocks)
+    components = pd.concat(meta, ignore_index=True)
+    clustering = _core.cluster_factors(stacked.ravel(order="C").tolist(), int(stacked.shape[0]),
+                                       [int(g) for g in components["group"]], float(match_min))
+    components["cluster"] = [int(c) + 1 for c in clustering["cluster"]]
+    components["agreement"] = [float(a) for a in clustering["within_correlation"]]
+    row_sums = stacked.sum(axis=1)
+    rows = []
+    for k, idx in components.groupby("cluster").indices.items():
+        per_group = components["group"].iloc[idx].value_counts()
+        rows.append({"cluster": int(k), "samples": int(components["sample"].iloc[idx].nunique()),
+                     "restarts": int(len(per_group)), "components": int(len(idx)),
+                     "agreement": float(np.nanmean(components["agreement"].iloc[idx])) if len(idx) > 1 else np.nan,
+                     "multi_component_restarts": int((per_group > 1).sum()),
+                     "mass": float(row_sums[idx].mean())})
+    summary = pd.DataFrame(rows).sort_values(["samples", "restarts", "mass"], ascending=False, kind="stable")
+    reproduced = summary[summary["restarts"] >= min_restarts].reset_index(drop=True)
+    sums = stacked.sum(axis=1, keepdims=True)
+    sums[sums <= 0] = 1.0
+    normalized = stacked / sums
+    consensus = np.zeros((len(reproduced), len(genes)))
+    for i, cluster in enumerate(reproduced["cluster"]):
+        idx = np.flatnonzero(components["cluster"].to_numpy() == cluster)
+        profile = np.zeros(len(genes))
+        scale = 0.0
+        total = 0.0
+        for s in pd.unique(components["sample"].iloc[idx]):
+            idx_s = idx[(components["sample"].iloc[idx] == s).to_numpy()]
+            w = float(weights[s])
+            profile += w * normalized[idx_s].mean(axis=0)
+            scale += w * float(row_sums[idx_s].mean())
+            total += w
+        consensus[i] = (profile / total) * (scale / total)
+    lookup = {int(c): i + 1 for i, c in enumerate(reproduced["cluster"])}
+    components["consensus_factor"] = [lookup.get(int(c), pd.NA) for c in components["cluster"]]
+    factors = pd.DataFrame({
+        "consensus_factor": range(1, len(reproduced) + 1),
+        "cluster": reproduced["cluster"].astype(int),
+        "samples": reproduced["samples"].astype(int),
+        "coverage": reproduced["samples"] / len(pools),
+        "restarts": reproduced["restarts"].astype(int),
+        "components": reproduced["components"].astype(int),
+        "agreement": reproduced["agreement"],
+        "multi_component_restarts": reproduced["multi_component_restarts"].astype(int)})
+    unreproduced = components[components["consensus_factor"].isna()].reset_index(drop=True)
+    frame = pd.DataFrame(consensus, index=[f"F{i + 1}" for i in range(len(reproduced))], columns=genes)
+    return {"profiles": frame, "components": components, "factors": factors,
+            "unreproduced": unreproduced, "restarts_total": {s: len(pool) for s, pool in pools.items()}}
 
 
 def _align_members(pool: list, consensus: pd.DataFrame, *, match_min: float) -> list:

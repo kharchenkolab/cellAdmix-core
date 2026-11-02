@@ -19,28 +19,35 @@ to be pooled.
 
 ## Consensus factorization
 
-The shared factor space is a consensus of the per-sample factorizations.
+The shared factor space is a consensus of the per-sample factorizations,
+built from every restart of every sample.
 
 1. **Per-sample fits.** Every sample is fitted as usual, with its NMF
    restarts. Cached runs are reused.
-2. **Matching.** Factors are described by their gene-ownership profiles
-   (each gene's loading rescaled to sum to one across factors, the
-   representation used by the restart-stability diagnostic). The other
-   samples' factors are matched one to one to those of a reference sample
-   (by default the sample with the most molecules) by the Hungarian
-   assignment on ownership correlations. Pairs whose correlation falls
-   below `match_min` (default 0.3) count as unmatched.
-3. **Consensus profiles.** Matched factors are averaged after each profile
-   is normalized to unit sum over genes, with weights proportional to the
-   samples' molecule counts (or equal, by `sample_allocation`). The
-   average is rescaled to the weighted mean of the original row sums, so
-   molecule labeling sees profiles on the usual scale. Unmatched factors
-   are appended to the shared set and flagged as sample-specific
-   (`unmatched = "append"`, the default), which keeps every sample near
-   its own optimum; `"drop"` keeps only the shared factors. Profiles are
-   compared in raw gene space: the inverse-square-root KL variant fits in
-   a feature space where every gene is scaled by a weight recorded in the
-   run, and the profiles are divided by that weight before matching.
+2. **Pooled clustering.** The factors of every restart of every sample
+   are pooled and described by their gene-ownership profiles (each gene's
+   loading rescaled to sum to one across the factors of its own restart,
+   the representation used by the restart-stability diagnostic). The
+   pooled factors are clustered by average linkage on the correlation of
+   these profiles, merging while the mean correlation between clusters
+   stays at or above `match_min` (default 0.3). Each cluster gathers one
+   recurring program: the same program as found by different restarts
+   and in different samples. Samples and restarts enter symmetrically, so
+   the result does not depend on a reference sample or on a merge order,
+   and samples fitted at different ranks pose no difficulty.
+3. **Consensus profiles.** A cluster becomes a shared factor when its
+   members come from at least `min_restarts` distinct restarts (default
+   2), of any samples: a program found by a single random start is not
+   reproducible and is reported rather than used. The shared profile is
+   the mean over contributing samples, weighted by molecule count (or
+   equal, by `sample_allocation`), of each sample's mean member profile
+   after normalization to unit sum; it is rescaled to the weighted mean of
+   the original row sums so that molecule labeling sees profiles on the
+   usual scale. Factors are ordered by the number of samples they cover,
+   then by the number of restarts. Profiles are compared in raw gene
+   space: the inverse-square-root KL variant fits in a feature space where
+   every gene is scaled by a weight recorded in the run, and the profiles
+   are divided by that weight before pooling.
 4. **Fixed-profile projection.** Every sample is refitted with the
    consensus profiles fixed: no factorization is run, and every molecule
    is labeled against the shared profiles in their given order. The
@@ -104,12 +111,24 @@ sample:
   objective, alongside the relative spread of the sample's restart
   objectives. A consensus within that spread fits the sample as well as
   one of its own restarts would.
-- **Matching** (`matching`): every per-sample factor with its matched
-  consensus factor, the ownership correlation of the match, and the
-  factor's restart stability within its own sample (`own_stability`);
-  `sample_specific` lists the appended factors with the same stability. An
-  unmatched factor that is also unstable within its own sample is restart
-  noise rather than sample-specific structure.
+- **Factors** (`factors`): one row per shared factor with the number and
+  fraction of samples contributing to its cluster (`samples`, `coverage`),
+  the number of distinct restarts and of components in the cluster
+  (`restarts`, `components`), the mean within-cluster ownership
+  correlation (`agreement`), and the number of restarts contributing more
+  than one component (`multi_component_restarts`, a sign that the cut
+  merged distinct programs). A factor whose coverage is one sample's share
+  is carried by that sample alone.
+- **Recurrence** (`recurrence()`): per factor and sample, the number of
+  that sample's restarts containing the program and the fraction of its
+  restarts; zero marks a sample that does not carry the factor.
+- **Unreproduced components** (`unreproduced`): the pooled components whose
+  cluster did not reach `min_restarts`, with their sample, restart, factor
+  index, and whether they belong to the sample's primary restart.
+- **Matching** (`matching`): each sample's primary factors with the shared
+  factor their cluster became (or none), the ownership correlation with
+  that shared profile, their within-cluster agreement, and their restart
+  stability within the sample (`own_stability`).
 - **Stability** (`stability()`): each sample's within-sample restart
   stability next to the agreement of its aligned restarts with the
   consensus profiles.
@@ -131,7 +150,9 @@ datasets <- list(
 collection <- cellAdmixCollection(datasets)          # sample_allocation = "proportional"
 consensus <- collection$fit_consensus()              # per-sample fits, matching, projection
 consensus$loss                                       # loss gap per sample
-consensus$matching                                   # factor matching table
+consensus$factors                                    # coverage and recurrence per shared factor
+consensus$recurrence()                               # per factor and sample
+consensus$matching                                   # each sample's primary factors in the shared space
 score <- consensus$score_bridge()                    # per-sample scores, pooled summary
 rules <- score$rules()                               # pooled rules with sample_support
 correction <- score$correct(rules = rules)           # per-sample ensemble corrections

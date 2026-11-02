@@ -7,7 +7,7 @@
 R6 object holding the per-sample datasets of a multi-sample analysis and
 the fits made on them. Construct with \code{\link[=cellAdmixCollection]{cellAdmixCollection()}}. The
 workflow is \code{fit()} (per-sample factorizations, cached like any fit),
-\code{fit_consensus()} (match factors across samples, average them into
-shared profiles, and label every sample against those profiles), then
+\code{fit_consensus()} (cluster the pooled restart factors of all samples into
+shared profiles and project every sample onto them), then
 scoring, rules, and correction on the returned \link{CellAdmixConsensusFit}.
 }

@@ -5,7 +5,7 @@
 \title{Consensus Factorization Across Samples}
 \description{
 Result of \link{CellAdmixCollection}\verb{$fit_consensus()}: the shared gene
-profiles, the factor matching that produced them, one fixed-profile fit
+profiles, the pooled clustering that produced them, one fixed-profile fit
 per sample (whose molecule labels and ensemble members share the consensus
 factor index), and diagnostics of how well the consensus represents each
 sample. Scoring methods return a \link{CellAdmixCollectionScore} whose rules
