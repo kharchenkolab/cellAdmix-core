@@ -115,7 +115,7 @@ class CollectionTests(unittest.TestCase):
         for fit in consensus.fits.values():
             self.assertTrue(fit.manifest["fixed_profiles"])
             self.assertEqual(int(fit.manifest["n_factors"]), len(profiles))
-            self.assertEqual(fit.manifest["fixed_profile_members"], 4)
+            self.assertEqual(fit.manifest["fixed_profile_members"], 7)
         stability = consensus.stability()
         self.assertEqual(list(stability["sample"]), ["a", "b"])
         usage = consensus.sample_usage()
@@ -148,6 +148,8 @@ class CollectionTests(unittest.TestCase):
         correction = score.correct(rules=rules, vote=0.3)
         self.assertIsInstance(correction, CellAdmixCollectionCorrection)
         self.assertEqual(correction.samples(), ["a", "b"])
+        self.assertIn("support", correction.rules.columns)
+        self.assertTrue(correction.rules["support"].between(0, 1).all())
         self.assertIn("sample", correction.summary().columns)
         self.assertIn("fraction_molecules_removed", correction.summary(by_sample=False).columns)
         corrected, _, corrected_cells = correction.counts()

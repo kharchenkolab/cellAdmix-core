@@ -84,8 +84,8 @@ test_that("a consensus factorization pools two samples end to end", {
     fit <- consensus$fits[[sample]]
     expect_true(isTRUE(fit$run$fixed_profiles))
     expect_equal(as.integer(fit$run$n_factors), nrow(profiles))
-    # consensus itself plus the sample's three aligned restarts
-    expect_equal(fit$run$fixed_profile_members, 4L)
+    # consensus itself plus both samples' three aligned restarts, shared
+    expect_equal(fit$run$fixed_profile_members, 7L)
   }
   stability <- consensus$stability()
   expect_equal(stability$sample, c("a", "b"))
@@ -124,6 +124,8 @@ test_that("a consensus factorization pools two samples end to end", {
   correction <- score$correct(rules = rules, vote = 0.3)
   expect_s3_class(correction, "CellAdmixCollectionCorrection")
   expect_equal(correction$samples(), c("a", "b"))
+  expect_true("support" %in% names(correction$rules))
+  expect_true(all(correction$rules$support >= 0 & correction$rules$support <= 1))
   per_sample_summary <- correction$summary()
   expect_true("sample" %in% names(per_sample_summary))
   pooled_summary <- correction$summary(by_sample = FALSE)

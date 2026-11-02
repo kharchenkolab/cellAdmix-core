@@ -43,13 +43,13 @@ The shared factor space is a consensus of the per-sample factorizations.
    run, and the profiles are divided by that weight before matching.
 4. **Fixed-profile projection.** Every sample is refitted with the
    consensus profiles fixed: no factorization is run, and every molecule
-   is labeled against the shared profiles in their given order. Each
-   sample's restart profiles, aligned to the consensus factor order,
-   become the ensemble member pool of its fixed-profile run (the
-   consensus itself leads as member 0, so the primary labeling and the
-   vote share one factor index). The run id carries a hash of the
-   profiles, so a cached projection is reused only for the consensus that
-   produced it.
+   is labeled against the shared profiles in their given order. The
+   restart profiles of all samples, aligned to the consensus factor
+   order and interleaved sample by sample, form one ensemble member pool
+   that every sample's run carries (the consensus itself leads as member
+   0, so the primary labeling and the vote share one factor index). The
+   run id carries a hash of the profiles and the pool, so a cached
+   projection is reused only for the consensus that produced it.
 
 The same projection can be applied to profiles from any other source
 through `fit_profiles()`: the profiles of one sample (reference-sample
@@ -77,10 +77,18 @@ applied everywhere, and the column says so. The native-factor check runs
 on the pooled rules with source exposure computed within each sample and
 the per-cell statistics stacked, so neighborhoods never cross samples.
 
-Correction applies the pooled rules to every sample through that sample's
-own ensemble members; the molecule vote and its threshold are the same as
-for a single sample. The audit runs per sample, with a pooled per-pair
-table and per-sample cleanup verification.
+Correction keeps the molecule-vote ensemble identical across samples,
+because the member-level scoring is the most seed-dependent step of the
+pipeline and pooling only the primary rules would leave it per sample.
+Every member of the shared pool is scored in every sample with the
+primary method and parameters, its summaries are pooled exactly like the
+primary ones, its rule set is derived once (vetted by the pooled
+native-factor check on the member's own cell factor fractions and
+restricted to the primary rules' source → target pairs), and that one
+member rule set votes in every sample. The vote threshold is the same as
+for a single sample, and the returned rules carry `support`, the fraction
+of members keeping each pair. The audit runs per sample, with a pooled
+per-pair table and per-sample cleanup verification.
 
 ## Diagnostics
 

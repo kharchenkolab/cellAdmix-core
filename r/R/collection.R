@@ -101,16 +101,20 @@ CellAdmixCollection <- R6::R6Class(
         state$fits, consensus$matching$sample, consensus$matching$sample_factor)
       consensus$sample_specific$own_stability <- .celladmix_own_factor_stability(
         state$fits, consensus$sample_specific$sample, consensus$sample_specific$sample_factor)
-      # Each sample's restart profiles, aligned to the consensus factor order,
-      # become the member pool of its fixed-profile run.
-      members <- lapply(state$samples, function(sample) {
+      # One member pool shared by every sample: the restart profiles of all
+      # samples aligned to the consensus factor order and interleaved, so an
+      # ensemble of any size draws from each sample alike and every member
+      # votes with the same decisions in every sample. The consensus itself
+      # leads the pool as member 0.
+      aligned <- lapply(state$samples, function(sample) {
         pool <- .celladmix_fit_member_profiles(state$fits[[sample]])
         pool <- lapply(pool, function(h) h[, state$genes, drop = FALSE])
         .celladmix_align_members(pool, consensus$profiles, match_min = match_min)
       })
-      names(members) <- state$samples
+      shared <- .celladmix_interleave(aligned)
+      members <- stats::setNames(rep(list(shared), length(state$samples)), state$samples)
       run_id <- paste0(.celladmix_clean_name(name, "run"), "_",
-        .celladmix_matrix_hash(consensus$profiles))
+        .celladmix_profiles_hash(consensus$profiles, shared))
       CellAdmixConsensusFit$new(
         collection = self,
         fits = private$project(consensus$profiles, members, run_id, num_threads),
@@ -164,7 +168,7 @@ CellAdmixCollection <- R6::R6Class(
         list()
       }
       member_pools <- stats::setNames(rep(list(aligned), length(state$samples)), state$samples)
-      run_id <- paste0(.celladmix_clean_name(name, "run"), "_", .celladmix_matrix_hash(profiles))
+      run_id <- paste0(.celladmix_clean_name(name, "run"), "_", .celladmix_profiles_hash(profiles, aligned))
       CellAdmixConsensusFit$new(
         collection = self,
         fits = private$project(profiles, member_pools, run_id, num_threads),
@@ -513,13 +517,66 @@ CellAdmixCollectionScore <- R6::R6Class(
       if ("keep" %in% names(kept)) {
         kept <- kept[is.na(kept$keep) | kept$keep, , drop = FALSE]
       }
+      if (!nrow(kept)) {
+        stop("no rules to apply")
+      }
       name <- .celladmix_clean_name(name %||% paste0(self$name, "_clean"), "correction")
-      corrections <- lapply(names(self$sample_scores), function(sample) {
-        self$consensus$fits[[sample]]$correct(
-          self$sample_scores[[sample]], rules = kept, name = name,
-          ensemble = ensemble, vote = vote, ...)
+      fits <- self$consensus$fits
+      samples <- names(fits)
+
+      # The molecule-vote ensemble is shared across samples: the member pool
+      # is the same in every sample's run, each member is scored in every
+      # sample, its evidence pooled like the primary evidence, and one member
+      # rule set votes in every sample.
+      ensemble <- if (is.null(ensemble)) 10L else max(1L, as.integer(ensemble))
+      member_rules <- NULL
+      members <- integer(0)
+      if (ensemble > 1L) {
+        available <- min(vapply(samples, function(sample) {
+          .celladmix_ensemble_prepare(fits[[sample]]$run$path, fits[[sample]]$dataset$num_threads)
+        }, numeric(1)))
+        if (available < 2L) {
+          message("Runs carry no shared ensemble member pool; applying single-fit corrections.")
+        } else {
+          selected <- as.integer(fits[[1]]$run$nmf_diagnostics$selected_run) - 1L
+          members <- unique(c(selected, setdiff(seq_len(available) - 1L, selected)))
+          members <- members[seq_len(min(ensemble, length(members)))]
+          member_rules <- private$pooled_member_rules(members, selected, kept,
+            p_thresh = p_thresh, adjust_p = adjust_p, targets = targets)
+        }
+      }
+      min_votes <- max(1L, as.integer(ceiling(vote * length(members))))
+      corrections <- lapply(samples, function(sample) {
+        fit <- fits[[sample]]
+        score_sample <- self$sample_scores[[sample]]
+        out_dir <- file.path(fit$run$paths$corrected_dir, name)
+        corrected <- if (is.null(member_rules)) {
+          celladmix_correct(fit$run, rules = kept, out_dir = out_dir,
+            annotation = score_sample$annotation_vector())
+        } else {
+          celladmix_correct(fit$run, rules = member_rules$rules, out_dir = out_dir,
+            annotation = score_sample$annotation_vector(),
+            rule_member = member_rules$member, min_votes = min_votes)
+        }
+        correction <- CellAdmixCorrection$new(name, fit, score_sample, corrected,
+          params = list(p_thresh = p_thresh, adjust_p = adjust_p, targets = targets,
+            ensemble = max(1L, length(members)),
+            vote = if (length(members) > 1L) vote else NA_real_,
+            pooled_members = !is.null(member_rules)),
+          rules = rules)
+        fit$corrections_registry[[name]] <- correction
+        correction$save_metadata()
+        correction
       })
-      names(corrections) <- names(self$sample_scores)
+      names(corrections) <- samples
+      if (!is.null(member_rules)) {
+        rules$support <- .celladmix_rule_support(rules, member_rules$pair_sets)
+        removed <- vapply(corrections, function(x) as.numeric(x$run$n_removed %||% NA_real_), numeric(1))
+        message(sprintf(
+          "Pooled ensemble correction over %d members shared by %d samples: molecules removed by >= %d members (vote >= %.2f) are dropped (%s).",
+          length(members), length(samples), min_votes, vote,
+          paste(sprintf("%s: %s", samples, format(removed, big.mark = ",")), collapse = ", ")))
+      }
       CellAdmixCollectionCorrection$new(self, name, corrections, rules = rules)
     }
   ),
@@ -549,16 +606,88 @@ CellAdmixCollectionScore <- R6::R6Class(
       rules
     },
 
-    pooled_native_check = function(rules, median_thresh, expr_thresh,
-                                   outlier_min_frac, neighbor_k) {
+    # One ensemble member's score summary in one sample, with the same method
+    # and parameters as the primary score; persisted in the sample's run so
+    # re-corrections reuse it.
+    member_summary = function(sample, member) {
+      fit <- self$consensus$fits[[sample]]
+      score_sample <- self$sample_scores[[sample]]
+      key <- paste(self$method, member, score_sample$annotation_hash,
+        paste(deparse(score_sample$params), collapse = ""), sep = "|")
+      path <- file.path(fit$run$paths$scores_dir,
+        sprintf("collection_member_summary_%s_m%d.rds", self$method, member))
+      if (file.exists(path)) {
+        stored <- tryCatch(readRDS(path), error = function(e) NULL)
+        if (!is.null(stored) && identical(stored$key, key)) {
+          return(stored$summary)
+        }
+      }
+      summary <- .celladmix_score_member(fit, score_sample, member)$summary
+      dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
+      saveRDS(list(key = key, summary = summary), path)
+      summary
+    },
+
+    # Per-member rule sets for the shared molecule-vote ensemble: each
+    # member's summaries from every sample are pooled like the primary
+    # summaries, thresholded, vetted by the pooled native-factor check on
+    # the member's own cell factor fractions, and restricted to the primary
+    # rules' source -> target pairs. Returns the stacked (factor, target)
+    # rows with their member indices and each member's kept pair set.
+    pooled_member_rules = function(members, selected, primary_rules, p_thresh,
+                                   adjust_p, targets) {
+      pair_key <- function(df) paste(df$source_cell_type, df$target_cell_type, sep = "\r")
+      restrict <- unique(pair_key(primary_rules))
+      frames <- list()
+      frame_members <- integer(0)
+      pair_sets <- list()
+      for (member in members) {
+        rules_member <- if (member == selected) {
+          primary_rules
+        } else {
+          summaries <- .celladmix_stack_samples(
+            lapply(stats::setNames(nm = names(self$sample_scores)), function(sample) {
+              private$member_summary(sample, member)
+            }))
+          pooled <- .celladmix_pool_score_summaries(summaries)
+          rules_member <- celladmix_bridge_rules(pooled, p_thresh = p_thresh,
+            adjust_p = adjust_p, target_cell_types = targets)
+          rules_member <- private$pooled_native_check(rules_member,
+            cell_factors_fn = function(fit) .celladmix_member_cell_factors(fit, member))
+          rules_member[is.na(rules_member$keep) | rules_member$keep, , drop = FALSE]
+        }
+        if (nrow(rules_member)) {
+          rules_member <- rules_member[pair_key(rules_member) %in% restrict, , drop = FALSE]
+        }
+        pair_sets[[as.character(member)]] <- unique(pair_key(rules_member))
+        if (nrow(rules_member)) {
+          frames[[length(frames) + 1L]] <- data.frame(
+            factor = as.integer(rules_member$factor),
+            target_cell_type = as.character(rules_member$target_cell_type),
+            stringsAsFactors = FALSE)
+          frame_members <- c(frame_members, rep(as.integer(member), nrow(rules_member)))
+        }
+      }
+      list(
+        rules = if (length(frames)) do.call(rbind, frames) else
+          data.frame(factor = integer(0), target_cell_type = character(0), stringsAsFactors = FALSE),
+        member = frame_members,
+        pair_sets = pair_sets)
+    },
+
+    pooled_native_check = function(rules, median_thresh = 0.1, expr_thresh = 0.05,
+                                   outlier_min_frac = 0.1, neighbor_k = 15L,
+                                   cell_factors_fn = function(fit) fit$cell_factors()) {
       # Source exposure is computed within each sample (its own cell
       # neighborhoods) and the per-cell tables are stacked, so the check's
       # statistics pool the samples without neighborhoods crossing them.
+      # `cell_factors_fn` supplies the per-sample cell factor fractions: the
+      # run's own, or one ensemble member's.
       fits <- self$consensus$fits
       annotations <- lapply(fits, function(fit) fit$dataset$annotation(fit$annotation_name, as_vector = TRUE))
       types <- sort(unique(unlist(lapply(annotations, function(ann) as.character(ann[!is.na(ann)])), use.names = FALSE)))
       pieces <- lapply(names(fits), function(sample) {
-        cells <- fits[[sample]]$cell_factors()
+        cells <- cell_factors_fn(fits[[sample]])
         annotation <- annotations[[sample]]
         exposure <- .celladmix_source_exposure_counts(cells, annotation, neighbor_k, types = types)
         cells$cell_id <- paste0(sample, "_", as.character(cells$cell_id))
@@ -893,6 +1022,26 @@ CellAdmixCollectionCleanupReport <- R6::R6Class(
     }
     aligned
   })
+}
+
+# Round-robin interleaving of several lists (a list per sample) into one.
+.celladmix_interleave <- function(lists) {
+  lists <- lists[vapply(lists, length, integer(1)) > 0]
+  if (!length(lists)) return(list())
+  out <- list()
+  for (i in seq_len(max(vapply(lists, length, integer(1))))) {
+    for (items in lists) {
+      if (i <= length(items)) out[[length(out) + 1L]] <- items[[i]]
+    }
+  }
+  out
+}
+
+# Content hash of shared profiles together with their member pool, so a
+# cached fixed-profile run is reused only for the same profiles and members.
+.celladmix_profiles_hash <- function(profiles, members = list()) {
+  stacked <- if (length(members)) rbind(profiles, do.call(rbind, members)) else profiles
+  .celladmix_matrix_hash(stacked)
 }
 
 # Short content hash of a numeric matrix, for run ids tied to the profiles.

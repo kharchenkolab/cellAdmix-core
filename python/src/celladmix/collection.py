@@ -77,13 +77,18 @@ class CellAdmixCollection:
         # its sample is restart noise rather than sample-specific structure.
         for table in (consensus["matching"], consensus["sample_specific"]):
             table["own_stability"] = _own_factor_stability(state["fits"], table["sample"], table["sample_factor"])
-        # Each sample's restart profiles, aligned to the consensus factor order,
-        # become the member pool of its fixed-profile run.
-        members = {}
+        # One member pool shared by every sample: the restart profiles of all
+        # samples aligned to the consensus factor order and interleaved, so an
+        # ensemble of any size draws from each sample alike and every member
+        # votes with the same decisions in every sample. The consensus itself
+        # leads the pool as member 0.
+        aligned = []
         for s in state["samples"]:
             pool = [h[state["genes"]] for h in _fit_member_profiles(state["fits"][s])]
-            members[s] = _align_members(pool, consensus["profiles"], match_min=match_min)
-        run_id = f"{name}_{_matrix_hash(consensus['profiles'])}"
+            aligned.append(_align_members(pool, consensus["profiles"], match_min=match_min))
+        shared = _interleave(aligned)
+        members = {s: shared for s in state["samples"]}
+        run_id = f"{name}_{_profiles_hash(consensus['profiles'], shared)}"
         return CellAdmixConsensusFit(
             self, self._project(consensus["profiles"], members, run_id, num_threads),
             state["fits"], consensus["profiles"], consensus["matching"],
@@ -128,7 +133,7 @@ class CellAdmixCollection:
                 frames.append(member)
             aligned = _align_members(frames, profiles, match_min=match_min)
         member_pools = {s: aligned for s in state["samples"]}
-        run_id = f"{name}_{_matrix_hash(profiles)}"
+        run_id = f"{name}_{_profiles_hash(profiles, aligned)}"
         return CellAdmixConsensusFit(
             self, self._project(profiles, member_pools, run_id, num_threads),
             state["fits"], profiles, matching,
@@ -403,16 +408,141 @@ class CellAdmixCollectionScore:
         return rules
 
     def correct(self, rules=None, *, name: Optional[str] = None, p_thresh: float = 0.1,
-                ensemble: Optional[int] = None, vote: float = 0.3):
+                adjust_p: bool = False, targets=None, ensemble: Optional[int] = None,
+                vote: float = 0.3):
+        """Apply the pooled rules to every sample.
+
+        The molecule-vote ensemble is shared across samples: the member pool
+        is the same in every sample's run, each member is scored in every
+        sample, its evidence pooled like the primary evidence, and one member
+        rule set votes in every sample.
+        """
+        import math
+
+        from . import _core
+
         if rules is None:
-            rules = self.rules(p_thresh=p_thresh)
+            rules = self.rules(p_thresh=p_thresh, adjust_p=adjust_p, targets=targets)
         kept = rules
         if "keep" in getattr(kept, "columns", ()):
             kept = kept[kept["keep"].fillna(True).astype(bool)]
+        if kept.empty:
+            raise ValueError("no rules to apply")
         name = name or f"{self.name}_clean"
-        corrections = {s: score.correct(rules=kept, name=name, ensemble=ensemble, vote=vote)
-                       for s, score in self.sample_scores.items()}
+        fits = self.consensus.fits
+        samples = list(fits)
+
+        ensemble = 10 if ensemble is None else max(1, int(ensemble))
+        member_rules = None
+        members: list[int] = []
+        if ensemble > 1:
+            available = min(_core.ensemble_prepare(str(fit.run_path), int(fit.dataset.num_threads))
+                            for fit in fits.values())
+            if available < 2:
+                print("Runs carry no shared ensemble member pool; applying single-fit corrections.")
+            else:
+                selected = int(fits[samples[0]].manifest["nmf_diagnostics"]["selected_run"]) - 1
+                members = [selected] + [m for m in range(available) if m != selected]
+                members = members[: min(ensemble, len(members))]
+                member_rules = self._pooled_member_rules(members, selected, kept, p_thresh=p_thresh,
+                                                         adjust_p=adjust_p, targets=targets)
+        min_votes = max(1, math.ceil(vote * len(members))) if members else 1
+        corrections = {}
+        for s in samples:
+            if member_rules is None:
+                corrections[s] = fits[s].correct(kept, name=name)
+            else:
+                corrections[s] = fits[s].correct(member_rules["rules"], name=name,
+                                                 rule_members=member_rules["member"], min_votes=min_votes)
+        rules = rules.copy()
+        if member_rules is not None:
+            from .score import _rule_support
+
+            rules["support"] = _rule_support(rules, member_rules["pair_sets"])
+            removed = ", ".join(f"{s}: {c.manifest.get('n_removed', 0):,}" for s, c in corrections.items())
+            print(f"Pooled ensemble correction over {len(members)} members shared by {len(samples)} "
+                  f"samples: molecules removed by >= {min_votes} members (vote >= {vote:.2f}) are "
+                  f"dropped ({removed}).")
+        for correction in corrections.values():
+            correction.rules = rules
         return CellAdmixCollectionCorrection(self, name, corrections, rules=rules)
+
+    def _member_summary(self, sample: str, member: int) -> pd.DataFrame:
+        """One ensemble member's score summary in one sample, with the same
+        method and parameters as the primary score; persisted in the sample's
+        run so re-corrections reuse it."""
+        fit = self.consensus.fits[sample]
+        score = self.sample_scores[sample]
+        from .dataset import _annotation_hash
+
+        key = "|".join([self.method, str(member), _annotation_hash(fit.dataset.annotation),
+                        repr(sorted(score.params.items()))])
+        cache_dir = fit.run_path / "scores"
+        cache_dir.mkdir(exist_ok=True)
+        path = cache_dir / f"collection_member_summary_{self.method}_m{member}.pkl"
+        if path.exists():
+            try:
+                stored = pd.read_pickle(path)
+            except Exception:
+                stored = None
+            if stored is not None and stored.get("key") == key:
+                return stored["summary"]
+        summary = score._score_member(member).summary
+        pd.to_pickle({"key": key, "summary": summary}, path)
+        return summary
+
+    def _member_cell_factors(self, fit, member: int) -> pd.DataFrame:
+        """Cell factor fractions of a run under one member's labeling."""
+        from . import _core
+
+        raw = _core.ensemble_member_fractions(str(fit.run_path), int(member))
+        fr = raw["fractions"]
+        cells = fit.cell_factors()
+        frame = pd.DataFrame(np.asarray(fr["data"], dtype=float).reshape(fr["rows"], fr["cols"]),
+                             columns=[f"factor_{k + 1}_fraction" for k in range(fr["cols"])])
+        frame["cell_id"] = [str(c) for c in raw["cell_id"]]
+        return cells.drop(columns=[c for c in cells.columns if c.endswith("_fraction")]).merge(
+            frame, on="cell_id", how="left")
+
+    def _pooled_member_rules(self, members, selected, primary_rules, *, p_thresh, adjust_p, targets) -> dict:
+        """Per-member rule sets for the shared molecule-vote ensemble: each
+        member's summaries from every sample are pooled like the primary
+        summaries, thresholded, vetted by the pooled native-factor check on
+        the member's own cell factor fractions, and restricted to the primary
+        rules' source -> target pairs."""
+        from ._score_utils import rules_from_annotation, score_annotation
+
+        def pair_keys(df):
+            return set(zip(df["source_cell_type"].astype(str), df["target_cell_type"].astype(str)))
+
+        restrict = pair_keys(primary_rules)
+        frames, frame_members, pair_sets = [], [], {}
+        for member in members:
+            if member == selected:
+                member_df = primary_rules
+            else:
+                summaries = [self._member_summary(s, member).assign(sample=s) for s in self.sample_scores]
+                summaries = [f for f in summaries if len(f)]
+                pooled = _pool_score_summaries(pd.concat(summaries, ignore_index=True)) if summaries else pd.DataFrame()
+                if pooled.empty:
+                    member_df = primary_rules.iloc[0:0]
+                else:
+                    member_df = rules_from_annotation(score_annotation(pooled, p_thresh=p_thresh, adjust_p=adjust_p),
+                                                      target_cell_types=targets)
+                    if not member_df.empty:
+                        member_df = self._pooled_native_check(
+                            member_df, 0.1, 0.05, 0.1, 15,
+                            cell_factors_fn=lambda fit, m=member: self._member_cell_factors(fit, m))
+                        member_df = member_df[member_df["keep"].fillna(True).astype(bool)]
+            if len(member_df):
+                keys = list(zip(member_df["source_cell_type"].astype(str), member_df["target_cell_type"].astype(str)))
+                member_df = member_df[[k in restrict for k in keys]]
+            pair_sets[member] = pair_keys(member_df) if len(member_df) else set()
+            if len(member_df):
+                frames.append(member_df[["factor", "target_cell_type"]])
+                frame_members.extend([int(member)] * len(member_df))
+        rules = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=["factor", "target_cell_type"])
+        return {"rules": rules, "member": frame_members, "pair_sets": pair_sets}
 
     def _add_sample_support(self, rules: pd.DataFrame, p_thresh: float) -> pd.DataFrame:
         """Fraction of samples whose own summary reaches p_thresh for the
@@ -436,17 +566,22 @@ class CellAdmixCollectionScore:
         rules["samples_significant"] = names
         return rules
 
-    def _pooled_native_check(self, rules, median_thresh, expr_thresh, outlier_min_frac, neighbor_k):
+    def _pooled_native_check(self, rules, median_thresh, expr_thresh, outlier_min_frac, neighbor_k,
+                             cell_factors_fn=None):
         """Source exposure computed within each sample and stacked, so the
-        check's statistics pool the samples without neighborhoods crossing."""
+        check's statistics pool the samples without neighborhoods crossing.
+        ``cell_factors_fn`` supplies the per-sample cell factor fractions: the
+        run's own (default) or one ensemble member's."""
         from ._score_utils import apply_native_check, source_exposure_counts
 
+        if cell_factors_fn is None:
+            cell_factors_fn = lambda fit: fit.cell_factors()  # noqa: E731
         fits = self.consensus.fits
         annotations = {s: fit.dataset.annotation for s, fit in fits.items()}
         types = sorted({str(t) for ann in annotations.values() for t in ann.dropna().unique()})
         cell_frames, count_blocks, ann_parts = [], [], []
         for s, fit in fits.items():
-            cells = fit.cell_factors().copy()
+            cells = cell_factors_fn(fit).copy()
             counts, _ = source_exposure_counts(cells, annotations[s], neighbor_k=neighbor_k, types=types)
             cells["cell_id"] = s + "_" + cells["cell_id"].astype(str)
             ann = annotations[s].copy()
@@ -720,6 +855,24 @@ def _training_loss(run_path: str, profiles: pd.DataFrame, num_threads: int = 1) 
     return float(_core.training_loss(
         run_path, profiles.to_numpy(dtype=float).ravel(order="C").tolist(),
         int(profiles.shape[0]), [str(g) for g in profiles.columns], int(num_threads)))
+
+
+def _interleave(lists: list) -> list:
+    """Round-robin interleaving of several lists (one per sample) into one."""
+    lists = [items for items in lists if items]
+    out = []
+    for i in range(max((len(items) for items in lists), default=0)):
+        for items in lists:
+            if i < len(items):
+                out.append(items[i])
+    return out
+
+
+def _profiles_hash(profiles: pd.DataFrame, members: list) -> str:
+    """Content hash of shared profiles together with their member pool, so a
+    cached fixed-profile run is reused only for the same profiles and members."""
+    stacked = pd.concat([profiles] + [m[list(profiles.columns)] for m in members]) if members else profiles
+    return _matrix_hash(stacked)
 
 
 def _matrix_hash(frame: pd.DataFrame) -> str:
