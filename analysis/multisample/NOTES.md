@@ -1023,14 +1023,56 @@ measure except separate processing's removal fraction, which it pays for
 with lost concordance. For multi-sample work the stable variant is the
 one to use; documented as the remedy when the shared-factor flag fires.
 
-## Closing summary, Loops 9 to 12 (2026-11-02)
+## Loop 13 (2026-11-02): concurrent per-sample correction steps
+
+Observe. Stage timing of the eight-tile collection correction on the
+cached consensus run (8 threads per dataset, thread budget 64, votes one
+tile after another): primary scoring 10.4 min; member scoring of the 72
+(sample, member) jobs with 8 concurrent workers 18.1 min; pooled member
+rules with the native-factor check 4.2 min; the eight votes 0.6 to 1.1
+min each, 6.6 min in all. The run removed exactly the molecules the Loop
+11 run removed in every tile, so member scoring is deterministic.
+Correction to Loop 11: the votes are not where the 68 minutes went. That
+correction ran at a load near 180 on 64 cores alongside the eight
+separate-tile arms, and member scoring is the dominant stage at any load.
+
+Correction to Loop 11 and to the open decisions: the per-sample candidate
+budget is not one eighth of a single-sample budget. The allocation shares
+sum to the number of samples, so every sample receives a full
+single-sample budget scaled by its relative size (rep1_t1 received 1122
+candidate pairs per type pair against the single-sample 1000). Single-tile
+support is sparse because a tile holds fewer cells, and fewer cells of
+each type pair, than a section, not because of the cap.
+
+Act. The three per-sample steps of the correction run as independent jobs
+in forked worker processes within one thread budget: labeling each
+sample's molecules with every member (the dataset's threads per job),
+scoring every member in every sample (as before), and the vote in each
+sample (one thread per job). The number of concurrent jobs is the budget
+divided by the threads one job uses, capped at the job count; the budget
+is `num_threads` on `correct()`, by default `CELLADMIX_NUM_THREADS` or the
+available cores (the Python dataset default now honors the same variable,
+as R did). One job runner per binding (`.celladmix_run_jobs`, `_run_jobs`)
+raises a worker's error in the parent; tests cover the worker count, the
+environment default, and error propagation.
+
+Result. With the member summaries cached, the eight-tile correction takes
+5.7 min (pooled member rules 4.2, the eight votes concurrently about 1.1)
+against 11 min with sequential votes, and removes exactly the same
+molecules in every tile (rep1_t1 1,690,200 through rep2_t4 2,619,253). A
+cold correction is dominated by member scoring, which was already
+concurrent; its workers each run one scoring job with the dataset's
+threads, so a dataset created with fewer threads admits more concurrent
+jobs.
+
+## Closing summary, Loops 9 to 13 (2026-11-02)
 
 Delivered on `dev_multisample` (both bindings, tests green, docs
 current): consensus by pooled clustering of all restarts with the
 one-to-one constraint, the per-gene weighted median, the majority
 recurrence rule (default 0.5), the shared molecule-vote ensemble with
-concurrent voter scoring, per-sample diagnostics on the fit and the
-correction, a scale-invariant training loss for the KL variants, the
+concurrent per-sample labeling, member scoring, and votes, per-sample
+diagnostics on the fit and the correction, a scale-invariant training loss for the KL variants, the
 agent skills, and the cohort analysis scripts.
 
 Evidence. Two breast replicates: concordance 0.991 / 128 DE genes (0.988 /
@@ -1049,9 +1091,7 @@ threshold; the stable variant should be used.
 Open for the user: (1) on cohorts, whether a rule should apply in a
 sample only where the sample's own restarts carry the program (a presence
 condition, leaving true replicates untouched), or whether a minimum
-sample coverage should be required for a shared program, or neither;
-(2) running the per-sample votes concurrently, as the voter scoring is
-(the eight-tile correction took 68 minutes, mostly in the sequential
-votes); (3) whether the candidate budget should grow with the sample
-count (one tile's budget is one eighth of a single-sample budget under
-proportional allocation; single-tile rule support was sparse).
+sample coverage should be required for a shared program, or neither.
+Resolved in Loop 13: the per-sample steps of the correction run
+concurrently, and the candidate budget already scales with the sample
+count (one single-sample budget per sample, scaled by relative size).
