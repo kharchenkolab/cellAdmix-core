@@ -99,6 +99,26 @@ applied everywhere, and the column says so. The native-factor check runs
 on the pooled rules with source exposure computed within each sample and
 the per-cell statistics stacked, so neighborhoods never cross samples.
 
+Every molecule of every sample is labeled with the shared program that
+fits it best, so a program absent from a sample still receives labels
+there, and those labels mark the cells' own molecules rather than the
+program. A rule on such a program, derived from the samples that do have
+it, removes native expression in the samples that do not. The rules carry
+`samples_without_program`, the samples none of whose own NMF restarts
+carries the rule's program. By default every rule is applied in every
+sample (`apply_rules = "everywhere"` on `correct()`), which treats
+replicates identically and is right when every program is present in
+every sample. With `apply_rules = "where_present"`, a rule is applied in a
+sample only when at least one of that sample's own restarts carries the
+program, so a sample is not cleaned of a program its own data never finds;
+with true replicates nothing changes, and with regional sections or a
+cohort the rules on regional programs are confined to the samples that
+have them. The condition rests on the sample's factorization, not on the
+correction outcome, and the skipped rules are counted per sample in the
+correction diagnostics. A program too weak for any restart of a sample to
+find may still contribute admixture there, which this option then leaves
+in place.
+
 Correction keeps the molecule-vote ensemble identical across samples,
 because the member-level scoring is the most seed-dependent step of the
 pipeline and pooling only the primary rules would leave it per sample.
@@ -176,24 +196,27 @@ flags that report rather than gate:
   shared space of reproducible programs can reconstruct an unstable
   variant's neighborhoods poorly and still remove admixture well, so the
   per-sample audit of the correction remains the arbiter of cleanup.
-- **Correction** (`diagnostics(report)`): the number of applied rules
-  that lack evidence from the sample itself (the sample is absent from the
-  rule's `samples_significant`) and the fraction of the sample's removed
-  molecules attributable to those rules; and the number of applied rules
-  whose program none of the sample's own restarts carries (zero recurrence
-  in that sample) and the fraction of its removed molecules attributable
-  to those. A removed molecule is attributed to the rule of its cell's
-  type and primary factor label. A high fraction in the first pair means
-  the sample's cleanup rests on other samples' evidence, which is the
-  intended uniform treatment of replicates but a point to examine when the
-  samples are not replicates; a high fraction in the second means the
-  sample is being cleaned of a program it does not have, whose labels in
-  that sample are nearest-factor artifacts, which happens when samples
-  differ in composition (regional sections, cohorts). Given the cleanup
-  report of the audit, the audit's leakage removed, median pair
-  sensitivity, and own-marker false removal are added per sample, with
-  `false_removal_flag` when a sample's false removal exceeds twice the
-  median across samples.
+- **Correction** (`diagnostics(report)`): the number of rules applied in
+  the sample (`rules_applied`); among them, the number that lack evidence
+  from the sample itself (the sample is absent from the rule's
+  `samples_significant`) and the fraction of the sample's removed
+  molecules attributable to those rules; and the number of rules whose
+  program none of the sample's own restarts carries (zero recurrence in
+  that sample), applied there under `apply_rules = "everywhere"` and
+  skipped under `"where_present"`, with the fraction of the sample's
+  removed molecules attributable to those. A removed molecule is
+  attributed to the rule of its cell's type and primary factor label. A
+  high fraction in the first pair means the sample's cleanup rests on
+  other samples' evidence, which is the intended uniform treatment of
+  replicates but a point to examine when the samples are not replicates; a
+  high fraction in the second means the sample is being cleaned of a
+  program it does not have, whose labels in that sample are nearest-factor
+  artifacts, which happens when samples differ in composition (regional
+  sections, cohorts) and is what `apply_rules = "where_present"` prevents.
+  Given the cleanup report of the audit, the audit's leakage removed,
+  median pair sensitivity, and own-marker false removal are added per
+  sample, with `false_removal_flag` when a sample's false removal exceeds
+  twice the median across samples.
 
 A sample that trips the shared-factor flag has many primary factors that
 no other restart reproduces, which happens when its own restarts disagree
@@ -227,6 +250,7 @@ consensus$matching                                   # each sample's primary fac
 score <- consensus$score_bridge()                    # per-sample scores, pooled summary
 rules <- score$rules()                               # pooled rules with sample_support
 correction <- score$correct(rules = rules)           # per-sample ensemble corrections
+score$correct(rules = rules, apply_rules = "where_present")  # skip rules on programs a sample lacks
 correction$summary()                                 # removal per cell type per sample
 correction$counts()                                  # combined; columns "<sample>_<cell_id>"
 correction$counts(sample = "rep1")                   # one sample, original cell ids

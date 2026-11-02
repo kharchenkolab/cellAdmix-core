@@ -127,6 +127,17 @@ class CollectionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "bad job"):
             _run_jobs(failing, [1, 2], workers=2)
 
+    def test_per_sample_rule_subset_keeps_rows_on_carried_programs(self):
+        from celladmix.collection import _rules_in_sample
+
+        rules = pd.DataFrame({"factor": [1, 2, 3, 2], "target_cell_type": ["T", "T", "U", "U"]})
+        subset = _rules_in_sample(rules, [0, 1, 1, 2], carried={2, 3})
+        self.assertEqual(list(subset["rules"]["factor"]), [2, 3, 2])
+        self.assertEqual(subset["member"], [1, 1, 2])
+        none = _rules_in_sample(rules, None, carried=set())
+        self.assertEqual(len(none["rules"]), 0)
+        self.assertIsNone(none["member"])
+
     def test_matching_and_training_loss(self):
         from celladmix.collection import _fit_profiles_raw, _match_factors, _training_loss
 
@@ -207,6 +218,29 @@ class CollectionTests(unittest.TestCase):
         self.assertEqual(correction.samples(), ["a", "b"])
         self.assertIn("support", correction.rules.columns)
         self.assertTrue(correction.rules["support"].between(0, 1).all())
+        self.assertEqual(correction.params["apply_rules"], "everywhere")
+        self.assertIn("samples_without_program", correction.rules.columns)
+
+        # Rules confined to the samples whose own restarts carry the program:
+        # identical where every program is present, skipped elsewhere.
+        present = score.correct(rules=rules, vote=0.3, apply_rules="where_present", name="present")
+        self.assertEqual(present.params["apply_rules"], "where_present")
+        recurrence = consensus.recurrence()
+        present_diagnostics = present.diagnostics().set_index("sample")
+        for s in ("a", "b"):
+            carried = set(recurrence[(recurrence["sample"] == s) & (recurrence["restarts"] > 0)]
+                          ["consensus_factor"].astype(int))
+            applied = int(rules["factor"].astype(int).isin(carried).sum())
+            self.assertEqual(int(present_diagnostics.loc[s, "rules_applied"]), applied)
+            self.assertEqual(int(present_diagnostics.loc[s, "rules_on_absent_programs"]), len(rules) - applied)
+            if applied == len(rules):
+                self.assertEqual(present.corrections[s].manifest.get("n_removed"),
+                                 correction.corrections[s].manifest.get("n_removed"))
+        # A sample with nothing to apply still yields a corrected run that removes nothing.
+        empty = consensus.fits["a"]._correct_run(rules.iloc[0:0], name="empty")
+        self.assertEqual(int(empty.get("n_removed", 0)), 0)
+        with self.assertRaises(ValueError):
+            score.correct(rules=rules, apply_rules="somewhere")
         diagnostics = consensus.diagnostics()
         self.assertEqual(list(diagnostics["sample"]), ["a", "b"])
         self.assertTrue({"loss_gap", "restart_spread", "representation_flag", "shared_fraction",

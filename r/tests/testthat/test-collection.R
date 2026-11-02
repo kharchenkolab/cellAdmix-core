@@ -76,6 +76,17 @@ test_that("worker counts follow the thread budget and jobs report their errors",
   expect_equal(run_jobs(character(0), identity, workers = 2L), list())
 })
 
+test_that("the per-sample rule subset keeps the rows on carried programs", {
+  rules <- data.frame(factor = c(1L, 2L, 3L, 2L), target_cell_type = c("T", "T", "U", "U"),
+    stringsAsFactors = FALSE)
+  subset <- cellAdmixCore:::.celladmix_rules_in_sample(rules, c(0L, 1L, 1L, 2L), carried = c(2L, 3L))
+  expect_equal(subset$rules$factor, c(2L, 3L, 2L))
+  expect_equal(subset$member, c(1L, 1L, 2L))
+  none <- cellAdmixCore:::.celladmix_rules_in_sample(rules, NULL, carried = integer(0))
+  expect_equal(nrow(none$rules), 0L)
+  expect_null(none$member)
+})
+
 test_that("factor matching and training loss are reachable from R", {
   ds <- make_sample_dataset(41L, "loss")
   fit <- do.call(ds$fit, c(list(annotation = "cell_type", run_id = "base", overwrite = TRUE), fit_args))
@@ -170,6 +181,31 @@ test_that("a consensus factorization pools two samples end to end", {
   expect_equal(correction$samples(), c("a", "b"))
   expect_true("support" %in% names(correction$rules))
   expect_true(all(correction$rules$support >= 0 & correction$rules$support <= 1))
+  expect_equal(correction$params$apply_rules, "everywhere")
+  expect_true("samples_without_program" %in% names(correction$rules))
+
+  # Rules confined to the samples whose own restarts carry the program:
+  # identical where every program is present, skipped elsewhere.
+  present <- score$correct(rules = rules, vote = 0.3, apply_rules = "where_present", name = "present")
+  expect_equal(present$params$apply_rules, "where_present")
+  recurrence <- consensus$recurrence()
+  present_diagnostics <- present$diagnostics()
+  for (sample in c("a", "b")) {
+    carried <- recurrence$consensus_factor[recurrence$sample == sample & recurrence$restarts > 0]
+    applied <- sum(as.integer(rules$factor) %in% carried)
+    expect_equal(present_diagnostics$rules_applied[present_diagnostics$sample == sample], applied)
+    expect_equal(present_diagnostics$rules_on_absent_programs[present_diagnostics$sample == sample],
+      nrow(rules) - applied)
+    if (applied == nrow(rules)) {
+      expect_equal(present$corrections[[sample]]$run$n_removed, correction$corrections[[sample]]$run$n_removed)
+    }
+  }
+  # A sample with nothing to apply still yields a corrected run that removes nothing.
+  fit_a <- consensus$fits[["a"]]
+  empty <- cellAdmixCore:::celladmix_correct(fit_a$run, rules = rules[0, , drop = FALSE],
+    out_dir = file.path(fit_a$run$paths$corrected_dir, "empty"),
+    annotation = score$sample_scores[["a"]]$annotation_vector())
+  expect_equal(as.numeric(empty$n_removed), 0)
   diagnostics <- consensus$diagnostics()
   expect_equal(diagnostics$sample, c("a", "b"))
   expect_true(all(c("loss_gap", "restart_spread", "representation_flag", "shared_fraction",

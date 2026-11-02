@@ -5,6 +5,12 @@
 \title{Per-Sample Corrections Under Shared Rules}
 \description{
 The corrections of every sample of a consensus fit under one pooled rule
-set, with per-sample and pooled removal summaries and combined or
-per-sample corrected counts.
+set, with per-sample and pooled removal summaries, combined or per-sample
+corrected counts, and per-sample diagnostics (\code{diagnostics()}): the rules
+applied to a sample without evidence from that sample, the rules whose
+program the sample's own restarts do not carry (applied there under
+\code{apply_rules = "everywhere"}, skipped under \code{"where_present"}), the share
+of the sample's removed molecules each accounts for, and, given a cleanup
+report, the audit's leakage removed and own-marker false removal.
+\code{params$apply_rules} records how the rules were applied.
 }

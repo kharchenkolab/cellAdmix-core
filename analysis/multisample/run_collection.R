@@ -9,8 +9,9 @@
 #                          joint stand-in's) with that run's restart pool
 # followed by scoring (bridge by default; CELLADMIX_SCORE=membrane selects
 # membrane scoring, CELLADMIX_VARIANT the per-sample NMF variant), pooled
-# rules, per-sample ensemble correction, and per-sample audits. Writes CSV
-# summaries under <out_dir>.
+# rules, per-sample ensemble correction (CELLADMIX_APPLY_RULES=where_present
+# skips, in each sample, the rules on programs its own restarts do not
+# carry), and per-sample audits. Writes CSV summaries under <out_dir>.
 #
 # Usage: Rscript run_collection.R <out_dir> <threads> <mode> [<mode arg>]
 #          <sample>=<bundle>=<annotation>=<separate_dir> ...
@@ -98,7 +99,8 @@ log_line("rules:", nrow(rules), "kept", sum(rules$keep),
   "fully supported", sum(rules$keep & rules$sample_support >= 1))
 
 t0 <- Sys.time()
-correction <- score$correct(rules = rules)
+correction <- score$correct(rules = rules,
+  apply_rules = Sys.getenv("CELLADMIX_APPLY_RULES", "everywhere"))
 log_line("correction done in", round(as.numeric(difftime(Sys.time(), t0, units = "mins")), 1), "min")
 write.csv(correction$summary(), file.path(out_dir, "correction_summary.csv"), row.names = FALSE)
 write.csv(correction$rules, file.path(out_dir, "correction_rules.csv"), row.names = FALSE)

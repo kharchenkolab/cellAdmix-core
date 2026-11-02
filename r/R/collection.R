@@ -562,7 +562,14 @@ CellAdmixConsensusFit <- R6::R6Class(
 #' `correct()` applies the rules with a molecule-vote ensemble shared across
 #' samples: every ensemble member is scored in every sample, its evidence is
 #' pooled like the primary evidence, and one member rule set votes in every
-#' sample. The per-sample steps of the correction (labeling each sample's
+#' sample. By default every rule is applied in every sample
+#' (`apply_rules = "everywhere"`); with `apply_rules = "where_present"` a
+#' rule is applied in a sample only when at least one of that sample's own
+#' NMF restarts carries the rule's program, so a sample is not cleaned of a
+#' program its own data never finds (the molecules labeled with it there are
+#' nearest-factor artifacts). The returned rules list the samples whose
+#' restarts do not carry each rule's program in `samples_without_program`.
+#' The per-sample steps of the correction (labeling each sample's
 #' molecules with every member, scoring every member in every sample, and
 #' the vote in each sample) are independent jobs that run concurrently in
 #' forked worker processes, as many at a time as fit a thread budget given
@@ -635,7 +642,9 @@ CellAdmixCollectionScore <- R6::R6Class(
     },
 
     correct = function(rules = NULL, name = NULL, p_thresh = 0.1, adjust_p = FALSE,
-                       targets = NULL, ensemble = NULL, vote = 0.3, num_threads = NULL, ...) {
+                       targets = NULL, ensemble = NULL, vote = 0.3,
+                       apply_rules = c("everywhere", "where_present"), num_threads = NULL, ...) {
+      apply_rules <- match.arg(apply_rules, c("everywhere", "where_present"))
       if (is.null(rules)) {
         rules <- self$rules(p_thresh = p_thresh, adjust_p = adjust_p, targets = targets)
       }
@@ -649,6 +658,18 @@ CellAdmixCollectionScore <- R6::R6Class(
       name <- .celladmix_clean_name(name %||% paste0(self$name, "_clean"), "correction")
       fits <- self$consensus$fits
       samples <- names(fits)
+
+      # The programs each sample's own restarts carry, from the consensus
+      # components (NULL for a fit whose profiles came from elsewhere).
+      carried <- private$carried_factors()
+      if (identical(apply_rules, "where_present") && is.null(carried)) {
+        stop("apply_rules = \"where_present\" needs a consensus fit, whose restart components tell which programs each sample carries")
+      }
+      if (!is.null(carried)) {
+        rules$samples_without_program <- vapply(as.integer(rules$factor), function(factor) {
+          paste(samples[!vapply(samples, function(s) factor %in% carried[[s]], logical(1))], collapse = ",")
+        }, character(1))
+      }
 
       # The molecule-vote ensemble is shared across samples: the member pool
       # is the same in every sample's run, each member is scored in every
@@ -673,15 +694,26 @@ CellAdmixCollectionScore <- R6::R6Class(
       min_votes <- max(1L, as.integer(ceiling(vote * length(members))))
       # The vote in each sample is an independent single-threaded job; the
       # samples are processed concurrently within the thread budget.
+      # The rule rows applied in a sample: all of them, or only those whose
+      # program the sample's own restarts carry.
+      in_sample <- function(sample) {
+        table <- if (is.null(member_rules)) kept else member_rules$rules
+        if (identical(apply_rules, "where_present")) {
+          .celladmix_rules_in_sample(table, member_rules$member, carried[[sample]])
+        } else {
+          list(rules = table, member = member_rules$member)
+        }
+      }
       corrected_runs <- .celladmix_run_jobs(samples, function(sample) {
         fit <- fits[[sample]]
         out_dir <- file.path(fit$run$paths$corrected_dir, name)
         annotation <- self$sample_scores[[sample]]$annotation_vector()
+        applied <- in_sample(sample)
         if (is.null(member_rules)) {
-          celladmix_correct(fit$run, rules = kept, out_dir = out_dir, annotation = annotation)
+          celladmix_correct(fit$run, rules = applied$rules, out_dir = out_dir, annotation = annotation)
         } else {
-          celladmix_correct(fit$run, rules = member_rules$rules, out_dir = out_dir,
-            annotation = annotation, rule_member = member_rules$member, min_votes = min_votes)
+          celladmix_correct(fit$run, rules = applied$rules, out_dir = out_dir,
+            annotation = annotation, rule_member = applied$member, min_votes = min_votes)
         }
       }, workers = .celladmix_parallel_workers(num_threads, 1L, length(samples)))
       corrections <- lapply(samples, function(sample) {
@@ -691,7 +723,8 @@ CellAdmixCollectionScore <- R6::R6Class(
           params = list(p_thresh = p_thresh, adjust_p = adjust_p, targets = targets,
             ensemble = max(1L, length(members)),
             vote = if (length(members) > 1L) vote else NA_real_,
-            pooled_members = !is.null(member_rules)),
+            pooled_members = !is.null(member_rules), apply_rules = apply_rules,
+            rule_rows_applied = nrow(in_sample(sample)$rules)),
           rules = rules)
         fit$corrections_registry[[name]] <- correction
         correction$save_metadata()
@@ -702,11 +735,13 @@ CellAdmixCollectionScore <- R6::R6Class(
         rules$support <- .celladmix_rule_support(rules, member_rules$pair_sets)
         removed <- vapply(corrections, function(x) as.numeric(x$run$n_removed %||% NA_real_), numeric(1))
         message(sprintf(
-          "Pooled ensemble correction over %d members shared by %d samples: molecules removed by >= %d members (vote >= %.2f) are dropped (%s).",
+          "Pooled ensemble correction over %d members shared by %d samples: molecules removed by >= %d members (vote >= %.2f) are dropped (%s)%s.",
           length(members), length(samples), min_votes, vote,
-          paste(sprintf("%s: %s", samples, format(removed, big.mark = ",")), collapse = ", ")))
+          paste(sprintf("%s: %s", samples, format(removed, big.mark = ",")), collapse = ", "),
+          if (identical(apply_rules, "where_present")) "; rules on programs a sample's restarts do not carry were skipped there" else ""))
       }
-      CellAdmixCollectionCorrection$new(self, name, corrections, rules = rules)
+      CellAdmixCollectionCorrection$new(self, name, corrections, rules = rules,
+        params = list(apply_rules = apply_rules))
     }
   ),
   private = list(
@@ -733,6 +768,20 @@ CellAdmixCollectionScore <- R6::R6Class(
         paste(sort(hits$sample[!is.na(hits$p_value) & hits$p_value < p_thresh]), collapse = ",")
       }, character(1))
       rules
+    },
+
+    # Per sample, the consensus factors that at least one of the sample's
+    # own restarts carries; NULL when the fit's profiles did not come from a
+    # consensus of the samples' restarts.
+    carried_factors = function() {
+      consensus <- self$consensus
+      if (!identical(consensus$params$source, "consensus")) {
+        return(NULL)
+      }
+      recurrence <- consensus$recurrence()
+      lapply(stats::setNames(nm = names(consensus$fits)), function(sample) {
+        as.integer(recurrence$consensus_factor[recurrence$sample == sample & recurrence$restarts > 0])
+      })
     },
 
     # Threads one job on a sample uses: the largest dataset thread count.
@@ -877,9 +926,12 @@ CellAdmixCollectionScore <- R6::R6Class(
 #' The corrections of every sample of a consensus fit under one pooled rule
 #' set, with per-sample and pooled removal summaries, combined or per-sample
 #' corrected counts, and per-sample diagnostics (`diagnostics()`): the rules
-#' applied to a sample without evidence from that sample, the share of its
-#' removed molecules they account for, and, given a cleanup report, the
-#' audit's leakage removed and own-marker false removal.
+#' applied to a sample without evidence from that sample, the rules whose
+#' program the sample's own restarts do not carry (applied there under
+#' `apply_rules = "everywhere"`, skipped under `"where_present"`), the share
+#' of the sample's removed molecules each accounts for, and, given a cleanup
+#' report, the audit's leakage removed and own-marker false removal.
+#' `params$apply_rules` records how the rules were applied.
 #' @export
 CellAdmixCollectionCorrection <- R6::R6Class(
   "CellAdmixCollectionCorrection",
@@ -888,12 +940,14 @@ CellAdmixCollectionCorrection <- R6::R6Class(
     name = NULL,
     corrections = NULL,
     rules = NULL,
+    params = NULL,
 
-    initialize = function(score, name, corrections, rules = NULL) {
+    initialize = function(score, name, corrections, rules = NULL, params = list()) {
       self$score <- score
       self$name <- name
       self$corrections <- corrections
       self$rules <- rules
+      self$params <- params
     },
 
     print = function(...) {
@@ -907,17 +961,18 @@ CellAdmixCollectionCorrection <- R6::R6Class(
     samples = function() names(self$corrections),
 
     diagnostics = function(report = NULL) {
-      # One row per sample: the number of applied rules that lack local
-      # evidence (the sample is absent from the rule's `samples_significant`)
-      # and the fraction of the sample's removed molecules attributable to
-      # them; the number of applied rules whose program none of the sample's
-      # own restarts carries and the fraction of its removed molecules
-      # attributable to those (a removed molecule is attributed to the rule
-      # of its cell's type and its primary factor label); and, when a cleanup
-      # report is given, the audit's leakage removed, median pair
-      # sensitivity, and own-marker false removal, with `false_removal_flag`
-      # when a sample's false removal exceeds twice the median across
-      # samples. Flags are reports.
+      # One row per sample: the number of rules applied in the sample; among
+      # them, the number that lack local evidence (the sample is absent from
+      # the rule's `samples_significant`) and the fraction of the sample's
+      # removed molecules attributable to them; the number of rules whose
+      # program none of the sample's own restarts carries (applied there
+      # under apply_rules = "everywhere", skipped under "where_present") and
+      # the fraction of its removed molecules attributable to those (a
+      # removed molecule is attributed to the rule of its cell's type and its
+      # primary factor label); and, when a cleanup report is given, the
+      # audit's leakage removed, median pair sensitivity, and own-marker
+      # false removal, with `false_removal_flag` when a sample's false
+      # removal exceeds twice the median across samples. Flags are reports.
       rules <- self$rules
       if (!is.null(rules) && "keep" %in% names(rules)) {
         rules <- rules[is.na(rules$keep) | rules$keep, , drop = FALSE]
@@ -925,6 +980,7 @@ CellAdmixCollectionCorrection <- R6::R6Class(
       consensus <- self$score$consensus
       fits <- consensus$fits
       recurrence <- if (identical(consensus$params$source, "consensus")) consensus$recurrence() else NULL
+      where_present <- identical(self$params$apply_rules, "where_present")
       out <- do.call(rbind, lapply(names(self$corrections), function(sample) {
         removed <- .celladmix_removed_by_type_factor(fits[[sample]], self$corrections[[sample]])
         total <- sum(removed$removed)
@@ -940,16 +996,21 @@ CellAdmixCollectionCorrection <- R6::R6Class(
             paste(removed$cell_type, removed$factor, sep = "\r"))]
           sum(mass, na.rm = TRUE) / max(total, 1)
         }
-        significant <- as.character(rules$samples_significant %||% rep("", nrow(rules)))
-        significant[is.na(significant)] <- ""
-        has_local <- vapply(strsplit(significant, ",", fixed = TRUE), function(x) sample %in% x, logical(1))
-        without <- rules[!has_local, , drop = FALSE]
         absent <- NULL
+        applied <- rules
         if (!is.null(recurrence)) {
           carried <- recurrence$consensus_factor[recurrence$sample == sample & recurrence$restarts > 0]
-          absent <- rules[!(as.integer(rules$factor) %in% carried), , drop = FALSE]
+          on_carried <- as.integer(rules$factor) %in% carried
+          absent <- rules[!on_carried, , drop = FALSE]
+          if (where_present) {
+            applied <- rules[on_carried, , drop = FALSE]
+          }
         }
-        data.frame(sample = sample, rules_applied = nrow(rules),
+        significant <- as.character(applied$samples_significant %||% rep("", nrow(applied)))
+        significant[is.na(significant)] <- ""
+        has_local <- vapply(strsplit(significant, ",", fixed = TRUE), function(x) sample %in% x, logical(1))
+        without <- applied[!has_local, , drop = FALSE]
+        data.frame(sample = sample, rules_applied = nrow(applied),
           rules_without_local_evidence = nrow(without),
           removed_without_local_evidence = attributed(without),
           rules_on_absent_programs = if (is.null(absent)) NA_integer_ else nrow(absent),
@@ -1368,6 +1429,14 @@ CellAdmixCollectionCleanupReport <- R6::R6Class(
     names(results) <- items
   }
   results
+}
+
+# The rule rows applied in one sample under apply_rules = "where_present":
+# those whose program is among `carried`, the factors the sample's own
+# restarts carry; `member` (one entry per row, or NULL) is subset alongside.
+.celladmix_rules_in_sample <- function(rules, member, carried) {
+  rows <- as.integer(rules$factor) %in% as.integer(carried)
+  list(rules = rules[rows, , drop = FALSE], member = member[rows])
 }
 
 # Round-robin interleaving of several lists (a list per sample) into one.

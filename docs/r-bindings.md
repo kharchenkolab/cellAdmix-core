@@ -372,14 +372,17 @@ score <- consensus$score_bridge()
 rules <- score$rules()            # pooled evidence, sample_support per rule
 correction <- score$correct(rules = rules)
 correction$counts(sample = "rep1")
+score$correct(rules = rules, apply_rules = "where_present")  # cohorts: skip rules on programs a sample lacks
 ```
 
 The consensus factorization pools the factors of every restart of every
-sample, clusters them into recurring programs, averages each program into
-a shared profile, and projects every sample onto the shared profiles;
-scoring pools the per-sample evidence into one rule set with per-sample
-support; correction votes with one ensemble of restarts shared by all
-samples; the audit runs per sample. Per-factor coverage and recurrence
+sample, clusters them into recurring programs, takes the per-gene median
+of each program as its shared profile, and projects every sample onto the
+shared profiles; scoring pools the per-sample evidence into one rule set
+with per-sample support; correction votes with one ensemble of restarts
+shared by all samples, applying every rule in every sample unless
+`apply_rules = "where_present"` confines each rule to the samples whose
+own restarts carry its program; the audit runs per sample. Per-factor coverage and recurrence
 tables and a loss-gap table show how well the shared space represents each
 sample. See
 [multisample.md](multisample.md) for the method and the diagnostics.

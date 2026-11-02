@@ -16,7 +16,14 @@ gate.
 \code{correct()} applies the rules with a molecule-vote ensemble shared across
 samples: every ensemble member is scored in every sample, its evidence is
 pooled like the primary evidence, and one member rule set votes in every
-sample. The per-sample steps of the correction (labeling each sample's
+sample. By default every rule is applied in every sample
+(\code{apply_rules = "everywhere"}); with \code{apply_rules = "where_present"} a
+rule is applied in a sample only when at least one of that sample's own
+NMF restarts carries the rule's program, so a sample is not cleaned of a
+program its own data never finds (the molecules labeled with it there are
+nearest-factor artifacts). The returned rules list the samples whose
+restarts do not carry each rule's program in \code{samples_without_program}.
+The per-sample steps of the correction (labeling each sample's
 molecules with every member, scoring every member in every sample, and
 the vote in each sample) are independent jobs that run concurrently in
 forked worker processes, as many at a time as fit a thread budget given

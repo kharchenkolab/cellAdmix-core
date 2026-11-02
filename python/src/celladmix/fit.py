@@ -345,14 +345,15 @@ class CellAdmixFit:
         ensemble member (see :meth:`CellAdmixScore.correct`); a molecule is
         removed when at least ``min_votes`` members remove it.
         """
+        if rules.empty:
+            raise ValueError("rules table is empty")
         manifest = self._correct_run(rules, name=name, rule_members=rule_members, min_votes=min_votes)
         return self._make_correction(name, manifest, rules)
 
     def _correct_run(self, rules: pd.DataFrame, *, name: str, rule_members=None,
                      min_votes: int = 1) -> dict:
-        """Write the corrected run and return its manifest."""
-        if rules.empty:
-            raise ValueError("rules table is empty")
+        """Write the corrected run and return its manifest; an empty rule
+        table writes the run unchanged."""
         cell_ids, labels = annotation_vectors(self.dataset.annotation)
         return _core.correct_run(
             str(self.run_path),

@@ -495,13 +495,22 @@ class CellAdmixCollectionScore:
 
     def correct(self, rules=None, *, name: Optional[str] = None, p_thresh: float = 0.1,
                 adjust_p: bool = False, targets=None, ensemble: Optional[int] = None,
-                vote: float = 0.3, num_threads: Optional[int] = None):
+                vote: float = 0.3, apply_rules: str = "everywhere",
+                num_threads: Optional[int] = None):
         """Apply the pooled rules to every sample.
 
         The molecule-vote ensemble is shared across samples: the member pool
         is the same in every sample's run, each member is scored in every
         sample, its evidence pooled like the primary evidence, and one member
-        rule set votes in every sample. The per-sample steps (labeling each
+        rule set votes in every sample. By default every rule is applied in
+        every sample (``apply_rules="everywhere"``); with
+        ``apply_rules="where_present"`` a rule is applied in a sample only
+        when at least one of that sample's own NMF restarts carries the
+        rule's program, so a sample is not cleaned of a program its own data
+        never finds (the molecules labeled with it there are nearest-factor
+        artifacts). The returned rules list the samples whose restarts do not
+        carry each rule's program in ``samples_without_program``. The
+        per-sample steps (labeling each
         sample's molecules with every member, scoring every member in every
         sample, and the vote in each sample) are independent jobs that run
         concurrently in forked worker processes, as many at a time as fit a
@@ -513,8 +522,11 @@ class CellAdmixCollectionScore:
 
         from . import _core
 
+        if apply_rules not in ("everywhere", "where_present"):
+            raise ValueError("apply_rules must be 'everywhere' or 'where_present'")
         if rules is None:
             rules = self.rules(p_thresh=p_thresh, adjust_p=adjust_p, targets=targets)
+        rules = rules.copy()
         kept = rules
         if "keep" in getattr(kept, "columns", ()):
             kept = kept[kept["keep"].fillna(True).astype(bool)]
@@ -523,6 +535,16 @@ class CellAdmixCollectionScore:
         name = name or f"{self.name}_clean"
         fits = self.consensus.fits
         samples = list(fits)
+
+        # The programs each sample's own restarts carry, from the consensus
+        # components (None for a fit whose profiles came from elsewhere).
+        carried = self._carried_factors()
+        if apply_rules == "where_present" and carried is None:
+            raise ValueError("apply_rules='where_present' needs a consensus fit, whose restart "
+                             "components tell which programs each sample carries")
+        if carried is not None:
+            rules["samples_without_program"] = [
+                ",".join(s for s in samples if int(f) not in carried[s]) for f in rules["factor"]]
 
         ensemble = 10 if ensemble is None else max(1, int(ensemble))
         member_rules = None
@@ -539,30 +561,53 @@ class CellAdmixCollectionScore:
                                                          adjust_p=adjust_p, targets=targets,
                                                          num_threads=num_threads)
         min_votes = max(1, math.ceil(vote * len(members))) if members else 1
+        # The rule rows applied in a sample: all of them, or only those whose
+        # program the sample's own restarts carry.
+        def in_sample(s):
+            table = kept if member_rules is None else member_rules["rules"]
+            member = None if member_rules is None else member_rules["member"]
+            if apply_rules == "where_present":
+                return _rules_in_sample(table, member, carried[s])
+            return {"rules": table, "member": member}
+
+        def vote_in_sample(s):
+            applied = in_sample(s)
+            if member_rules is None:
+                return fits[s]._correct_run(applied["rules"], name=name)
+            return fits[s]._correct_run(applied["rules"], name=name, rule_members=applied["member"],
+                                        min_votes=min_votes)
+
         # The vote in each sample is an independent single-threaded job; the
         # samples are processed concurrently within the thread budget.
-        if member_rules is None:
-            vote_args = dict(rules=kept)
-        else:
-            vote_args = dict(rules=member_rules["rules"], rule_members=member_rules["member"],
-                             min_votes=min_votes)
-        manifests = _run_jobs(
-            lambda s: fits[s]._correct_run(name=name, **vote_args), samples,
-            workers=_parallel_workers(num_threads, 1, len(samples)))
-        corrections = {s: fits[s]._make_correction(name, manifest, vote_args["rules"])
+        manifests = _run_jobs(vote_in_sample, samples,
+                              workers=_parallel_workers(num_threads, 1, len(samples)))
+        corrections = {s: fits[s]._make_correction(name, manifest, in_sample(s)["rules"])
                        for s, manifest in zip(samples, manifests)}
-        rules = rules.copy()
         if member_rules is not None:
             from .score import _rule_support
 
             rules["support"] = _rule_support(rules, member_rules["pair_sets"])
             removed = ", ".join(f"{s}: {c.manifest.get('n_removed', 0):,}" for s, c in corrections.items())
+            skipped = ("; rules on programs a sample's restarts do not carry were skipped there"
+                       if apply_rules == "where_present" else "")
             print(f"Pooled ensemble correction over {len(members)} members shared by {len(samples)} "
                   f"samples: molecules removed by >= {min_votes} members (vote >= {vote:.2f}) are "
-                  f"dropped ({removed}).")
+                  f"dropped ({removed}){skipped}.")
         for correction in corrections.values():
             correction.rules = rules
-        return CellAdmixCollectionCorrection(self, name, corrections, rules=rules)
+        return CellAdmixCollectionCorrection(self, name, corrections, rules=rules,
+                                             params={"apply_rules": apply_rules})
+
+    def _carried_factors(self):
+        """Per sample, the consensus factors at least one of the sample's own
+        restarts carries; None when the fit's profiles did not come from a
+        consensus of the samples' restarts."""
+        consensus = self.consensus
+        if consensus.params.get("source") != "consensus":
+            return None
+        recurrence = consensus.recurrence()
+        return {s: set(recurrence[(recurrence["sample"] == s) & (recurrence["restarts"] > 0)]
+                       ["consensus_factor"].astype(int)) for s in consensus.fits}
 
     def _member_summary(self, sample: str, member: int) -> pd.DataFrame:
         """One ensemble member's score summary in one sample, with the same
@@ -730,13 +775,15 @@ class CellAdmixCollectionScore:
 
 
 class CellAdmixCollectionCorrection:
-    """The corrections of every sample under one pooled rule set."""
+    """The corrections of every sample under one pooled rule set;
+    ``params["apply_rules"]`` records how the rules were applied."""
 
-    def __init__(self, score, name, corrections, rules=None):
+    def __init__(self, score, name, corrections, rules=None, params=None):
         self.score = score
         self.name = name
         self.corrections = corrections
         self.rules = rules
+        self.params = dict(params or {})
 
     def __repr__(self) -> str:
         removed = {s: c.manifest.get("n_removed") for s, c in self.corrections.items()}
@@ -746,23 +793,26 @@ class CellAdmixCollectionCorrection:
         return list(self.corrections)
 
     def diagnostics(self, report=None) -> pd.DataFrame:
-        """One row per sample: the number of applied rules that lack local
-        evidence (the sample is absent from the rule's ``samples_significant``)
-        and the fraction of the sample's removed molecules attributable to
-        them; the number of applied rules whose program none of the sample's
-        own restarts carries and the fraction of its removed molecules
+        """One row per sample: the number of rules applied in the sample;
+        among them, the number that lack local evidence (the sample is absent
+        from the rule's ``samples_significant``) and the fraction of the
+        sample's removed molecules attributable to them; the number of rules
+        whose program none of the sample's own restarts carries (applied
+        there under ``apply_rules="everywhere"``, skipped under
+        ``"where_present"``) and the fraction of its removed molecules
         attributable to those (a removed molecule is attributed to the rule
         of its cell's type and its primary factor label); and, when a cleanup
-        report is given,
-        the audit's leakage removed, median pair sensitivity, and own-marker
-        false removal, with ``false_removal_flag`` when a sample's false
-        removal exceeds twice the median across samples. Flags are reports."""
+        report is given, the audit's leakage removed, median pair
+        sensitivity, and own-marker false removal, with
+        ``false_removal_flag`` when a sample's false removal exceeds twice
+        the median across samples. Flags are reports."""
         rules = self.rules
         if rules is not None and "keep" in rules.columns:
             rules = rules[rules["keep"].fillna(True).astype(bool)]
         consensus = self.score.consensus
         fits = consensus.fits
         recurrence = consensus.recurrence() if consensus.params.get("source") == "consensus" else None
+        where_present = self.params.get("apply_rules") == "where_present"
         rows = []
         for s, correction in self.corrections.items():
             removed = _removed_by_type_factor(fits[s], correction)
@@ -777,15 +827,19 @@ class CellAdmixCollectionCorrection:
             def attributed(subset):
                 return sum(lookup.get((str(t), int(f)), 0.0) for t, f in zip(subset["target_cell_type"], subset["factor"])) / max(total, 1.0)
 
-            significant = rules["samples_significant"].fillna("").astype(str) if "samples_significant" in rules.columns \
-                else pd.Series([""] * len(rules), index=rules.index)
-            has_local = significant.map(lambda x: s in x.split(",") if x else False).to_numpy(dtype=bool)
-            without = rules[~has_local]
             absent = None
+            applied = rules
             if recurrence is not None:
                 carried = set(recurrence[(recurrence["sample"] == s) & (recurrence["restarts"] > 0)]["consensus_factor"].astype(int))
-                absent = rules[~rules["factor"].astype(int).isin(carried)]
-            rows.append({"sample": s, "rules_applied": int(len(rules)),
+                on_carried = rules["factor"].astype(int).isin(carried).to_numpy(dtype=bool)
+                absent = rules[~on_carried]
+                if where_present:
+                    applied = rules[on_carried]
+            significant = applied["samples_significant"].fillna("").astype(str) if "samples_significant" in applied.columns \
+                else pd.Series([""] * len(applied), index=applied.index)
+            has_local = significant.map(lambda x: s in x.split(",") if x else False).to_numpy(dtype=bool)
+            without = applied[~has_local]
+            rows.append({"sample": s, "rules_applied": int(len(applied)),
                          "rules_without_local_evidence": int(len(without)),
                          "removed_without_local_evidence": attributed(without),
                          "rules_on_absent_programs": int(len(absent)) if absent is not None else pd.NA,
@@ -1181,6 +1235,18 @@ def _parallel_workers(num_threads: Optional[int], per_job: int, n_jobs: int) -> 
                 budget = os.cpu_count() or 1
     budget = max(1, budget)
     return max(1, min(n_jobs, budget // max(1, per_job)))
+
+
+def _rules_in_sample(rules: pd.DataFrame, member, carried) -> dict:
+    """The rule rows applied in one sample under ``apply_rules="where_present"``:
+    those whose program is among ``carried``, the factors the sample's own
+    restarts carry; ``member`` (one entry per row, or None) is subset
+    alongside."""
+    rows = rules["factor"].astype(int).isin({int(f) for f in carried}).to_numpy(dtype=bool)
+    subset = rules[rows]
+    if member is None:
+        return {"rules": subset, "member": None}
+    return {"rules": subset, "member": [m for m, keep in zip(list(member), rows) if keep]}
 
 
 def _interleave(lists: list) -> list:
