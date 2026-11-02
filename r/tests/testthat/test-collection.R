@@ -80,7 +80,9 @@ test_that("a consensus factorization pools two samples end to end", {
   factors <- consensus$factors
   expect_equal(nrow(factors), nrow(profiles))
   expect_true(all(c("consensus_factor", "samples", "coverage", "restarts", "components",
-    "agreement", "multi_component_restarts") %in% names(factors)))
+    "agreement") %in% names(factors)))
+  # one factorization contributes at most one component to a shared factor
+  expect_true(all(factors$components == factors$restarts))
   expect_true(all(factors$restarts >= 2L))
   expect_true(all(factors$coverage > 0 & factors$coverage <= 1))
   recurrence <- consensus$recurrence()

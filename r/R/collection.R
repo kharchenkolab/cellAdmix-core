@@ -200,7 +200,7 @@ CellAdmixCollection <- R6::R6Class(
       factors <- data.frame(consensus_factor = seq_len(nrow(profiles)), cluster = NA_integer_,
         samples = samples_per_factor, coverage = samples_per_factor / length(state$samples),
         restarts = NA_integer_, components = NA_integer_, agreement = NA_real_,
-        multi_component_restarts = NA_integer_, stringsAsFactors = FALSE)
+        stringsAsFactors = FALSE)
       components <- data.frame(sample = matching$sample, restart = NA_integer_,
         factor = matching$sample_factor, group = NA_integer_, selected = TRUE,
         cluster = NA_integer_, agreement = NA_real_, consensus_factor = matching$consensus_factor,
@@ -1220,13 +1220,11 @@ CellAdmixCollectionCleanupReport <- R6::R6Class(
   row_sums <- rowSums(stacked)
   summary <- do.call(rbind, lapply(sort(unique(components$cluster)), function(k) {
     idx <- which(components$cluster == k)
-    per_group <- table(components$group[idx])
     data.frame(cluster = k,
       samples = length(unique(components$sample[idx])),
-      restarts = length(per_group),
+      restarts = length(unique(components$group[idx])),
       components = length(idx),
       agreement = if (length(idx) > 1L) mean(components$agreement[idx], na.rm = TRUE) else NA_real_,
-      multi_component_restarts = sum(per_group > 1L),
       mass = mean(row_sums[idx]),
       stringsAsFactors = FALSE)
   }))
@@ -1254,8 +1252,7 @@ CellAdmixCollectionCleanupReport <- R6::R6Class(
   factors <- data.frame(consensus_factor = seq_len(nrow(reproduced)), cluster = reproduced$cluster,
     samples = reproduced$samples, coverage = reproduced$samples / length(pools),
     restarts = reproduced$restarts, components = reproduced$components,
-    agreement = reproduced$agreement, multi_component_restarts = reproduced$multi_component_restarts,
-    stringsAsFactors = FALSE)
+    agreement = reproduced$agreement, stringsAsFactors = FALSE)
   rownames(factors) <- NULL
   unreproduced <- components[is.na(components$consensus_factor), , drop = FALSE]
   rownames(unreproduced) <- NULL

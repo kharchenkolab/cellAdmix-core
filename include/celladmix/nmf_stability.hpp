@@ -64,7 +64,10 @@ struct FactorClusterResult {
 // from; ownership shares are normalized within each group, so a gene's
 // loading is divided among the factors of one factorization. Clusters merge
 // while their average pairwise distance stays at or below
-// 1 - min_correlation. Deterministic: ties resolve by row order.
+// 1 - min_correlation, and never merge two clusters that both hold a factor
+// of the same factorization: one factorization finds a program once, so a
+// cluster is the one-to-one correspondence of a program across
+// factorizations. Deterministic: ties resolve by row order.
 FactorClusterResult cluster_factor_profiles(
     const DenseMatrix& profiles,
     const std::vector<int>& group,

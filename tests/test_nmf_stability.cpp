@@ -367,7 +367,33 @@ TEST_CASE("Profile clustering groups recurring programs across factorizations") 
   const auto rescaled = cluster_factor_profiles(scaled, group, 0.3);
   REQUIRE(rescaled.cluster == result.cluster);
 
-  // A permissive threshold merges everything; a strict one merges nothing.
-  REQUIRE_EQ(cluster_factor_profiles(pooled, group, -1.5).n_clusters, 1);
+  // A permissive threshold still never merges two factors of the same
+  // factorization, so the floor is the largest factorization (4 factors);
+  // a strict threshold merges nothing.
+  const auto permissive = cluster_factor_profiles(pooled, group, -1.5);
+  REQUIRE_EQ(permissive.n_clusters, 4);
+  for (std::size_t i = 0; i < group.size(); ++i) {
+    for (std::size_t j = i + 1; j < group.size(); ++j) {
+      if (group[i] == group[j]) {
+        REQUIRE(permissive.cluster[i] != permissive.cluster[j]);
+      }
+    }
+  }
   REQUIRE_EQ(cluster_factor_profiles(pooled, group, 1.5).n_clusters, 10);
+
+  // Two programs correlated above the cut but found side by side in the
+  // same factorizations stay separate: a factorization finds a program once.
+  const DenseMatrix split = from_rows({
+      {5.0, 4.0, 3.0, 0.0, 0.0, 0.0},
+      {4.0, 5.0, 0.0, 3.0, 0.0, 0.0},
+      {0.0, 0.0, 0.0, 0.0, 6.0, 6.0},
+      {5.2, 3.8, 3.1, 0.0, 0.0, 0.0},
+      {3.9, 5.1, 0.0, 2.9, 0.0, 0.0},
+      {0.0, 0.1, 0.0, 0.0, 6.2, 5.8}});
+  const std::vector<int> split_group = {0, 0, 0, 1, 1, 1};
+  const auto kept_apart = cluster_factor_profiles(split, split_group, -1.5);
+  REQUIRE_EQ(kept_apart.n_clusters, 3);
+  REQUIRE_EQ(kept_apart.cluster[0], kept_apart.cluster[3]);
+  REQUIRE_EQ(kept_apart.cluster[1], kept_apart.cluster[4]);
+  REQUIRE_EQ(kept_apart.cluster[2], kept_apart.cluster[5]);
 }

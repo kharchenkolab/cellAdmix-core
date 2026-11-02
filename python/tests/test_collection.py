@@ -113,7 +113,9 @@ class CollectionTests(unittest.TestCase):
         factors = consensus.factors
         self.assertEqual(len(factors), len(profiles))
         self.assertTrue({"consensus_factor", "samples", "coverage", "restarts", "components",
-                         "agreement", "multi_component_restarts"} <= set(factors.columns))
+                         "agreement"} <= set(factors.columns))
+        # one factorization contributes at most one component to a shared factor
+        self.assertTrue((factors["components"] == factors["restarts"]).all())
         self.assertTrue((factors["restarts"] >= 2).all())
         self.assertTrue(((factors["coverage"] > 0) & (factors["coverage"] <= 1)).all())
         recurrence = consensus.recurrence()

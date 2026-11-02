@@ -30,11 +30,14 @@ built from every restart of every sample.
    the representation used by the restart-stability diagnostic). The
    pooled factors are clustered by average linkage on the correlation of
    these profiles, merging while the mean correlation between clusters
-   stays at or above `match_min` (default 0.3). Each cluster gathers one
-   recurring program: the same program as found by different restarts
-   and in different samples. Samples and restarts enter symmetrically, so
-   the result does not depend on a reference sample or on a merge order,
-   and samples fitted at different ranks pose no difficulty.
+   stays at or above `match_min` (default 0.3) and never merging two
+   clusters that both hold a factor of the same restart: one restart finds
+   a program once, so a cluster is the one-to-one correspondence of a
+   program across restarts and samples, and two distinct programs that a
+   restart finds side by side stay separate however similar they are.
+   Samples and restarts enter symmetrically, so the result does not depend
+   on a reference sample or on a merge order, and samples fitted at
+   different ranks pose no difficulty.
 3. **Consensus profiles.** A cluster becomes a shared factor when its
    members come from at least `min_restarts` distinct restarts (default
    2), of any samples: a program found by a single random start is not
@@ -113,12 +116,10 @@ sample:
   one of its own restarts would.
 - **Factors** (`factors`): one row per shared factor with the number and
   fraction of samples contributing to its cluster (`samples`, `coverage`),
-  the number of distinct restarts and of components in the cluster
-  (`restarts`, `components`), the mean within-cluster ownership
-  correlation (`agreement`), and the number of restarts contributing more
-  than one component (`multi_component_restarts`, a sign that the cut
-  merged distinct programs). A factor whose coverage is one sample's share
-  is carried by that sample alone.
+  the number of restarts carrying it (`restarts`, equal to the number of
+  components since each restart contributes at most one), and the mean
+  within-cluster ownership correlation (`agreement`). A factor whose
+  coverage is one sample's share is carried by that sample alone.
 - **Recurrence** (`recurrence()`): per factor and sample, the number of
   that sample's restarts containing the program and the fraction of its
   restarts; zero marks a sample that does not carry the factor.
@@ -164,9 +165,14 @@ flags that report rather than gate:
   median across samples.
 
 A sample that trips the representation or shared-factor flag is one the
-consensus describes poorly; the remedies are, in order, a lower
-`match_min`, separate processing of that sample against the shared rules
-through `fit_profiles()`, or a joint factorization.
+pooled profiles describe poorly. This happens when a sample's own
+restarts disagree among themselves (low within-sample stability): the
+clusters then hold loosely related components whose average is a blurred
+profile, and neither a tighter nor a looser clustering cut repairs it.
+The remedies are projecting every sample onto one coherent decomposition,
+such as one sample's own profiles through `fit_profiles()`, choosing a
+more stable NMF variant or rank for the per-sample fits, or a joint
+factorization.
 
 ## Usage
 

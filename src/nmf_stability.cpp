@@ -226,9 +226,24 @@ FactorClusterResult cluster_factor_profiles(
   std::vector<int> size(nn_, 1);
   std::vector<bool> alive(nn_, true);
   std::vector<int> root(nn_);
+  // The factorizations represented in each cluster, as a membership vector
+  // over the distinct groups; two clusters sharing a factorization never merge.
+  std::vector<std::vector<char>> holds(nn_, std::vector<char>(groups.size(), 0));
   for (int i = 0; i < n; ++i) {
     root[static_cast<std::size_t>(i)] = i;
+    const auto g = std::lower_bound(groups.begin(), groups.end(), group[static_cast<std::size_t>(i)]);
+    holds[static_cast<std::size_t>(i)][static_cast<std::size_t>(g - groups.begin())] = 1;
   }
+  auto compatible = [&](int a, int b) {
+    const auto& ha = holds[static_cast<std::size_t>(a)];
+    const auto& hb = holds[static_cast<std::size_t>(b)];
+    for (std::size_t g = 0; g < ha.size(); ++g) {
+      if (ha[g] && hb[g]) {
+        return false;
+      }
+    }
+    return true;
+  };
   const double inf = std::numeric_limits<double>::infinity();
   std::vector<int> nn(nn_, -1);
   std::vector<double> nn_dist(nn_, inf);
@@ -236,7 +251,7 @@ FactorClusterResult cluster_factor_profiles(
     nn[static_cast<std::size_t>(i)] = -1;
     nn_dist[static_cast<std::size_t>(i)] = inf;
     for (int j = 0; j < n; ++j) {
-      if (j == i || !alive[static_cast<std::size_t>(j)]) {
+      if (j == i || !alive[static_cast<std::size_t>(j)] || !compatible(i, j)) {
         continue;
       }
       if (d(i, j) < nn_dist[static_cast<std::size_t>(i)]) {
@@ -278,6 +293,9 @@ FactorClusterResult cluster_factor_profiles(
     size[static_cast<std::size_t>(a)] += size[static_cast<std::size_t>(b)];
     alive[static_cast<std::size_t>(b)] = false;
     --clusters;
+    for (std::size_t g = 0; g < groups.size(); ++g) {
+      holds[static_cast<std::size_t>(a)][g] |= holds[static_cast<std::size_t>(b)][g];
+    }
     for (int i = 0; i < n; ++i) {
       if (root[static_cast<std::size_t>(i)] == b) {
         root[static_cast<std::size_t>(i)] = a;
@@ -291,7 +309,7 @@ FactorClusterResult cluster_factor_profiles(
       const int current = nn[static_cast<std::size_t>(k)];
       if (current == a || current == b) {
         refresh(k);
-      } else if (d(k, a) < nn_dist[static_cast<std::size_t>(k)]) {
+      } else if (compatible(k, a) && d(k, a) < nn_dist[static_cast<std::size_t>(k)]) {
         nn_dist[static_cast<std::size_t>(k)] = d(k, a);
         nn[static_cast<std::size_t>(k)] = a;
       }

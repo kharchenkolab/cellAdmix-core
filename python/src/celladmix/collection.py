@@ -157,7 +157,7 @@ class CellAdmixCollection:
             "cluster": pd.NA,
             "samples": [int(counts.get(k, 0)) for k in range(1, len(profiles) + 1)]})
         factors["coverage"] = factors["samples"] / len(state["samples"])
-        for column in ("restarts", "components", "agreement", "multi_component_restarts"):
+        for column in ("restarts", "components", "agreement"):
             factors[column] = pd.NA
         components = pd.DataFrame({
             "sample": matching["sample"], "restart": pd.NA, "factor": matching["sample_factor"],
@@ -1016,11 +1016,9 @@ def _consensus_profiles(pools: dict, weights: dict, selected: dict, *, match_min
     row_sums = stacked.sum(axis=1)
     rows = []
     for k, idx in components.groupby("cluster").indices.items():
-        per_group = components["group"].iloc[idx].value_counts()
         rows.append({"cluster": int(k), "samples": int(components["sample"].iloc[idx].nunique()),
-                     "restarts": int(len(per_group)), "components": int(len(idx)),
+                     "restarts": int(components["group"].iloc[idx].nunique()), "components": int(len(idx)),
                      "agreement": float(np.nanmean(components["agreement"].iloc[idx])) if len(idx) > 1 else np.nan,
-                     "multi_component_restarts": int((per_group > 1).sum()),
                      "mass": float(row_sums[idx].mean())})
     summary = pd.DataFrame(rows).sort_values(["samples", "restarts", "mass"], ascending=False, kind="stable")
     reproduced = summary[summary["restarts"] >= min_restarts].reset_index(drop=True)
@@ -1049,8 +1047,7 @@ def _consensus_profiles(pools: dict, weights: dict, selected: dict, *, match_min
         "coverage": reproduced["samples"] / len(pools),
         "restarts": reproduced["restarts"].astype(int),
         "components": reproduced["components"].astype(int),
-        "agreement": reproduced["agreement"],
-        "multi_component_restarts": reproduced["multi_component_restarts"].astype(int)})
+        "agreement": reproduced["agreement"]})
     unreproduced = components[components["consensus_factor"].isna()].reset_index(drop=True)
     frame = pd.DataFrame(consensus, index=[f"F{i + 1}" for i in range(len(reproduced))], columns=genes)
     return {"profiles": frame, "components": components, "factors": factors,

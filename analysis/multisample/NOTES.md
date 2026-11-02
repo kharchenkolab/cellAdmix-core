@@ -578,3 +578,109 @@ median. All flags report; none gates. Documented with the remedies in
 order (lower `match_min`, `fit_profiles()` for the sample, joint
 factorization). Positive control (a rank-10 profile set projected onto
 the rank-23 breast data) pending the end of the regression arms.
+
+Observed, pancreas (pooled clustering, `min_restarts` 2, cut 0.3; Loop 8
+pairwise construction in parentheses).
+
+Bridge, `ls_nmf` (9 factors per sample, 20 restarts pooled): 12 shared
+factors, 7 of them carried by every restart of both halves (agreement 0.68
+to 0.92), four more carried by 3 to 13 restarts (alternative
+decompositions found by a minority of restarts), one carried by one half
+only; a single unreproduced component. Loss gaps −0.1% and −0.4%
+(spreads 0.4% and 1.4%); member agreement 0.92. Cleanup: left 0.41 /
+0.59 at 1.1% false removal, 9.5% removed (0.43 / 0.66 at 3.2%, 11.9%);
+right 0.17 / 0.53 at 0.4%, 5.8% removed (0.35 / 0.56 at 3.4%, 13.2%).
+Concordance 0.920 / 415 (0.914 / 573; uncorrected 0.924 / 389; joint
+0.918 / 387). Less is removed, with far fewer own-marker losses, and the
+halves end as concordant as under the joint stand-in; the right half's
+leakage removal falls to the joint stand-in's level (0.17).
+
+Membrane, `invsqrt_kl`: 15 shared factors, 7 covering both halves (3 of
+them in 18 to 20 restarts, the rest in 2 to 10), 8 covering one half only
+(2 to 10 restarts), 58 unreproduced components of which 7 are primary
+factors with own-sample stability 0.05 to 0.27. Loss gaps +5.7% and
++9.1% against spreads 1.5% and 1.4%: the representation flag fires for
+both halves (Loop 8: 1.8% and 3.5%). Cleanup: left 0.74 / 0.95 at 1.6%
+(0.81 / 0.97 at 1.9%); right 0.45 / 0.93 at 0.4%, 17% removed (0.78 /
+0.98 at 3.0%, 33%). Concordance 0.941 / 364 (0.939 / 338).
+
+Interpretation. For the unstable variant every restart is a different,
+equally good local optimum (within-sample stability 0.37 to 0.47, restart
+spread 1.4%). Average-linkage clusters at the 0.3 cut have agreement 0.33
+to 0.55, and the mean of such loosely related components is a blurred
+profile that reconstructs the neighborhoods worse than any single
+restart would; the right half, whose primary factors are the least
+reproducible, loses half its cleanup. The pairwise construction averaged
+fewer, better-matched components (one per sample) and blurred less. The
+diagnostics table caught it (gap far above spread), which is what it is
+for. Next: compare, by the same loss gap, the cluster mean against the
+per-gene median, the medoid component, and an agreement-weighted mean,
+at cuts 0.3, 0.5, and 0.7 (`consensus_variants.R`); the pancreas bridge
+configuration serves as the control that should not change much.
+
+Observed, profile construction experiment (`consensus_variants.R`; loss gap
+per half under the shared profiles, restart spreads 0.4% / 1.4% bridge and
+1.5% / 1.4% membrane):
+
+| configuration | cut | factors | mean | median | medoid | agreement-weighted |
+|---|---|---|---|---|---|---|
+| bridge `ls_nmf` | 0.3 | 12 | −0.1% / −0.4% | −0.5% / +0.3% | 0.0% / +0.3% | −0.2% / −0.2% |
+| bridge `ls_nmf` | 0.5 | 14 | −0.8% / −0.7% | −1.1% / −0.1% | −0.3% / −0.2% | −0.8% / −0.5% |
+| bridge `ls_nmf` | 0.7 | 21 | −3.1% / −3.3% | −3.6% / −3.4% | −3.7% / −3.2% | −3.2% / −3.3% |
+| membrane `invsqrt_kl` | 0.3 | 15 | +5.7% / +9.1% | +4.0% / +4.3% | +21.6% / +19.8% | +3.7% / +6.1% |
+| membrane `invsqrt_kl` | 0.5 | 12 | +10.7% / +10.3% | +39% / +35% | +39% / +38% | +10.5% / +11.0% |
+| membrane `invsqrt_kl` | 0.7 | 5 | +98% / +270% | | | |
+
+Each half under the other half's primary profiles: bridge +2.2% / +2.8%;
+membrane, left under right's +8.7%, right under left's −2.6% (the left
+decomposition fits the right half's neighborhoods better than the right's
+own selected restart does).
+
+Interpretation. For the stable variant every construction is within the
+restart spread and the choice does not matter; more factors (a higher
+cut) lower the loss by over-completeness, not by better programs. For
+the unstable variant no construction from pooled clusters reaches the
+spread: the median and the agreement-weighted mean blur less than the
+mean, the medoid is worst because factors drawn from different restarts
+do not form one coherent decomposition, and a tighter cut discards most
+components as unreproduced (114 of 180 at 0.5) and leaves too few
+factors. What does represent both halves is one coherent decomposition:
+the left half's own profiles (gap 0 and −2.6%), which is the reference
+projection; its cleanup in Loop 8 (0.78 / 0.98 and 0.74 / 0.95) was also
+close to the pairwise construction's and well above the pooled mean's
+(0.74 / 0.95 and 0.45 / 0.93). Conclusion: averaging components is sound
+when the restarts agree (stable variants, the breast and bridge cases)
+and unsound when they do not; in the latter case a single decomposition
+chosen for how well it represents every sample, or a joint refinement of
+the profiles on the pooled training rows, is needed. The diagnostics
+table identifies the case (gap above spread; within-sample stability low).
+
+Observed, positive control for the diagnostics (`diagnostics_check.R`): the
+rank-10 primary profiles of replicate 1 projected onto both rank-23 breast
+replicates give loss gaps +8.4% and +9.0% against spreads 0.5% (the
+representation flag fires for both), 10 of 23 primary factors in the
+shared space (shared fraction 0.43, the shared-factor flag fires), usage
+divergence at most 0.05. Both flags fire when they should.
+
+Observed, breast under pooled clustering at cut 0.3 (projection stage of
+the Loop 9 arm): 24 shared factors, 20 covering both replicates, 4 from
+one replicate only with agreement 0.95 to 0.99; no unmatched primary
+factor; but loss gaps +1.5% and +1.2% against spreads 0.5%, so the
+representation flag fires, where the pairwise construction had −1.3% and
+−1.2%. The cause is visible in the factor table: several clusters gather
+up to 36 components from 20 restarts (15 restarts contributing two or
+more), with agreement 0.52 to 0.64; distinct programs that a restart
+finds side by side (correlated at 0.3 to 0.5) were merged, and their mean
+is a blur. The pairwise Hungarian construction cannot do this because it
+matches one to one.
+
+Act. The clustering now carries the one-to-one structure as a constraint:
+two clusters that both hold a factor of the same restart never merge
+(C++ `cluster_factor_profiles`, tested), so a shared factor is the
+one-to-one correspondence of a program across restarts and samples, and
+each restart contributes at most one component to it. The purity column
+is gone since it is always zero. The construction experiment and the
+breast loss check are rerun with the constraint; the running breast arm
+(unconstrained) is left to finish as the test of whether a fired
+representation flag predicts worse cleanup or concordance on true
+replicates.
