@@ -1015,11 +1015,12 @@ def _consensus_profiles(pools: dict, weights: dict, selected: dict, *, match_min
     any samples, and from at least a fraction ``min_recurrence`` of the
     restarts of some sample, becomes a consensus factor, and the remaining
     components are reported as unreproduced. The consensus profile of a cluster is the
-    weighted per-gene median of its unit-sum component profiles (each
-    sample's weight divided among its components in the cluster),
-    renormalized to unit sum and rescaled to the weighted mean of the
-    original row sums so that labeling sees the usual profile scale; the
-    median keeps the profile of a loosely agreeing cluster from blurring.
+    weighted per-gene median of its unit-sum component profiles (every
+    component weighted by its sample's weight, so a program found by more of
+    a sample's restarts carries more of that sample's evidence), renormalized
+    to unit sum and rescaled to the weighted mean of the original row sums so
+    that labeling sees the usual profile scale; the median keeps the profile
+    of a loosely agreeing cluster from blurring.
     Factors are ordered by the number of samples covered, then restarts,
     then profile mass."""
     genes = list(next(iter(pools.values()))[0].columns)
@@ -1056,9 +1057,7 @@ def _consensus_profiles(pools: dict, weights: dict, selected: dict, *, match_min
     consensus = np.zeros((len(reproduced), len(genes)))
     for i, cluster in enumerate(reproduced["cluster"]):
         idx = np.flatnonzero(components["cluster"].to_numpy() == cluster)
-        samples_in = components["sample"].iloc[idx]
-        per_sample = samples_in.value_counts()
-        w = np.array([float(weights[s]) / float(per_sample[s]) for s in samples_in])
+        w = np.array([float(weights[s]) for s in components["sample"].iloc[idx]])
         profile = _weighted_median(normalized[idx], w)
         profile = profile / max(float(profile.sum()), np.finfo(float).eps)
         consensus[i] = profile * (float((w * row_sums[idx]).sum()) / float(w.sum()))

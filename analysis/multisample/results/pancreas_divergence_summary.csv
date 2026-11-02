@@ -1,6 +1,8 @@
 "arm","n_types","mean_correlation","total_de_genes","types_with_de_test"
 "consensus",7,0.920380987757266,415,7
 "consensus_loop8",7,0.913863583391881,573,7
+"consensus_majority",7,0.917708409206926,428,7
+"consensus_median",7,0.914691894080313,470,7
 "joint",7,0.91843577423734,387,7
 "joint_profiles",7,0.906569763605922,420,7
 "reference_left",7,0.906993233220438,548,7

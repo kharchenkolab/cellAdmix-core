@@ -20,6 +20,27 @@
 "consensus","after","Fibroblast / CAF",22046,6320,0.961245207823602,57,15,11
 "consensus","after","Immune",11496,7755,0.97046928441623,31,15,11
 "consensus","after","Mural / pericyte",1315,1238,0.870470480478153,7,14,8
+"consensus_loop8","after","Ductal/tumor epithelial",18759,11227,0.890713609427699,130,15,11
+"consensus_loop8","after","Endocrine",700,1512,0.908747425053351,3,5,8
+"consensus_loop8","after","Endothelial",3374,3652,0.938609596666503,27,15,11
+"consensus_loop8","after","Exocrine epithelial",2857,33472,0.952393065451215,98,8,11
+"consensus_loop8","after","Fibroblast / CAF",22046,6320,0.967492298545982,41,15,11
+"consensus_loop8","after","Immune",11496,7755,0.958534688572997,32,15,11
+"consensus_loop8","after","Mural / pericyte",1315,1238,0.876919594005402,7,14,8
+"consensus_majority","after","Ductal/tumor epithelial",18759,11227,0.948874439064722,128,15,11
+"consensus_majority","after","Endocrine",700,1512,0.850298236028334,7,5,8
+"consensus_majority","after","Endothelial",3374,3652,0.956557457983741,21,15,11
+"consensus_majority","after","Exocrine epithelial",2857,33472,0.902478141698573,118,8,11
+"consensus_majority","after","Fibroblast / CAF",22046,6320,0.969034810528391,39,15,11
+"consensus_majority","after","Immune",11496,7755,0.968834013516246,33,15,11
+"consensus_majority","after","Mural / pericyte",1315,1238,0.876200757899311,8,14,8
+"consensus_median","after","Ductal/tumor epithelial",18759,11227,0.930041471129856,108,15,11
+"consensus_median","after","Endocrine",700,1512,0.904353391588592,4,5,8
+"consensus_median","after","Endothelial",3374,3652,0.957284647074903,15,15,11
+"consensus_median","after","Exocrine epithelial",2857,33472,0.940282306655827,129,8,11
+"consensus_median","after","Fibroblast / CAF",22046,6320,0.964045848253286,31,15,11
+"consensus_median","after","Immune",11496,7755,0.965675820675493,34,15,11
+"consensus_median","after","Mural / pericyte",1315,1238,0.895633773362007,7,14,8
 "reference_left","after","Ductal/tumor epithelial",18759,11227,0.924792899965722,151,15,11
 "reference_left","after","Endocrine",700,1512,0.854532049049949,3,5,8
 "reference_left","after","Endothelial",3374,3652,0.948965539125362,19,15,11

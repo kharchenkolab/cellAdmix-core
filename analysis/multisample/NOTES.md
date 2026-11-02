@@ -735,3 +735,50 @@ one sample enter, which on breast would give about 24 shared factors for
 rank 23. The arms run both ways (`min_recurrence` 0 and 0.5) so that the
 choice of default rests on cleanup and concordance, not on the loss gap
 alone (which favors over-completeness).
+
+Observed, pancreas with the corrected median (component weights balanced
+per sample, the first weighting) at recurrence thresholds 0 (`median`)
+and 0.5 (`majority`); `results/pancreas*_arms_per_sample.csv`:
+
+| configuration | arm | factors | loss gap | left leak / sens / false | right leak / sens / false | concordance |
+|---|---|---|---|---|---|---|
+| membrane | separate | 9 + 9 | | 0.73 / 0.97 / 2.3% | 0.85 / 0.99 / 3.6% | 0.489 / 910 |
+| membrane | pairwise (Loop 8) | 14 | +1.8% / +3.5% | 0.81 / 0.97 / 1.9% | 0.78 / 0.98 / 3.0% | 0.939 / 338 |
+| membrane | pooled mean, unconstrained | 15 | +5.7% / +9.1% | 0.74 / 0.95 / 1.6% | 0.45 / 0.93 / 0.4% | 0.941 / 364 |
+| membrane | median, recurrence 0 | 16 | +5.9% / +3.0% | 0.81 / 0.96 / 1.3% | 0.80 / 0.98 / 0.8% | 0.947 / 328 |
+| membrane | median, recurrence 0.5 | 9 | +72% / +63% | 0.82 / 0.99 / 3.8% | 0.90 / 0.99 / 3.8% | 0.940 / 354 |
+| bridge | separate | 9 + 9 | | 0.30 / 0.03 / 0.5% | 0.20 / 0.38 / 0.3% | 0.846 / 540 |
+| bridge | pairwise (Loop 8) | 10 | +0.7% / +0.6% | 0.43 / 0.66 / 3.2% | 0.35 / 0.56 / 3.4% | 0.914 / 573 |
+| bridge | pooled mean, unconstrained | 12 | −0.1% / −0.4% | 0.41 / 0.59 / 1.1% | 0.17 / 0.53 / 0.4% | 0.920 / 415 |
+| bridge | median, recurrence 0 | 15 | −1.4% / −2.3% | 0.56 / 0.60 / 4.4% | 0.36 / 0.55 / 1.8% | 0.915 / 470 |
+| bridge | median, recurrence 0.5 | 9 | +1.9% / +0.9% | 0.38 / 0.48 / 0.9% | 0.18 / 0.40 / 0.2% | 0.918 / 428 |
+| bridge | joint stand-in | 9 | | 0.38 / 0.55 / 0.7% | 0.17 / 0.15 / 0.2% | 0.918 / 387 |
+
+Interpretation. (1) The median construction repairs the membrane case:
+both halves clean as well as or better than separately, at lower false
+removal, with the best concordance of any arm (0.947 / 328). (2) The
+training-loss gap does not predict cleanup. The nine majority programs
+reconstruct the membrane halves' neighborhoods 60 to 70% worse than
+their own fits, yet clean them best of all arms (0.82 and 0.90 leakage
+removed at sensitivity 0.99), at the price of 3.8% own-marker false
+removal, the level of separate processing for this configuration. The
+gap measures how well fixed profiles reconstruct neighborhood
+compositions, which an unstable variant's idiosyncratic per-restart
+programs do and reproducible programs need not; cleanup depends on
+whether the admixture programs are present and sharp. The representation
+flag therefore reports reconstruction, and the per-sample audit remains
+the arbiter of cleanup; the documentation will say so. (3) The recurrence
+threshold trades thoroughness for specificity in the stable bridge
+configuration: all programs (15 factors) remove the most leakage with the
+most own-marker loss (4.4% on the left), the majority programs (9) the
+least of both. Concordance between the halves is nearly the same for
+every shared construction (0.915 to 0.920 against 0.924 uncorrected).
+
+Also observed: the balanced weighting (each sample's weight divided among
+its components in a cluster) lets a lone component of one sample carry
+half the median when the other sample contributes many; the package now
+weights each component by its sample's weight alone, which reduces to the
+ordinary median under equal allocation and matches the construction the
+loss experiment validated (−0.4% / +1.6% on membrane). The pancreas median
+and majority arms are rerun with it (the balanced results are kept as
+`*_balanced`); the running breast arms still use the balanced weighting.

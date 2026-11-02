@@ -1210,11 +1210,12 @@ CellAdmixCollectionCleanupReport <- R6::R6Class(
 # samples, and from at least a fraction `min_recurrence` of the restarts of
 # some sample, becomes a consensus factor, and the remaining components are
 # reported as unreproduced. The consensus profile of a cluster is the
-# weighted per-gene median of its unit-sum component profiles (each sample's
-# weight divided among its components in the cluster), renormalized to unit
-# sum and rescaled to the weighted mean of the original row sums so that
-# labeling sees the usual profile scale; the median keeps the profile of a
-# loosely agreeing cluster from blurring. Factors are ordered by the number
+# weighted per-gene median of its unit-sum component profiles (every
+# component weighted by its sample's weight, so a program found by more of a
+# sample's restarts carries more of that sample's evidence), renormalized to
+# unit sum and rescaled to the weighted mean of the original row sums so
+# that labeling sees the usual profile scale; the median keeps the profile
+# of a loosely agreeing cluster from blurring. Factors are ordered by the number
 # of samples covered, then restarts, then profile mass.
 .celladmix_consensus_profiles <- function(pools, weights, selected, match_min, min_restarts,
                                           min_recurrence = 0) {
@@ -1259,8 +1260,7 @@ CellAdmixCollectionCleanupReport <- R6::R6Class(
   normalized <- .celladmix_normalize_profiles(stacked)
   for (i in seq_len(nrow(reproduced))) {
     idx <- which(components$cluster == reproduced$cluster[[i]])
-    per_sample <- table(components$sample[idx])
-    w <- as.numeric(weights[components$sample[idx]]) / as.numeric(per_sample[components$sample[idx]])
+    w <- as.numeric(weights[components$sample[idx]])
     profile <- apply(normalized[idx, , drop = FALSE], 2, .celladmix_weighted_median, w = w)
     profile <- profile / max(sum(profile), .Machine$double.eps)
     consensus[i, ] <- profile * (sum(w * row_sums[idx]) / sum(w))

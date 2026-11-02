@@ -49,10 +49,11 @@ built from every restart of every sample.
    low-recurrence programs. The shared profile is
    the per-gene median of the cluster's components after each is
    normalized to unit sum, every component weighted by its sample's weight
-   (molecule count, or equal, by `sample_allocation`) divided among that
-   sample's components in the cluster; the median profile is renormalized
-   to unit sum and rescaled to the weighted mean of the original row sums
-   so that molecule labeling sees profiles on the usual scale. The median
+   (molecule count, or equal, by `sample_allocation`), so that a program
+   found by more of a sample's restarts carries more of that sample's
+   evidence; the median profile is renormalized to unit sum and rescaled
+   to the weighted mean of the original row sums so that molecule labeling
+   sees profiles on the usual scale. The median
    rather than the mean keeps the profile of a loosely agreeing cluster
    from blurring, which matters when a sample's restarts disagree among
    themselves. Factors are ordered by the number of samples they cover,
@@ -156,11 +157,15 @@ flags that report rather than gate:
 
 - **Consensus fit** (`diagnostics()`): the loss gap and restart spread
   with `representation_flag` when the gap exceeds the spread (the shared
-  space fits the sample worse than one of its own restarts would); the
-  number and fraction of the sample's primary factors that entered the
-  shared space with `shared_factors_flag` below one half; within-sample
-  stability next to consensus agreement; and the largest usage divergence
-  of any cell type with that type's name.
+  profiles reconstruct the sample's neighborhood compositions worse than
+  one of its own restarts would); the number and fraction of the sample's
+  primary factors that entered the shared space with `shared_factors_flag`
+  below one half; within-sample stability next to consensus agreement; and
+  the largest usage divergence of any cell type with that type's name. The
+  representation flag describes reconstruction, not cleanup: a compact
+  shared space of reproducible programs can reconstruct an unstable
+  variant's neighborhoods poorly and still remove admixture well, so the
+  per-sample audit of the correction remains the arbiter of cleanup.
 - **Correction** (`diagnostics(report)`): the number of applied rules
   that lack evidence from the sample itself (the sample is absent from the
   rule's `samples_significant`) and the fraction of the sample's removed
