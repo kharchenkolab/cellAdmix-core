@@ -457,8 +457,20 @@ std::vector<std::string> read_string_column(const std::shared_ptr<arrow::Table>&
     } else if (chunk->type_id() == arrow::Type::LARGE_STRING) {
       const auto arr = std::static_pointer_cast<arrow::LargeStringArray>(chunk);
       for (int64_t i = 0; i < arr->length(); ++i) out.push_back(arr->IsNull(i) ? "" : arr->GetString(i));
+    } else if (chunk->type_id() == arrow::Type::INT32) {
+      // Integer identifiers (e.g. the cell ids of 2022 Xenium bundles) are
+      // read as their decimal strings, as the transcript loader does.
+      const auto arr = std::static_pointer_cast<arrow::Int32Array>(chunk);
+      for (int64_t i = 0; i < arr->length(); ++i) {
+        out.push_back(arr->IsNull(i) ? "" : std::to_string(arr->Value(i)));
+      }
+    } else if (chunk->type_id() == arrow::Type::INT64) {
+      const auto arr = std::static_pointer_cast<arrow::Int64Array>(chunk);
+      for (int64_t i = 0; i < arr->length(); ++i) {
+        out.push_back(arr->IsNull(i) ? "" : std::to_string(arr->Value(i)));
+      }
     } else {
-      throw std::runtime_error("Column '" + name + "' must be string");
+      throw std::runtime_error("Column '" + name + "' must be string or integer");
     }
   }
   return out;
@@ -596,6 +608,7 @@ bool passes_union_bounds(double x, double y, double z, const UnionBounds& bounds
 bool is_unassigned_cell_id(const std::string& cell_id) {
   return cell_id.empty() ||
       cell_id == "0" ||
+      cell_id == "-1" ||
       cell_id == "NA" ||
       cell_id == "NaN" ||
       cell_id == "null" ||

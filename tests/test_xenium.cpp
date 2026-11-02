@@ -179,6 +179,45 @@ TEST_CASE("Xenium bundle loader applies crop filtering at load time") {
   std::filesystem::remove_all(dir);
 }
 
+TEST_CASE("Xenium bundle loader treats the -1 cell id of 2022 bundles as unassigned") {
+  const auto dir = std::filesystem::temp_directory_path() / "celladmix_xenium_test_bundle_minus_one";
+  std::filesystem::remove_all(dir);
+  std::filesystem::create_directories(dir);
+
+  write_text(
+      dir / "experiment.xenium",
+      "{\n"
+      "  \"run_name\": \"Mock Xenium 2022\",\n"
+      "  \"pixel_size\": 0.2125,\n"
+      "  \"z_step_size\": 3.0\n"
+      "}\n");
+
+  write_gzip_text(
+      dir / "transcripts.csv.gz",
+      "transcript_id,cell_id,feature_name,x_location,y_location,z_location,qv\n"
+      "t1,1,G1,10,10,0,20\n"
+      "t2,-1,G2,12,12,0,20\n"
+      "t3,2,G3,20,20,0,35\n");
+
+  write_gzip_text(
+      dir / "cells.csv.gz",
+      "cell_id,x_centroid,y_centroid,z_centroid\n"
+      "1,10,10,0\n"
+      "2,20,20,0\n");
+
+  XeniumLoadOptions options;
+  options.keep_unassigned = false;
+  options.read_cells = true;
+
+  const auto bundle = load_xenium_bundle(dir.string(), options);
+  REQUIRE_EQ(bundle.transcripts.size(), 2U);
+  REQUIRE_EQ(bundle.transcripts.orig_cell_id[0], std::string("1"));
+  REQUIRE_EQ(bundle.transcripts.orig_cell_id[1], std::string("2"));
+  REQUIRE_EQ(bundle.cells.size(), 2U);
+
+  std::filesystem::remove_all(dir);
+}
+
 TEST_CASE("Xenium bundle loader prefers parquet and accepts numeric identifiers") {
   const auto dir = std::filesystem::temp_directory_path() / "celladmix_xenium_test_bundle_parquet";
   std::filesystem::remove_all(dir);

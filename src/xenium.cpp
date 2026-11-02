@@ -684,7 +684,8 @@ std::optional<std::size_t> find_optional_field(
 
 // Detect the common unassigned-cell sentinels used in Xenium output.
 bool is_unassigned_cell_id(const std::string& cell_id) {
-  return cell_id.empty() || cell_id == "UNASSIGNED" || cell_id == "0" || cell_id == "cell_0";
+  return cell_id.empty() || cell_id == "UNASSIGNED" || cell_id == "0" ||
+      cell_id == "-1" || cell_id == "cell_0";
 }
 
 std::optional<std::pair<double, double>> parquet_numeric_minmax(
@@ -890,8 +891,7 @@ void load_xenium_transcripts_csv(
     }
 
     const std::string cell_id = fields[cell_col];
-    if (!options.keep_unassigned &&
-        (cell_id.empty() || cell_id == "UNASSIGNED" || cell_id == "0" || cell_id == "cell_0")) {
+    if (!options.keep_unassigned && is_unassigned_cell_id(cell_id)) {
       continue;
     }
 
