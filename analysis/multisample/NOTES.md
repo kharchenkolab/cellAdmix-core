@@ -1065,7 +1065,57 @@ concurrent; its workers each run one scoring job with the dataset's
 threads, so a dataset created with fewer threads admits more concurrent
 jobs.
 
-## Closing summary, Loops 9 to 13 (2026-11-02)
+## Loop 14 (2026-11-02): rules confined to the samples carrying the program
+
+Decision. The user chose to make the presence condition an option
+(`apply_rules = "where_present"` on `correct()`) and to keep uniform
+application (`"everywhere"`) as the default.
+
+Act. A rule is applied in a sample only when at least one of the sample's
+own restarts carries the rule's program (recurrence above zero in the
+consensus components); primary and member rules are filtered alike, so the
+vote threshold is unchanged. The returned rules carry
+`samples_without_program`; the correction records `params$apply_rules`,
+and `diagnostics()` counts the rules applied in each sample and the rules
+on programs it does not carry (applied under the default, skipped under
+the option). An empty per-sample rule set writes the sample's run
+unchanged. Both bindings, tests on the row filter and the end-to-end path,
+docs, skill. The analysis driver names the correction after the mode so
+the two arms do not overwrite one another's corrected runs (the first run
+did, and the comparison tables were regenerated after the uniform arm's
+corrected runs were restored; they came back with the identical removal
+counts).
+
+Observe (eight tiles, bridge, `ls_nmf`, majority consensus; the audit per
+tile and the concordance between the pooled replicates):
+
+| arm | leakage removed | pair sensitivity | own-marker false removal | removed fraction | concordance (r / DE genes) |
+|---|---|---|---|---|---|
+| separate | 0.64 | 0.83 | 1.5% | 0.21 | 0.904 / 688 |
+| consensus, rules everywhere | 0.69 | 0.91 | 4.1% | 0.26 | 0.991 / 153 |
+| consensus, rules where present | 0.65 | 0.83 | 2.7% | 0.22 | 0.938 / 362 |
+| uncorrected | | | | | 0.987 / 272 |
+
+Per tile, confining the rules lowered false removal everywhere (largest
+drops rep2_t2 6.0% to 2.0%, rep1_t4 4.1% to 1.4%, rep2_t3 3.2% to 1.1%)
+but also the leakage removed (rep2_t3 0.70 to 0.56, rep1_t4 0.65 to 0.57)
+and the pair sensitivity (rep2_t3 0.91 to 0.65, rep1_t4 0.91 to 0.75):
+programs that no restart of those tiles found still carried real
+admixture there. The concordance between the replicates fell below the
+uncorrected value because corresponding regions of the two replicates were
+no longer cleaned alike; which programs a tile's restarts find depends on
+the tile's composition and on the restarts themselves.
+
+Interpretation. The presence condition does what it says, removing less
+native expression, but on this cohort it costs sensitivity and undoes the
+uniformity that the shared rules provide, which is the purpose of the
+multi-sample analysis. Uniform application stays the default; the option
+is documented, with these numbers, for cohorts whose samples are not
+replicates and whose composition differences are real. My earlier
+recommendation of the presence condition as the default was wrong on the
+evidence.
+
+## Closing summary, Loops 9 to 14 (2026-11-02)
 
 Delivered on `dev_multisample` (both bindings, tests green, docs
 current): consensus by pooled clustering of all restarts with the
@@ -1088,10 +1138,11 @@ Unstable variant (`invsqrt_kl`): the consensus restores concordance but
 cannot match separate processing's cleanup balance at any recurrence
 threshold; the stable variant should be used.
 
-Open for the user: (1) on cohorts, whether a rule should apply in a
-sample only where the sample's own restarts carry the program (a presence
-condition, leaving true replicates untouched), or whether a minimum
-sample coverage should be required for a shared program, or neither.
-Resolved in Loop 13: the per-sample steps of the correction run
-concurrently, and the candidate budget already scales with the sample
-count (one single-sample budget per sample, scaled by relative size).
+Resolved: (1) the presence condition is an option
+(`apply_rules = "where_present"`), with uniform application the default
+after the Loop 14 cohort test showed the option lowers false removal but
+costs sensitivity and replicate concordance; a minimum sample coverage
+for shared programs was not pursued; (2) the per-sample steps of the
+correction run concurrently (Loop 13); (3) the candidate budget already
+scales with the sample count, one single-sample budget per sample scaled
+by relative size (Loop 13). The pull request to `dev` waits for the user.

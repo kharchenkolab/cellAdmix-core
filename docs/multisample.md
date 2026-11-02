@@ -115,9 +115,18 @@ with true replicates nothing changes, and with regional sections or a
 cohort the rules on regional programs are confined to the samples that
 have them. The condition rests on the sample's factorization, not on the
 correction outcome, and the skipped rules are counted per sample in the
-correction diagnostics. A program too weak for any restart of a sample to
-find may still contribute admixture there, which this option then leaves
-in place.
+correction diagnostics. The option trades cleanup for conservatism: a
+program too weak for any restart of a sample to find may still contribute
+admixture there, which is then left in place, and samples that happen to
+carry different programs are cleaned differently. On eight regional tiles
+cut from two breast replicates, confining the rules lowered own-marker
+false removal from 4.1% to 2.7% but also lowered the leakage removed (0.69
+to 0.65) and the median pair sensitivity (0.91 to 0.83), and the
+concordance between the replicates fell from 0.991 to 0.938, below the
+uncorrected 0.987, because corresponding regions of the two replicates
+were no longer cleaned alike. Uniform application is therefore the
+default; the option suits cohorts whose samples are not replicates of one
+another and whose composition differences are real.
 
 Correction keeps the molecule-vote ensemble identical across samples,
 because the member-level scoring is the most seed-dependent step of the

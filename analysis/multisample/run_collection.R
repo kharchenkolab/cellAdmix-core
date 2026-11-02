@@ -99,8 +99,9 @@ log_line("rules:", nrow(rules), "kept", sum(rules$keep),
   "fully supported", sum(rules$keep & rules$sample_support >= 1))
 
 t0 <- Sys.time()
-correction <- score$correct(rules = rules,
-  apply_rules = Sys.getenv("CELLADMIX_APPLY_RULES", "everywhere"))
+apply_rules <- Sys.getenv("CELLADMIX_APPLY_RULES", "everywhere")
+correction <- score$correct(rules = rules, apply_rules = apply_rules,
+  name = paste0(score_method, "_clean", if (identical(apply_rules, "where_present")) "_where_present" else ""))
 log_line("correction done in", round(as.numeric(difftime(Sys.time(), t0, units = "mins")), 1), "min")
 write.csv(correction$summary(), file.path(out_dir, "correction_summary.csv"), row.names = FALSE)
 write.csv(correction$rules, file.path(out_dir, "correction_rules.csv"), row.names = FALSE)
