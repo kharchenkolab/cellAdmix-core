@@ -806,6 +806,77 @@ DenseMatrix project_to_factors(const DenseMatrix& x, const DenseMatrix& h) {
 }
 
 // Project sparse rows to factor scores with row normalization.
+DenseMatrix weighted_ls_usages_fixed_h(
+    const SparseRowMatrix& x,
+    const DenseMatrix& h,
+    const std::vector<double>& column_weights,
+    int iterations,
+    double epsilon) {
+  if (x.cols() != h.cols()) {
+    throw std::runtime_error("weighted_ls_usages_fixed_h: matrix dimensions do not match");
+  }
+  if (static_cast<int>(column_weights.size()) != x.cols()) {
+    throw std::runtime_error("weighted_ls_usages_fixed_h: column_weights length must match columns");
+  }
+  const int rank = h.rows();
+  // Start from the normalized projection scaled to each row's total mass.
+  DenseMatrix w = project_to_factors(x, h);
+  const auto h_row_sums = h.row_sums();
+  for (int i = 0; i < x.rows(); ++i) {
+    double row_total = 0.0;
+    for (int p = x.indptr()[static_cast<std::size_t>(i)];
+         p < x.indptr()[static_cast<std::size_t>(i + 1)];
+         ++p) {
+      row_total += x.values()[static_cast<std::size_t>(p)];
+    }
+    double fitted_total = 0.0;
+    for (int a = 0; a < rank; ++a) {
+      fitted_total += w(i, a) * h_row_sums[static_cast<std::size_t>(a)];
+    }
+    const double scale = fitted_total > epsilon ? row_total / fitted_total : 0.0;
+    for (int a = 0; a < rank; ++a) {
+      w(i, a) *= scale;
+    }
+  }
+  // The numerator (x diag(weights)) h^T is fixed; the denominator is
+  // w (h diag(weights) h^T), so the Gram matrix is formed once.
+  DenseMatrix numerator(x.rows(), rank, 0.0);
+  for (int i = 0; i < x.rows(); ++i) {
+    for (int p = x.indptr()[static_cast<std::size_t>(i)];
+         p < x.indptr()[static_cast<std::size_t>(i + 1)];
+         ++p) {
+      const int j = x.indices()[static_cast<std::size_t>(p)];
+      const double weighted = x.values()[static_cast<std::size_t>(p)] *
+          column_weights[static_cast<std::size_t>(j)];
+      for (int a = 0; a < rank; ++a) {
+        numerator(i, a) += weighted * h(a, j);
+      }
+    }
+  }
+  DenseMatrix gram(rank, rank, 0.0);
+  for (int a = 0; a < rank; ++a) {
+    for (int b = 0; b < rank; ++b) {
+      double total = 0.0;
+      for (int j = 0; j < h.cols(); ++j) {
+        total += h(a, j) * column_weights[static_cast<std::size_t>(j)] * h(b, j);
+      }
+      gram(a, b) = total;
+    }
+  }
+  for (int iteration = 0; iteration < iterations; ++iteration) {
+    for (int i = 0; i < x.rows(); ++i) {
+      for (int a = 0; a < rank; ++a) {
+        double denominator = 0.0;
+        for (int b = 0; b < rank; ++b) {
+          denominator += w(i, b) * gram(b, a);
+        }
+        w(i, a) *= numerator(i, a) / (denominator + epsilon);
+      }
+    }
+  }
+  return w;
+}
+
 DenseMatrix project_to_factors(const SparseRowMatrix& x, const DenseMatrix& h) {
   if (x.cols() != h.cols()) {
     throw std::runtime_error("Matrix dimensions do not match for project_to_factors");

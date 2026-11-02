@@ -34,6 +34,20 @@ DenseMatrix row_correlation_matrix(const DenseMatrix& lhs, const DenseMatrix& rh
 // Returns match such that row i is paired with column match[i].
 std::vector<int> hungarian_match(const DenseMatrix& similarity);
 
+struct FactorMatchResult {
+  // For each row of `profiles`: the matched row of `reference` (-1 when the
+  // reference has fewer rows) and the ownership correlation of the pair.
+  std::vector<int> match;
+  std::vector<double> correlation;
+};
+
+// One-to-one matching of the factors of `profiles` to those of `reference`
+// by gene-ownership correlation, the restart-stability metric. Rectangular
+// inputs are handled by padding the assignment with zero-similarity slots.
+FactorMatchResult match_factor_profiles(
+    const DenseMatrix& profiles,
+    const DenseMatrix& reference);
+
 struct FactorStabilityResult {
   // Mean matched ownership correlation per selected-run factor, averaged over
   // the comparison runs. Filled with 1.0 when there are no comparison runs.

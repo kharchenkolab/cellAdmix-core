@@ -1,0 +1,4 @@
+"arm","pairs_a","pairs_b","jaccard"
+"separate",14,20,0.478260869565217
+"consensus",23,23,1
+"joint",16,16,1

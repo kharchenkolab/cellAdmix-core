@@ -845,9 +845,26 @@ celladmix_cluster_cells <- function(
     nmf_n_runs = NA_integer_, nmf_train_max_rows = 10000L,
     nmf_min_molecules = 10L, num_threads = 1L,
     tile_size = 100, parquet_row_group_size = 65536L, report_ncv_umap = FALSE,
-    seed = 1L, verbose = FALSE, annotation_hash = NULL, nmf_fixed_h = NULL) {
+    seed = 1L, verbose = FALSE, annotation_hash = NULL, nmf_fixed_h = NULL,
+    nmf_fixed_h_members = NULL) {
   if (!inherits(prep, "celladmix_prep")) {
     stop(".celladmix_fit_prep() expects a celladmix_prep object")
+  }
+  if (!is.null(nmf_fixed_h_members)) {
+    if (is.null(nmf_fixed_h)) {
+      stop("nmf_fixed_h_members requires nmf_fixed_h")
+    }
+    # Members share the fixed profiles' gene columns and factor count.
+    nmf_fixed_h_members <- lapply(nmf_fixed_h_members, function(member) {
+      member <- as.matrix(member)
+      if (nrow(member) != nrow(nmf_fixed_h)) {
+        stop("every nmf_fixed_h_members matrix must have as many factors as nmf_fixed_h")
+      }
+      if (is.null(colnames(member)) || !all(colnames(nmf_fixed_h) %in% colnames(member))) {
+        stop("every nmf_fixed_h_members matrix must carry the gene columns of nmf_fixed_h")
+      }
+      member[, colnames(nmf_fixed_h), drop = FALSE]
+    })
   }
 
   nmf_init <- match.arg(nmf_init)
@@ -890,7 +907,8 @@ celladmix_cluster_cells <- function(
       report_ncv_umap = report_ncv_umap,
       verbose = verbose,
       nmf_fixed_h = nmf_fixed_h,
-      nmf_fixed_h_genes = if (is.null(nmf_fixed_h)) NULL else colnames(nmf_fixed_h)
+      nmf_fixed_h_genes = if (is.null(nmf_fixed_h)) NULL else colnames(nmf_fixed_h),
+      nmf_fixed_h_members = nmf_fixed_h_members
     ),
     class = "celladmix_run"
   )
@@ -966,6 +984,14 @@ celladmix_cluster_cells <- function(
 #' @param seed Integer RNG seed.
 #' @param verbose Logical; if `TRUE`, emit `[INFO]` fit-stage progress messages
 #'   from the native backend.
+#' @param nmf_fixed_h Optional factor-by-gene profile matrix with gene column
+#'   names. When supplied no factorization is run: the profiles are fixed and
+#'   every molecule is labeled against them (fixed-profile projection), in the
+#'   given factor order.
+#' @param nmf_fixed_h_members Optional list of profile matrices shaped like
+#'   `nmf_fixed_h` (same factor count and gene columns) that become the run's
+#'   ensemble member pool behind the fixed profiles, so the molecule-vote
+#'   correction is available on a fixed-profile run.
 #'
 #' @return A persisted `celladmix_run` object.
 #' @keywords internal
@@ -979,7 +1005,8 @@ celladmix_fit <- function(
     molecule_scoring = c("gene_loadings", "ncv_projection", "auto"), nmf_n_runs = NA_integer_,
     nmf_train_max_rows = 10000L, nmf_min_molecules = 10L, num_threads = 1L,
     tile_size = 100, parquet_row_group_size = 65536L, report_ncv_umap = FALSE, seed = 1L,
-    verbose = FALSE, annotation_hash = NULL, nmf_fixed_h = NULL) {
+    verbose = FALSE, annotation_hash = NULL, nmf_fixed_h = NULL,
+    nmf_fixed_h_members = NULL) {
   nmf_init <- match.arg(nmf_init)
   nmf_variant <- match.arg(nmf_variant)
   molecule_scoring <- match.arg(molecule_scoring)
@@ -993,7 +1020,8 @@ celladmix_fit <- function(
     num_threads = num_threads, tile_size = tile_size,
     parquet_row_group_size = parquet_row_group_size, report_ncv_umap = report_ncv_umap,
     annotation_hash = annotation_hash,
-    seed = seed, verbose = verbose, nmf_fixed_h = nmf_fixed_h)
+    seed = seed, verbose = verbose, nmf_fixed_h = nmf_fixed_h,
+    nmf_fixed_h_members = nmf_fixed_h_members)
 }
 
 #' Read a Persisted cellAdmix Run

@@ -20,6 +20,9 @@ This folder contains user-facing documentation for `cellAdmix-core`.
 - [Admixture and induced expression](generative.md): the generative model
   separating transferred material from proximity-induced transcription,
   its validation, and the induced-gene retention it enables.
+- [Multi-sample processing](multisample.md): consensus factorization across
+  samples, pooled rules with per-sample support, and per-sample
+  corrections under one shared factor space.
 - [Python bindings](python-bindings.md): Python API and SpatialData integration.
 - [Python batch processing](python-batch.md): CLI workflow for Xenium batch
   processing through the Python bindings.

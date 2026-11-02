@@ -255,3 +255,42 @@ TEST_CASE("Sparse NMF supports H regularization") {
   REQUIRE_LT(h_sum_penalized, h_sum_baseline);
   REQUIRE(std::isfinite(penalized.final_objective));
 }
+
+TEST_CASE("Fixed-profile weighted LS usages reconstruct an exact factorization") {
+  // x = w_true * h exactly; the fixed-profile usages must recover a
+  // reconstruction with (near) zero weighted loss.
+  const int rows = 6, rank = 2, genes = 4;
+  DenseMatrix h(rank, genes, 0.0);
+  h(0, 0) = 4.0; h(0, 1) = 2.0; h(0, 2) = 0.0; h(0, 3) = 0.5;
+  h(1, 0) = 0.0; h(1, 1) = 1.0; h(1, 2) = 3.0; h(1, 3) = 2.0;
+  DenseMatrix w_true(rows, rank, 0.0);
+  for (int i = 0; i < rows; ++i) {
+    w_true(i, 0) = 1.0 + 0.5 * i;
+    w_true(i, 1) = 2.0 - 0.25 * i;
+  }
+  std::vector<int> indptr{0};
+  std::vector<int> indices;
+  std::vector<double> values;
+  for (int i = 0; i < rows; ++i) {
+    for (int g = 0; g < genes; ++g) {
+      const double value = w_true(i, 0) * h(0, g) + w_true(i, 1) * h(1, g);
+      if (value > 0.0) {
+        indices.push_back(g);
+        values.push_back(value);
+      }
+    }
+    indptr.push_back(static_cast<int>(indices.size()));
+  }
+  const SparseRowMatrix x(rows, genes, indptr, indices, values);
+  const auto weights = default_column_weights(x);
+  const DenseMatrix w = weighted_ls_usages_fixed_h(x, h, weights, 300);
+  DenseMatrix reconstruction(rows, genes, 0.0);
+  for (int i = 0; i < rows; ++i) {
+    for (int g = 0; g < genes; ++g) {
+      reconstruction(i, g) = w(i, 0) * h(0, g) + w(i, 1) * h(1, g);
+    }
+  }
+  const double loss = weighted_reconstruction_loss(x, reconstruction, weights);
+  const double scale = weighted_reconstruction_loss(x, DenseMatrix(rows, genes, 0.0), weights);
+  REQUIRE(loss < 1e-4 * scale);
+}

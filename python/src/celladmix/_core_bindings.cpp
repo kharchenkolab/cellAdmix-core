@@ -20,6 +20,8 @@
 #include "celladmix/generative.hpp"
 #include "celladmix/input_store.hpp"
 #include "celladmix/membrane.hpp"
+#include "celladmix/nmf_stability.hpp"
+#include "celladmix/pipeline_common.hpp"
 #include "celladmix/pipeline_store.hpp"
 #include "celladmix/run_store.hpp"
 #include "celladmix/workflow.hpp"
@@ -105,6 +107,8 @@ py::dict manifest_to_dict(const celladmix::RunManifest& manifest) {
   out["package_version"] = manifest.package_version;
   out["annotation_hash"] = manifest.annotation_hash;
   out["run_type"] = manifest.run_type;
+  out["fixed_profiles"] = manifest.fixed_profiles;
+  out["fixed_profile_members"] = manifest.fixed_profile_members;
   out["source"] = source_to_dict(manifest.source);
   out["paths"] = paths_to_dict(manifest.paths);
   out["pipeline_options"] = pipeline_options_to_dict(manifest.pipeline_options);
@@ -580,7 +584,10 @@ PYBIND11_MODULE(_core, m) {
          const std::vector<std::string>& training_scope_cell_types,
          const std::string& annotation_hash,
          bool report_ncv_umap,
-         bool verbose) {
+         bool verbose,
+         const std::vector<double>& nmf_fixed_h,
+         const std::vector<std::string>& nmf_fixed_h_genes,
+         const std::vector<double>& nmf_fixed_h_members) {
         celladmix::BasicPipelineOptions pipeline_options;
         pipeline_options.ncv_k = ncv_k;
         pipeline_options.rank = rank;
@@ -604,6 +611,37 @@ PYBIND11_MODULE(_core, m) {
         const auto store_manifest = celladmix::read_input_store_manifest(store_dir);
         const auto source = source_from_store_manifest(store_dir, store_manifest);
         const auto counts = celladmix::load_input_store_counts(store_dir);
+        if (!nmf_fixed_h.empty()) {
+          // Supplied profiles (row-major over nmf_fixed_h_genes) are placed
+          // onto the store's gene order; an optional member pool of the
+          // same shape follows them into the run's ensemble pool.
+          if (nmf_fixed_h_genes.empty() || nmf_fixed_h.size() % nmf_fixed_h_genes.size() != 0) {
+            throw std::runtime_error("nmf_fixed_h must be rank x len(nmf_fixed_h_genes), row-major");
+          }
+          const int fixed_rank = static_cast<int>(nmf_fixed_h.size() / nmf_fixed_h_genes.size());
+          int matched = 0;
+          pipeline_options.nmf_fixed_h = celladmix::align_profiles_to_genes(
+              nmf_fixed_h, fixed_rank, nmf_fixed_h_genes, counts.genes, &matched);
+          if (matched < 2) {
+            throw std::runtime_error("nmf_fixed_h genes do not match the input store gene vocabulary");
+          }
+          if (!nmf_fixed_h_members.empty()) {
+            const std::size_t member_size = nmf_fixed_h.size();
+            if (nmf_fixed_h_members.size() % member_size != 0) {
+              throw std::runtime_error("nmf_fixed_h_members must hold matrices shaped like nmf_fixed_h");
+            }
+            const std::size_t n_members = nmf_fixed_h_members.size() / member_size;
+            for (std::size_t m = 0; m < n_members; ++m) {
+              const std::vector<double> member(
+                  nmf_fixed_h_members.begin() + static_cast<std::ptrdiff_t>(m * member_size),
+                  nmf_fixed_h_members.begin() + static_cast<std::ptrdiff_t>((m + 1) * member_size));
+              const auto aligned = celladmix::align_profiles_to_genes(
+                  member, fixed_rank, nmf_fixed_h_genes, counts.genes);
+              pipeline_options.nmf_fixed_h_members.insert(
+                  pipeline_options.nmf_fixed_h_members.end(), aligned.begin(), aligned.end());
+            }
+          }
+        }
 
         celladmix::StorePipelineResult fit;
         {
@@ -644,7 +682,79 @@ PYBIND11_MODULE(_core, m) {
       py::arg("training_scope_cell_types") = std::vector<std::string>{},
       py::arg("annotation_hash") = "",
       py::arg("report_ncv_umap") = false,
-      py::arg("verbose") = false);
+      py::arg("verbose") = false,
+      py::arg("nmf_fixed_h") = std::vector<double>{},
+      py::arg("nmf_fixed_h_genes") = std::vector<std::string>{},
+      py::arg("nmf_fixed_h_members") = std::vector<double>{});
+
+  m.def(
+      "ensemble_h",
+      [](const std::string& run_path) {
+        const auto pool = celladmix::load_ensemble_h(run_path);
+        const auto manifest = celladmix::read_run_manifest(run_path);
+        py::list out;
+        for (const auto& h : pool) {
+          out.append(dense_matrix_to_dict(h));
+        }
+        py::dict result;
+        result["members"] = out;
+        result["genes"] = manifest.genes;
+        return result;
+      },
+      py::arg("run_path"));
+
+  m.def(
+      "match_factors",
+      [](const std::vector<double>& profiles,
+         int profile_rows,
+         const std::vector<double>& reference,
+         int reference_rows) {
+        if (profile_rows <= 0 || reference_rows <= 0 ||
+            profiles.size() % static_cast<std::size_t>(profile_rows) != 0 ||
+            reference.size() % static_cast<std::size_t>(reference_rows) != 0) {
+          throw std::runtime_error("match_factors: matrices must be row-major with the given row counts");
+        }
+        const int cols = static_cast<int>(profiles.size() / static_cast<std::size_t>(profile_rows));
+        const int ref_cols = static_cast<int>(reference.size() / static_cast<std::size_t>(reference_rows));
+        celladmix::DenseMatrix lhs(profile_rows, cols, 0.0);
+        celladmix::DenseMatrix rhs(reference_rows, ref_cols, 0.0);
+        lhs.data() = profiles;
+        rhs.data() = reference;
+        const auto match = celladmix::match_factor_profiles(lhs, rhs);
+        py::dict out;
+        out["match"] = match.match;
+        out["correlation"] = match.correlation;
+        return out;
+      },
+      py::arg("profiles"),
+      py::arg("profile_rows"),
+      py::arg("reference"),
+      py::arg("reference_rows"));
+
+  m.def(
+      "training_loss",
+      [](const std::string& run_path,
+         const std::vector<double>& profiles,
+         int rank,
+         const std::vector<std::string>& genes,
+         int num_threads) {
+        const auto manifest = celladmix::read_run_manifest(run_path);
+        if (rank <= 0 || genes.empty() || profiles.size() != static_cast<std::size_t>(rank) * genes.size()) {
+          throw std::runtime_error("training_loss: profiles must be rank x len(genes), row-major");
+        }
+        const auto aligned = celladmix::align_profiles_to_genes(profiles, rank, genes, manifest.genes);
+        double loss = 0.0;
+        {
+          py::gil_scoped_release release;
+          loss = celladmix::training_loss_under_profiles(run_path, aligned, rank, num_threads);
+        }
+        return loss;
+      },
+      py::arg("run_path"),
+      py::arg("profiles"),
+      py::arg("rank"),
+      py::arg("genes"),
+      py::arg("num_threads") = 1);
 
   m.def(
       "read_run_manifest",

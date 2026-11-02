@@ -51,6 +51,10 @@ short steps.
 - Ensemble correction by default: molecule-level voting across NMF restarts
   stabilizes seed-dependent corrections, with the vote threshold as a
   sensitivity/specificity dial.
+- Multi-sample processing: a consensus factorization across samples gives
+  replicates one shared factor space and one pooled rule set, with
+  per-sample corrections and audits
+  ([docs/multisample.md](docs/multisample.md)).
 
 ## NMF Methods
 
@@ -160,6 +164,7 @@ notebooks.
 - [docs/scoring_methods.md](docs/scoring_methods.md): bridge, membrane, and coherence scoring definitions.
 - [docs/nmf_stability.md](docs/nmf_stability.md): the per-factor restart stability diagnostic.
 - [docs/audit.md](docs/audit.md): the admixture audit methodology and factorization/scoring comparisons.
+- [docs/multisample.md](docs/multisample.md): consensus factorization and pooled rules across samples.
 - [docs/python-bindings.md](docs/python-bindings.md): Python interface and SpatialData integration overview.
 - [docs/python-batch.md](docs/python-batch.md): Python command-line batch workflow.
 

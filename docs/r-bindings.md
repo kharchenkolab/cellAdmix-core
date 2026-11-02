@@ -33,6 +33,7 @@ The main objects are:
 | `CellAdmixFit` | NMF factors, molecule assignments, smoothed labels, cell-level factor fractions, and plotting helpers. |
 | `CellAdmixScore` | Source/target/factor admixture evidence from bridge, membrane, or coherence scoring. |
 | `CellAdmixCorrection` | Rule-based molecule removal results and corrected sparse counts. |
+| `CellAdmixCollection` | Several per-sample datasets processed as one analysis; see [multisample.md](multisample.md). |
 
 ## Input Sources
 
@@ -140,6 +141,14 @@ whatever the cached run recorded. `overwrite = TRUE` forces a refit even when
 parameters match — useful after package upgrades, which are reported in the
 reuse message but do not trigger refits on their own. Scores and corrections
 are recomputed on every call and never go stale.
+
+A fit can also be made against given gene profiles instead of a
+factorization: `ds$fit(nmf_fixed_h = profiles)` labels every molecule
+against the supplied factor-by-gene matrix (gene names as column names) in
+its given order, and `nmf_fixed_h_members` supplies a list of matrices of
+the same shape as the run's ensemble member pool. This is the projection
+step of the multi-sample consensus factorization
+([multisample.md](multisample.md)).
 
 Useful fit diagnostics:
 
@@ -349,6 +358,26 @@ single-fit correction with a message.
 molecules — usually a sign that the factorization has no native factor for
 that type; the minimum-molecule gate for the warning is
 `options(celladmix.overremoval_min_molecules = )`.
+
+## Multi-Sample Processing
+
+Samples that share one annotation scheme can be processed with one shared
+factor space and one pooled rule set, so that replicates are treated by the
+same procedure:
+
+```r
+collection <- cellAdmixCollection(list(rep1 = ds1, rep2 = ds2))
+consensus <- collection$fit_consensus()
+score <- consensus$score_bridge()
+rules <- score$rules()            # pooled evidence, sample_support per rule
+correction <- score$correct(rules = rules)
+correction$counts(sample = "rep1")
+```
+
+The consensus factorization matches the per-sample factors, averages them
+into shared profiles, and projects every sample onto them; scoring pools
+the per-sample evidence, and correction and audit run per sample. See
+[multisample.md](multisample.md) for the method and the diagnostics.
 
 ## Clustering and Annotation
 

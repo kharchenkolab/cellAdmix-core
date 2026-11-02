@@ -33,6 +33,12 @@ struct BasicPipelineOptions {
   // taken as given (identity feature space) and training rows are projected
   // onto it. Used for anchor-based / consensus factor injection.
   std::vector<double> nmf_fixed_h;
+  // Optional member pool accompanying nmf_fixed_h: further profile matrices
+  // of the same shape, concatenated row-major. The fixed profiles become
+  // member 0 (the selected member) and these follow, so a fixed-profile run
+  // carries an ensemble member pool whose labels share the fixed factor
+  // index.
+  std::vector<double> nmf_fixed_h_members;
   // Provenance of the annotation the strata came from (binding-provided).
   std::string annotation_hash;
   // Optional cell types used only to select NMF training rows. Projection and

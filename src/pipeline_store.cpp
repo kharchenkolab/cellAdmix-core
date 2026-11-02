@@ -28,6 +28,7 @@
 #include "celladmix/ncv.hpp"
 #include "celladmix/nmf_euclidean.hpp"
 #include "celladmix/nmf_kl.hpp"
+#include "celladmix/nmf_stability.hpp"
 #include "celladmix/pipeline_common.hpp"
 #include "celladmix/report_embedding.hpp"
 
@@ -1457,21 +1458,64 @@ StorePipelineResult run_basic_pipeline_store(
     const auto& kept_cols = compact_training.kept_cols;
     const int n_compact = kept_cols.empty()
         ? n_genes_full : static_cast<int>(kept_cols.size());
-    DenseMatrix h_compact(fixed_rank, n_compact);
-    for (int f = 0; f < fixed_rank; ++f) {
-      for (int c = 0; c < n_compact; ++c) {
-        const int full_col = kept_cols.empty() ? c : kept_cols[static_cast<std::size_t>(c)];
-        h_compact(f, c) = options.nmf_fixed_h[
-            static_cast<std::size_t>(f) * static_cast<std::size_t>(n_genes_full) +
-            static_cast<std::size_t>(full_col)];
+    // Restrict a full-vocabulary profile matrix to the training matrix's kept
+    // gene columns; `offset` selects one matrix inside a concatenated pool.
+    const auto compact_profiles = [&](const std::vector<double>& flat, std::size_t offset) {
+      DenseMatrix out(fixed_rank, n_compact, 0.0);
+      for (int f = 0; f < fixed_rank; ++f) {
+        for (int c = 0; c < n_compact; ++c) {
+          const int full_col = kept_cols.empty() ? c : kept_cols[static_cast<std::size_t>(c)];
+          out(f, c) = flat[offset +
+              static_cast<std::size_t>(f) * static_cast<std::size_t>(n_genes_full) +
+              static_cast<std::size_t>(full_col)];
+        }
       }
-    }
+      return out;
+    };
+    const DenseMatrix h_compact = compact_profiles(options.nmf_fixed_h, 0);
     compact_transform = make_ncv_feature_transform(compact_training.matrix, "kl");
     SparseNmfResult fixed;
     fixed.h = h_compact;
     fixed.w = project_rows_to_factors_kl(compact_training.matrix, fixed.h, options.num_threads);
     fixed.selected_run = 0;
     fixed.selected_seed = options.seed;
+    if (!options.nmf_fixed_h_members.empty()) {
+      // A supplied member pool: the fixed profiles lead as member 0 (the
+      // selected member, whose labels are the run's primary labels) and the
+      // supplied matrices follow. Their agreement with the fixed profiles is
+      // reported in the restart-stability slots of the diagnostics.
+      const std::size_t member_size =
+          static_cast<std::size_t>(fixed_rank) * static_cast<std::size_t>(n_genes_full);
+      if (options.nmf_fixed_h_members.size() % member_size != 0) {
+        throw std::runtime_error(
+            "nmf_fixed_h_members length must be a multiple of the fixed profile size");
+      }
+      const int n_members = static_cast<int>(options.nmf_fixed_h_members.size() / member_size);
+      fixed.candidate_h.push_back(h_compact);
+      fixed.candidate_seeds.push_back(options.seed);
+      for (int m = 0; m < n_members; ++m) {
+        fixed.candidate_h.push_back(
+            compact_profiles(options.nmf_fixed_h_members, static_cast<std::size_t>(m) * member_size));
+        fixed.candidate_seeds.push_back(options.seed + 1U + static_cast<unsigned int>(m));
+      }
+      std::vector<const DenseMatrix*> pool;
+      std::vector<int> comparison;
+      for (std::size_t m = 0; m < fixed.candidate_h.size(); ++m) {
+        pool.push_back(&fixed.candidate_h[m]);
+        if (m > 0) comparison.push_back(static_cast<int>(m));
+      }
+      const auto stability = matched_ownership_stability(pool, 0, comparison);
+      fixed.selected_factor_stability = stability.factor_stability;
+      fixed.candidate_best_match_correlations = stability.run_matched_means;
+      fixed.stability_comparison_runs = stability.comparison_runs;
+      fixed.stable_factor_count = stability.stable_factor_count;
+      fixed.stability_threshold = stability.threshold;
+      double matched_total = 0.0;
+      for (int m = 1; m <= n_members; ++m) {
+        matched_total += stability.run_matched_means[static_cast<std::size_t>(m)];
+      }
+      fixed.candidate_best_match_correlation_mean = matched_total / static_cast<double>(n_members);
+    }
     result.nmf = fixed;
   } else if (is_weighted_ls_variant(options.nmf_variant)) {
     const auto column_weights = default_column_weights(compact_training.matrix);
@@ -1501,7 +1545,11 @@ StorePipelineResult run_basic_pipeline_store(
     result.nmf = sparse_nmf(transformed_training_ncv, {}, nmf_options);
     result.nmf.w = project_rows_to_factors_kl(transformed_training_ncv, result.nmf.h, options.num_threads);
   }
-  order_nmf_factors_by_training_importance(result.nmf);
+  // Supplied profiles keep their order: it is the factor index shared with
+  // whatever produced them (e.g. a consensus across samples).
+  if (options.nmf_fixed_h.empty()) {
+    order_nmf_factors_by_training_importance(result.nmf);
+  }
   NcvFeatureTransform full_transform = compact_transform;
   if (!compact_training.kept_cols.empty() &&
       static_cast<int>(compact_training.kept_cols.size()) != static_cast<int>(counts.genes.size())) {
@@ -1533,7 +1581,10 @@ StorePipelineResult run_basic_pipeline_store(
       message << " [" << options.nmf_variant << "]";
     }
     if (!nmf_init_groups.empty()) message << " [cluster init]";
-    message << " [ordered by training W mass]";
+    if (options.nmf_fixed_h.empty()) message << " [ordered by training W mass]";
+    if (!result.nmf.candidate_h.empty() && !options.nmf_fixed_h.empty()) {
+      message << " [member pool: " << result.nmf.candidate_h.size() << "]";
+    }
     if (options.nmf_n_runs > 1) {
       message << " (selected run " << (result.nmf.selected_run + 1)
               << "/" << options.nmf_n_runs
@@ -1748,6 +1799,9 @@ StorePipelineResult run_basic_pipeline_store(
   result.manifest.pipeline_options = options;
   result.manifest.package_version = kCelladmixVersion;
   result.manifest.annotation_hash = options.annotation_hash;
+  result.manifest.fixed_profiles = !options.nmf_fixed_h.empty();
+  result.manifest.fixed_profile_members = result.manifest.fixed_profiles
+      ? static_cast<int>(result.nmf.candidate_h.size()) : 0;
   result.manifest.storage_options = storage_options;
   result.manifest.analysis_crop = analysis_crop;
   result.manifest.genes = counts.genes;
@@ -1775,6 +1829,76 @@ StorePipelineResult run_basic_pipeline_store(
     emit_info(pipeline_start, "Finished cell-blocked store-backed fit", result.timing.total_sec);
   }
   return result;
+}
+
+double training_loss_under_profiles(
+    const std::string& run_path_or_dir,
+    const std::vector<double>& profiles,
+    int rank,
+    int num_threads) {
+  const TrainingRunData training = load_run_training_cell_data(run_path_or_dir);
+  if (training.training_obs_ids.empty() || training.training_query_indices.empty()) {
+    throw std::runtime_error("training_loss_under_profiles: run has no persisted training rows");
+  }
+  const auto& manifest = training.manifest;
+  const int n_genes = static_cast<int>(manifest.genes.size());
+  if (rank <= 0 || profiles.size() != static_cast<std::size_t>(rank) * static_cast<std::size_t>(n_genes)) {
+    throw std::runtime_error("training_loss_under_profiles: profiles must be rank x run genes");
+  }
+  if (training.transcripts.genes.size() != manifest.genes.size()) {
+    throw std::runtime_error("training_loss_under_profiles: training table gene vocabulary mismatch");
+  }
+  DenseMatrix h(rank, n_genes, 0.0);
+  for (int f = 0; f < rank; ++f) {
+    for (int g = 0; g < n_genes; ++g) {
+      h(f, g) = std::max(0.0, profiles[static_cast<std::size_t>(f) * static_cast<std::size_t>(n_genes) +
+          static_cast<std::size_t>(g)]);
+    }
+  }
+
+  const auto& opts = manifest.pipeline_options;
+  NcvOptions ncv_options;
+  ncv_options.k = opts.ncv_k + 1;
+  ncv_options.include_self = true;
+  ncv_options.within_cell = true;
+  ncv_options.query_indices = training.training_query_indices;
+  const SparseRowMatrix x = build_sparse_ncv_matrix(training.transcripts, ncv_options);
+  const int threads = std::max(1, num_threads);
+
+  if (is_weighted_ls_variant(opts.nmf_variant)) {
+    const auto column_weights = default_column_weights(x);
+    const DenseMatrix w = weighted_ls_usages_fixed_h(x, h, column_weights);
+    DenseMatrix reconstruction(x.rows(), x.cols(), 0.0);
+    for (int i = 0; i < x.rows(); ++i) {
+      for (int a = 0; a < rank; ++a) {
+        const double usage = w(i, a);
+        if (usage <= 0.0) continue;
+        for (int g = 0; g < n_genes; ++g) {
+          reconstruction(i, g) += usage * h(a, g);
+        }
+      }
+    }
+    return weighted_reconstruction_loss(x, reconstruction, column_weights);
+  }
+
+  // KL variants fit in the run's transformed feature space; profiles arrive
+  // in raw gene space and are carried into that space by the same per-gene
+  // weights.
+  NcvFeatureTransform transform;
+  transform.mode = opts.nmf_variant;
+  transform.gene_weights = manifest.nmf_gene_weights;
+  transform.target_row_sum = manifest.nmf_transform_target_row_sum;
+  const SparseRowMatrix x_t = transform_sparse_ncv_matrix(x, transform);
+  DenseMatrix h_t = h;
+  if (static_cast<int>(transform.gene_weights.size()) == n_genes) {
+    for (int f = 0; f < rank; ++f) {
+      for (int g = 0; g < n_genes; ++g) {
+        h_t(f, g) *= transform.gene_weights[static_cast<std::size_t>(g)];
+      }
+    }
+  }
+  const DenseMatrix w = project_rows_to_factors_kl(x_t, h_t, threads);
+  return sparse_kl_divergence(x_t, w, h_t, threads);
 }
 
 }  // namespace celladmix

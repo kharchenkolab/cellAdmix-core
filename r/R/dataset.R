@@ -376,13 +376,22 @@ CellAdmixDataset <- R6::R6Class(
             as.integer(round(20 * sqrt(n_genes / 400)))), call. = FALSE)
         }
       }
+      # Fixed profiles and their member pool are recorded by shape, not
+      # content, in the fit metadata.
+      params_dots <- dots
+      if (!is.null(dots$nmf_fixed_h)) {
+        params_dots$nmf_fixed_h <- NULL
+        params_dots$nmf_fixed_h_members <- NULL
+        params_dots$fixed_profiles <- TRUE
+        params_dots$fixed_profile_members <- length(dots$nmf_fixed_h_members %||% list())
+      }
       fit <- CellAdmixFit$new(
         dataset = self,
         run = run,
         annotation = ann,
-        rank = resolved_rank,
+        rank = if (!is.null(dots$nmf_fixed_h)) nrow(dots$nmf_fixed_h) else resolved_rank,
         params = c(list(rank_policy = "auto_annotation", rank_multiplier = rank_multiplier,
-          rank_cap = rank_cap, overwrite = isTRUE(overwrite)), dots)
+          rank_cap = rank_cap, overwrite = isTRUE(overwrite)), params_dots)
       )
       self$fits[[run_id]] <- fit
       fit$save_metadata()

@@ -811,6 +811,8 @@ nlohmann::json manifest_to_json(const RunManifest& manifest) {
       {"format_version", manifest.format_version},
       {"package_version", manifest.package_version},
       {"annotation_hash", manifest.annotation_hash},
+      {"fixed_profiles", manifest.fixed_profiles},
+      {"fixed_profile_members", manifest.fixed_profile_members},
       {"run_type", manifest.run_type},
       {"source",
        {
@@ -896,6 +898,8 @@ RunManifest manifest_from_json(const nlohmann::json& json, const std::filesystem
   manifest.format_version = json.at("format_version").get<std::string>();
   manifest.package_version = json.value("package_version", std::string{});
   manifest.annotation_hash = json.value("annotation_hash", std::string{});
+  manifest.fixed_profiles = json.value("fixed_profiles", false);
+  manifest.fixed_profile_members = json.value("fixed_profile_members", 0);
   manifest.run_type = json.at("run_type").get<std::string>();
   const auto& source = json.at("source");
   manifest.source.type = source.at("type").get<std::string>();

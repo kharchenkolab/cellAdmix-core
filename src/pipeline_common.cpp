@@ -5,8 +5,42 @@
 #include <cmath>
 #include <numeric>
 #include <stdexcept>
+#include <unordered_map>
 
 namespace celladmix {
+
+std::vector<double> align_profiles_to_genes(
+    const std::vector<double>& profiles,
+    int rank,
+    const std::vector<std::string>& profile_genes,
+    const std::vector<std::string>& target_genes,
+    int* matched) {
+  if (rank < 0 || profiles.size() != static_cast<std::size_t>(rank) * profile_genes.size()) {
+    throw std::runtime_error("align_profiles_to_genes: profiles must be rank x length(profile_genes)");
+  }
+  std::unordered_map<std::string, int> target_index;
+  target_index.reserve(target_genes.size());
+  for (std::size_t g = 0; g < target_genes.size(); ++g) {
+    target_index.emplace(target_genes[g], static_cast<int>(g));
+  }
+  std::vector<double> out(static_cast<std::size_t>(rank) * target_genes.size(), 0.0);
+  int found = 0;
+  for (std::size_t c = 0; c < profile_genes.size(); ++c) {
+    const auto hit = target_index.find(profile_genes[c]);
+    if (hit == target_index.end()) {
+      continue;
+    }
+    ++found;
+    for (int f = 0; f < rank; ++f) {
+      out[static_cast<std::size_t>(f) * target_genes.size() + static_cast<std::size_t>(hit->second)] =
+          profiles[static_cast<std::size_t>(f) * profile_genes.size() + c];
+    }
+  }
+  if (matched != nullptr) {
+    *matched = found;
+  }
+  return out;
+}
 
 DenseMatrix expand_h_to_full_genes(
     const DenseMatrix& compact_h,

@@ -28,7 +28,10 @@ test_that("core version and simulation helpers work", {
   expect_setequal(
     getNamespaceExports("cellAdmixCore"),
     c("CellAdmixAudit", "CellAdmixCleanupReport", "CellAdmixCorrection", "CellAdmixDataset", "CellAdmixFactorSourceScore",
-      "CellAdmixFit",
+      "CellAdmixFit", "CellAdmixCollection", "CellAdmixConsensusFit",
+      "CellAdmixCollectionScore", "CellAdmixCollectionCorrection",
+      "CellAdmixCollectionAudit", "CellAdmixCollectionCleanupReport",
+      "cellAdmixCollection",
       "CellAdmixScore", "cellAdmix", "celladmix_core_version",
       "celladmix_correction_impact", "celladmix_de",
       "celladmix_de_by_group", "celladmix_domain_composition",

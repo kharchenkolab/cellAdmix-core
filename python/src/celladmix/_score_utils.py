@@ -141,16 +141,18 @@ def _benjamini_hochberg(values: pd.Series) -> np.ndarray:
     out[order] = np.minimum(ranked, 1.0)
     return out
 
-def source_exposure_counts(cells: pd.DataFrame, annotation, *, neighbor_k: int = 15):
+def source_exposure_counts(cells: pd.DataFrame, annotation, *, neighbor_k: int = 15, types=None):
     """Count annotated cell types among each cell's k nearest neighbor cells.
 
     Returns ``(counts, types)`` where counts is an ``len(cells) x len(types)``
     array aligned to the rows of ``cells``. Unannotated cells occupy space as
-    neighbors but contribute no counts.
+    neighbors but contribute no counts. ``types`` fixes the column set, so
+    counts computed sample by sample (each within its own neighborhoods) can
+    be stacked.
     """
     from . import _core
 
-    types = sorted(map(str, pd.Series(annotation).dropna().unique()))
+    types = list(types) if types is not None else sorted(map(str, pd.Series(annotation).dropna().unique()))
     type_index = {t: i for i, t in enumerate(types)}
     codes = [
         type_index.get(str(annotation.get(str(c), None)), -1)
@@ -200,6 +202,8 @@ def apply_native_check(
     outlier_min_frac: float = 0.1,
     neighbor_k: int = 15,
     cell_factors: pd.DataFrame | None = None,
+    annotation=None,
+    exposure=None,
 ) -> pd.DataFrame:
     """Flag likely-native factor/target rules using source-distant cells.
 
@@ -221,11 +225,19 @@ def apply_native_check(
             rules[key] = values
         return rules
 
-    annotation = getattr(getattr(fit, "dataset", None), "annotation", None)
+    # The annotation, cell factors, and source exposure default to the fit's
+    # own; a caller pooling several samples supplies all three, with exposure
+    # computed within each sample and stacked as ``(counts, types)``.
+    if annotation is None:
+        annotation = getattr(getattr(fit, "dataset", None), "annotation", None)
     cells = cell_factors if cell_factors is not None else fit.cell_factors()
     if annotation is None or cells.empty:
         raise ValueError("native_check requires an annotation and cell factors")
-    counts, types = source_exposure_counts(cells, annotation, neighbor_k=neighbor_k)
+    if exposure is not None:
+        counts, types = exposure
+        types = list(types)
+    else:
+        counts, types = source_exposure_counts(cells, annotation, neighbor_k=neighbor_k)
     cell_types = np.array(
         [str(annotation.get(str(c), None)) for c in cells["cell_id"].astype(str)]
     )

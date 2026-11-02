@@ -69,6 +69,51 @@ TEST_CASE("Hungarian match maximizes total similarity") {
   }
 }
 
+TEST_CASE("Factor matching recovers a permutation and pads rectangular inputs") {
+  const DenseMatrix reference = from_rows({
+      {5.0, 4.0, 0.1, 0.0, 0.0, 0.2},
+      {0.1, 0.0, 6.0, 5.0, 0.0, 0.1},
+      {0.0, 0.2, 0.0, 0.1, 7.0, 6.0}});
+  const DenseMatrix permuted = from_rows({
+      {0.0, 0.3, 0.1, 0.0, 6.5, 6.5},
+      {5.5, 3.5, 0.0, 0.1, 0.0, 0.2},
+      {0.2, 0.0, 5.5, 5.5, 0.1, 0.0}});
+  const auto match = match_factor_profiles(permuted, reference);
+  REQUIRE_EQ(match.match.size(), 3U);
+  REQUIRE_EQ(match.match[0], 2);
+  REQUIRE_EQ(match.match[1], 0);
+  REQUIRE_EQ(match.match[2], 1);
+  for (const double value : match.correlation) {
+    REQUIRE(value > 0.9);
+  }
+
+  // Fewer reference factors than profiles: one profile stays unmatched.
+  const DenseMatrix two = from_rows({
+      {5.0, 4.0, 0.1, 0.0, 0.0, 0.2},
+      {0.1, 0.0, 6.0, 5.0, 0.0, 0.1}});
+  const auto partial = match_factor_profiles(permuted, two);
+  REQUIRE_EQ(partial.match[0], -1);
+  REQUIRE_EQ(partial.correlation[0], 0.0);
+  REQUIRE_EQ(partial.match[1], 0);
+  REQUIRE_EQ(partial.match[2], 1);
+}
+
+TEST_CASE("Profile alignment places genes by name, drops unknown ones, and zero-fills") {
+  const std::vector<double> profiles = {1.0, 2.0, 3.0,   // factor 0 over a, b, c
+                                        4.0, 5.0, 6.0};  // factor 1
+  int matched = 0;
+  const auto aligned = align_profiles_to_genes(
+      profiles, 2, {"a", "b", "c"}, {"c", "x", "a"}, &matched);
+  REQUIRE_EQ(matched, 2);
+  REQUIRE_EQ(aligned.size(), 6U);
+  REQUIRE_EQ(aligned[0], 3.0);
+  REQUIRE_EQ(aligned[1], 0.0);
+  REQUIRE_EQ(aligned[2], 1.0);
+  REQUIRE_EQ(aligned[3], 6.0);
+  REQUIRE_EQ(aligned[4], 0.0);
+  REQUIRE_EQ(aligned[5], 4.0);
+}
+
 TEST_CASE("Ownership profiles normalize genes across factors") {
   const DenseMatrix h = from_rows({
       {3.0, 0.0, 1.0, 5.0},

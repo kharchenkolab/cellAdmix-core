@@ -54,6 +54,14 @@ struct SparseNmfResult {
   std::vector<unsigned int> candidate_seeds;
 };
 
+// Generalized KL divergence of sparse rows x from the reconstruction w * h,
+// the objective of the KL solver without penalties.
+double sparse_kl_divergence(
+    const SparseRowMatrix& x,
+    const DenseMatrix& w,
+    const DenseMatrix& h,
+    int num_threads = 1);
+
 // Fit sparse NMF under the requested objective and initialization strategy.
 SparseNmfResult sparse_nmf(
     const SparseRowMatrix& x,

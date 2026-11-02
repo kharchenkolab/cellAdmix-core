@@ -181,8 +181,11 @@ CellAdmixScore <- R6::R6Class(
 #' Count annotated cell types among each cell's nearest neighbor cells
 #' @keywords internal
 #' @noRd
-.celladmix_source_exposure_counts <- function(cells, annotation, neighbor_k = 15L) {
-  types <- sort(unique(as.character(annotation[!is.na(annotation)])))
+.celladmix_source_exposure_counts <- function(cells, annotation, neighbor_k = 15L,
+                                              types = NULL) {
+  # `types` fixes the column set, so that counts computed sample by sample
+  # (each with its own neighborhoods) can be stacked.
+  types <- types %||% sort(unique(as.character(annotation[!is.na(annotation)])))
   codes <- match(as.character(annotation[as.character(cells$cell_id)]), types)
   codes[is.na(codes)] <- 0L
   counts <- .celladmix_cell_neighbor_type_counts(
@@ -239,7 +242,9 @@ CellAdmixScore <- R6::R6Class(
     expr_thresh = 0.05,
     outlier_min_frac = 0.1,
     neighbor_k = 15L,
-    cell_factors = NULL
+    cell_factors = NULL,
+    annotation = NULL,
+    exposure = NULL
   ) {
   empty_cols <- function(df) {
     df$keep <- logical(0)
@@ -254,14 +259,17 @@ CellAdmixScore <- R6::R6Class(
   if (is.null(rules) || !nrow(rules)) {
     return(if (is.null(rules)) rules else empty_cols(rules))
   }
-  annotation <- tryCatch(
+  # The annotation, cell factors, and source exposure default to the fit's
+  # own; a caller pooling several samples supplies all three, with exposure
+  # computed within each sample and stacked.
+  annotation <- annotation %||% tryCatch(
     fit$dataset$annotation(fit$annotation_name, as_vector = TRUE),
     error = function(e) NULL)
   cells <- cell_factors %||% fit$cell_factors()
   if (is.null(annotation) || !nrow(cells)) {
     stop("native_check requires an annotation and cell factors")
   }
-  exposure <- .celladmix_source_exposure_counts(cells, annotation, neighbor_k)
+  exposure <- exposure %||% .celladmix_source_exposure_counts(cells, annotation, neighbor_k)
   counts <- exposure$counts
   types <- exposure$types
   cell_types <- as.character(annotation[as.character(cells$cell_id)])

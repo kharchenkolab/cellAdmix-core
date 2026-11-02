@@ -683,7 +683,11 @@ class CellAdmixAudit:
                 admixed_molecules=round(d["excess"] / d["coverage"]),
                 excess=round(d["excess"]), sensitivity=sens,
                 sensitivity_strict=sens_strict))
-        pairs = pd.DataFrame(rows)
+        # An audit with no detected pairs evaluates to an empty table with
+        # the usual columns, so downstream summaries stay well defined.
+        pairs = pd.DataFrame(rows, columns=[
+            "source", "target", "admixed_molecules", "excess",
+            "sensitivity", "sensitivity_strict"]) if not rows else pd.DataFrame(rows)
         fr_rows = []
         for t, gene_idx in self._native_markers.items():
             tc = self._ctypes.index[self._ctypes == t]

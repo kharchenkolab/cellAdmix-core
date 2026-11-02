@@ -38,7 +38,9 @@
 #include "celladmix/ncv.hpp"
 #include "celladmix/nmf_euclidean.hpp"
 #include "celladmix/nmf_kl.hpp"
+#include "celladmix/nmf_stability.hpp"
 #include "celladmix/pipeline.hpp"
+#include "celladmix/pipeline_common.hpp"
 #include "celladmix/pipeline_store.hpp"
 #include "celladmix/report_embedding.hpp"
 #include "celladmix/run_store.hpp"
@@ -1863,6 +1865,8 @@ List run_manifest_to_r(const celladmix::RunManifest& manifest) {
       _["run_type"] = manifest.run_type,
       _["package_version"] = manifest.package_version,
       _["annotation_hash"] = manifest.annotation_hash,
+      _["fixed_profiles"] = manifest.fixed_profiles,
+      _["fixed_profile_members"] = manifest.fixed_profile_members,
       _["source"] = source,
       _["paths"] = paths,
       _["pipeline_options"] = pipeline_options,
@@ -3867,6 +3871,97 @@ extern "C" SEXP _cellAdmixCore_celladmix_cluster_run_counts(
   return R_NilValue;
 }
 
+// Row-major copy of an R numeric matrix (factors x genes).
+std::vector<double> row_major_profiles(const Rcpp::NumericMatrix& matrix) {
+  std::vector<double> out(static_cast<std::size_t>(matrix.nrow()) * static_cast<std::size_t>(matrix.ncol()));
+  for (int f = 0; f < matrix.nrow(); ++f) {
+    for (int c = 0; c < matrix.ncol(); ++c) {
+      out[static_cast<std::size_t>(f) * static_cast<std::size_t>(matrix.ncol()) + static_cast<std::size_t>(c)] =
+          matrix(f, c);
+    }
+  }
+  return out;
+}
+
+celladmix::DenseMatrix dense_matrix_from_r(const Rcpp::NumericMatrix& matrix) {
+  celladmix::DenseMatrix out(matrix.nrow(), matrix.ncol(), 0.0);
+  for (int i = 0; i < matrix.nrow(); ++i) {
+    for (int j = 0; j < matrix.ncol(); ++j) {
+      out(i, j) = matrix(i, j);
+    }
+  }
+  return out;
+}
+
+extern "C" SEXP _cellAdmixCore_celladmix_ensemble_h(SEXP path_sexp) {
+  try {
+    const std::string run_path = as<std::string>(path_sexp);
+    const auto pool = celladmix::load_ensemble_h(run_path);
+    const auto manifest = celladmix::read_run_manifest(run_path);
+    List out(static_cast<R_xlen_t>(pool.size()));
+    for (std::size_t m = 0; m < pool.size(); ++m) {
+      NumericMatrix matrix = matrix_to_r(pool[m]);
+      if (static_cast<std::size_t>(matrix.ncol()) == manifest.genes.size()) {
+        Rcpp::colnames(matrix) = wrap(manifest.genes);
+      }
+      out[static_cast<R_xlen_t>(m)] = matrix;
+    }
+    return out;
+  } catch (std::exception& ex) {
+    forward_exception_to_r(ex);
+  } catch (...) {
+    ::Rf_error("celladmix_ensemble_h: unknown C++ exception");
+  }
+  return R_NilValue;
+}
+
+extern "C" SEXP _cellAdmixCore_celladmix_match_factors(
+    SEXP profiles_sexp,
+    SEXP reference_sexp) {
+  try {
+    const auto match = celladmix::match_factor_profiles(
+        dense_matrix_from_r(Rcpp::NumericMatrix(profiles_sexp)),
+        dense_matrix_from_r(Rcpp::NumericMatrix(reference_sexp)));
+    Rcpp::IntegerVector matched(static_cast<R_xlen_t>(match.match.size()));
+    for (std::size_t i = 0; i < match.match.size(); ++i) {
+      matched[static_cast<R_xlen_t>(i)] = match.match[i] < 0 ? NA_INTEGER : match.match[i] + 1;
+    }
+    return List::create(
+        _["match"] = matched,
+        _["correlation"] = wrap(match.correlation));
+  } catch (std::exception& ex) {
+    forward_exception_to_r(ex);
+  } catch (...) {
+    ::Rf_error("celladmix_match_factors: unknown C++ exception");
+  }
+  return R_NilValue;
+}
+
+extern "C" SEXP _cellAdmixCore_celladmix_training_loss(
+    SEXP run_path_sexp,
+    SEXP profiles_sexp,
+    SEXP genes_sexp,
+    SEXP num_threads_sexp) {
+  try {
+    const std::string run_path = as<std::string>(run_path_sexp);
+    const auto manifest = celladmix::read_run_manifest(run_path);
+    const Rcpp::NumericMatrix h_in(profiles_sexp);
+    const auto genes = optional_string_vector_sexp(genes_sexp);
+    if (static_cast<int>(genes.size()) != h_in.ncol()) {
+      throw std::runtime_error("profiles must carry one gene name per column");
+    }
+    const auto aligned = celladmix::align_profiles_to_genes(
+        row_major_profiles(h_in), h_in.nrow(), genes, manifest.genes);
+    return wrap(celladmix::training_loss_under_profiles(
+        run_path, aligned, h_in.nrow(), as<int>(num_threads_sexp)));
+  } catch (std::exception& ex) {
+    forward_exception_to_r(ex);
+  } catch (...) {
+    ::Rf_error("celladmix_training_loss: unknown C++ exception");
+  }
+  return R_NilValue;
+}
+
 extern "C" SEXP _cellAdmixCore_celladmix_fit_store_run(
     SEXP store_dir_sexp,
     SEXP analysis_crop_sexp,
@@ -3893,7 +3988,8 @@ extern "C" SEXP _cellAdmixCore_celladmix_fit_store_run(
     SEXP report_ncv_umap_sexp,
     SEXP verbose_sexp,
     SEXP nmf_fixed_h_sexp,
-    SEXP nmf_fixed_h_genes_sexp) {
+    SEXP nmf_fixed_h_genes_sexp,
+    SEXP nmf_fixed_h_members_sexp) {
   try {
     const auto fit_start = std::chrono::steady_clock::now();
     auto stage_start = fit_start;
@@ -3961,28 +4057,27 @@ extern "C" SEXP _cellAdmixCore_celladmix_fit_store_run(
       if (static_cast<int>(h_genes.size()) != h_in.ncol()) {
         throw std::runtime_error("nmf_fixed_h_genes must name every column of nmf_fixed_h");
       }
-      std::unordered_map<std::string, int> gene_index;
-      for (std::size_t g = 0; g < counts.genes.size(); ++g) {
-        gene_index[counts.genes[g]] = static_cast<int>(g);
-      }
       const int rank_in = h_in.nrow();
-      pipeline_options.nmf_fixed_h.assign(
-          static_cast<std::size_t>(rank_in) * counts.genes.size(), 0.0);
       int matched = 0;
-      for (int c = 0; c < h_in.ncol(); ++c) {
-        const auto hit = gene_index.find(h_genes[static_cast<std::size_t>(c)]);
-        if (hit == gene_index.end()) {
-          continue;
-        }
-        ++matched;
-        for (int f = 0; f < rank_in; ++f) {
-          pipeline_options.nmf_fixed_h[
-              static_cast<std::size_t>(f) * counts.genes.size() +
-              static_cast<std::size_t>(hit->second)] = h_in(f, c);
-        }
-      }
+      pipeline_options.nmf_fixed_h = celladmix::align_profiles_to_genes(
+          row_major_profiles(h_in), rank_in, h_genes, counts.genes, &matched);
       if (matched < 2) {
         throw std::runtime_error("nmf_fixed_h genes do not match the input store gene vocabulary");
+      }
+      if (nmf_fixed_h_members_sexp != R_NilValue) {
+        // Member matrices share the fixed profiles' gene columns and factor
+        // count; they follow the fixed profiles into the run's member pool.
+        const Rcpp::List members(nmf_fixed_h_members_sexp);
+        for (R_xlen_t m = 0; m < members.size(); ++m) {
+          const Rcpp::NumericMatrix member(members[m]);
+          if (member.nrow() != rank_in || member.ncol() != h_in.ncol()) {
+            throw std::runtime_error("nmf_fixed_h_members matrices must be shaped like nmf_fixed_h");
+          }
+          const auto aligned = celladmix::align_profiles_to_genes(
+              row_major_profiles(member), rank_in, h_genes, counts.genes);
+          pipeline_options.nmf_fixed_h_members.insert(
+              pipeline_options.nmf_fixed_h_members.end(), aligned.begin(), aligned.end());
+        }
       }
     }
     stage_start = std::chrono::steady_clock::now();

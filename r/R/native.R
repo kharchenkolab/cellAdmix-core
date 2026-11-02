@@ -264,7 +264,8 @@
     report_ncv_umap = FALSE,
     verbose = FALSE,
     nmf_fixed_h = NULL,
-    nmf_fixed_h_genes = NULL
+    nmf_fixed_h_genes = NULL,
+    nmf_fixed_h_members = NULL
   ) {
   .Call(
     "_cellAdmixCore_celladmix_fit_store_run",
@@ -294,6 +295,45 @@
     isTRUE(verbose),
     if (is.null(nmf_fixed_h)) NULL else as.matrix(nmf_fixed_h),
     if (is.null(nmf_fixed_h_genes)) NULL else as.character(nmf_fixed_h_genes),
+    if (is.null(nmf_fixed_h_members)) NULL else lapply(nmf_fixed_h_members, as.matrix),
+    PACKAGE = "cellAdmixCore"
+  )
+}
+
+# Every restart's profile matrix persisted with a run (its ensemble member
+# pool), as factor x gene matrices with gene column names; empty when the
+# run carries no pool.
+.celladmix_ensemble_h <- function(run_path) {
+  .Call("_cellAdmixCore_celladmix_ensemble_h", as.character(run_path[[1]]),
+    PACKAGE = "cellAdmixCore")
+}
+
+# One-to-one matching of the factors (rows) of `profiles` to those of
+# `reference` by gene-ownership correlation; both are factor x gene matrices
+# over the same gene columns. Returns 1-based matched rows (NA when the
+# reference has fewer factors) and the matched correlations.
+.celladmix_match_factors <- function(profiles, reference) {
+  .Call(
+    "_cellAdmixCore_celladmix_match_factors",
+    as.matrix(profiles),
+    as.matrix(reference),
+    PACKAGE = "cellAdmixCore"
+  )
+}
+
+# Loss of a run's sampled training rows under the given gene profiles
+# (factor x gene matrix with gene column names), in the run's NMF objective.
+.celladmix_training_loss <- function(run_path, profiles, num_threads = 1L) {
+  profiles <- as.matrix(profiles)
+  if (is.null(colnames(profiles))) {
+    stop("profiles must carry gene names as column names")
+  }
+  .Call(
+    "_cellAdmixCore_celladmix_training_loss",
+    as.character(run_path[[1]]),
+    profiles,
+    as.character(colnames(profiles)),
+    as.integer(num_threads),
     PACKAGE = "cellAdmixCore"
   )
 }

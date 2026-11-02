@@ -1,5 +1,6 @@
 #include "celladmix/nmf_stability.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 #include <stdexcept>
@@ -140,6 +141,36 @@ std::vector<int> hungarian_match(const DenseMatrix& similarity) {
     }
   }
   return match;
+}
+
+FactorMatchResult match_factor_profiles(
+    const DenseMatrix& profiles,
+    const DenseMatrix& reference) {
+  if (profiles.cols() != reference.cols()) {
+    throw std::runtime_error("match_factor_profiles: gene dimensions differ");
+  }
+  const DenseMatrix lhs = ownership_profiles(profiles);
+  const DenseMatrix rhs = ownership_profiles(reference);
+  const DenseMatrix correlations = row_correlation_matrix(lhs, rhs);
+  const int n = std::max(profiles.rows(), reference.rows());
+  DenseMatrix padded(n, n, 0.0);
+  for (int i = 0; i < profiles.rows(); ++i) {
+    for (int j = 0; j < reference.rows(); ++j) {
+      padded(i, j) = correlations(i, j);
+    }
+  }
+  const auto assignment = hungarian_match(padded);
+  FactorMatchResult out;
+  out.match.assign(static_cast<std::size_t>(profiles.rows()), -1);
+  out.correlation.assign(static_cast<std::size_t>(profiles.rows()), 0.0);
+  for (int i = 0; i < profiles.rows(); ++i) {
+    const int j = assignment[static_cast<std::size_t>(i)];
+    if (j < reference.rows()) {
+      out.match[static_cast<std::size_t>(i)] = j;
+      out.correlation[static_cast<std::size_t>(i)] = correlations(i, j);
+    }
+  }
+  return out;
 }
 
 FactorStabilityResult matched_ownership_stability(

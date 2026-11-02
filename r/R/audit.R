@@ -863,7 +863,10 @@ CellAdmixAudit <- R6::R6Class(
           sensitivity_strict = sens_strict,
           stringsAsFactors = FALSE)
       }
-      pairs <- do.call(rbind, rows)
+      pairs <- if (length(rows)) do.call(rbind, rows) else data.frame(
+        source = character(), target = character(), admixed_molecules = numeric(),
+        excess = numeric(), excess_strict = numeric(), sensitivity = numeric(),
+        sensitivity_strict = numeric(), stringsAsFactors = FALSE)
       rownames(pairs) <- NULL
       fr <- do.call(rbind, lapply(names(private$.native_markers), function(t) {
         tc <- names(private$.cell_types)[!is.na(private$.cell_types) &

@@ -6,6 +6,14 @@ from .fit import CellAdmixFit
 from .score import CellAdmixScore
 from .correction import CellAdmixCorrection
 from .audit import CellAdmixAudit, CellAdmixCleanupReport
+from .collection import (
+    CellAdmixCollection,
+    CellAdmixCollectionAudit,
+    CellAdmixCollectionCleanupReport,
+    CellAdmixCollectionCorrection,
+    CellAdmixCollectionScore,
+    CellAdmixConsensusFit,
+)
 from .io import read_annotation
 from .plotting import plot_spatial
 from .spatialdata import add_corrected_counts_to_spatialdata, add_fit_to_spatialdata, from_spatialdata
@@ -19,6 +27,12 @@ __all__ = [
     "CellAdmixFit",
     "CellAdmixScore",
     "CellAdmixCorrection",
+    "CellAdmixCollection",
+    "CellAdmixConsensusFit",
+    "CellAdmixCollectionScore",
+    "CellAdmixCollectionCorrection",
+    "CellAdmixCollectionAudit",
+    "CellAdmixCollectionCleanupReport",
     "read_annotation",
     "plot_spatial",
     "annotation_knn_purity",

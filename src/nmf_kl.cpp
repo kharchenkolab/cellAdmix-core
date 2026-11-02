@@ -731,6 +731,16 @@ SparseNmfResult sparse_nmf_multirun(
 
 }  // namespace
 
+double sparse_kl_divergence(
+    const SparseRowMatrix& x,
+    const DenseMatrix& w,
+    const DenseMatrix& h,
+    int num_threads) {
+  SparseNmfOptions options;
+  options.num_threads = num_threads;
+  return generalized_kl_objective(x, w, h, options);
+}
+
 // Validate arguments and fit the sparse production NMF solver.
 SparseNmfResult sparse_nmf(
     const SparseRowMatrix& x,

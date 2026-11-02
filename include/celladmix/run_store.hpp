@@ -76,6 +76,11 @@ struct RunManifest {
   std::string package_version;
   std::string annotation_hash;
   std::string run_type = "fit";
+  // Fixed-profile runs: gene profiles were supplied rather than fitted;
+  // fixed_profile_members counts the ensemble members they carry (the fixed
+  // profiles plus any supplied member pool; 0 when none).
+  bool fixed_profiles = false;
+  int fixed_profile_members = 0;
   RunSourceInfo source;
   RunPaths paths;
   BasicPipelineOptions pipeline_options;

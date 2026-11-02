@@ -251,6 +251,29 @@ as the `coverage` column of `audit.pairs()`. Pair detection itself remains
 based on the rise of exposed cells over unexposed ones, which no reference
 choice can inflate.
 
+## Multi-Sample Processing
+
+Samples that share one annotation scheme can be processed with one shared
+factor space and one pooled rule set, so that replicates are treated by the
+same procedure:
+
+```python
+collection = ca.CellAdmixCollection({"rep1": ds1, "rep2": ds2})
+consensus = collection.fit_consensus()
+score = consensus.score_bridge()
+rules = score.rules()             # pooled evidence, sample_support per rule
+correction = score.correct(rules=rules)
+counts, genes, cells = correction.counts(sample="rep1")
+```
+
+The consensus factorization matches the per-sample factors, averages them
+into shared profiles, and projects every sample onto them; scoring pools
+the per-sample evidence, and correction and audit run per sample. A single
+dataset can be fitted against given profiles with
+`ds.fit(nmf_fixed_h=profiles, nmf_fixed_h_members=members)`, where
+`profiles` is a factor-by-gene frame with gene columns. See
+[multisample.md](multisample.md) for the method and the diagnostics.
+
 ## SpatialData API
 
 SpatialData integration keeps SpatialData as the Python-side source of

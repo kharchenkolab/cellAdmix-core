@@ -1,0 +1,29 @@
+"arm","stage","cell_type","cells_a","cells_b","correlation","n_de","n_blocks_a","n_blocks_b"
+"uncorrected","before","Ductal/tumor epithelial",18759,11227,0.846663774944139,145,15,11
+"uncorrected","before","Endocrine",700,1512,0.838694035570577,17,5,8
+"uncorrected","before","Endothelial",3374,3652,0.904199660283599,49,15,11
+"uncorrected","before","Exocrine epithelial",2857,33472,0.967797678472169,79,8,11
+"uncorrected","before","Fibroblast / CAF",22046,6320,0.94657639241106,36,15,11
+"uncorrected","before","Immune",11496,7755,0.930095949659035,65,15,11
+"uncorrected","before","Mural / pericyte",1315,1238,0.856976031821429,9,14,8
+"separate","after","Ductal/tumor epithelial",18759,11227,0.826601236842726,170,15,11
+"separate","after","Endocrine",700,1512,0.838694035570577,17,5,8
+"separate","after","Endothelial",3374,3652,0.712544531624709,81,15,11
+"separate","after","Exocrine epithelial",2857,33472,0.849961400035865,100,8,11
+"separate","after","Fibroblast / CAF",22046,6320,0.92413112938843,52,15,11
+"separate","after","Immune",11496,7755,0.874151113999415,83,15,11
+"separate","after","Mural / pericyte",1315,1238,0.598153048147247,28,14,8
+"consensus","after","Ductal/tumor epithelial",18759,11227,0.857170637575164,142,15,11
+"consensus","after","Endocrine",700,1512,0.788042402926726,25,5,8
+"consensus","after","Endothelial",3374,3652,0.833484252408813,68,15,11
+"consensus","after","Exocrine epithelial",2857,33472,0.880798035842634,90,8,11
+"consensus","after","Fibroblast / CAF",22046,6320,0.905348990159994,60,15,11
+"consensus","after","Immune",11496,7755,0.913807753286549,69,15,11
+"consensus","after","Mural / pericyte",1315,1238,0.586707696431262,24,14,8
+"joint","after","Ductal/tumor epithelial",18759,11227,0.889077043758091,114,15,12
+"joint","after","Endocrine",700,1512,0.838694035570577,19,5,8
+"joint","after","Endothelial",3374,3652,0.897254440560693,37,15,11
+"joint","after","Exocrine epithelial",2857,33472,0.964426743222452,87,8,11
+"joint","after","Fibroblast / CAF",22046,6320,0.936249621623347,48,15,11
+"joint","after","Immune",11496,7755,0.92579540477418,69,15,11
+"joint","after","Mural / pericyte",1315,1238,0.851717619372514,8,14,8

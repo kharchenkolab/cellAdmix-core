@@ -21,6 +21,17 @@ DenseMatrix expand_h_to_full_genes(
     const std::vector<int>& kept_cols);
 
 // Return true for the weighted least-squares NMF compatibility mode.
+// Place profiles given over `profile_genes` (row-major, rank x genes) onto
+// `target_genes`: columns are matched by gene name, genes absent from the
+// target are dropped, and target genes absent from the profiles get zero
+// loadings. `matched`, when supplied, receives the number of genes found.
+std::vector<double> align_profiles_to_genes(
+    const std::vector<double>& profiles,
+    int rank,
+    const std::vector<std::string>& profile_genes,
+    const std::vector<std::string>& target_genes,
+    int* matched = nullptr);
+
 bool is_weighted_ls_variant(const std::string& mode);
 
 // Resolve the automatic NCV neighborhood size for a panel and cell-size

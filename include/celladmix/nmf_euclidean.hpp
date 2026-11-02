@@ -73,6 +73,16 @@ WeightedNmfResult weighted_nmf(
     const std::vector<double>& column_weights,
     const WeightedNmfOptions& options = {});
 
+// Row usages for fixed profiles h under the weighted Euclidean objective,
+// by multiplicative updates from the normalized projection (scaled to the
+// row totals). Used to evaluate a profile set on rows it was not fitted on.
+DenseMatrix weighted_ls_usages_fixed_h(
+    const SparseRowMatrix& x,
+    const DenseMatrix& h,
+    const std::vector<double>& column_weights,
+    int iterations = 100,
+    double epsilon = 1e-10);
+
 // Project dense rows into Euclidean factor space with fixed H.
 DenseMatrix project_to_factors(const DenseMatrix& x, const DenseMatrix& h);
 // Project sparse rows into Euclidean factor space with fixed H.

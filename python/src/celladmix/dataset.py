@@ -66,6 +66,34 @@ def _fit_param_diff(manifest: dict, requested: dict, annotation_hash: str) -> li
     return diff
 
 
+def _fixed_profile_arguments(profiles, members):
+    """Flatten fixed profiles (a factor x gene frame with gene columns) and
+    an optional list of member frames of the same shape into the binding's
+    row-major vectors; ``None`` when no profiles were given."""
+    if profiles is None:
+        if members is not None:
+            raise ValueError("nmf_fixed_h_members requires nmf_fixed_h")
+        return None
+    frame = pd.DataFrame(profiles)
+    genes = [str(g) for g in frame.columns]
+    out = {
+        "nmf_fixed_h": frame.to_numpy(dtype=float).ravel(order="C").tolist(),
+        "nmf_fixed_h_genes": genes,
+    }
+    if members:
+        flat = []
+        for member in members:
+            member = pd.DataFrame(member)
+            if member.shape[0] != frame.shape[0]:
+                raise ValueError("every nmf_fixed_h_members frame must have as many factors as nmf_fixed_h")
+            missing = [g for g in genes if g not in member.columns]
+            if missing:
+                raise ValueError("nmf_fixed_h_members frames must carry the gene columns of nmf_fixed_h")
+            flat.extend(member[genes].to_numpy(dtype=float).ravel(order="C").tolist())
+        out["nmf_fixed_h_members"] = flat
+    return out
+
+
 class CellAdmix:
     """A cellAdmix dataset backed by a Xenium bundle and an on-disk cache."""
 
@@ -248,10 +276,23 @@ class CellAdmix:
         10 independent NMF restarts are run (more with higher thread counts),
         so the stability diagnostic and the ensemble correction have a full
         member pool.
+
+        ``nmf_fixed_h`` (a factor-by-gene frame with gene columns) replaces
+        the factorization by a fixed-profile projection: every molecule is
+        labeled against the given profiles in their given order, and
+        ``nmf_fixed_h_members`` (a list of frames of the same shape) becomes
+        the run's ensemble member pool. Multi-sample consensus fits use this
+        step; see :class:`celladmix.CellAdmixCollection`.
         """
         self.ensure_store(force=False)
         threads = int(num_threads or self.num_threads)
         explicit_n_runs = nmf_n_runs
+        fixed = _fixed_profile_arguments(
+            kwargs.pop("nmf_fixed_h", None), kwargs.pop("nmf_fixed_h_members", None))
+        if fixed is not None:
+            # Supplied profiles define the factor count and are labeled
+            # against as given (fixed-profile projection).
+            rank = int(len(fixed["nmf_fixed_h"]) // len(fixed["nmf_fixed_h_genes"]))
         rank = int(rank or recommended_rank(self.annotation, multiplier=rank_multiplier, cap=rank_cap))
         nmf_n_runs = int(nmf_n_runs or max(threads, 10))
         run_id = run_id or f"fit_rank{rank}_{nmf_variant}"
@@ -299,6 +340,7 @@ class CellAdmix:
             training_cell_strata=training_strata,
             annotation_hash=annotation_hash,
             verbose=verbose,
+            **(fixed or {}),
             **kwargs,
         )
         explicit_ncv_k = kwargs.get("ncv_k")
