@@ -501,11 +501,13 @@ class CellAdmixCollectionScore:
         The molecule-vote ensemble is shared across samples: the member pool
         is the same in every sample's run, each member is scored in every
         sample, its evidence pooled like the primary evidence, and one member
-        rule set votes in every sample. The member scorings run concurrently,
-        one (sample, member) job per worker process, with as many workers as
-        fit the thread budget given each dataset's ``num_threads``;
-        ``num_threads`` sets the budget (default: the number of available
-        cores).
+        rule set votes in every sample. The per-sample steps (labeling each
+        sample's molecules with every member, scoring every member in every
+        sample, and the vote in each sample) are independent jobs that run
+        concurrently in forked worker processes, as many at a time as fit a
+        thread budget given the threads each job uses; ``num_threads`` sets
+        the budget (default: the ``CELLADMIX_NUM_THREADS`` environment
+        variable, or else the number of available cores).
         """
         import math
 
@@ -526,8 +528,7 @@ class CellAdmixCollectionScore:
         member_rules = None
         members: list[int] = []
         if ensemble > 1:
-            available = min(_core.ensemble_prepare(str(fit.run_path), int(fit.dataset.num_threads))
-                            for fit in fits.values())
+            available = min(self._prepare_members(num_threads))
             if available < 2:
                 print("Runs carry no shared ensemble member pool; applying single-fit corrections.")
             else:
@@ -538,13 +539,18 @@ class CellAdmixCollectionScore:
                                                          adjust_p=adjust_p, targets=targets,
                                                          num_threads=num_threads)
         min_votes = max(1, math.ceil(vote * len(members))) if members else 1
-        corrections = {}
-        for s in samples:
-            if member_rules is None:
-                corrections[s] = fits[s].correct(kept, name=name)
-            else:
-                corrections[s] = fits[s].correct(member_rules["rules"], name=name,
-                                                 rule_members=member_rules["member"], min_votes=min_votes)
+        # The vote in each sample is an independent single-threaded job; the
+        # samples are processed concurrently within the thread budget.
+        if member_rules is None:
+            vote_args = dict(rules=kept)
+        else:
+            vote_args = dict(rules=member_rules["rules"], rule_members=member_rules["member"],
+                             min_votes=min_votes)
+        manifests = _run_jobs(
+            lambda s: fits[s]._correct_run(name=name, **vote_args), samples,
+            workers=_parallel_workers(num_threads, 1, len(samples)))
+        corrections = {s: fits[s]._make_correction(name, manifest, vote_args["rules"])
+                       for s, manifest in zip(samples, manifests)}
         rules = rules.copy()
         if member_rules is not None:
             from .score import _rule_support
@@ -595,32 +601,37 @@ class CellAdmixCollectionScore:
         return cells.drop(columns=[c for c in cells.columns if c.endswith("_fraction")]).merge(
             frame, on="cell_id", how="left")
 
+    def _threads_per_sample(self) -> int:
+        """Threads one job on a sample uses: the largest dataset thread count."""
+        return max(int(getattr(fit.dataset, "num_threads", 1) or 1) for fit in self.consensus.fits.values())
+
+    def _prepare_members(self, num_threads: Optional[int] = None) -> list:
+        """Make sure every sample's run carries one labeling of its molecules
+        per member of the shared pool (written once, then reused) and return
+        the number of members available per sample. The samples are prepared
+        concurrently, each with its dataset's thread count."""
+        from . import _core
+
+        fits = self.consensus.fits
+
+        def prepare(sample):
+            fit = fits[sample]
+            return int(_core.ensemble_prepare(str(fit.run_path), int(fit.dataset.num_threads)))
+
+        return _run_jobs(prepare, list(fits),
+                         workers=_parallel_workers(num_threads, self._threads_per_sample(), len(fits)))
+
     def _score_members(self, members, num_threads: Optional[int] = None) -> None:
         """Score the given ensemble members in every sample. The (sample,
-        member) jobs are independent and run in forked worker processes, as
-        many as the thread budget allows given each dataset's own thread
-        count; each worker writes its summary to the run's cache, which the
-        parent then reads."""
-        global _FORKED_SCORE
-
+        member) jobs are independent and run concurrently, as many as the
+        thread budget allows given each dataset's own thread count; each
+        worker writes its summary to the run's cache, which the parent then
+        reads."""
         jobs = [(s, int(m)) for m in members for s in self.sample_scores]
         if not jobs:
             return
-        per_job = max(int(getattr(fit.dataset, "num_threads", 1) or 1) for fit in self.consensus.fits.values())
-        workers = _parallel_workers(num_threads, per_job, len(jobs))
-        if workers <= 1:
-            for s, m in jobs:
-                self._member_summary(s, m)
-            return
-        import multiprocessing
-
-        context = multiprocessing.get_context("fork")
-        _FORKED_SCORE = self
-        try:
-            with context.Pool(workers, maxtasksperchild=1) as pool:
-                pool.map(_score_member_job, jobs, chunksize=1)
-        finally:
-            _FORKED_SCORE = None
+        _run_jobs(lambda job: self._member_summary(*job), jobs,
+                  workers=_parallel_workers(num_threads, self._threads_per_sample(), len(jobs)))
 
     def _pooled_member_rules(self, members, selected, primary_rules, *, p_thresh, adjust_p, targets,
                              num_threads: Optional[int] = None) -> dict:
@@ -1118,26 +1129,57 @@ def _training_loss(run_path: str, profiles: pd.DataFrame, num_threads: int = 1) 
         int(profiles.shape[0]), [str(g) for g in profiles.columns], int(num_threads)))
 
 
-_FORKED_SCORE = None  # the score object a forked scoring worker inherits
+_FORKED_JOB = None  # the function a forked worker inherits and applies
 
 
-def _score_member_job(job) -> None:
-    sample, member = job
-    _FORKED_SCORE._member_summary(sample, member)
+def _forked_job(item):
+    return _FORKED_JOB(item)
+
+
+def _run_jobs(fn, items, workers: int) -> list:
+    """Apply ``fn`` to every item in forked worker processes (``workers`` at a
+    time; in this process when ``workers`` is 1) and return the results in
+    order. An error in any job is raised here."""
+    global _FORKED_JOB
+
+    items = list(items)
+    if not items:
+        return []
+    if workers <= 1:
+        return [fn(item) for item in items]
+    import multiprocessing
+
+    context = multiprocessing.get_context("fork")
+    _FORKED_JOB = fn
+    try:
+        with context.Pool(workers, maxtasksperchild=1) as pool:
+            return pool.map(_forked_job, items, chunksize=1)
+    finally:
+        _FORKED_JOB = None
 
 
 def _parallel_workers(num_threads: Optional[int], per_job: int, n_jobs: int) -> int:
     """Number of concurrent worker processes for independent jobs that each
-    use ``per_job`` threads, within a total thread budget (default: all cores)."""
+    use ``per_job`` threads, within a total thread budget: ``num_threads``, or
+    by default the ``CELLADMIX_NUM_THREADS`` environment variable, or else
+    every available core. Jobs run sequentially on Windows, which cannot
+    fork."""
     import os
     import sys
 
     if sys.platform.startswith("win"):
         return 1
-    if num_threads is None:
-        budget = os.cpu_count() or 1
+    if num_threads is not None:
+        budget = int(num_threads)
     else:
-        budget = max(1, int(num_threads))
+        env = os.environ.get("CELLADMIX_NUM_THREADS", "")
+        budget = int(env) if env.strip().isdigit() and int(env) > 0 else 0
+        if budget < 1:
+            try:
+                budget = len(os.sched_getaffinity(0))
+            except (AttributeError, OSError):
+                budget = os.cpu_count() or 1
+    budget = max(1, budget)
     return max(1, min(n_jobs, budget // max(1, per_job)))
 
 

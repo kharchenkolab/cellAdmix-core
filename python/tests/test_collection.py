@@ -95,6 +95,38 @@ class CollectionTests(unittest.TestCase):
         np.testing.assert_allclose(_weighted_median(np.array([[1.0], [2.0], [10.0]]), np.array([1.0, 1.0, 5.0])), [10.0])
         np.testing.assert_allclose(_weighted_median(np.array([[1.0], [2.0], [10.0]]), np.array([5.0, 1.0, 1.0])), [1.0])
 
+    def test_worker_counts_follow_the_thread_budget_and_jobs_report_errors(self):
+        import os
+        import sys
+
+        from celladmix.collection import _parallel_workers, _run_jobs
+
+        if sys.platform.startswith("win"):
+            self.skipTest("forked workers are not available on Windows")
+        self.assertEqual(_parallel_workers(16, 4, 10), 4)
+        self.assertEqual(_parallel_workers(16, 4, 2), 2)
+        self.assertEqual(_parallel_workers(2, 4, 10), 1)
+        saved = os.environ.get("CELLADMIX_NUM_THREADS")
+        os.environ["CELLADMIX_NUM_THREADS"] = "6"
+        try:
+            self.assertEqual(_parallel_workers(None, 2, 10), 3)
+        finally:
+            if saved is None:
+                del os.environ["CELLADMIX_NUM_THREADS"]
+            else:
+                os.environ["CELLADMIX_NUM_THREADS"] = saved
+        self.assertEqual(_run_jobs(lambda x: x * 2, ["a", "b"], workers=2), ["aa", "bb"])
+        self.assertEqual(_run_jobs(lambda i: i * 2, [1, 2, 3], workers=1), [2, 4, 6])
+        self.assertEqual(_run_jobs(lambda x: x, [], workers=2), [])
+
+        def failing(i):
+            if i == 2:
+                raise ValueError("bad job")
+            return i
+
+        with self.assertRaisesRegex(ValueError, "bad job"):
+            _run_jobs(failing, [1, 2], workers=2)
+
     def test_matching_and_training_loss(self):
         from celladmix.collection import _fit_profiles_raw, _match_factors, _training_loss
 

@@ -16,8 +16,11 @@ gate.
 \code{correct()} applies the rules with a molecule-vote ensemble shared across
 samples: every ensemble member is scored in every sample, its evidence is
 pooled like the primary evidence, and one member rule set votes in every
-sample. The member scorings run concurrently, one (sample, member) job per
-worker process, with as many workers as fit the thread budget given each
-dataset's \code{num_threads}; \code{num_threads} sets the budget (default: the number
-of available cores).
+sample. The per-sample steps of the correction (labeling each sample's
+molecules with every member, scoring every member in every sample, and
+the vote in each sample) are independent jobs that run concurrently in
+forked worker processes, as many at a time as fit a thread budget given
+the threads each job uses: \code{num_threads} sets the budget (default: the
+\code{CELLADMIX_NUM_THREADS} environment variable, or else the number of
+available cores).
 }

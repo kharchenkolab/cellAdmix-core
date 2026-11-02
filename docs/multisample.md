@@ -109,12 +109,20 @@ native-factor check on the member's own cell factor fractions and
 restricted to the primary rules' source → target pairs), and that one
 member rule set votes in every sample. The vote threshold is the same as
 for a single sample, and the returned rules carry `support`, the fraction
-of members keeping each pair. The member scorings are independent jobs,
-one per sample and member, and run concurrently in worker processes: as
-many as fit the thread budget given each dataset's `num_threads`, with
-`num_threads` on `correct()` setting the budget (default: the number of
-available cores). The audit runs per sample, with a pooled per-pair table
-and per-sample cleanup verification.
+of members keeping each pair.
+
+The per-sample steps of the correction are independent jobs that run
+concurrently in forked worker processes: labeling each sample's molecules
+with every member of the pool (once per run, then reused), scoring every
+member in every sample (one job per sample and member), and the vote in
+each sample. The number of jobs running at a time is a thread budget
+divided by the threads one job uses (the dataset's `num_threads` for
+labeling and scoring, one for the vote), never more than the number of
+jobs. `num_threads` on `correct()` sets the budget; by default it is the
+`CELLADMIX_NUM_THREADS` environment variable, or else the number of
+available cores. Each concurrent vote holds one sample's molecule table in
+memory, so a smaller budget also bounds memory use. The audit runs per
+sample, with a pooled per-pair table and per-sample cleanup verification.
 
 ## Diagnostics
 

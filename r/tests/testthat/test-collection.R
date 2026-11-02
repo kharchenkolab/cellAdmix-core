@@ -57,6 +57,25 @@ test_that("the weighted median reduces to the median for equal weights", {
   expect_equal(wm(c(1, 2, 10), c(5, 1, 1)), 1)
 })
 
+test_that("worker counts follow the thread budget and jobs report their errors", {
+  workers <- cellAdmixCore:::.celladmix_parallel_workers
+  skip_on_os("windows")
+  expect_equal(workers(16L, 4L, 10L), 4L)
+  expect_equal(workers(16L, 4L, 2L), 2L)
+  expect_equal(workers(2L, 4L, 10L), 1L)
+  old_env <- Sys.getenv("CELLADMIX_NUM_THREADS", unset = NA_character_)
+  Sys.setenv(CELLADMIX_NUM_THREADS = "6")
+  on.exit(if (is.na(old_env)) Sys.unsetenv("CELLADMIX_NUM_THREADS") else
+    Sys.setenv(CELLADMIX_NUM_THREADS = old_env), add = TRUE)
+  expect_equal(workers(NULL, 2L, 10L), 3L)
+  run_jobs <- cellAdmixCore:::.celladmix_run_jobs
+  expect_equal(run_jobs(c(a = "a", b = "b"), function(x) paste0(x, x), workers = 2L),
+    list(a = "aa", b = "bb"))
+  expect_equal(run_jobs(1:3, function(i) i * 2L, workers = 1L), list(2L, 4L, 6L))
+  expect_error(run_jobs(1:2, function(i) if (i == 2L) stop("bad job") else i, workers = 2L), "bad job")
+  expect_equal(run_jobs(character(0), identity, workers = 2L), list())
+})
+
 test_that("factor matching and training loss are reachable from R", {
   ds <- make_sample_dataset(41L, "loss")
   fit <- do.call(ds$fit, c(list(annotation = "cell_type", run_id = "base", overwrite = TRUE), fit_args))

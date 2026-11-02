@@ -345,15 +345,18 @@ class CellAdmixFit:
         ensemble member (see :meth:`CellAdmixScore.correct`); a molecule is
         removed when at least ``min_votes`` members remove it.
         """
-        from .correction import CellAdmixCorrection
+        manifest = self._correct_run(rules, name=name, rule_members=rule_members, min_votes=min_votes)
+        return self._make_correction(name, manifest, rules)
 
+    def _correct_run(self, rules: pd.DataFrame, *, name: str, rule_members=None,
+                     min_votes: int = 1) -> dict:
+        """Write the corrected run and return its manifest."""
         if rules.empty:
             raise ValueError("rules table is empty")
         cell_ids, labels = annotation_vectors(self.dataset.annotation)
-        out_dir = self.run_path / "corrected" / name
-        result = _core.correct_run(
+        return _core.correct_run(
             str(self.run_path),
-            str(out_dir),
+            str(self.run_path / "corrected" / name),
             factors=rules["factor"].astype(int).tolist(),
             target_cell_types=rules["target_cell_type"].astype(str).tolist(),
             annotation_cell_ids=cell_ids,
@@ -361,7 +364,12 @@ class CellAdmixFit:
             rule_members=[int(m) for m in (rule_members or [])],
             min_votes=int(min_votes),
         )
-        correction = CellAdmixCorrection(str(out_dir), result, rules=rules)
+
+    def _make_correction(self, name: str, manifest: dict, rules: pd.DataFrame):
+        """Wrap a written corrected run, warning when a cell type was emptied."""
+        from .correction import CellAdmixCorrection
+
+        correction = CellAdmixCorrection(str(self.run_path / "corrected" / name), manifest, rules=rules)
         # Over-removal guard: a rule set whose factors jointly cover a cell
         # type's whole molecule content (typically because the factorization
         # has no native factor for a small type) erases the type rather than

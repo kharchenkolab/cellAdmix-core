@@ -17,6 +17,11 @@ from .state import clustering_result_to_frame
 
 
 def _default_threads() -> int:
+    """The ``CELLADMIX_NUM_THREADS`` environment variable, or else the core
+    count capped at 10."""
+    env = os.environ.get("CELLADMIX_NUM_THREADS", "").strip()
+    if env.isdigit() and int(env) > 0:
+        return int(env)
     return max(1, min(10, os.cpu_count() or 1))
 
 

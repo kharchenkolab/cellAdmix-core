@@ -562,10 +562,13 @@ CellAdmixConsensusFit <- R6::R6Class(
 #' `correct()` applies the rules with a molecule-vote ensemble shared across
 #' samples: every ensemble member is scored in every sample, its evidence is
 #' pooled like the primary evidence, and one member rule set votes in every
-#' sample. The member scorings run concurrently, one (sample, member) job per
-#' worker process, with as many workers as fit the thread budget given each
-#' dataset's `num_threads`; `num_threads` sets the budget (default: the number
-#' of available cores).
+#' sample. The per-sample steps of the correction (labeling each sample's
+#' molecules with every member, scoring every member in every sample, and
+#' the vote in each sample) are independent jobs that run concurrently in
+#' forked worker processes, as many at a time as fit a thread budget given
+#' the threads each job uses: `num_threads` sets the budget (default: the
+#' `CELLADMIX_NUM_THREADS` environment variable, or else the number of
+#' available cores).
 #' @export
 CellAdmixCollectionScore <- R6::R6Class(
   "CellAdmixCollectionScore",
@@ -655,9 +658,7 @@ CellAdmixCollectionScore <- R6::R6Class(
       member_rules <- NULL
       members <- integer(0)
       if (ensemble > 1L) {
-        available <- min(vapply(samples, function(sample) {
-          .celladmix_ensemble_prepare(fits[[sample]]$run$path, fits[[sample]]$dataset$num_threads)
-        }, numeric(1)))
+        available <- min(unlist(private$prepare_members(num_threads)))
         if (available < 2L) {
           message("Runs carry no shared ensemble member pool; applying single-fit corrections.")
         } else {
@@ -670,19 +671,23 @@ CellAdmixCollectionScore <- R6::R6Class(
         }
       }
       min_votes <- max(1L, as.integer(ceiling(vote * length(members))))
-      corrections <- lapply(samples, function(sample) {
+      # The vote in each sample is an independent single-threaded job; the
+      # samples are processed concurrently within the thread budget.
+      corrected_runs <- .celladmix_run_jobs(samples, function(sample) {
         fit <- fits[[sample]]
-        score_sample <- self$sample_scores[[sample]]
         out_dir <- file.path(fit$run$paths$corrected_dir, name)
-        corrected <- if (is.null(member_rules)) {
-          celladmix_correct(fit$run, rules = kept, out_dir = out_dir,
-            annotation = score_sample$annotation_vector())
+        annotation <- self$sample_scores[[sample]]$annotation_vector()
+        if (is.null(member_rules)) {
+          celladmix_correct(fit$run, rules = kept, out_dir = out_dir, annotation = annotation)
         } else {
           celladmix_correct(fit$run, rules = member_rules$rules, out_dir = out_dir,
-            annotation = score_sample$annotation_vector(),
-            rule_member = member_rules$member, min_votes = min_votes)
+            annotation = annotation, rule_member = member_rules$member, min_votes = min_votes)
         }
-        correction <- CellAdmixCorrection$new(name, fit, score_sample, corrected,
+      }, workers = .celladmix_parallel_workers(num_threads, 1L, length(samples)))
+      corrections <- lapply(samples, function(sample) {
+        fit <- fits[[sample]]
+        correction <- CellAdmixCorrection$new(name, fit, self$sample_scores[[sample]],
+          corrected_runs[[sample]],
           params = list(p_thresh = p_thresh, adjust_p = adjust_p, targets = targets,
             ensemble = max(1L, length(members)),
             vote = if (length(members) > 1L) vote else NA_real_,
@@ -730,36 +735,39 @@ CellAdmixCollectionScore <- R6::R6Class(
       rules
     },
 
+    # Threads one job on a sample uses: the largest dataset thread count.
+    threads_per_sample = function() {
+      max(vapply(self$consensus$fits, function(fit) {
+        as.integer(fit$dataset$num_threads %||% 1L)
+      }, integer(1)))
+    },
+
+    # Make sure every sample's run carries one labeling of its molecules per
+    # member of the shared pool (written once, then reused), and return the
+    # number of members available per sample. The samples are prepared
+    # concurrently, each with its dataset's thread count.
+    prepare_members = function(num_threads = NULL) {
+      fits <- self$consensus$fits
+      .celladmix_run_jobs(names(fits), function(sample) {
+        .celladmix_ensemble_prepare(fits[[sample]]$run$path, fits[[sample]]$dataset$num_threads)
+      }, workers = .celladmix_parallel_workers(num_threads, private$threads_per_sample(), length(fits)))
+    },
+
     # Score the given ensemble members in every sample. The (sample, member)
-    # jobs are independent and run in forked worker processes, as many as the
-    # thread budget allows given each dataset's own thread count; each worker
-    # writes its summary to the run's cache, which the parent then reads.
+    # jobs are independent and run concurrently, as many as the thread budget
+    # allows given each dataset's own thread count; each worker writes its
+    # summary to the run's cache, which the parent then reads.
     score_members = function(members, num_threads = NULL) {
       samples <- names(self$sample_scores)
       jobs <- expand.grid(sample = samples, member = members, stringsAsFactors = FALSE)
       if (!nrow(jobs)) {
         return(invisible(NULL))
       }
-      per_job <- max(vapply(self$consensus$fits, function(fit) {
-        as.integer(fit$dataset$num_threads %||% 1L)
-      }, integer(1)))
-      workers <- .celladmix_parallel_workers(num_threads, per_job, nrow(jobs))
-      run_job <- function(i) {
+      workers <- .celladmix_parallel_workers(num_threads, private$threads_per_sample(), nrow(jobs))
+      .celladmix_run_jobs(seq_len(nrow(jobs)), function(i) {
         private$member_summary(jobs$sample[[i]], jobs$member[[i]])
         NULL
-      }
-      if (workers <= 1L) {
-        for (i in seq_len(nrow(jobs))) run_job(i)
-        return(invisible(NULL))
-      }
-      results <- parallel::mclapply(seq_len(nrow(jobs)), run_job,
-        mc.cores = workers, mc.preschedule = FALSE)
-      failed <- vapply(results, inherits, logical(1), "try-error")
-      if (any(failed)) {
-        first <- results[[which(failed)[[1]]]]
-        stop("scoring of ensemble members failed: ",
-          conditionMessage(attr(first, "condition")), call. = FALSE)
-      }
+      }, workers = workers)
       invisible(NULL)
     },
 
@@ -1315,16 +1323,51 @@ CellAdmixCollectionCleanupReport <- R6::R6Class(
 }
 
 # Number of concurrent worker processes for independent jobs that each use
-# `per_job` threads, within a total thread budget (default: all cores).
+# `per_job` threads, within a total thread budget: `num_threads`, or by
+# default the `CELLADMIX_NUM_THREADS` environment variable, or else every
+# available core. Jobs run sequentially on Windows, which cannot fork.
 .celladmix_parallel_workers <- function(num_threads, per_job, n_jobs) {
   if (identical(.Platform$OS.type, "windows")) {
     return(1L)
   }
-  budget <- if (is.null(num_threads)) parallel::detectCores() else as.integer(num_threads)
+  budget <- if (!is.null(num_threads)) {
+    as.integer(num_threads)
+  } else {
+    env <- suppressWarnings(as.integer(Sys.getenv("CELLADMIX_NUM_THREADS", NA_character_)))
+    if (!is.na(env) && env > 0L) env else parallel::detectCores()
+  }
   if (is.na(budget) || budget < 1L) {
     budget <- 1L
   }
   max(1L, min(as.integer(n_jobs), budget %/% max(1L, as.integer(per_job))))
+}
+
+# Run independent jobs, one per element of `items`, in forked worker
+# processes (`workers` at a time; in this process when `workers` is 1) and
+# return their results as a list named like `items` when those are names.
+# An error in any job is raised here with the job's message.
+.celladmix_run_jobs <- function(items, fn, workers) {
+  if (!length(items)) {
+    return(list())
+  }
+  results <- if (workers <= 1L) {
+    lapply(items, fn)
+  } else {
+    parallel::mclapply(items, function(item) {
+      tryCatch(fn(item), error = function(e) e)
+    }, mc.cores = workers, mc.preschedule = FALSE)
+  }
+  failed <- vapply(results, inherits, logical(1), c("error", "try-error"))
+  if (any(failed)) {
+    first <- results[[which(failed)[[1]]]]
+    msg <- if (inherits(first, "error")) conditionMessage(first) else
+      conditionMessage(attr(first, "condition"))
+    stop("a worker job failed: ", msg, call. = FALSE)
+  }
+  if (is.character(items)) {
+    names(results) <- items
+  }
+  results
 }
 
 # Round-robin interleaving of several lists (a list per sample) into one.
