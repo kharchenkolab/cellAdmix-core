@@ -1177,6 +1177,15 @@ CellAdmixCollectionCleanupReport <- R6::R6Class(
   genes
 }
 
+# Weighted median: the smallest value whose cumulative weight reaches half
+# the total weight (an even count of equal weights resolves to the lower
+# middle value; the Python binding uses the same convention).
+.celladmix_weighted_median <- function(x, w) {
+  o <- order(x)
+  cumulative <- cumsum(w[o])
+  x[o][which(cumulative >= sum(w) / 2)[[1]]]
+}
+
 # Rows rescaled to sum to one.
 .celladmix_normalize_profiles <- function(h) {
   sums <- rowSums(h)
@@ -1192,10 +1201,12 @@ CellAdmixCollectionCleanupReport <- R6::R6Class(
 # components come from at least `min_restarts` distinct restarts, of any
 # samples, becomes a consensus factor, and the remaining components are
 # reported as unreproduced. The consensus profile of a cluster is the
-# sample-weighted mean of each sample's mean unit-sum component profile,
-# rescaled to the weighted mean of the original row sums so that labeling
-# sees the usual profile scale. Factors are ordered by the number of samples
-# covered, then restarts, then profile mass.
+# weighted per-gene median of its unit-sum component profiles (each sample's
+# weight divided among its components in the cluster), renormalized to unit
+# sum and rescaled to the weighted mean of the original row sums so that
+# labeling sees the usual profile scale; the median keeps the profile of a
+# loosely agreeing cluster from blurring. Factors are ordered by the number
+# of samples covered, then restarts, then profile mass.
 .celladmix_consensus_profiles <- function(pools, weights, selected, match_min, min_restarts) {
   genes <- colnames(pools[[1]][[1]])
   blocks <- list()
@@ -1235,17 +1246,11 @@ CellAdmixCollectionCleanupReport <- R6::R6Class(
   normalized <- .celladmix_normalize_profiles(stacked)
   for (i in seq_len(nrow(reproduced))) {
     idx <- which(components$cluster == reproduced$cluster[[i]])
-    profile <- numeric(length(genes))
-    scale <- 0
-    total <- 0
-    for (sample in unique(components$sample[idx])) {
-      idx_s <- idx[components$sample[idx] == sample]
-      w <- weights[[sample]]
-      profile <- profile + w * colMeans(normalized[idx_s, , drop = FALSE])
-      scale <- scale + w * mean(row_sums[idx_s])
-      total <- total + w
-    }
-    consensus[i, ] <- (profile / total) * (scale / total)
+    per_sample <- table(components$sample[idx])
+    w <- as.numeric(weights[components$sample[idx]]) / as.numeric(per_sample[components$sample[idx]])
+    profile <- apply(normalized[idx, , drop = FALSE], 2, .celladmix_weighted_median, w = w)
+    profile <- profile / max(sum(profile), .Machine$double.eps)
+    consensus[i, ] <- profile * (sum(w * row_sums[idx]) / sum(w))
   }
   lookup <- stats::setNames(seq_len(nrow(reproduced)), reproduced$cluster)
   components$consensus_factor <- unname(lookup[as.character(components$cluster)])

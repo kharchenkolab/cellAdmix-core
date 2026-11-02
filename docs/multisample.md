@@ -42,11 +42,15 @@ built from every restart of every sample.
    members come from at least `min_restarts` distinct restarts (default
    2), of any samples: a program found by a single random start is not
    reproducible and is reported rather than used. The shared profile is
-   the mean over contributing samples, weighted by molecule count (or
-   equal, by `sample_allocation`), of each sample's mean member profile
-   after normalization to unit sum; it is rescaled to the weighted mean of
-   the original row sums so that molecule labeling sees profiles on the
-   usual scale. Factors are ordered by the number of samples they cover,
+   the per-gene median of the cluster's components after each is
+   normalized to unit sum, every component weighted by its sample's weight
+   (molecule count, or equal, by `sample_allocation`) divided among that
+   sample's components in the cluster; the median profile is renormalized
+   to unit sum and rescaled to the weighted mean of the original row sums
+   so that molecule labeling sees profiles on the usual scale. The median
+   rather than the mean keeps the profile of a loosely agreeing cluster
+   from blurring, which matters when a sample's restarts disagree among
+   themselves. Factors are ordered by the number of samples they cover,
    then by the number of restarts. Profiles are compared in raw gene
    space: the inverse-square-root KL variant fits in a feature space where
    every gene is scaled by a weight recorded in the run, and the profiles

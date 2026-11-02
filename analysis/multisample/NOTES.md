@@ -684,3 +684,25 @@ breast loss check are rerun with the constraint; the running breast arm
 (unconstrained) is left to finish as the test of whether a fired
 representation flag predicts worse cleanup or concordance on true
 replicates.
+
+Observed, construction experiment with the one-to-one constraint (loss gap
+per half; spreads 0.4% / 1.4% bridge, 1.5% / 1.4% membrane):
+
+| configuration | cut | factors | mean | median | medoid | agreement-weighted |
+|---|---|---|---|---|---|---|
+| bridge `ls_nmf` | 0.3 | 15 | −1.9% / −1.8% | −1.9% / −1.3% | −1.8% / −1.2% | −2.0% / −1.2% |
+| membrane `invsqrt_kl` | 0.3 | 16 | +4.0% / +8.8% | −0.4% / +1.6% | +16% / +17% | +2.1% / +5.8% |
+
+Cuts 0.5 and 0.7 are unchanged (the constraint does not bind there) and
+remain unusable for the unstable variant. With one component per restart
+in each cluster, the per-gene median of the unit-sum components
+represents both halves of the membrane configuration within or at their
+restart spread, where the mean does not; on the stable bridge
+configuration the choice is immaterial. The medoid stays worst: factors
+drawn from different restarts do not form one coherent decomposition.
+
+Decided. The shared profile of a cluster is the weighted per-gene median
+of its unit-sum components (each sample's weight divided among its
+components in the cluster), renormalized and rescaled as before; both
+bindings, documented. The three consensus arms are rerun with the
+constrained clustering and the median construction.

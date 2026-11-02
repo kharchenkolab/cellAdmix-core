@@ -960,6 +960,18 @@ def _common_genes(profiles: dict) -> list:
     return genes
 
 
+def _weighted_median(values: np.ndarray, weights: np.ndarray) -> np.ndarray:
+    """Column-wise weighted median of a (components x genes) array: the
+    smallest value whose cumulative weight reaches half the total (an even
+    count of equal weights resolves to the lower middle value; the R binding
+    uses the same convention)."""
+    order = np.argsort(values, axis=0, kind="stable")
+    sorted_values = np.take_along_axis(values, order, axis=0)
+    cumulative = np.cumsum(weights[order], axis=0)
+    pick = (cumulative >= weights.sum() / 2.0).argmax(axis=0)
+    return sorted_values[pick, np.arange(values.shape[1])]
+
+
 def _normalize_profiles(frame: pd.DataFrame) -> pd.DataFrame:
     sums = frame.sum(axis=1).replace(0, 1)
     return frame.div(sums, axis=0)
@@ -994,10 +1006,13 @@ def _consensus_profiles(pools: dict, weights: dict, selected: dict, *, match_min
     whose components come from at least ``min_restarts`` distinct restarts, of
     any samples, becomes a consensus factor, and the remaining components are
     reported as unreproduced. The consensus profile of a cluster is the
-    sample-weighted mean of each sample's mean unit-sum component profile,
-    rescaled to the weighted mean of the original row sums so that labeling
-    sees the usual profile scale. Factors are ordered by the number of samples
-    covered, then restarts, then profile mass."""
+    weighted per-gene median of its unit-sum component profiles (each
+    sample's weight divided among its components in the cluster),
+    renormalized to unit sum and rescaled to the weighted mean of the
+    original row sums so that labeling sees the usual profile scale; the
+    median keeps the profile of a loosely agreeing cluster from blurring.
+    Factors are ordered by the number of samples covered, then restarts,
+    then profile mass."""
     genes = list(next(iter(pools.values()))[0].columns)
     blocks, meta = [], []
     group = 0
@@ -1028,16 +1043,12 @@ def _consensus_profiles(pools: dict, weights: dict, selected: dict, *, match_min
     consensus = np.zeros((len(reproduced), len(genes)))
     for i, cluster in enumerate(reproduced["cluster"]):
         idx = np.flatnonzero(components["cluster"].to_numpy() == cluster)
-        profile = np.zeros(len(genes))
-        scale = 0.0
-        total = 0.0
-        for s in pd.unique(components["sample"].iloc[idx]):
-            idx_s = idx[(components["sample"].iloc[idx] == s).to_numpy()]
-            w = float(weights[s])
-            profile += w * normalized[idx_s].mean(axis=0)
-            scale += w * float(row_sums[idx_s].mean())
-            total += w
-        consensus[i] = (profile / total) * (scale / total)
+        samples_in = components["sample"].iloc[idx]
+        per_sample = samples_in.value_counts()
+        w = np.array([float(weights[s]) / float(per_sample[s]) for s in samples_in])
+        profile = _weighted_median(normalized[idx], w)
+        profile = profile / max(float(profile.sum()), np.finfo(float).eps)
+        consensus[i] = profile * (float((w * row_sums[idx]).sum()) / float(w.sum()))
     lookup = {int(c): i + 1 for i, c in enumerate(reproduced["cluster"])}
     components["consensus_factor"] = [lookup.get(int(c), pd.NA) for c in components["cluster"]]
     factors = pd.DataFrame({
