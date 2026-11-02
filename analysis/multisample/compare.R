@@ -11,6 +11,12 @@
 # (Welch t-test, |log2 fold change| >= 0.585, BH FDR 0.05).
 #
 # Usage: Rscript compare.R <dataset> <runs_root> <results_dir> <sample>=<annotation.csv.gz> ...
+#          [--groups=<name>:<sample>,<sample>,...;<name>:<sample>,...]
+#
+# The divergence is measured between two groups of samples (pooled counts,
+# cells, and annotations): by default the first two samples; with --groups,
+# the two named groups (for a cohort of tiles cut from two replicates, the
+# tiles of each replicate).
 .libPaths(c(Sys.getenv("CELLADMIX_R_LIB", "/home/pkharchenko/cellAdmix/wt-dev_multisample/.Rlib"), .libPaths()))
 suppressMessages(library(cellAdmixCore))
 suppressMessages(library(Matrix))
@@ -21,8 +27,18 @@ dataset <- args[[1]]
 root <- file.path(args[[2]], dataset)
 results_dir <- args[[3]]
 dir.create(results_dir, recursive = TRUE, showWarnings = FALSE)
-specs <- strsplit(args[-(1:3)], "=", fixed = TRUE)
+rest <- args[-(1:3)]
+groups_arg <- rest[startsWith(rest, "--groups=")]
+rest <- rest[!startsWith(rest, "--groups=")]
+specs <- strsplit(rest, "=", fixed = TRUE)
 samples <- vapply(specs, `[[`, character(1), 1)
+groups <- if (length(groups_arg)) {
+  parts <- strsplit(strsplit(sub("^--groups=", "", groups_arg[[1]]), ";", fixed = TRUE)[[1]], ":", fixed = TRUE)
+  stats::setNames(lapply(parts, function(x) strsplit(x[[2]], ",", fixed = TRUE)[[1]]), vapply(parts, `[[`, character(1), 1))
+} else {
+  stats::setNames(list(samples[[1]], samples[[2]]), samples[1:2])
+}
+if (length(groups) != 2L) stop("exactly two groups are compared")
 annotation_paths <- stats::setNames(vapply(specs, `[[`, character(1), 2), samples)
 
 read_annotation <- function(path) {
@@ -51,7 +67,8 @@ if (all(dir.exists(file.path(root, samples)))) {
   })
   names(arms$separate) <- samples
 }
-for (arm in c("consensus", "joint_profiles", paste0("reference_", samples))) {
+candidate_arms <- setdiff(basename(list.dirs(root, recursive = FALSE)), c(samples, "joint"))
+for (arm in sort(candidate_arms)) {
   pointers_path <- file.path(root, arm, "pointers.csv")
   if (file.exists(pointers_path)) {
     pointers <- read.csv(pointers_path, stringsAsFactors = FALSE)
@@ -111,9 +128,26 @@ block_pseudobulks <- function(counts, cells, annotation, type, block_um = 1000, 
   if (length(groups) < 3) return(NULL)
   sapply(groups, function(g) log_cpm(rowSums(counts[, g, drop = FALSE])))
 }
+# Pool the counts, cells, and annotations of a group of samples.
+group_data <- function(members, counts_by_sample, which) {
+  genes <- Reduce(intersect, lapply(members, function(s) rownames(counts_by_sample[[s]][[which]])))
+  counts <- do.call(cbind, lapply(members, function(s) counts_by_sample[[s]][[which]][genes, , drop = FALSE]))
+  cells <- do.call(rbind, lapply(members, function(s) {
+    cells <- counts_by_sample[[s]]$cells
+    cells[, intersect(c("cell_id", "x", "y"), names(cells)), drop = FALSE]
+  }))
+  annotation <- do.call(c, lapply(members, function(s) annotations[[s]]))
+  list(counts = counts, cells = cells, annotation = annotation)
+}
 divergence_table <- function(arm, counts_by_sample, which = c("before", "after")) {
   which <- match.arg(which)
-  a <- samples[[1]]; b <- samples[[2]]
+  ga <- group_data(groups[[1]], counts_by_sample, which)
+  gb <- group_data(groups[[2]], counts_by_sample, which)
+  a <- "a"; b <- "b"
+  counts_by_sample <- list(a = list(cells = ga$cells), b = list(cells = gb$cells))
+  counts_by_sample$a[[which]] <- ga$counts
+  counts_by_sample$b[[which]] <- gb$counts
+  annotations <- list(a = ga$annotation, b = gb$annotation)
   pb_a <- pseudobulk_by_type(counts_by_sample[[a]][[which]], annotations[[a]])
   pb_b <- pseudobulk_by_type(counts_by_sample[[b]][[which]], annotations[[b]])
   types <- intersect(colnames(pb_a), colnames(pb_b))
@@ -183,7 +217,12 @@ for (arm in names(arms)) {
     kept <- rules[rules$keep %in% TRUE, , drop = FALSE]
     unique(paste(kept$source_cell_type, kept$target_cell_type))
   })
-  jaccard <- length(intersect(pair_sets[[1]], pair_sets[[2]])) / max(1, length(union(pair_sets[[1]], pair_sets[[2]])))
+  # Mean Jaccard over all sample pairs (one pair for two samples).
+  pair_index <- utils::combn(length(pair_sets), 2)
+  jaccard <- mean(apply(pair_index, 2, function(ij) {
+    length(intersect(pair_sets[[ij[1]]], pair_sets[[ij[2]]])) /
+      max(1, length(union(pair_sets[[ij[1]]], pair_sets[[ij[2]]])))
+  }))
   rule_rows[[length(rule_rows) + 1]] <- data.frame(arm = arm, pairs_a = length(pair_sets[[1]]),
     pairs_b = length(pair_sets[[2]]), jaccard = jaccard, stringsAsFactors = FALSE)
   if (identical(arm, names(arms)[[1]])) {

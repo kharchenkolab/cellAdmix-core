@@ -20,6 +20,13 @@
 "consensus","after","Fibroblast / CAF",22046,6320,0.947053610499576,38,15,11
 "consensus","after","Immune",11496,7755,0.929113739532018,65,15,11
 "consensus","after","Mural / pericyte",1315,1238,0.837338017146376,0,14,8
+"consensus_loop8","after","Ductal/tumor epithelial",18759,11227,0.850391597126332,156,15,11
+"consensus_loop8","after","Endocrine",700,1512,0.842980563514092,22,5,8
+"consensus_loop8","after","Endothelial",3374,3652,0.88674051795447,51,15,11
+"consensus_loop8","after","Exocrine epithelial",2857,33472,0.951642599561882,238,8,11
+"consensus_loop8","after","Fibroblast / CAF",22046,6320,0.937702856929956,39,15,11
+"consensus_loop8","after","Immune",11496,7755,0.931103307421047,59,15,11
+"consensus_loop8","after","Mural / pericyte",1315,1238,0.862962776100536,8,14,8
 "joint_profiles","after","Ductal/tumor epithelial",18759,11227,0.852523228035736,154,15,11
 "joint_profiles","after","Endocrine",700,1512,0.847495197216723,22,5,8
 "joint_profiles","after","Endothelial",3374,3652,0.877607842518762,54,15,11

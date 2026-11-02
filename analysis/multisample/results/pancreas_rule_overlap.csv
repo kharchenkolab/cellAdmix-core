@@ -1,6 +1,7 @@
 "arm","pairs_a","pairs_b","jaccard"
 "separate",14,17,0.55
 "consensus",26,26,1
+"consensus_loop8",22,22,1
 "joint_profiles",17,17,1
 "reference_left",18,18,1
 "joint",20,20,1
