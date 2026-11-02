@@ -1002,3 +1002,56 @@ their molecules than under separate processing). Whether a cohort of
 regional tiles should be cleaned this much more thoroughly, at 4% own-
 marker loss, is a question for the user; the diagnostics now make both
 components visible per sample.
+
+Observed, breast membrane with `min_recurrence = 0` (`consensus_all`):
+71 shared factors from rank-23 fits (134 unreproduced components, 12 of
+them primary), loss gaps −8.9% / −8.7%, 421 rules kept (276 supported by
+both replicates), leakage removed 0.59 / 0.64, sensitivity 0.77 / 0.86,
+own-marker false removal 4.7% / 5.5%, removal 31% / 32%, concordance
+0.991 / 142. Against the majority rule (12 factors: 0.51 / 0.57, 0.59 /
+0.66, 0.7% / 0.8%, 0.992 / 129) and separate processing (0.60 / 0.66,
+0.88 / 0.85, 3.0% / 2.1%, 0.642 / 1242).
+
+Interpretation. Lowering the recurrence threshold recovers the lost
+sensitivity on the unstable variant at the price of a tripled shared
+space and own-marker removal above separate processing; no threshold
+reproduces separate processing's balance because the variant's programs
+are not reproducible across restarts. The same replicates under `ls_nmf`
+with bridge scoring and the default consensus reach 0.63 / 0.69, 0.88 /
+0.89, 1.1% / 1.7%, 0.991 / 128: better than every membrane arm on every
+measure except separate processing's removal fraction, which it pays for
+with lost concordance. For multi-sample work the stable variant is the
+one to use; documented as the remedy when the shared-factor flag fires.
+
+## Closing summary, Loops 9 to 12 (2026-11-02)
+
+Delivered on `dev_multisample` (both bindings, tests green, docs
+current): consensus by pooled clustering of all restarts with the
+one-to-one constraint, the per-gene weighted median, the majority
+recurrence rule (default 0.5), the shared molecule-vote ensemble with
+concurrent voter scoring, per-sample diagnostics on the fit and the
+correction, a scale-invariant training loss for the KL variants, the
+agent skills, and the cohort analysis scripts.
+
+Evidence. Two breast replicates: concordance 0.991 / 128 DE genes (0.988 /
+242 uncorrected, 0.902 / 1066 separate), cleanup equal to separate
+processing with the lowest false removal of any arm. Eight regional
+tiles: concordance between replicates restored (0.991 / 153 against
+0.904 / 688 separate), sensitivity up, own-marker false removal 4.1%
+against 1.5% separate, part of it from rules on programs a tile does not
+carry (0.2 to 18% of a tile's removal, now reported per sample). The star
+construction duplicates programs on cohorts (60 duplicate pairs, 34
+single-tile factors) where the pooled clustering gives 12 and 2.
+Unstable variant (`invsqrt_kl`): the consensus restores concordance but
+cannot match separate processing's cleanup balance at any recurrence
+threshold; the stable variant should be used.
+
+Open for the user: (1) on cohorts, whether a rule should apply in a
+sample only where the sample's own restarts carry the program (a presence
+condition, leaving true replicates untouched), or whether a minimum
+sample coverage should be required for a shared program, or neither;
+(2) running the per-sample votes concurrently, as the voter scoring is
+(the eight-tile correction took 68 minutes, mostly in the sequential
+votes); (3) whether the candidate budget should grow with the sample
+count (one tile's budget is one eighth of a single-sample budget under
+proportional allocation; single-tile rule support was sparse).
