@@ -59,7 +59,7 @@ class CellAdmixCollection:
             self.fits[name] = dataset.fit(**kwargs)
         return self
 
-    def fit_consensus(self, *, match_min: float = 0.3, min_restarts: int = 2, min_recurrence: float = 0.0,
+    def fit_consensus(self, *, match_min: float = 0.3, min_restarts: int = 2, min_recurrence: float = 0.5,
                       name: str = "consensus", num_threads: Optional[int] = None, **fit_kwargs):
         """Cluster the pooled restart factors of all samples into shared
         profiles and project every sample onto them."""

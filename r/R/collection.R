@@ -83,7 +83,7 @@ CellAdmixCollection <- R6::R6Class(
       invisible(self)
     },
 
-    fit_consensus = function(..., match_min = 0.3, min_restarts = 2L, min_recurrence = 0,
+    fit_consensus = function(..., match_min = 0.3, min_restarts = 2L, min_recurrence = 0.5,
                              name = "consensus", num_threads = NULL) {
       state <- private$prepare_profiles(...)
       min_restarts <- max(1L, as.integer(min_restarts))

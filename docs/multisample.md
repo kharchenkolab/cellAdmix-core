@@ -40,13 +40,15 @@ built from every restart of every sample.
    different ranks pose no difficulty.
 3. **Consensus profiles.** A cluster becomes a shared factor when its
    members come from at least `min_restarts` distinct restarts (default
-   2), of any samples: a program found by a single random start is not
-   reproducible and is reported rather than used. `min_recurrence`
-   (default 0) additionally requires the program in at least that fraction
-   of the restarts of some sample; at 0.5 only programs that are the
-   majority solution of at least one sample enter, which keeps the shared
-   space close to the per-sample rank when restarts find many
-   low-recurrence programs. The shared profile is
+   2), of any samples, and from at least a fraction `min_recurrence`
+   (default 0.5) of the restarts of some sample: a program found by a
+   single random start is not reproducible, and one found by a minority
+   of every sample's restarts is an alternative decomposition rather than
+   the solution any sample settles on. With the default, the shared
+   factors are the programs that are the majority solution of at least
+   one sample, which keeps the shared space close to the per-sample rank;
+   `min_recurrence = 0` admits every program that recurs at all. The
+   excluded components are reported rather than used. The shared profile is
    the per-gene median of the cluster's components after each is
    normalized to unit sum, every component weighted by its sample's weight
    (molecule count, or equal, by `sample_allocation`), so that a program

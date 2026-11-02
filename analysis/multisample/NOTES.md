@@ -782,3 +782,64 @@ ordinary median under equal allocation and matches the construction the
 loss experiment validated (−0.4% / +1.6% on membrane). The pancreas median
 and majority arms are rerun with it (the balanced results are kept as
 `*_balanced`); the running breast arms still use the balanced weighting.
+
+Correction to the loss-gap record. The training loss under fixed profiles
+for the KL variants depended on the overall scale of the profiles: the
+row projection returns usage fractions, and the loss used them as usages,
+so halving every profile lowered the loss by a quarter. Every membrane
+(`invsqrt_kl`) loss gap above, including the construction experiments
+and the Loop 8 and Loop 9 tables, is affected; the `ls_nmf` gaps are not
+(the least-squares projection refits the usages). Fixed in commit
+f238e55: the usages are rescaled to the observed row totals, the
+projection starts at the observed scale, and a unit test holds the loss
+invariant to the profile scale. Recomputed membrane gaps (spreads 1.5% /
+1.4%): pairwise Loop 8 consensus (14 factors) −0.1% / 0.0%; pooled mean,
+unconstrained (15) +4.4% / +5.5%; pooled median (16) +18% / +17%;
+majority (9) +128% / +122%; reference projection of the left half 0 /
++13.8%; each half under the other's primary profiles +20.6% / +13.8%.
+Bridge gaps are unchanged: pooled median (15) −1.5% / −2.1%, majority (9)
++1.8% / +0.9%, pairwise +0.7% / +0.6%.
+
+Interpretation, revised. Averaging across a sample's own restarts blurs
+when the restarts disagree; the per-gene median does not fix this (it
+sparsifies instead, reconstructing worse than the mean). The pairwise
+construction averaged one component per sample, the primary one, and
+reconstructs both membrane halves as well as their own fits. The
+cleanup rankings are nearly flat across constructions apart from the
+pooled mean's failure on the right half, so representation is the
+criterion left to decide between them, together with scalability. Next
+test: the cluster structure of all restarts for correspondence,
+recurrence, and coverage, with the shared profile of a cluster formed
+from each sample's primary component only.
+
+Observed, primary-component construction (scratch): with the pooled
+clusters as correspondence but each cluster's profile averaged from the
+samples' primary components only, membrane gives 8 factors with gaps
++65% / +76% (the unstable variant's primary factors mostly fall into
+unreproduced clusters and are lost), bridge 10 factors at +0.1% / +0.2%,
+breast 27 factors at −1.3% / −1.2% (the pairwise numbers). Not pursued:
+it reproduces the pairwise construction on stable variants and fails on
+unstable ones. For unstable variants no construction of reproducible
+programs reconstructs the samples' neighborhoods as their own idiosyncratic
+solutions do, and the cleanup evidence says it does not need to.
+
+Decided (pending the breast arms). Keep the pooled clustering with the
+one-to-one constraint and the per-gene median; make the majority rule
+(`min_recurrence` 0.5, programs that are the majority solution of at least
+one sample) the default if the breast arms confirm its concordance and
+cleanup, since it gives rank-sized shared spaces with the plainest
+meaning; keep the representation flag as information.
+
+Observed, breast under the unconstrained pooled mean (the Loop 9 arm left
+to finish as the test of the representation flag; 24 factors, gaps +1.5%
+and +1.2% against spreads 0.5%, flag fired for both replicates; `ls_nmf`,
+so the gap is trustworthy): leakage removed 0.64 / 0.70 (separate 0.62 /
+0.68; pairwise Loop 8 0.61 / 0.67), median pair sensitivity 0.86 / 0.87,
+own-marker false removal 1.9% / 2.6% (Loop 8 1.3% / 1.9%), removal 25% /
+26%, 209 rules kept (177 supported by both replicates); concordance
+0.992 / 145 DE genes (Loop 8 0.992 / 141; joint 0.991 / 117; uncorrected
+0.988 / 242). A fired representation flag therefore did not predict
+worse cleanup or concordance on true replicates; its only trace is the
+somewhat higher own-marker false removal, consistent with blurred merged
+profiles labeling a few native molecules as admixture. The flag stays
+informational, as documented.
