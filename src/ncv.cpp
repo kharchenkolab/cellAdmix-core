@@ -185,7 +185,14 @@ void fill_kl_projected_score_row(
     const double uniform = std::max(row_sum / std::max(n_factors, 1), update_epsilon);
     std::fill(weights.begin(), weights.end(), uniform);
   } else {
-    const double scale = std::max(row_sum, 1.0) / init_sum;
+    // Scale the starting usages so that the fitted row total matches the
+    // observed one, whatever the scale of the profiles; the multiplicative
+    // updates then refine the mixture rather than the overall scale.
+    double fitted_total = 0.0;
+    for (int factor = 0; factor < n_factors; ++factor) {
+      fitted_total += weights[static_cast<std::size_t>(factor)] * h_sums[static_cast<std::size_t>(factor)];
+    }
+    const double scale = fitted_total > update_epsilon ? std::max(row_sum, 1.0) / fitted_total : 1.0;
     for (double& value : weights) {
       value = std::max(value * scale, update_epsilon);
     }
@@ -283,7 +290,14 @@ void fill_kl_projected_sparse_row(
     const double uniform = std::max(row_sum / std::max(n_factors, 1), update_epsilon);
     std::fill(weights.begin(), weights.end(), uniform);
   } else {
-    const double scale = std::max(row_sum, 1.0) / init_sum;
+    // Scale the starting usages so that the fitted row total matches the
+    // observed one, whatever the scale of the profiles; the multiplicative
+    // updates then refine the mixture rather than the overall scale.
+    double fitted_total = 0.0;
+    for (int factor = 0; factor < n_factors; ++factor) {
+      fitted_total += weights[static_cast<std::size_t>(factor)] * h_sums[static_cast<std::size_t>(factor)];
+    }
+    const double scale = fitted_total > update_epsilon ? std::max(row_sum, 1.0) / fitted_total : 1.0;
     for (double& value : weights) {
       value = std::max(value * scale, update_epsilon);
     }

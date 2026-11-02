@@ -1,8 +1,10 @@
 "arm","n_types","mean_correlation","total_de_genes","types_with_de_test"
 "consensus",7,0.941403671947997,364,7
 "consensus_loop8",7,0.938958343749695,338,7
-"consensus_majority",7,0.940291874215674,354,7
-"consensus_median",7,0.946501068882475,328,7
+"consensus_majority",7,0.940728276850855,397,7
+"consensus_majority_balanced",7,0.940291874215674,354,7
+"consensus_median",7,0.943545398795138,345,7
+"consensus_median_balanced",7,0.946501068882475,328,7
 "reference_left",7,0.946863859181459,446,7
 "separate",7,0.489267912019165,910,7
 "uncorrected",7,0.923919476481446,389,7

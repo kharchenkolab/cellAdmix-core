@@ -1897,7 +1897,27 @@ double training_loss_under_profiles(
       }
     }
   }
-  const DenseMatrix w = project_rows_to_factors_kl(x_t, h_t, threads);
+  // The row projection returns usage fractions; scale each row's usages so
+  // that the fitted total matches the observed one, which makes the
+  // divergence independent of the overall scale of the profiles.
+  DenseMatrix w = project_rows_to_factors_kl(x_t, h_t, threads);
+  const auto h_sums = h_t.row_sums();
+  for (int i = 0; i < x_t.rows(); ++i) {
+    double observed = 0.0;
+    for (int p = x_t.indptr()[static_cast<std::size_t>(i)];
+         p < x_t.indptr()[static_cast<std::size_t>(i + 1)];
+         ++p) {
+      observed += x_t.values()[static_cast<std::size_t>(p)];
+    }
+    double fitted = 0.0;
+    for (int a = 0; a < rank; ++a) {
+      fitted += w(i, a) * h_sums[static_cast<std::size_t>(a)];
+    }
+    const double scale = fitted > 0.0 ? observed / fitted : 0.0;
+    for (int a = 0; a < rank; ++a) {
+      w(i, a) *= scale;
+    }
+  }
   return sparse_kl_divergence(x_t, w, h_t, threads);
 }
 

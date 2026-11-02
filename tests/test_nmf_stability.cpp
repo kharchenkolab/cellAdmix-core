@@ -3,6 +3,7 @@
 #include <numeric>
 #include <vector>
 
+#include "celladmix/ncv.hpp"
 #include "celladmix/nmf_kl.hpp"
 #include "celladmix/nmf_stability.hpp"
 #include "celladmix/pipeline.hpp"
@@ -396,4 +397,63 @@ TEST_CASE("Profile clustering groups recurring programs across factorizations") 
   REQUIRE_EQ(kept_apart.cluster[0], kept_apart.cluster[3]);
   REQUIRE_EQ(kept_apart.cluster[1], kept_apart.cluster[4]);
   REQUIRE_EQ(kept_apart.cluster[2], kept_apart.cluster[5]);
+}
+
+TEST_CASE("KL row projection is invariant to the profile scale") {
+  // Rows drawn from two programs; projecting onto the programs and onto the
+  // same programs scaled by 4 must give the same divergence, because the
+  // usages absorb the scale.
+  std::vector<std::vector<double>> rows;
+  for (int i = 0; i < 40; ++i) {
+    const double a = static_cast<double>(i % 5), b = static_cast<double>((i * 3) % 7);
+    rows.push_back({5 * a + 0.1 * b, 4 * a, 0.2 * a + 6 * b, 5 * b, 0.1 * (a + b), 7 * b});
+  }
+  const DenseMatrix dense = from_rows(rows);
+  std::vector<int> indptr{0};
+  std::vector<int> indices;
+  std::vector<double> values;
+  for (int i = 0; i < dense.rows(); ++i) {
+    for (int j = 0; j < dense.cols(); ++j) {
+      if (dense(i, j) > 0.0) {
+        indices.push_back(j);
+        values.push_back(dense(i, j));
+      }
+    }
+    indptr.push_back(static_cast<int>(values.size()));
+  }
+  const SparseRowMatrix x(dense.rows(), dense.cols(), indptr, indices, values);
+  const DenseMatrix h = from_rows({
+      {5.0, 4.0, 0.2, 0.0, 0.1, 0.0},
+      {0.1, 0.0, 6.0, 5.0, 0.1, 7.0}});
+  DenseMatrix scaled = h;
+  for (int f = 0; f < scaled.rows(); ++f) {
+    for (int g = 0; g < scaled.cols(); ++g) {
+      scaled(f, g) *= 4.0;
+    }
+  }
+  // The projection returns usage fractions, which must not depend on the
+  // scale of the profiles.
+  const DenseMatrix w = project_rows_to_factors_kl(x, h, 1);
+  const DenseMatrix w_scaled = project_rows_to_factors_kl(x, scaled, 1);
+  for (int i = 0; i < w.rows(); ++i) {
+    for (int a = 0; a < w.cols(); ++a) {
+      REQUIRE(std::abs(w(i, a) - w_scaled(i, a)) <= 1e-9);
+    }
+  }
+  // Rescaled to the observed row totals, the usages give the same divergence
+  // under both profile sets (the convention of training_loss_under_profiles).
+  auto rescale = [&](DenseMatrix usages, const DenseMatrix& profiles) {
+    const auto sums = profiles.row_sums();
+    for (int i = 0; i < usages.rows(); ++i) {
+      double observed = 0.0;
+      for (int j = 0; j < dense.cols(); ++j) observed += dense(i, j);
+      double fitted = 0.0;
+      for (int a = 0; a < usages.cols(); ++a) fitted += usages(i, a) * sums[static_cast<std::size_t>(a)];
+      for (int a = 0; a < usages.cols(); ++a) usages(i, a) *= observed / fitted;
+    }
+    return usages;
+  };
+  const double loss = sparse_kl_divergence(x, rescale(w, h), h, 1);
+  const double loss_scaled = sparse_kl_divergence(x, rescale(w_scaled, scaled), scaled, 1);
+  REQUIRE(std::abs(loss - loss_scaled) <= 1e-6 * std::max(1.0, std::abs(loss)));
 }

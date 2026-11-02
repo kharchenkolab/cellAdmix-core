@@ -2,8 +2,10 @@
 "separate",14,17,0.55
 "consensus",26,26,1
 "consensus_loop8",22,22,1
-"consensus_majority",17,17,1
-"consensus_median",27,27,1
+"consensus_majority",18,18,1
+"consensus_majority_balanced",17,17,1
+"consensus_median",24,24,1
+"consensus_median_balanced",27,27,1
 "joint_profiles",17,17,1
 "reference_left",18,18,1
 "joint",20,20,1

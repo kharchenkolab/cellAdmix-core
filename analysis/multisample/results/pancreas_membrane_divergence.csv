@@ -27,20 +27,34 @@
 "consensus_loop8","after","Fibroblast / CAF",22046,6320,0.967492298545982,41,15,11
 "consensus_loop8","after","Immune",11496,7755,0.958534688572997,32,15,11
 "consensus_loop8","after","Mural / pericyte",1315,1238,0.876919594005402,7,14,8
-"consensus_majority","after","Ductal/tumor epithelial",18759,11227,0.948874439064722,128,15,11
-"consensus_majority","after","Endocrine",700,1512,0.850298236028334,7,5,8
-"consensus_majority","after","Endothelial",3374,3652,0.956557457983741,21,15,11
-"consensus_majority","after","Exocrine epithelial",2857,33472,0.902478141698573,118,8,11
-"consensus_majority","after","Fibroblast / CAF",22046,6320,0.969034810528391,39,15,11
-"consensus_majority","after","Immune",11496,7755,0.968834013516246,33,15,11
-"consensus_majority","after","Mural / pericyte",1315,1238,0.876200757899311,8,14,8
-"consensus_median","after","Ductal/tumor epithelial",18759,11227,0.930041471129856,108,15,11
-"consensus_median","after","Endocrine",700,1512,0.904353391588592,4,5,8
-"consensus_median","after","Endothelial",3374,3652,0.957284647074903,15,15,11
-"consensus_median","after","Exocrine epithelial",2857,33472,0.940282306655827,129,8,11
-"consensus_median","after","Fibroblast / CAF",22046,6320,0.964045848253286,31,15,11
-"consensus_median","after","Immune",11496,7755,0.965675820675493,34,15,11
-"consensus_median","after","Mural / pericyte",1315,1238,0.895633773362007,7,14,8
+"consensus_majority","after","Ductal/tumor epithelial",18759,11227,0.945154034649126,137,15,11
+"consensus_majority","after","Endocrine",700,1512,0.854617540260603,7,5,8
+"consensus_majority","after","Endothelial",3374,3652,0.95247668509333,23,15,11
+"consensus_majority","after","Exocrine epithelial",2857,33472,0.933720265121717,132,8,11
+"consensus_majority","after","Fibroblast / CAF",22046,6320,0.968920783376049,38,15,11
+"consensus_majority","after","Immune",11496,7755,0.917008838578657,53,15,11
+"consensus_majority","after","Mural / pericyte",1315,1238,0.89636093798649,7,14,8
+"consensus_majority_balanced","after","Ductal/tumor epithelial",18759,11227,0.948874439064722,128,15,11
+"consensus_majority_balanced","after","Endocrine",700,1512,0.850298236028334,7,5,8
+"consensus_majority_balanced","after","Endothelial",3374,3652,0.956557457983741,21,15,11
+"consensus_majority_balanced","after","Exocrine epithelial",2857,33472,0.902478141698573,118,8,11
+"consensus_majority_balanced","after","Fibroblast / CAF",22046,6320,0.969034810528391,39,15,11
+"consensus_majority_balanced","after","Immune",11496,7755,0.968834013516246,33,15,11
+"consensus_majority_balanced","after","Mural / pericyte",1315,1238,0.876200757899311,8,14,8
+"consensus_median","after","Ductal/tumor epithelial",18759,11227,0.929250969530313,111,15,11
+"consensus_median","after","Endocrine",700,1512,0.866849571322909,4,5,8
+"consensus_median","after","Endothelial",3374,3652,0.948088907499764,19,15,11
+"consensus_median","after","Exocrine epithelial",2857,33472,0.948325216169085,114,8,11
+"consensus_median","after","Fibroblast / CAF",22046,6320,0.969455100665562,42,15,11
+"consensus_median","after","Immune",11496,7755,0.935539590912247,50,15,11
+"consensus_median","after","Mural / pericyte",1315,1238,0.869859716485637,5,14,8
+"consensus_median_balanced","after","Ductal/tumor epithelial",18759,11227,0.930041471129856,108,15,11
+"consensus_median_balanced","after","Endocrine",700,1512,0.904353391588592,4,5,8
+"consensus_median_balanced","after","Endothelial",3374,3652,0.957284647074903,15,15,11
+"consensus_median_balanced","after","Exocrine epithelial",2857,33472,0.940282306655827,129,8,11
+"consensus_median_balanced","after","Fibroblast / CAF",22046,6320,0.964045848253286,31,15,11
+"consensus_median_balanced","after","Immune",11496,7755,0.965675820675493,34,15,11
+"consensus_median_balanced","after","Mural / pericyte",1315,1238,0.895633773362007,7,14,8
 "reference_left","after","Ductal/tumor epithelial",18759,11227,0.924792899965722,151,15,11
 "reference_left","after","Endocrine",700,1512,0.854532049049949,3,5,8
 "reference_left","after","Endothelial",3374,3652,0.948965539125362,19,15,11
