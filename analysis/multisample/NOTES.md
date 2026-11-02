@@ -843,3 +843,148 @@ worse cleanup or concordance on true replicates; its only trace is the
 somewhat higher own-marker false removal, consistent with blurred merged
 profiles labeling a few native molecules as admixture. The flag stays
 informational, as documented.
+
+Observed, breast replicates under the corrected median construction
+(`results/breast_*.csv`; bridge, `ls_nmf`):
+
+| arm | factors | rep1 leak / sens / false | rep2 leak / sens / false | rules (both-supported) | concordance |
+|---|---|---|---|---|---|
+| separate | 23 + 23 | 0.62 / 0.86 / 1.6% | 0.68 / 0.89 / 1.5% | 213, 235 | 0.902 / 1066 |
+| pairwise (Loop 8) | 27 | 0.61 / 0.86 / 1.3% | 0.67 / 0.86 / 1.9% | 250 (217) | 0.992 / 141 |
+| pooled mean, unconstrained | 24 | 0.64 / 0.86 / 1.9% | 0.70 / 0.87 / 2.6% | 209 (177) | 0.992 / 145 |
+| median, recurrence 0 | 37 | 0.63 / 0.89 / 1.4% | 0.70 / 0.89 / 2.0% | 326 (268) | 0.992 / 138 |
+| median, recurrence 0.5 | 26 | 0.63 / 0.88 / 1.1% | 0.69 / 0.89 / 1.7% | 270 (233) | 0.991 / 128 |
+| joint stand-in | 23 | 0.62 / 0.88 / 1.2% | 0.68 / 0.88 / 1.5% | 260 | 0.991 / 117 |
+
+Every shared construction holds replicate concordance at or above
+uncorrected (0.988 / 242) with cleanup equal to separate processing; the
+differences between them are at the level of run-to-run variation. The
+majority rule (recurrence 0.5) has the lowest own-marker false removal
+of all arms, the highest sensitivity among the consensus arms, a
+rank-sized shared space (26 factors for rank 23; loss gaps −0.8% and
+−0.4%), and the fewest DE genes between replicates of any consensus arm
+(128; the joint stand-in 117). The residual DE genes sit in the three
+types where the uncorrected replicates already differ (DCIS 1 and 2,
+stromal).
+
+Decided. `min_recurrence = 0.5` is the default in both bindings: the
+shared factors are the programs that are the majority solution of at
+least one sample. Loops 9 and 10 are closed. Loop 11 (eight-tile cohort)
+is running; Loop 12's headline run (breast replicates, membrane scoring,
+`invsqrt_kl`) is launched behind it.
+
+## Loop 11 (2026-11-02): eight-tile cohort
+
+Setup. Each breast replicate cut into four quantile tiles (41,945 cells
+per replicate-1 tile, 29,688 per replicate-2 tile; 6.2 to 11.0 million
+molecules), replicate-1 tile 3 and replicate-2 tile 2 thinned gene by
+gene at a log-efficiency SD of 0.4; separate per-tile fits (`ls_nmf`, 10
+restarts each, 80 restarts pooled), bridge scoring.
+
+Observed, factor space (`cohort_factor_space.R`, tile restart spreads
+0.2% to 0.8%):
+
+| construction | shared factors | duplicate pairs (ownership r ≥ 0.3) | max pair r | in all 8 tiles | in one tile only | tiles with loss gap above spread |
+|---|---|---|---|---|---|---|
+| star (pairwise to the largest tile) | 57 | 60 | 0.82 | 11 | 34 | 1 of 8 (+11%) |
+| pooled clustering, recurrence 0 | 61 | 30 | 0.72 | 19 | 6 | 0 of 8 (gaps −10%) |
+| pooled clustering, majority rule (the arm) | 37 | 12 | 0.66 | 19 | 2 | 0 of 8 (gaps −3.2% to −4.1%) |
+
+The star construction behaves as predicted for many samples: programs
+the reference tile lacks are appended once per tile that has them (34
+single-tile factors, 60 duplicate pairs), and the reference tile's own
+space fits one tile 11% worse than its own restarts. The pooled
+clustering finds 19 programs present in every tile; with the majority
+rule the shared space has 37 factors for rank-23 fits, 26 of them in at
+least 7 of the 8 tiles, 127 unreproduced components, and reconstructs
+every tile within 3 to 4% below its own fit. Its pooled rules: 246 kept,
+53 supported by all eight tiles' own evidence, 170 by at least four, 23 by
+one tile only (the per-tile candidate budget is one eighth of a
+single-sample budget under proportional allocation, so single-tile
+support is expected to be sparse). The cohort consensus arm (scoring,
+shared ensemble over 8 tiles, per-tile audits) and the grouped replicate
+comparison are running.
+
+## Loop 12 (2026-11-02): breast replicates with membrane scoring
+
+Observed (`invsqrt_kl`, rank 23, 10 restarts per replicate, membrane
+scoring; `results/breast_membrane_*.csv`):
+
+| arm | factors | rep1 leak / sens / false | rep2 leak / sens / false | removed | rules | concordance |
+|---|---|---|---|---|---|---|
+| separate | 23 + 23 | 0.60 / 0.88 / 3.0% | 0.66 / 0.85 / 2.1% | 32% / 29% | 188, 191 (Jaccard 0.48) | 0.642 / 1242 |
+| consensus, majority rule | 12 | 0.51 / 0.59 / 0.7% | 0.57 / 0.66 / 0.8% | 21% / 22% | 115 (92 both) | 0.992 / 129 |
+
+Separate membrane processing diverges the replicates far more than
+separate bridge processing did (correlation 0.988 → 0.642; 1242 DE
+genes); the consensus restores concordance to the bridge level (0.992 /
+129) but cleans less than separate processing (leakage removed 0.51 /
+0.57 against 0.60 / 0.66; sensitivity 0.59 / 0.66 against 0.88 / 0.85),
+with very low own-marker false removal (0.7% / 0.8%).
+
+Diagnosis from the tables. The variant is unstable on this tissue:
+within-sample restart stability 0.38 for both replicates. The majority
+rule keeps 12 shared programs (6 in every restart, 6 in 50 to 70%); 277
+components are unreproduced, among them 14 of replicate 1's and 12 of
+replicate 2's 23 primary factors, all with own-sample stability 0.13 to
+0.26. The shared-factor flag of `diagnostics()` fires for both replicates
+(9 and 11 of 23 primary factors in the shared space), and the loss gap is
++339% / +330%. Admixture programs among the unstable primaries are lost
+to the shared space, hence the lower sensitivity. The pancreas membrane
+case (rank 9, stability 0.37 to 0.47) kept 9 of its programs under the
+same rule and cleaned best; at rank 23 the majority rule bites harder.
+
+Act. The same configuration runs with `min_recurrence = 0` (every
+program recurring in two restarts) to see whether the lost programs come
+back with their cleanup, which would make "lower `min_recurrence`" the
+documented first remedy when the shared-factor flag fires.
+
+Observed, cohort cleanup and concordance (`results/breast_tiles_*.csv`;
+bridge, `ls_nmf`, majority-rule consensus with 37 shared factors):
+
+| arm | leakage removed, mean (range) | median pair sensitivity | own-marker false removal, mean (range) | removed | rules per tile | concordance rep1 vs rep2 (pooled tiles) |
+|---|---|---|---|---|---|---|
+| uncorrected | | | | | | 0.987 / 272 |
+| separate per tile | 0.64 (0.56 to 0.71) | 0.83 | 1.5% (1.0 to 2.4%) | 21% | 95 to 135 (pairwise Jaccard 0.45) | 0.904 / 688 |
+| consensus, majority rule | 0.69 (0.55 to 0.77) | 0.91 | 4.1% (2.3 to 7.5%) | 26% | 246 (53 supported by all tiles, 23 by one) | 0.991 / 153 |
+
+Concordance between the replicates is restored (0.991 / 153, against
+0.987 / 272 uncorrected and 0.904 / 688 separate), immune, endothelial,
+and tumor types have 0 to 2 DE genes left, and sensitivity rises, but
+own-marker false removal is 2.7 times that of separate processing, above
+the 2% acceptance level in every tile, and the two-replicate consensus
+(1.1% / 1.7%) did not show this. The thinned tiles are not the cause
+(rep1_t3 3.1%, rep2_t2 6.0%, but the unthinned rep2_t4 7.5%).
+
+Attribution (removed molecules per tile credited to the rule of their
+cell's type and primary factor): rules lacking the tile's own evidence
+account for 1.5 to 11% of a tile's removal, so pooled power is not the
+driver; rules on factors carried by fewer than 7 of the 8 tiles account
+for 12 to 30%. Eleven of the 37 shared factors are present in 1 to 6
+tiles only (regional programs: DCIS present in some tiles, a program of
+one replicate's tiles). A rule for such a program applies in tiles that
+do not carry it, where the molecules labeled with it are nearest-factor
+artifacts rather than that program, and they are removed. Per type the
+cohort removes more than both the two-replicate consensus and separate
+processing from B cells (59% against 48% and 40%), stromal (51 against
+44 and 41), CD8 T cells (44 against 33 and 31), and KRT15+ myoepithelial
+cells (22% against 6% and 10%).
+
+Also observed: the eight-tile correction took 68 minutes, most of it the
+eight per-tile votes applied one tile after another; the voter scoring
+itself (72 jobs) ran concurrently.
+
+Interpretation. With two replicate sections nearly every shared program
+is present in both, so uniform rules act on equal contexts; with eight
+regional tiles a third of the shared programs are regional, and the
+uniform application of their rules in tiles lacking the program is where
+the extra own-marker removal comes from. Two levers, both decisions for
+the user: apply a rule in a sample only where the sample's own restarts
+carry the rule's program (a presence condition on the data, not an
+evidence threshold; it leaves true replicates untouched because their
+programs are shared), or require a minimum sample coverage for a program
+to enter the shared space (which drops regional programs altogether).
+The per-sample `diagnostics()` tables already show coverage per factor
+and the removed fraction attributable to rules without local evidence;
+a column for the removed fraction attributable to programs the sample
+does not carry would make this visible directly.

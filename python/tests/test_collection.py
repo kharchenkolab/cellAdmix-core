@@ -186,6 +186,9 @@ class CollectionTests(unittest.TestCase):
         correction_diagnostics = correction.diagnostics()
         self.assertEqual(list(correction_diagnostics["sample"]), ["a", "b"])
         self.assertTrue((correction_diagnostics["rules_without_local_evidence"] >= 0).all())
+        self.assertIn("removed_via_absent_programs", correction_diagnostics.columns)
+        absent = correction_diagnostics["removed_via_absent_programs"]
+        self.assertTrue((absent.isna() | absent.between(0, 1)).all())
         fraction = correction_diagnostics["removed_without_local_evidence"]
         self.assertTrue((fraction.isna() | fraction.between(0, 1)).all())
         self.assertIn("sample", correction.summary().columns)

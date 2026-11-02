@@ -900,37 +900,53 @@ CellAdmixCollectionCorrection <- R6::R6Class(
 
     diagnostics = function(report = NULL) {
       # One row per sample: the number of applied rules that lack local
-      # evidence (the sample is absent from the rule's `samples_significant`),
-      # the fraction of the sample's removed molecules attributable to those
-      # rules (a removed molecule is attributed to the rule of its cell's type
-      # and its primary factor label), and, when a cleanup report is given,
-      # the audit's leakage removed, median pair sensitivity, and own-marker
-      # false removal, with `false_removal_flag` when a sample's false removal
-      # exceeds twice the median across samples. Flags are reports.
+      # evidence (the sample is absent from the rule's `samples_significant`)
+      # and the fraction of the sample's removed molecules attributable to
+      # them; the number of applied rules whose program none of the sample's
+      # own restarts carries and the fraction of its removed molecules
+      # attributable to those (a removed molecule is attributed to the rule
+      # of its cell's type and its primary factor label); and, when a cleanup
+      # report is given, the audit's leakage removed, median pair
+      # sensitivity, and own-marker false removal, with `false_removal_flag`
+      # when a sample's false removal exceeds twice the median across
+      # samples. Flags are reports.
       rules <- self$rules
       if (!is.null(rules) && "keep" %in% names(rules)) {
         rules <- rules[is.na(rules$keep) | rules$keep, , drop = FALSE]
       }
-      fits <- self$score$consensus$fits
+      consensus <- self$score$consensus
+      fits <- consensus$fits
+      recurrence <- if (identical(consensus$params$source, "consensus")) consensus$recurrence() else NULL
       out <- do.call(rbind, lapply(names(self$corrections), function(sample) {
         removed <- .celladmix_removed_by_type_factor(fits[[sample]], self$corrections[[sample]])
         total <- sum(removed$removed)
         if (is.null(rules) || !nrow(rules)) {
           return(data.frame(sample = sample, rules_applied = 0L, rules_without_local_evidence = 0L,
-            molecules_removed = total, removed_without_local_evidence = NA_real_,
+            removed_without_local_evidence = NA_real_, rules_on_absent_programs = NA_integer_,
+            removed_via_absent_programs = NA_real_, molecules_removed = total,
             stringsAsFactors = FALSE))
+        }
+        attributed <- function(subset) {
+          mass <- removed$removed[match(
+            paste(subset$target_cell_type, as.integer(subset$factor), sep = "\r"),
+            paste(removed$cell_type, removed$factor, sep = "\r"))]
+          sum(mass, na.rm = TRUE) / max(total, 1)
         }
         significant <- as.character(rules$samples_significant %||% rep("", nrow(rules)))
         significant[is.na(significant)] <- ""
         has_local <- vapply(strsplit(significant, ",", fixed = TRUE), function(x) sample %in% x, logical(1))
         without <- rules[!has_local, , drop = FALSE]
-        attributed <- removed$removed[match(
-          paste(without$target_cell_type, as.integer(without$factor), sep = "\r"),
-          paste(removed$cell_type, removed$factor, sep = "\r"))]
+        absent <- NULL
+        if (!is.null(recurrence)) {
+          carried <- recurrence$consensus_factor[recurrence$sample == sample & recurrence$restarts > 0]
+          absent <- rules[!(as.integer(rules$factor) %in% carried), , drop = FALSE]
+        }
         data.frame(sample = sample, rules_applied = nrow(rules),
-          rules_without_local_evidence = nrow(without), molecules_removed = total,
-          removed_without_local_evidence = sum(attributed, na.rm = TRUE) / max(total, 1),
-          stringsAsFactors = FALSE)
+          rules_without_local_evidence = nrow(without),
+          removed_without_local_evidence = attributed(without),
+          rules_on_absent_programs = if (is.null(absent)) NA_integer_ else nrow(absent),
+          removed_via_absent_programs = if (is.null(absent)) NA_real_ else attributed(absent),
+          molecules_removed = total, stringsAsFactors = FALSE)
       }))
       if (!is.null(report)) {
         s <- report$summary()

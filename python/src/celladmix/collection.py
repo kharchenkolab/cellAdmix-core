@@ -736,34 +736,50 @@ class CellAdmixCollectionCorrection:
 
     def diagnostics(self, report=None) -> pd.DataFrame:
         """One row per sample: the number of applied rules that lack local
-        evidence (the sample is absent from the rule's ``samples_significant``),
-        the fraction of the sample's removed molecules attributable to those
-        rules (a removed molecule is attributed to the rule of its cell's type
-        and its primary factor label), and, when a cleanup report is given,
+        evidence (the sample is absent from the rule's ``samples_significant``)
+        and the fraction of the sample's removed molecules attributable to
+        them; the number of applied rules whose program none of the sample's
+        own restarts carries and the fraction of its removed molecules
+        attributable to those (a removed molecule is attributed to the rule
+        of its cell's type and its primary factor label); and, when a cleanup
+        report is given,
         the audit's leakage removed, median pair sensitivity, and own-marker
         false removal, with ``false_removal_flag`` when a sample's false
         removal exceeds twice the median across samples. Flags are reports."""
         rules = self.rules
         if rules is not None and "keep" in rules.columns:
             rules = rules[rules["keep"].fillna(True).astype(bool)]
-        fits = self.score.consensus.fits
+        consensus = self.score.consensus
+        fits = consensus.fits
+        recurrence = consensus.recurrence() if consensus.params.get("source") == "consensus" else None
         rows = []
         for s, correction in self.corrections.items():
             removed = _removed_by_type_factor(fits[s], correction)
             total = float(removed["removed"].sum()) if len(removed) else 0.0
             if rules is None or rules.empty:
                 rows.append({"sample": s, "rules_applied": 0, "rules_without_local_evidence": 0,
-                             "molecules_removed": total, "removed_without_local_evidence": np.nan})
+                             "removed_without_local_evidence": np.nan, "rules_on_absent_programs": pd.NA,
+                             "removed_via_absent_programs": np.nan, "molecules_removed": total})
                 continue
+            lookup = {(str(t), int(f)): float(r) for t, f, r in zip(removed["cell_type"], removed["factor"], removed["removed"])}
+
+            def attributed(subset):
+                return sum(lookup.get((str(t), int(f)), 0.0) for t, f in zip(subset["target_cell_type"], subset["factor"])) / max(total, 1.0)
+
             significant = rules["samples_significant"].fillna("").astype(str) if "samples_significant" in rules.columns \
                 else pd.Series([""] * len(rules), index=rules.index)
             has_local = significant.map(lambda x: s in x.split(",") if x else False).to_numpy(dtype=bool)
             without = rules[~has_local]
-            lookup = {(str(t), int(f)): float(r) for t, f, r in zip(removed["cell_type"], removed["factor"], removed["removed"])}
-            attributed = sum(lookup.get((str(t), int(f)), 0.0) for t, f in zip(without["target_cell_type"], without["factor"]))
+            absent = None
+            if recurrence is not None:
+                carried = set(recurrence[(recurrence["sample"] == s) & (recurrence["restarts"] > 0)]["consensus_factor"].astype(int))
+                absent = rules[~rules["factor"].astype(int).isin(carried)]
             rows.append({"sample": s, "rules_applied": int(len(rules)),
-                         "rules_without_local_evidence": int(len(without)), "molecules_removed": total,
-                         "removed_without_local_evidence": attributed / max(total, 1.0)})
+                         "rules_without_local_evidence": int(len(without)),
+                         "removed_without_local_evidence": attributed(without),
+                         "rules_on_absent_programs": int(len(absent)) if absent is not None else pd.NA,
+                         "removed_via_absent_programs": attributed(absent) if absent is not None else np.nan,
+                         "molecules_removed": total})
         out = pd.DataFrame(rows)
         if report is not None:
             summary = report.summary()

@@ -162,6 +162,10 @@ test_that("a consensus factorization pools two samples end to end", {
   correction_diagnostics <- correction$diagnostics()
   expect_equal(correction_diagnostics$sample, c("a", "b"))
   expect_true(all(correction_diagnostics$rules_without_local_evidence >= 0))
+  expect_true(all(c("rules_on_absent_programs", "removed_via_absent_programs") %in% names(correction_diagnostics)))
+  expect_true(all(is.na(correction_diagnostics$removed_via_absent_programs) |
+    (correction_diagnostics$removed_via_absent_programs >= 0 &
+      correction_diagnostics$removed_via_absent_programs <= 1)))
   expect_true(all(is.na(correction_diagnostics$removed_without_local_evidence) |
     (correction_diagnostics$removed_without_local_evidence >= 0 &
       correction_diagnostics$removed_without_local_evidence <= 1)))

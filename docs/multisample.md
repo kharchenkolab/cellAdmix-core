@@ -171,11 +171,17 @@ flags that report rather than gate:
 - **Correction** (`diagnostics(report)`): the number of applied rules
   that lack evidence from the sample itself (the sample is absent from the
   rule's `samples_significant`) and the fraction of the sample's removed
-  molecules attributable to those rules, a removed molecule being
-  attributed to the rule of its cell's type and primary factor label. A
-  high fraction means the sample's cleanup rests on other samples'
-  evidence, which is the intended uniform treatment of replicates but a
-  point to examine when the samples are not replicates. Given the cleanup
+  molecules attributable to those rules; and the number of applied rules
+  whose program none of the sample's own restarts carries (zero recurrence
+  in that sample) and the fraction of its removed molecules attributable
+  to those. A removed molecule is attributed to the rule of its cell's
+  type and primary factor label. A high fraction in the first pair means
+  the sample's cleanup rests on other samples' evidence, which is the
+  intended uniform treatment of replicates but a point to examine when the
+  samples are not replicates; a high fraction in the second means the
+  sample is being cleaned of a program it does not have, whose labels in
+  that sample are nearest-factor artifacts, which happens when samples
+  differ in composition (regional sections, cohorts). Given the cleanup
   report of the audit, the audit's leakage removed, median pair
   sensitivity, and own-marker false removal are added per sample, with
   `false_removal_flag` when a sample's false removal exceeds twice the
