@@ -571,7 +571,10 @@ richer starting programs let the model separate more induced structure
 from transfer. The practical guidance: use the NMF
 initialization when a fit exists (it is the validated configuration and
 preserves the most induced biology); the alternatives serve when no
-factorization is available.
+factorization is available. Each target type can carry at most 32
+detected contamination sources and 32 own-expression programs
+(`n_programs`, default 4); a fit that would exceed either limit stops
+with an error.
 
 Worked examples with figures accompany the package: a
 [minimal pancreas example](../examples/xenium_pancreas_membrane_377_full/pancreas_generative_minimal.md)

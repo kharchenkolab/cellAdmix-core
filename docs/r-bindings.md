@@ -242,7 +242,8 @@ cell's counts are decomposed into the cell's own expression, contamination
 from each detected source type, ambient background, and
 neighborhood-induced expression; the contamination and ambient shares are
 removed while the induced ones are retained. The fit runs in the C++ core
-(seconds to a few minutes depending on dataset size) and returns a
+(seconds to a few minutes on panels of a few hundred to 5,000 genes, hours on
+larger panels and whole-transcriptome datasets) and returns a
 correction object that `evaluate()` accepts, together with the model's
 per-cell decomposition:
 

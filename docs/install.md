@@ -172,3 +172,29 @@ cmake --build --preset user-vcpkg -j8
 The GitHub Actions workflow builds the C++ core on Ubuntu, macOS, and
 Windows, and runs Ubuntu smoke jobs for C++ tests, R install/load, and Python
 install/import.
+
+## Running the Tests
+
+The C++ tests run through `ctest` as shown above. The Python tests run from
+the repository root against the installed package:
+
+```bash
+python -m pytest python/tests
+```
+
+The R tests run against the installed package:
+
+```bash
+Rscript -e 'testthat::test_dir("r/tests/testthat", package = "cellAdmixCore")'
+```
+
+The Atera reader's tests build small Atera bundles in a temporary directory.
+In Python they are skipped when `zarr` is not installed. The R round trip,
+which converts such a bundle through `python -m celladmix.atera` and reads
+it back with `cellAdmix()`, runs only when `CELLADMIX_PYTHON` names an
+interpreter that has `celladmix` and `zarr`:
+
+```bash
+CELLADMIX_PYTHON=$(which python) \
+  Rscript -e 'testthat::test_dir("r/tests/testthat", package = "cellAdmixCore", filter = "atera")'
+```

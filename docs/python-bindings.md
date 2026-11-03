@@ -2,8 +2,8 @@
 
 The Python package exposes the same C++ analysis store and persisted run
 artifacts used by the R package. The current implementation is focused on
-Xenium bundles and the scverse ecosystem; tabular and other input adapters can
-reuse the same store abstraction later.
+10x Xenium and Atera bundles and the scverse ecosystem; tabular and other input
+adapters can reuse the same store abstraction later.
 
 ## Install
 
@@ -37,6 +37,11 @@ counts, genes, cells = correction.counts()
 `CellAdmix()` validates configuration and owns an on-disk output/cache
 directory. The full molecule table is not loaded into Python memory. Fitting,
 scoring, and correction call the C++ core through pybind11.
+
+An Atera output directory is passed in place of the Xenium bundle. Its Zarr
+stores are written once as Xenium-layout tables under `out/atera_xenium`
+(`ds.xenium_source()` returns that directory); the conversion needs the
+`atera` extra (see [inputs.md](inputs.md#atera)).
 
 Fitted runs are cached on disk by run id and reused only when the requested
 parameters match the cached run: `fit()` compares the requested parameters
@@ -208,7 +213,8 @@ cell's counts are decomposed into the cell's own expression, contamination
 from each detected source type, ambient background, and
 neighborhood-induced expression; the contamination and ambient shares are
 removed while the induced ones are retained. The fit runs in the C++ core
-(seconds to a few minutes depending on dataset size) and returns a
+(seconds to a few minutes on panels of a few hundred to 5,000 genes, hours on
+larger panels and whole-transcriptome datasets) and returns a
 correction object that `evaluate()` accepts, together with the model's
 per-cell decomposition:
 
@@ -227,7 +233,11 @@ The `init` argument selects the expression-program initialization: an
 NMF fit's factor-labeled molecules (the recommended configuration, and
 the default for a fit-derived audit), `"clusters"` (the default for a
 dataset-derived audit), `"pseudobulk"`, or a dict of explicit profile
-matrices.
+matrices. With `verbose=True` (the default) the fit prints timestamped
+`[INFO ...]` progress lines to standard output: its stages, and per target
+type the dose prior, each expectation-maximization pass with its
+log-likelihood, and the molecules attributed to contamination
+([generative.md](generative.md) lists them); `verbose=False` silences them.
 `audit.correct_generative()` remains as the one-call convenience.
 
 Neither the audit nor the generative model requires a factorization:

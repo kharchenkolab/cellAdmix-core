@@ -5,8 +5,9 @@ the R workflow while returning Python-native objects such as pandas DataFrames,
 SciPy sparse matrices, and AnnData objects.
 
 The package is currently experimental. The primary target is scverse workflows,
-including SpatialData integration. Input support is currently limited to Xenium
-bundles; the R bindings additionally accept generic tabular molecule tables.
+including SpatialData integration. Input support is currently limited to 10x
+Xenium and Atera bundles (Atera needs the `atera` extra); the R bindings
+additionally accept generic tabular molecule tables.
 
 ```python
 import pandas as pd
@@ -40,7 +41,7 @@ SpatialData integration is available through `ca.from_spatialdata()`.
 Rendering SpatialData-native figures also uses `spatialdata-plot`; current
 SpatialData packages require Python 3.11 or newer.
 
-For command-line Xenium processing, use:
+For command-line Xenium or Atera processing, use:
 
 ```bash
 python scripts/celladmix_batch.py --input data --output out \
