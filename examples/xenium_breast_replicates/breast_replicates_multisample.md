@@ -142,6 +142,12 @@ change.
 
 ``` r
 consensus <- collection$fit_consensus()
+```
+
+    ## Reusing cached run consensus_0e364129 (parameters match)
+    ## Reusing cached run consensus_0e364129 (parameters match)
+
+``` r
 consensus
 ```
 
@@ -598,18 +604,16 @@ show(head(pairs, 10))
 | Myoepi\_ACTA2+          | DCIS\_1         |             614022 | 0.090 | TRUE     |          2 |                    2 |
 
 The admixture maps show the same estimates per sample as
-source-by-target matrices. Replicates should show the same pattern of
-pairs; a pair present in one map only is a difference between the
-sections, whether real or technical.
+source-by-target matrices, one row per sample on one color scale.
+Replicates should show the same pattern of pairs; a pair present in one
+row only is a difference between the sections, whether real or
+technical.
 
 ``` r
-plot_grid(
-  audit$audits$rep1$plot_map() + ggtitle("rep1"),
-  audit$audits$rep2$plot_map() + ggtitle("rep2"),
-  ncol = 2)
+audit$plot_map()
 ```
 
-<img src="breast_replicates_multisample_files/figure-gfm/audit-maps-1.png" alt="" width="1200" style="display: block; margin: auto;" />
+<img src="breast_replicates_multisample_files/figure-gfm/audit-maps-1.png" alt="" width="720" style="display: block; margin: auto;" />
 
 ### Verification of the cleanup
 
@@ -788,6 +792,18 @@ two sections were treated alike. A negative sensitivity means the pair’s
 exposure gradient was slightly steeper after the correction than before,
 which happens for small pairs when removals in the surrounding types
 shift the reference; it reads as no removal.
+
+The admixture maps after the correction show what the cleanup left: each
+pair’s estimate scaled by the share of its leakage that remains, next to
+the estimate before, one row per sample on one color scale. The cells
+that stay dark in the after column are the uncovered pairs the warnings
+list; the others should fade in both rows alike.
+
+``` r
+report$plot_map()
+```
+
+<img src="breast_replicates_multisample_files/figure-gfm/cleanup-maps-1.png" alt="" width="1248" style="display: block; margin: auto;" />
 
 The pairs table of the report gives every detected pair’s sensitivity
 per sample; its lower end shows which pairs the rules did not cover.
@@ -982,8 +998,8 @@ data. A report back should include:
 5.  `correction$summary()` for the `all` rows and the per-type removal
     plot, which shows whether the samples were cleaned alike.
 6.  `report$summary()` and `correction$diagnostics(report)`, with any
-    warnings printed by `evaluate()`, and the admixture maps and
-    verification plots.
+    warnings printed by `evaluate()`, the admixture maps before and
+    after the correction, and the verification plots.
 7.  The replicate-agreement table when the samples are replicates.
 
 Points to flag explicitly: either flag set in `consensus$diagnostics()`;
