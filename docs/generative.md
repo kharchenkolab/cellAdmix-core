@@ -33,11 +33,7 @@ boundary:
 (red), so its segmentation boundary (dashed) collects the cell's own
 expression programs (blue), molecules admixed from the neighbor (red),
 background (grey), and the cell's own response induced by the neighbor
-(green). The formula gives each origin a term, in the same colors:
-
-$$y_{cg} \sim \mathrm{Poisson}\Big(t_c \big[ \textstyle\sum_k \theta_{ck} F_{kg}
-\;+\; \sum_s \alpha_{cs}\, P_{sg} \;+\; \beta_c\, A_g \;+\;
-\sum_s \lambda_{cs}\, \rho_{cs}\, M_{sg} \;+\; \varepsilon_g \big]\Big)$$
+(green). The formula below gives each origin a term, in the same colors.
 
 Indices are $c$ for cells, $g$ for genes, $k$ for expression programs and
 $s$ for source cell types; per-cell weights are lower-case Greek letters
