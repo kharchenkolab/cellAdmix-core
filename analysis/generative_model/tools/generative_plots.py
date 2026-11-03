@@ -257,77 +257,82 @@ def _label_points(ax, xs, ys, labels, color="black", fontsize=7.5):
                     arrowprops=None if dy >= 0 else dict(arrowstyle="-", color="#999999", lw=0.5))
 
 
-def generative_plot_volcano(changes, source, z_cap=60, label_n=7, ax=None):
-    """Volcano of the changes for one source (docs/generative.md Figure 5)."""
-    import matplotlib.pyplot as plt
+def _volcano_panel(ax, genes, x, z, lf, partly, hollow, src, z_cap, z_min, label_n, title=None):
+    """One volcano panel. Genes reported (|z| >= z_min and at least a 4%
+    change per neighbor) are colored by direction; a filled circle marks a
+    gene with essentially nothing removed as admixture, a filled square a
+    gene partly removed as admixture, and a hollow circle a gene that is no
+    longer reported after correction. Genes not reported are small grey
+    dots. The label_n most significant reported genes are named."""
+    from matplotlib.lines import Line2D
 
-    d = changes[(changes.source == source) & np.isfinite(changes.z)].copy()
-    src = _short(source)
-    d["lfc"] = d.log_fold_per_neighbor / np.log(2)
-    d["zc"] = np.minimum(d.z.abs(), z_cap)
-    if ax is None:
-        _, ax = plt.subplots(figsize=(6.8, 5))
-    ent = d[~d.clean]
-    ax.scatter(ent.lfc, ent.zc, s=12, facecolors="none", edgecolors="#b6b6b6", lw=0.8,
-               label="entangled with the admixture split")
-    up = d[d.clean & (d.z > 0)]; dn = d[d.clean & (d.z < 0)]
-    ax.scatter(up.lfc, up.zc, s=14, color="#1e8449", lw=0, label=f"increased near {src}")
-    ax.scatter(dn.lfc, dn.zc, s=14, color="#7d3c98", lw=0, label=f"decreased near {src}")
-    ax.axhline(6, color="grey", lw=0.7, ls=":")
-    lab = d[d.clean].sort_values("zc", ascending=False).head(label_n)
-    _label_points(ax, lab.lfc, lab.zc, lab.gene)
+    x, z, lf = np.asarray(x), np.asarray(z), np.asarray(lf)
+    partly, hollow, genes = np.asarray(partly), np.asarray(hollow), np.asarray(genes)
+    y = np.minimum(np.abs(z), z_cap)
+    rep = (np.abs(z) >= z_min) & (np.abs(lf) >= np.log(1.04))
+    ax.scatter(x[~rep], y[~rep], s=5, color="#c8c8c8", lw=0)
+    ax.axhline(z_min, color="grey", lw=0.7, ls=":")
+    up, down = "#1e8449", "#7d3c98"
+    col = np.where(z > 0, up, down)
+    for m, sel in (("o", rep & ~hollow & ~partly), ("s", rep & ~hollow & partly)):
+        ax.scatter(x[sel], y[sel], s=16, marker=m, color=col[sel], lw=0)
+    sel = rep & hollow
+    ax.scatter(x[sel], y[sel], s=16, marker="o", facecolors="none", edgecolors=col[sel], lw=0.8)
+    top = np.flatnonzero(rep)[np.argsort(-y[rep])][:label_n]
+    _label_points(ax, x[top], y[top], genes[top])
+    handles = [Line2D([], [], ls="", marker="o", color=up, label=f"increased near {src}"),
+               Line2D([], [], ls="", marker="o", color=down, label=f"decreased near {src}"),
+               Line2D([], [], ls="", marker="o", color="#555555",
+                      label="essentially nothing removed as admixture"),
+               Line2D([], [], ls="", marker="s", color="#555555", label="partly removed as admixture")]
+    if hollow.any():
+        handles.append(Line2D([], [], ls="", marker="o", mfc="none", color="#555555",
+                              label="no longer reported after correction"))
+    ax.legend(handles=handles, frameon=False, fontsize=7.5, loc="upper left")
     ax.set_xlabel(f"fold change per {src} neighbor (log2)")
     ax.set_ylabel(f"significance |z| (capped at {z_cap})")
-    ax.legend(frameon=False, fontsize=7.5, loc="upper left")
+    if title:
+        ax.set_title(title)
     return ax
 
 
-def generative_plot_volcano_pair(changes, source, z_cap=60, z_min=6, label_n=6, axes=None):
-    """The same test before and after correction, side by side on one scale.
-    Left, the observed counts: red marks genes reported there (|z| >= z_min,
-    at least a 4% change per neighbor) that are no longer reported on the
-    corrected counts - associations explained by the removed admixture;
-    green/purple mark genes reported in both. Right, the corrected counts,
-    drawn as generative_plot_volcano."""
+def generative_plot_volcano(changes, source, z_cap=60, z_min=6, label_n=10, ax=None):
+    """Volcano of the changes for one source on the corrected counts
+    (docs/generative.md Figure 5)."""
+    import matplotlib.pyplot as plt
+
+    d = changes[(changes.source == source) & np.isfinite(changes.z)]
+    if ax is None:
+        _, ax = plt.subplots(figsize=(6.8, 5))
+    return _volcano_panel(ax, d.gene, d.log_fold_per_neighbor / np.log(2), d.z,
+                          d.log_fold_per_neighbor, ~d.clean, np.zeros(len(d), bool),
+                          _short(source), z_cap, z_min, label_n)
+
+
+def generative_plot_volcano_pair(changes, source, z_cap=60, z_min=6, label_n=10, axes=None):
+    """The same test before and after correction, side by side on one scale:
+    left the observed counts, where hollow circles mark genes reported there
+    that are no longer reported after correction (associations explained by
+    the removed admixture); right the corrected counts."""
     import matplotlib.pyplot as plt
 
     d = changes[(changes.source == source) & np.isfinite(changes.z)
-                & np.isfinite(changes.z_observed)].copy()
+                & np.isfinite(changes.z_observed)]
     src = _short(source)
-    min_lf = np.log(1.04)
-    before = (d.z_observed.abs() >= z_min) & (d.log_fold_observed.abs() >= min_lf)
-    after = (d.z.abs() >= z_min) & (d.log_fold_per_neighbor.abs() >= min_lf)
-    d["x0"] = d.log_fold_observed / np.log(2)
-    d["y0"] = np.minimum(d.z_observed.abs(), z_cap)
+    kept = ((d.z.abs() >= z_min) & (d.log_fold_per_neighbor.abs() >= np.log(1.04))).to_numpy()
+    x0, x1 = d.log_fold_observed / np.log(2), d.log_fold_per_neighbor / np.log(2)
     if axes is None:
         _, axes = plt.subplots(1, 2, figsize=(11, 5), sharex=True, sharey=True)
     # fix the shared limits first, so that the labels are placed on the final scale
-    x1 = d.log_fold_per_neighbor / np.log(2)
-    lo, hi = min(d.x0.min(), x1.min()), max(d.x0.max(), x1.max())
-    top = max(d.y0.max(), np.minimum(d.z.abs(), z_cap).max()) * 1.05
+    lo, hi = min(x0.min(), x1.min()), max(x0.max(), x1.max())
+    top = np.minimum(np.concatenate([d.z_observed.abs(), d.z.abs()]), z_cap).max() * 1.05
     for a in axes:
         a.set_xlim(lo - 0.05 * (hi - lo), hi + 0.12 * (hi - lo))
         a.set_ylim(-0.02 * top, top)
-    ax = axes[0]
-    rest = d[~before]
-    ax.scatter(rest.x0, rest.y0, s=12, facecolors="none", edgecolors="#b6b6b6", lw=0.8,
-               label="not reported")
-    kept = d[before & after]
-    up, dn = kept[kept.z_observed > 0], kept[kept.z_observed < 0]
-    ax.scatter(up.x0, up.y0, s=14, color="#1e8449", lw=0, label=f"increased near {src}")
-    ax.scatter(dn.x0, dn.y0, s=14, color="#7d3c98", lw=0, label=f"decreased near {src}")
-    lost = d[before & ~after]
-    ax.scatter(lost.x0, lost.y0, s=14, color="#c0392b", lw=0,
-               label="reported before correction only")
-    ax.axhline(z_min, color="grey", lw=0.7, ls=":")
-    lab = lost.sort_values("y0", ascending=False).head(label_n)
-    _label_points(ax, lab.x0, lab.y0, lab.gene, color="#c0392b")
-    ax.set_xlabel(f"fold change per {src} neighbor (log2)")
-    ax.set_ylabel(f"significance |z| (capped at {z_cap})")
-    ax.set_title("observed counts")
-    ax.legend(frameon=False, fontsize=7.5, loc="upper left")
-    generative_plot_volcano(changes, source, z_cap=z_cap, label_n=label_n, ax=axes[1])
-    axes[1].set_title("after correction")
+    _volcano_panel(axes[0], d.gene, x0, d.z_observed, d.log_fold_observed, ~d.clean, ~kept,
+                   src, z_cap, z_min, label_n, "observed counts")
+    _volcano_panel(axes[1], d.gene, x1, d.z, d.log_fold_per_neighbor, ~d.clean,
+                   np.zeros(len(d), bool), src, z_cap, z_min, label_n, "after correction")
     return axes
 
 

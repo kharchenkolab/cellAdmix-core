@@ -259,82 +259,75 @@ generative_induced_changes <- function(before, after, model, cells_xy, annotatio
   out
 }
 
+# One volcano panel. Genes reported (|z| >= z_min and at least a 4% change
+# per neighbor) are colored by direction; a filled circle marks a gene with
+# essentially nothing removed as admixture, a filled square a gene partly
+# removed as admixture, and a hollow circle (hollow = TRUE) a gene that is
+# no longer reported after correction. Genes not reported are small grey
+# dots. The label_n most significant reported genes are named.
+generative_volcano_panel <- function(d, x, z, lf, partly, hollow, src, z_cap, z_min,
+                                     label_n, title = NULL) {
+  up <- paste("increased near", src)
+  down <- paste("decreased near", src)
+  rep <- abs(z) >= z_min & abs(lf) >= log(1.04)
+  kinds <- c("essentially nothing removed as admixture", "partly removed as admixture",
+    "no longer reported after correction")
+  p <- data.frame(gene = d$gene, x = x, y = pmin(abs(z), z_cap), rep = rep,
+    dir = factor(ifelse(z > 0, up, down), c(up, down)),
+    kind = factor(ifelse(hollow, kinds[3], ifelse(partly, kinds[2], kinds[1])), kinds))
+  r <- p[p$rep, ]
+  lab <- r[order(-r$y), ][seq_len(min(label_n, nrow(r))), ]
+  cols <- stats::setNames(c("#1e8449", "#7d3c98"), c(up, down))
+  ggplot(r, aes(x, y)) +
+    geom_point(data = p[!p$rep, ], color = "#c8c8c8", size = 0.8) +
+    geom_hline(yintercept = z_min, color = "grey50", linetype = "13") +
+    geom_point(data = r[r$kind == kinds[3], ], aes(color = dir, shape = kind),
+      size = 1.6, stroke = 0.6) +
+    geom_point(data = r[r$kind != kinds[3], ], aes(color = dir, shape = kind), size = 1.6) +
+    ggrepel::geom_text_repel(data = lab, aes(label = gene), size = 3, color = "black",
+      max.overlaps = Inf, min.segment.length = 0.2) +
+    scale_color_manual(values = cols, name = NULL, drop = FALSE) +
+    scale_shape_manual(values = stats::setNames(c(16, 15, 1), kinds), name = NULL,
+      breaks = kinds[kinds %in% r$kind]) +
+    guides(color = guide_legend(order = 1), shape = guide_legend(order = 2)) +
+    labs(title = title, x = sprintf("fold change per %s neighbor (log2)", src),
+      y = sprintf("significance |z| (capped at %d)", z_cap)) +
+    theme_classic(base_size = 11) +
+    theme(plot.title = element_text(size = 11))
+}
+
 # Volcano of the changes for one source on the corrected counts:
 # docs/generative.md Figure 5.
-generative_plot_volcano <- function(changes, source, z_cap = 60, label_n = 7,
+generative_plot_volcano <- function(changes, source, z_cap = 60, z_min = 6, label_n = 10,
                                     source_label = NULL) {
   d <- changes[changes$source == source & is.finite(changes$z), ]
   src <- source_label %||% generative_short_label(source)
-  d$lfc <- d$log_fold_per_neighbor / log(2)
-  d$zc <- pmin(abs(d$z), z_cap)
-  up <- paste("increased near", src)
-  down <- paste("decreased near", src)
-  ent <- "entangled with the admixture split"
-  d$tier <- factor(ifelse(!d$clean, ent, ifelse(d$z > 0, up, down)), c(up, down, ent))
-  lab <- d[d$clean, ]
-  lab <- lab[order(-lab$zc), ][seq_len(min(label_n, sum(d$clean))), ]
-  ggplot(d, aes(lfc, zc, color = tier, shape = tier)) +
-    geom_point(data = d[!d$clean, ], size = 1.3) +
-    geom_point(data = d[d$clean, ], size = 1.5) +
-    geom_hline(yintercept = 6, color = "grey50", linetype = "13") +
-    ggrepel::geom_text_repel(data = lab, aes(label = gene), size = 3, color = "black",
-      show.legend = FALSE) +
-    scale_color_manual(values = stats::setNames(c("#1e8449", "#7d3c98", "#b6b6b6"),
-      c(up, down, ent)), name = NULL, drop = FALSE) +
-    scale_shape_manual(values = stats::setNames(c(16, 16, 1), c(up, down, ent)),
-      name = NULL, drop = FALSE) +
-    labs(x = sprintf("fold change per %s neighbor (log2)", src),
-      y = sprintf("significance |z| (capped at %d)", z_cap)) +
-    theme_classic(base_size = 11)
+  generative_volcano_panel(d, d$log_fold_per_neighbor / log(2), d$z,
+    d$log_fold_per_neighbor, !d$clean, rep(FALSE, nrow(d)), src, z_cap, z_min, label_n)
 }
 
-# The same test before and after correction, side by side on one scale.
-# Left, the observed counts: red marks genes reported there (|z| >= z_min,
-# at least a 4% change per neighbor) that are no longer reported on the
-# corrected counts - associations explained by the removed admixture;
-# green/purple mark genes reported in both. Right, the corrected counts,
-# drawn as generative_plot_volcano.
+# The same test before and after correction, side by side on one scale:
+# left the observed counts, where hollow circles mark genes reported there
+# that are no longer reported after correction (associations explained by
+# the removed admixture); right the corrected counts.
 generative_plot_volcano_pair <- function(changes, source, z_cap = 60, z_min = 6,
-                                         label_n = 6, source_label = NULL) {
+                                         label_n = 10, source_label = NULL) {
   d <- changes[changes$source == source & is.finite(changes$z) &
     is.finite(changes$z_observed), ]
   src <- source_label %||% generative_short_label(source)
-  min_lf <- log(1.04)
-  called <- function(z, lf) abs(z) >= z_min & abs(lf) >= min_lf
-  d$before <- called(d$z_observed, d$log_fold_observed)
-  d$after <- called(d$z, d$log_fold_per_neighbor)
-  up <- paste("increased near", src)
-  down <- paste("decreased near", src)
-  lost <- "reported before correction only"
-  none <- "not reported"
-  d$status <- factor(ifelse(d$before & !d$after, lost,
-    ifelse(d$before, ifelse(d$z_observed > 0, up, down), none)), c(up, down, lost, none))
-  d$x0 <- d$log_fold_observed / log(2)
-  d$y0 <- pmin(abs(d$z_observed), z_cap)
-  xr <- range(c(d$x0, d$log_fold_per_neighbor / log(2)))
-  yr <- c(0, max(c(d$y0, pmin(abs(d$z), z_cap))) * 1.05)
-  lab0 <- d[d$status == lost, ]
-  lab0 <- lab0[order(-lab0$y0), ][seq_len(min(label_n, nrow(lab0))), ]
-  bottom <- theme(legend.position = "bottom", legend.direction = "vertical",
-    plot.title = element_text(size = 11))
-  left <- ggplot(d, aes(x0, y0, color = status, shape = status)) +
-    geom_point(data = d[d$status == none, ], size = 1.3) +
-    geom_point(data = d[d$status != none, ], size = 1.5) +
-    geom_hline(yintercept = z_min, color = "grey50", linetype = "13") +
-    ggrepel::geom_text_repel(data = lab0, aes(label = gene), size = 3,
-      color = "#c0392b", max.overlaps = Inf, show.legend = FALSE) +
-    scale_color_manual(values = stats::setNames(c("#1e8449", "#7d3c98", "#c0392b", "#b6b6b6"),
-      c(up, down, lost, none)), name = NULL, drop = FALSE) +
-    scale_shape_manual(values = stats::setNames(c(16, 16, 16, 1), c(up, down, lost, none)),
-      name = NULL, drop = FALSE) +
-    coord_cartesian(xlim = xr, ylim = yr) +
-    labs(title = "observed counts", x = sprintf("fold change per %s neighbor (log2)", src),
-      y = sprintf("significance |z| (capped at %d)", z_cap)) +
-    theme_classic(base_size = 11) + bottom
-  right <- generative_plot_volcano(changes, source, z_cap = z_cap, label_n = label_n,
-    source_label = source_label) +
-    coord_cartesian(xlim = xr, ylim = yr) +
-    labs(title = "after correction") + bottom
+  kept <- abs(d$z) >= z_min & abs(d$log_fold_per_neighbor) >= log(1.04)
+  x0 <- d$log_fold_observed / log(2)
+  x1 <- d$log_fold_per_neighbor / log(2)
+  xr <- range(c(x0, x1))
+  yr <- c(0, max(pmin(abs(c(d$z_observed, d$z)), z_cap)) * 1.05)
+  bottom <- theme(legend.position = "bottom", legend.box = "vertical",
+    legend.direction = "vertical", legend.spacing.y = unit(0, "pt"))
+  left <- generative_volcano_panel(d, x0, d$z_observed, d$log_fold_observed, !d$clean,
+      !kept, src, z_cap, z_min, label_n, "observed counts") +
+    coord_cartesian(xlim = xr, ylim = yr) + bottom
+  right <- generative_volcano_panel(d, x1, d$z, d$log_fold_per_neighbor, !d$clean,
+      rep(FALSE, nrow(d)), src, z_cap, z_min, label_n, "after correction") +
+    coord_cartesian(xlim = xr, ylim = yr) + bottom
   patchwork::wrap_plots(left, right, nrow = 1)
 }
 

@@ -131,15 +131,17 @@ counts support the general question of which genes — of any ownership,
 in either direction — change in the target cells with the source's
 proximity, tested jointly across all sources
 ([docs/generative.md](../../docs/generative.md), Figure 5). The same
-test on the observed counts shows what the correction changes. On the
-left (observed counts), red points are associations reported before
-correction but not after: the admixture accounts for them. Green and
-purple points remain reported after correction. On the right (corrected
-counts), filled points are genes with essentially none of their content
-removed as admixture and no meaningful share of the source's admixture
-profile; open grey points are entangled with the admixture split. A
-change is reported at six standard errors (dotted line) and at least a
-4% change per neighboring cell:
+test on the observed counts shows what the correction changes. A change
+is reported at six standard errors (dotted line) and at least a 4%
+change per neighboring cell; reported genes are colored by direction,
+and genes not reported are small grey dots. Filled circles are genes
+with essentially none of their content removed as admixture and no
+meaningful share of the source's admixture profile; filled squares are
+genes partly removed as admixture, whose change after correction rests
+on the model's estimate of the admixed part. On the left (observed
+counts), hollow circles are associations reported before correction but
+not after: the admixture accounts for them. The most significant
+reported genes are named in each panel:
 
 ```{r volcano, fig.width=11, fig.height=5.6}
 changes <- generative_induced_changes(before, after, model, cells_xy,
