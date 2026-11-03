@@ -146,6 +146,10 @@
     if (file.exists(path) && identical(basename(path), "experiment.xenium")) {
       return("xenium")
     }
+    if (!is.null(.celladmix_atera_bundle_dir(path))) {
+      # Atera bundles are read through Xenium-layout tables (see atera.R).
+      return("xenium")
+    }
     if (file.exists(path)) {
       return("tabular")
     }

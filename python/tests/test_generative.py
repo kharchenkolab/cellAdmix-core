@@ -1,6 +1,8 @@
 """End-to-end test of the generative admixture correction."""
 import gzip
 import json
+import os
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -133,6 +135,43 @@ class GenerativeCorrectionTests(unittest.TestCase):
         self.assertLess(removed_a(control), 0.1 * removed_a(plain))
         with self.assertRaises(Exception):
             self.audit.fit_generative(num_threads=2, dose_mode="bogus")
+
+    def test_progress_messages_follow_verbose(self):
+        # The core writes progress to the process's standard output, so it
+        # is captured at the file-descriptor level.
+        def captured(**kwargs):
+            sys.stdout.flush()
+            sys.stderr.flush()
+            saved = os.dup(1), os.dup(2)
+            with tempfile.TemporaryFile(mode="w+") as out:
+                os.dup2(out.fileno(), 1)
+                os.dup2(out.fileno(), 2)
+                try:
+                    self.audit.fit_generative(num_threads=2, **kwargs)
+                finally:
+                    os.dup2(saved[0], 1)
+                    os.dup2(saved[1], 2)
+                    os.close(saved[0])
+                    os.close(saved[1])
+                out.seek(0)
+                return out.read()
+
+        quiet = captured(verbose=False)
+        self.assertNotIn("[INFO", quiet)
+        log = captured(verbose=True)
+        lines = [ln for ln in log.splitlines() if ln.startswith("[INFO ")]
+        self.assertTrue(lines[0].endswith("s)"))
+        self.assertIn("Generative fit:", lines[0])
+        self.assertIn("2 types", lines[0])
+        self.assertIn("Read the molecule table", log)
+        self.assertIn("Fitting round 1/2, target B (1/2)", log)
+        self.assertIn("expectation-maximization:", log)
+        self.assertIn("log-likelihood", log)
+        self.assertIn("Generative fit finished", lines[-1])
+        # with no minimum interval, the loops report every item
+        every = captured(verbose=True, progress_interval_sec=0.0)
+        self.assertIn("expectation-maximization: iteration 2/", every)
+        self.assertIn("Interface-local source profiles: pair 1/", every)
 
     def test_correct_generative_removes_planted_admixture(self):
         correction = self.audit.correct_generative(num_threads=2)

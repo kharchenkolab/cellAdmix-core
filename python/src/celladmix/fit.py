@@ -424,7 +424,7 @@ class CellAdmixFit:
         """Read Xenium cell-boundary vertices for plotting."""
         from .examples import discover_cell_boundaries, read_cell_boundaries
 
-        path = discover_cell_boundaries(self.dataset.source, boundary_path=boundary_path)
+        path = discover_cell_boundaries(self.dataset.xenium_source(verbose=False), boundary_path=boundary_path)
         if path is None:
             return pd.DataFrame(columns=["cell_id", "x", "y"])
         return read_cell_boundaries(path, cells=cells, bbox=bbox)

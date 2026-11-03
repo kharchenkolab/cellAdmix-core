@@ -129,7 +129,7 @@ class GenerativeModel:
 
 
 def fit_generative(audit, *, init=None, n_programs=4, num_threads=None,
-                   seed=1, **options):
+                   seed=1, verbose=True, **options):
     """Fit the generative model on the audit's detected pairs.
 
     ``init`` selects the expression-program initialization: an NMF fit
@@ -141,8 +141,19 @@ def fit_generative(audit, *, init=None, n_programs=4, num_threads=None,
     cell-type names to
     profile matrices (programs x genes, columns aligned with the count
     matrix genes) supplies explicit programs, e.g. from an external
-    reference. Extra keyword arguments override the model's constants
-    (see ``GenerativeOptions`` in the C++ core).
+    reference. ``verbose`` prints timestamped ``[INFO ...]`` progress
+    lines to standard output while the fit runs: the stages (spatial
+    covariates, molecule-table preparation, program initialization,
+    interface-local source profiles), then per outer round and target
+    type the cell, source, and count sizes, the dose prior, the
+    induced-expression screen, each expectation-maximization pass with
+    its iteration count, log-likelihood, and relative change, each
+    refinement of the dose prior, and the molecules attributed to
+    contamination. Within long loops a line is printed at most every
+    ``progress_interval_sec`` seconds (default 5). Each line is flushed
+    as it is written, so a redirected log follows the fit. Extra keyword
+    arguments override the model's constants (see ``GenerativeOptions``
+    in the C++ core).
     """
     from . import _core
 
@@ -215,6 +226,8 @@ def fit_generative(audit, *, init=None, n_programs=4, num_threads=None,
     opts["init_mode"] = init_mode
     opts["n_programs"] = int(n_programs)
     opts["seed"] = int(seed)
+    opts["verbose"] = bool(verbose)
+    opts["type_names"] = [str(t) for t in types]
     if num_threads is not None:
         opts["num_threads"] = int(num_threads)
 

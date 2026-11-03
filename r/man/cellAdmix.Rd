@@ -22,14 +22,21 @@ cellAdmix(
 )
 }
 \arguments{
-\item{source}{Xenium bundle path, \code{experiment.xenium} path, tabular molecule
-path when \code{format = "tabular"}, or an existing \code{celladmix_prep} object.}
+\item{source}{Xenium bundle path, \code{experiment.xenium} path, Atera output
+directory (or its \code{experiment.spatial}), tabular molecule path when
+\code{format = "tabular"}, or an existing \code{celladmix_prep} object. Atera Zarr
+stores are written once as Xenium-layout tables under
+\verb{<output_dir>/atera_xenium} by the Python command
+\verb{python -m celladmix.atera}, run with the interpreter given by
+\code{options(cellAdmix.python = ...)}, the \code{CELLADMIX_PYTHON} environment
+variable, or \code{python3}; see \code{docs/inputs.md}.}
 
 \item{output_dir}{Output/cache directory.}
 
 \item{annotation}{Optional initial cell annotation.}
 
-\item{format}{Input format. \code{"auto"} detects Xenium bundles and prep objects.}
+\item{format}{Input format. \code{"auto"} detects Xenium and Atera bundles
+(both read with \code{format = "xenium"}) and prep objects.}
 
 \item{schema}{Optional \code{\link[=celladmix_schema]{celladmix_schema()}} for tabular inputs.}
 
@@ -58,6 +65,6 @@ sensible Seurat defaults are used.}
 A \code{CellAdmixDataset} object.
 }
 \description{
-Creates a high-level R6 dataset object from a Xenium bundle, tabular source,
-or existing prepared project.
+Creates a high-level R6 dataset object from a Xenium or Atera bundle,
+tabular source, or existing prepared project.
 }

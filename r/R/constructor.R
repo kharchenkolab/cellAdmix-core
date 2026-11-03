@@ -1,13 +1,20 @@
 #' Construct a cellAdmix Dataset Object
 #'
-#' Creates a high-level R6 dataset object from a Xenium bundle, tabular source,
-#' or existing prepared project.
+#' Creates a high-level R6 dataset object from a Xenium or Atera bundle,
+#' tabular source, or existing prepared project.
 #'
-#' @param source Xenium bundle path, `experiment.xenium` path, tabular molecule
-#'   path when `format = "tabular"`, or an existing `celladmix_prep` object.
+#' @param source Xenium bundle path, `experiment.xenium` path, Atera output
+#'   directory (or its `experiment.spatial`), tabular molecule path when
+#'   `format = "tabular"`, or an existing `celladmix_prep` object. Atera Zarr
+#'   stores are written once as Xenium-layout tables under
+#'   `<output_dir>/atera_xenium` by the Python command
+#'   `python -m celladmix.atera`, run with the interpreter given by
+#'   `options(cellAdmix.python = ...)`, the `CELLADMIX_PYTHON` environment
+#'   variable, or `python3`; see `docs/inputs.md`.
 #' @param output_dir Output/cache directory.
 #' @param annotation Optional initial cell annotation.
-#' @param format Input format. `"auto"` detects Xenium bundles and prep objects.
+#' @param format Input format. `"auto"` detects Xenium and Atera bundles
+#'   (both read with `format = "xenium"`) and prep objects.
 #' @param schema Optional [celladmix_schema()] for tabular inputs.
 #' @param annotation_name Name for the initial annotation.
 #' @param annotation_col Optional one-time label column override for

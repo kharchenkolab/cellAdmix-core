@@ -35,7 +35,9 @@ short steps.
 - Python bindings with a high-level `CellAdmix` class and optional SpatialData
   adapter.
 - Native Xenium bundle support, including transcript tables, cell metadata,
-  boundaries, and morphology images when available.
+  boundaries, and morphology images when available. 10x Atera output
+  directories are read the same way, through Xenium-layout tables written once
+  from their Zarr stores ([docs/inputs.md](docs/inputs.md#atera)).
 - Generic tabular input support for `.csv`, `.csv.gz`, `.tsv`, `.tsv.gz`, and
   Parquet molecule tables.
 - Seurat integration: use a Seurat object for cells, genes, annotations, and
@@ -118,7 +120,7 @@ counts, genes, cells = correction.counts()
 
 Batch processing from Python is available through
 [`scripts/celladmix_batch.py`](scripts/celladmix_batch.py). The current Python
-batch entrypoint supports Xenium bundle inputs and mirrors the core R batch
+batch entrypoint supports Xenium and Atera bundle inputs and mirrors the core R batch
 workflow:
 
 ```bash

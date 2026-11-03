@@ -50,8 +50,14 @@ By default, Xenium control/codeword/non-gene features are excluded while
 building the input store. Use `keep_non_gene = TRUE` only when explicitly
 diagnosing control features.
 
-See [inputs.md](inputs.md) for supported Xenium files, stain-image discovery,
-and cropping/filtering options.
+10x Atera output directories (with `experiment.spatial` and zipped Zarr
+stores) are passed the same way. Their stores are written once as
+Xenium-layout tables under `output_dir/atera_xenium` by the Python command
+`python -m celladmix.atera`, which R runs with the interpreter set by
+`options(cellAdmix.python = ...)` or `CELLADMIX_PYTHON`.
+
+See [inputs.md](inputs.md) for supported Xenium and Atera files, stain-image
+discovery, and cropping/filtering options.
 
 ### Tabular Molecule Tables
 
@@ -255,7 +261,11 @@ The `init` argument selects the expression-program initialization: an
 NMF fit's factor-labeled molecules (the recommended configuration, and
 the default for a fit-derived audit), `"clusters"` (the default for a
 dataset-derived audit), `"pseudobulk"`, or a named list of explicit
-profile matrices.
+profile matrices. `verbose = TRUE` prints timestamped `[INFO ...]`
+progress lines while the fit runs — its stages, and per target type the
+dose prior, each expectation-maximization pass with its log-likelihood,
+and the molecules attributed to contamination — which is useful for
+long fits on large datasets.
 `audit$correct_generative()` remains as the one-call convenience.
 
 Neither the audit nor the generative model requires a factorization:

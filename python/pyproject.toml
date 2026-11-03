@@ -18,6 +18,7 @@ dependencies = [
 
 [project.optional-dependencies]
 anndata = ["anndata"]
+atera = ["zarr>=3"]
 plot = ["matplotlib", "seaborn"]
 spatialdata = [
   "anndata",

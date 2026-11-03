@@ -532,7 +532,21 @@ three datasets; the defaults are the joint fit, the ladder of 30, 60,
 configuration whose evaluation is recorded in
 `analysis/generative_model/REPORT.md`. The fit runs in about 20 seconds
 on the pancreas dataset, under a minute on NSCLC, and a few minutes on
-breast 5K.
+breast 5K; on larger panels and whole-transcriptome datasets it can take
+hours. With progress reporting on (`verbose=True`, the default in
+Python; `verbose = TRUE` in R, where it is off by default, as for the
+package's other R functions) the fit prints timestamped `[INFO ...]`
+lines as it goes: the spatial covariates, the molecule-table
+preparation and program initialization,
+the interface-local source profiles, and then, for each outer round and
+target type (counted as "round 1/2, target B (3/24)"), its cells,
+sources and nonzero counts, the dose prior, the induced-expression
+screen, each expectation-maximization pass with its iteration count,
+log-likelihood and relative change, each refinement of the dose prior,
+and the molecules attributed to contamination. Long loops (sources,
+pairs, iterations) report their position at most every
+`progress_interval_sec` seconds (default 5), and each line is flushed as
+it is written, so a log redirected to a file follows the fit.
 
 The expression programs that represent each type's own states are an
 initialization, selected by the `init` argument: an NMF fit supplies

@@ -13,6 +13,7 @@
 
 #pragma once
 
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -110,6 +111,16 @@ struct GenerativeOptions {
   // exposures and ladder strata together) across the type's cells with this
   // seed; 0 leaves them in place.
   unsigned int permute_covariates_seed = 0;
+  // Progress reporting: when set, called with a message and the seconds
+  // elapsed since the previous message at each stage boundary (spatial
+  // covariates, molecule-table preparation, program initialization,
+  // interface profiles, and each target type's dose prior, induced-gene
+  // screen, expectation-maximization passes, and dose-prior refinements),
+  // and from within long loops at most every progress_interval_sec seconds.
+  // Messages name types by type_names when it holds one name per type code.
+  std::function<void(const std::string&, double)> progress;
+  double progress_interval_sec = 5.0;
+  std::vector<std::string> type_names;
 };
 
 // One source -> target pair, from the admixture audit. Gene sets are indices

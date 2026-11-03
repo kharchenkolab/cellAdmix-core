@@ -36,14 +36,14 @@ def build_parser() -> argparse.ArgumentParser:
     --score bridge --no-null --threads 10
 
 Notes:
-  Python v1 supports Xenium bundle inputs. Tabular input options are accepted
+  Python v1 supports Xenium and Atera bundle inputs. Tabular input options are accepted
   for CLI parity with the R script, but currently fail with explicit messages
   until the Python tabular store binding is added.
 """,
     )
 
     core = parser.add_argument_group("Core options")
-    core.add_argument("--input", required=True, help="Xenium bundle or input source path")
+    core.add_argument("--input", required=True, help="Xenium or Atera bundle, or input source path")
     core.add_argument("--output", required=True, help="Output/cache directory")
     core.add_argument("--format", choices=("auto", "xenium", "tabular"), default="auto")
     core.add_argument("--threads", type=int, default=max(1, os.cpu_count() or 1))
@@ -149,6 +149,9 @@ def infer_format(source: Path, requested: str) -> str:
     if requested != "auto":
         return requested
     if source.is_dir() and (source / "experiment.xenium").exists():
+        return "xenium"
+    if source.is_dir() and (source / "experiment.spatial").exists():
+        # Atera bundles are read through Xenium-layout tables written by celladmix.atera.
         return "xenium"
     return "tabular"
 

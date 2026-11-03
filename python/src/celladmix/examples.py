@@ -437,7 +437,7 @@ def prepare_cell_example(
 
     boundary_path = None
     if boundaries is None:
-        boundary_path = discover_cell_boundaries(fit.dataset.source)
+        boundary_path = discover_cell_boundaries(fit.dataset.xenium_source(verbose=False))
         boundaries = (
             read_cell_boundaries(boundary_path, cells=[target_cell])
             if boundary_path is not None
@@ -620,7 +620,7 @@ def plot_examples(examples, *, fit, score_annotation=None, cell_data=None, bound
     if isinstance(boundaries, (str, Path)):
         boundaries = read_cell_boundaries(boundaries)
     elif boundaries is None:
-        path = discover_cell_boundaries(fit.dataset.source)
+        path = discover_cell_boundaries(fit.dataset.xenium_source(verbose=False))
         boundaries = read_cell_boundaries(path) if path is not None else pd.DataFrame()
     ncol = max(1, int(ncol))
     nrow = math.ceil(len(examples) / ncol)

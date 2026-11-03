@@ -3,7 +3,7 @@
 `cellAdmix-core` supports two file-level input families through the public
 `cellAdmix()` constructor:
 
-- Xenium bundles
+- 10x Xenium and Atera bundles
 - generic tabular molecule tables
 
 The constructor also accepts Seurat objects and prepared-project/store
@@ -89,6 +89,67 @@ Because Xenium bundle manifests and channel naming can change across 10x bundle
 versions, notebooks should call `fit$stain_image()` and show the resolved path
 before scoring. Use explicit `image_path` when discovery picks the wrong
 channel.
+
+## Atera
+
+10x Atera output directories are passed exactly like Xenium bundles:
+
+```r
+ds <- cellAdmix("/path/to/atera/outs", output_dir = "out", annotation = annotation)
+```
+
+```python
+ds = ca.CellAdmix("/path/to/atera/outs", output_dir="out", annotation=annotation)
+```
+
+An Atera directory is recognized by its `experiment.spatial` manifest (a
+directory that also has `experiment.xenium` is read as Xenium). Atera stores
+molecules, cells, and the cell-feature matrix as zipped Zarr stores
+(`transcripts.zarr.zip`, `cells.zarr.zip`, `cell_feature_matrix.zarr.zip`)
+rather than the Parquet tables the store builder reads. On first use these
+stores are written once as Xenium-layout tables under
+`<output_dir>/atera_xenium` (`transcripts.parquet`, `cells.parquet`,
+`cell_boundaries.parquet`, `nucleus_boundaries.parquet`, and an
+`experiment.xenium` manifest), and the rest of the workflow reads that
+directory as a Xenium bundle. The tables are reused as long as the Atera
+manifest and Zarr stores keep the sizes and modification times recorded at
+conversion. The conversion reads the transcript store one spatial grid tile
+at a time, so its memory use is bounded by the largest tile.
+
+The conversion is done by the Python module `celladmix.atera`, which needs
+the `zarr` package (version 3 or later; `pip install "celladmix[atera]"`).
+The R package runs the same conversion as
+
+```bash
+python -m celladmix.atera /path/to/atera/outs out/atera_xenium
+```
+
+with the interpreter given by `options(cellAdmix.python = ...)`, the
+`CELLADMIX_PYTHON` environment variable, or `python3` on the `PATH`. If no
+interpreter with `celladmix` is available, `cellAdmix()` stops with this
+command; running it once by hand lets later R sessions reuse the tables
+without Python.
+
+Record conversion:
+
+- Cell ids take the Xenium string form: the eight hexadecimal digits of the
+  integer id prefix written with the letters `a`-`p`, then `-` and the dataset
+  suffix (the id pair (25465, 1) becomes `aaaagdhj-1`).
+- Molecules that the Zarr store marks with the id pair (4294967295,
+  4294967295) are unassigned and get `UNASSIGNED`, so `keep_unassigned`
+  applies to them as for Xenium.
+- The feature type of each gene in the cell-feature matrix becomes the
+  molecule's `codeword_category`, and `is_gene` is true only for
+  "Gene Expression" features; negative-control probes and codewords, genomic
+  controls, and unassigned or deprecated codewords are therefore excluded
+  under the default `keep_non_gene = FALSE`.
+- The Atera per-molecule quality score becomes `qv`, so `min_qv` applies to it.
+- Cell centroids come from the cell summary table; cell and nucleus
+  boundaries come from the cell store's polygon sets.
+
+The Atera manifest lists no morphology-focus images, so membrane scoring on
+Atera input needs the stain image and its pixel size passed explicitly
+(`image_path` and `pixel_size`).
 
 ## Generic Tabular
 
@@ -178,7 +239,7 @@ For current cell-centric workflows, `keep_unassigned = FALSE` is usually the sen
 
 ## Cropping and Filtering
 
-Both Xenium and tabular input support restricting the analysis scope.
+Xenium, Atera, and tabular input all support restricting the analysis scope.
 
 Common filtering options:
 

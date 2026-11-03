@@ -797,6 +797,15 @@ PYBIND11_MODULE(_core, m) {
         set_bool("use_ambient", opt.use_ambient);
         set_bool("use_induced", opt.use_induced);
         set_int("num_threads", opt.num_threads);
+        if (options.contains("type_names")) {
+          opt.type_names = options["type_names"].cast<std::vector<std::string>>();
+        }
+        set_double("progress_interval_sec", opt.progress_interval_sec);
+        bool verbose = false;
+        set_bool("verbose", verbose);
+        // Progress lines go to stdout and are flushed one by one, so a
+        // redirected log shows them while the fit runs.
+        if (verbose) opt.progress = make_progress_logger(true);
         celladmix::GenerativeResult res;
         {
           py::gil_scoped_release release;

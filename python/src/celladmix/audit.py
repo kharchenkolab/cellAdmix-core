@@ -427,6 +427,11 @@ class CellAdmixAudit:
         derives corrections via ``model.correct()``. The ``init``
         argument selects the expression-program initialization (an NMF
         fit, ``"clusters"``, ``"pseudobulk"``, or explicit profiles).
+        With ``verbose=True`` (the default) the fit prints timestamped
+        progress lines to standard output: its stages, and per target
+        type the dose prior, the expectation-maximization passes with
+        their log-likelihood, and the molecules attributed to
+        contamination.
         """
         from .generative import fit_generative
 

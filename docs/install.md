@@ -106,6 +106,14 @@ Install plotting and SpatialData extras when needed:
 python -m pip install -e "python[plot,spatialdata]"
 ```
 
+Reading 10x Atera bundles requires the `atera` extra (the `zarr` package,
+version 3 or later); see [inputs.md](inputs.md#atera). The R package reads
+Atera bundles through the same Python installation:
+
+```bash
+python -m pip install -e "python[atera]"
+```
+
 If C++ dependencies are installed in a non-standard location, pass the prefix to
 CMake through the build environment:
 

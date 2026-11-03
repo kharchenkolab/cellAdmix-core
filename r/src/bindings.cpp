@@ -5040,6 +5040,36 @@ extern "C" SEXP _cellAdmixCore_celladmix_fit_generative(
     if (options.containsElementNamed("seed")) {
       opt.seed = static_cast<unsigned int>(as<int>(options["seed"]));
     }
+    if (options.containsElementNamed("type_names")) {
+      opt.type_names = as<std::vector<std::string>>(options["type_names"]);
+    }
+    set_double("progress_interval_sec", opt.progress_interval_sec);
+    bool verbose = false;
+    set_bool("verbose", verbose);
+    if (verbose) {
+      // The fit reports from the calling (R main) thread only; std::endl
+      // flushes the console, so a redirected log stays current.
+      const auto fit_start = std::chrono::steady_clock::now();
+      opt.progress = [fit_start](const std::string& message, double stage_sec) {
+        const auto now = std::chrono::system_clock::now();
+        const auto tt = std::chrono::system_clock::to_time_t(now);
+        std::tm tm{};
+#ifdef _WIN32
+        localtime_s(&tm, &tt);
+#else
+        localtime_r(&tt, &tm);
+#endif
+        std::ostringstream line;
+        line << "[INFO " << std::put_time(&tm, "%H:%M:%S") << " +"
+             << std::fixed << std::setprecision(3)
+             << std::chrono::duration<double>(std::chrono::steady_clock::now() - fit_start).count()
+             << "s] " << message;
+        if (stage_sec >= 0.0) {
+          line << " (" << std::fixed << std::setprecision(3) << stage_sec << "s)";
+        }
+        Rcpp::Rcout << line.str() << std::endl;
+      };
+    }
 
     const auto res = celladmix::fit_generative(
         as<std::vector<int>>(counts_indptr_sexp),

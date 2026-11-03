@@ -101,7 +101,11 @@ celladmix_simulate_nsclc <- function(
 #' This step does not load the full transcript table into R memory.
 #'
 #' @param bundle_dir Path to a Xenium bundle directory or directly to an
-#'   `experiment.xenium` manifest.
+#'   `experiment.xenium` manifest, or to an Atera output directory (or its
+#'   `experiment.spatial`). An Atera bundle's Zarr stores are first written as
+#'   Xenium-layout Parquet tables under `<output_dir>/atera_xenium` by the
+#'   Python command `python -m celladmix.atera`, and those tables are reused
+#'   while the Atera files are unchanged.
 #' @param output_dir Optional output/cache directory for cellAdmix artifacts. If
 #'   `NULL`, a temporary output directory is created.
 #' @param analysis_bbox Optional convenience bounding box for a single crop,
@@ -138,13 +142,18 @@ celladmix_prepare_xenium <- function(
     read_cells = TRUE,
     prefer_parquet = TRUE
   ) {
+  output_dir <- output_dir %||% .celladmix_default_output_dir()
+  atera_dir <- .celladmix_atera_bundle_dir(bundle_dir)
+  if (!is.null(atera_dir)) {
+    bundle_dir <- .celladmix_atera_xenium_dir(atera_dir, output_dir)
+  }
   manifest_path <- if (dir.exists(bundle_dir)) {
     file.path(bundle_dir, "experiment.xenium")
   } else {
     bundle_dir
   }
   if (!file.exists(manifest_path)) {
-    stop("Could not find experiment.xenium at ", manifest_path)
+    stop("Could not find experiment.xenium or experiment.spatial at ", bundle_dir)
   }
 
   if (!is.null(analysis_bbox) && is.null(analysis_crops)) {
@@ -158,7 +167,6 @@ celladmix_prepare_xenium <- function(
   }
   crops <- .celladmix_normalize_crops(analysis_crops)
 
-  output_dir <- output_dir %||% .celladmix_default_output_dir()
   dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
   annotations_dir <- file.path(output_dir, "annotations")
   runs_dir <- file.path(output_dir, "runs")
@@ -172,7 +180,8 @@ celladmix_prepare_xenium <- function(
     source = list(
       type = "xenium",
       bundle_dir = probe$bundle_dir,
-      manifest_path = probe$manifest_path
+      manifest_path = probe$manifest_path,
+      atera_dir = atera_dir
     ),
     crops = crops,
     defaults = list(

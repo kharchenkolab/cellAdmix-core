@@ -279,6 +279,26 @@ test_that("the generative correction removes planted admixture", {
   expect_gt(ab$sensitivity, 0.5)
 })
 
+test_that("the generative fit reports progress only when verbose", {
+  fit <- make_audit_fit()
+  audit <- fit$audit_admixture(neighbor_k = 6L, min_target_cells = 50L,
+    min_reference_cells = 20L, min_excess = 50)
+  quiet <- capture.output(audit$fit_generative(num_threads = 2L))
+  expect_false(any(grepl("[INFO", quiet, fixed = TRUE)))
+  log <- capture.output(m <- audit$fit_generative(num_threads = 2L,
+    verbose = TRUE))
+  info <- grep("^\\[INFO ", log, value = TRUE)
+  expect_match(info[[1]], "Generative fit: .*2 types")
+  expect_true(any(grepl("Fitting round 1/2, target B (1/2)", info,
+    fixed = TRUE)))
+  expect_true(any(grepl("expectation-maximization: .*log-likelihood", info)))
+  expect_match(info[[length(info)]], "Generative fit finished")
+  every <- capture.output(audit$fit_generative(num_threads = 2L,
+    verbose = TRUE, progress_interval_sec = 0))
+  expect_true(any(grepl("expectation-maximization: iteration 2/", every,
+    fixed = TRUE)))
+})
+
 test_that("dose options run and the covariate control collapses", {
   fit <- make_audit_fit()
   audit <- fit$audit_admixture(neighbor_k = 6L, min_target_cells = 50L,

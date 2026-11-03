@@ -2,7 +2,7 @@
 
 `scripts/celladmix_batch.py` runs the core cellAdmix workflow from the Python
 bindings without opening a notebook. It is intended for command-line Xenium
-processing and mirrors the high-level behavior of `scripts/celladmix_batch.R`
+and Atera processing and mirrors the high-level behavior of `scripts/celladmix_batch.R`
 where the Python bindings currently expose the needed backend features.
 
 ## Minimal Run
@@ -93,7 +93,7 @@ Important options:
 
 ## Current Python Limitations
 
-The Python bindings implement Xenium bundle processing. The CLI exposes
+The Python bindings implement Xenium and Atera bundle processing. The CLI exposes
 tabular and related schema options for parity with the R script, but generic
 tabular input fails with an explicit message:
 

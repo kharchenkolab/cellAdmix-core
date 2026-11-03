@@ -1,11 +1,14 @@
 #include "celladmix/generative.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <functional>
+#include <iomanip>
 #include <limits>
 #include <numeric>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <random>
@@ -118,6 +121,61 @@ void parallel_rows(int n, int num_threads, const std::function<void(int, int, in
   }
   for (auto& t : threads) t.join();
 }
+
+// ---- progress reporting -----------------------------------------------------
+
+// Concatenate values into one message; floating-point values are written
+// with four significant digits.
+template <typename... Args>
+std::string msg(const Args&... args) {
+  std::ostringstream out;
+  out << std::setprecision(4);
+  (out << ... << args);
+  return out.str();
+}
+
+// Molecule counts and log-likelihoods are reported rounded to integers.
+long long whole(double v) { return std::llround(v); }
+
+// "1 source", "3 sources".
+std::string count_of(std::size_t n, const std::string& noun) {
+  return msg(n, " ", noun, n == 1 ? "" : "s");
+}
+std::string count_of(int n, const std::string& noun) {
+  return count_of(static_cast<std::size_t>(std::max(n, 0)), noun);
+}
+
+// Forwards messages to GenerativeOptions::progress together with the
+// seconds elapsed since the previous message. Stage boundaries call emit()
+// directly; long loops test due() first, so that they report at most once
+// per progress_interval_sec. Messages are emitted from the calling thread
+// only, never from worker threads.
+class FitProgress {
+ public:
+  explicit FitProgress(const GenerativeOptions& opt)
+      : fn_(opt.progress),
+        interval_(opt.progress_interval_sec),
+        last_(std::chrono::steady_clock::now()) {}
+
+  bool on() const { return static_cast<bool>(fn_); }
+
+  bool due() const {
+    return on() && std::chrono::duration<double>(
+                       std::chrono::steady_clock::now() - last_).count() >= interval_;
+  }
+
+  void emit(const std::string& message) {
+    if (!fn_) return;
+    const auto now = std::chrono::steady_clock::now();
+    fn_(message, std::chrono::duration<double>(now - last_).count());
+    last_ = now;
+  }
+
+ private:
+  const std::function<void(const std::string&, double)>& fn_;
+  double interval_;
+  std::chrono::steady_clock::time_point last_;
+};
 
 // ---- per-target-type working state ------------------------------------------
 
@@ -297,6 +355,18 @@ GenerativeResult fit_generative(
       type_codes.size() != cell_ids.size()) {
     throw std::runtime_error("generative: cell metadata does not match cells");
   }
+  FitProgress progress(opt);
+  const auto type_label = [&](int t) {
+    return static_cast<int>(opt.type_names.size()) == n_types
+        ? opt.type_names[static_cast<std::size_t>(t)]
+        : msg("type ", t);
+  };
+  progress.emit(msg("Generative fit: ", count_of(n_cells, "cell"), ", ", count_of(G, "gene"),
+                    ", ", count_of(n_types, "type"), ", ",
+                    count_of(pairs.size(), "source-target pair"), ", ",
+                    counts_values.size(), " nonzero counts; ",
+                    count_of(opt.outer_rounds, "outer round"), ", ",
+                    count_of(opt.num_threads, "thread")));
   GenerativeResult result;
   result.removed.assign(counts_values.size(), 0.0);
   result.removed_without_retention.assign(counts_values.size(), 0.0);
@@ -357,13 +427,22 @@ GenerativeResult fit_generative(
     }
   }
   const bool joint_dose = opt.dose_mode == "joint";
+  progress.emit("Computed per-cell totals and per-type expression profiles");
   const DenseMatrix exposure_counts =
       cell_neighbor_type_counts(x, y, type_codes, n_types, opt.neighbor_k);
+  progress.emit(msg("Counted the cell types among each cell's ", opt.neighbor_k,
+                    " nearest neighbors (exposure)"));
   const DenseMatrix nearest_dist = cell_nearest_type_distance(x, y, type_codes, n_types);
+  progress.emit("Computed each cell's distance to the nearest cell of every type");
   const DenseMatrix nearest_rank = ladder_n > 0
       ? cell_nearest_type_rank(x, y, type_codes, n_types,
                                opt.dose_ladder[static_cast<std::size_t>(ladder_n - 1)])
       : DenseMatrix(1, 1, 0.0);
+  if (ladder_n > 0) {
+    progress.emit(msg("Ranked the nearest cell of every type among each cell's ",
+                      opt.dose_ladder[static_cast<std::size_t>(ladder_n - 1)],
+                      " nearest neighbors (dose ladder)"));
+  }
 
   // Cells of each type in column order.
   std::vector<std::vector<int>> type_cols(static_cast<std::size_t>(n_types));
@@ -412,10 +491,16 @@ GenerativeResult fit_generative(
     int max_run_idx = 0;
     for (const int i : run_cell_idx) max_run_idx = std::max(max_run_idx, i);
     std::vector<int> col_of_run(static_cast<std::size_t>(max_run_idx + 1), -1);
+    std::size_t n_matched = 0;
     for (std::size_t i = 0; i < run_cell_ids.size(); ++i) {
       const auto it = col_of_id.find(run_cell_ids[i]);
-      if (it != col_of_id.end()) col_of_run[static_cast<std::size_t>(run_cell_idx[i])] = it->second;
+      if (it != col_of_id.end()) {
+        col_of_run[static_cast<std::size_t>(run_cell_idx[i])] = it->second;
+        ++n_matched;
+      }
     }
+    progress.emit(msg("Read the run's cell table: ", run_cell_ids.size(), " cells, ",
+                      n_matched, " matched to count-matrix columns"));
 
     const auto mol = read_parquet(molecules_parquet);
     const auto gene_idx = extract_int_column(*mol, "gene_idx");
@@ -428,6 +513,9 @@ GenerativeResult fit_generative(
 
     int n_factors = 0;
     for (const int k : labels) n_factors = std::max(n_factors, k + 1);
+    progress.emit(msg("Read the molecule table: ", gene_idx.size(), " molecules, ",
+                      count_of(n_factors, "factor"),
+                      has_nucleus ? "" : ", no nucleus-overlap flag"));
 
     // One pass accumulates everything needed: cytoplasmic per-column counts,
     // per-factor global gene profiles (for alignment), per-(type, factor)
@@ -470,6 +558,13 @@ GenerativeResult fit_generative(
         cyto[static_cast<std::size_t>(col)].push_back({g, static_cast<float>(j - i)});
         i = j;
       }
+      std::size_t n_entries = 0;
+      for (const auto& col : cyto) n_entries += col.size();
+      progress.emit(msg("Tallied factor-labeled molecules and ",
+                        has_nucleus ? "cytoplasmic counts (molecules outside nuclei)"
+                                    : "whole-cell counts",
+                        ": ", keys.size(), " molecules in ", n_entries,
+                        " nonzero cell-gene entries"));
     }
 
     // Factor-to-type alignment: supplied, or derived by cosine similarity of
@@ -516,6 +611,13 @@ GenerativeResult fit_generative(
       }
     }
     result.factor_alignment = alignment;
+    if (factor_programs) {
+      int n_aligned = 0;
+      for (const int t : alignment) n_aligned += t >= 0 ? 1 : 0;
+      progress.emit(msg(factor_to_type.empty() ? "Derived" : "Using the supplied",
+                        " factor-to-type alignment: ", n_aligned, " of ", alignment.size(),
+                        " factors aligned to a type"));
+    }
 
     // Program initializations: the type's aligned factors plus unaligned
     // factors carrying at least program_share_min of the type's molecules;
@@ -598,6 +700,18 @@ GenerativeResult fit_generative(
     for (int g = 0; g < G; ++g) F(0, g) = profiles_cpm(g, t) / std::max(sum, 1.0);
     program_init[static_cast<std::size_t>(t)] = std::move(F);
   }
+  {
+    int n_init = 0;
+    for (const auto& F : program_init) n_init += F.rows();
+    progress.emit(msg("Initialized ", count_of(n_init, "expression program"), " over ",
+                      count_of(n_types, "type"), " (",
+                      explicit_programs ? "explicit programs"
+                          : factor_programs ? "factor-labeled molecules"
+                          : cluster_programs
+                          ? "pooled profiles; clustered programs are derived per type"
+                          : "pooled profiles",
+                      ")"));
+  }
 
   // Interface-local raw transfer profile of source S toward target type T:
   // cytoplasmic profile of S cells within near_um of the nearest T cell,
@@ -627,7 +741,24 @@ GenerativeResult fit_generative(
   std::vector<std::vector<double>> psi_raw(pairs.size());
   for (std::size_t j = 0; j < pairs.size(); ++j) {
     psi_raw[j] = near_profile(pairs[j].source_type, pairs[j].target_type);
+    if (progress.due()) {
+      progress.emit(msg("Interface-local source profiles: pair ", j + 1, "/", pairs.size()));
+    }
   }
+  progress.emit(msg("Computed interface-local source profiles for ",
+                    count_of(pairs.size(), "pair")));
+
+  // Target types fitted in each outer round (those with pairs and cells),
+  // for reporting progress through the rounds.
+  int n_blocks = 0;
+  for (int T = 0; T < n_types; ++T) {
+    if (type_cols[static_cast<std::size_t>(T)].empty()) continue;
+    if (std::any_of(pairs.begin(), pairs.end(),
+                    [T](const GenerativePairSpec& p) { return p.target_type == T; })) {
+      ++n_blocks;
+    }
+  }
+  int block = 0;
 
   // Per-gene own-expression fraction of each type, from the previous outer
   // round, used to decontaminate the source profiles.
@@ -679,6 +810,12 @@ GenerativeResult fit_generative(
       for (int i = 0; i < n; ++i) row_of_col[static_cast<std::size_t>(blk.cols[static_cast<std::size_t>(i)])] = i;
 
       const int S_n = static_cast<int>(plist.size());
+      ++block;
+      const std::string block_label =
+          msg("round ", round + 1, "/", opt.outer_rounds, ", target ", type_label(T), " (",
+              block, "/", n_blocks * opt.outer_rounds, ")");
+      progress.emit(msg("Fitting ", block_label, ": ", count_of(n, "cell"), ", ",
+                        count_of(S_n, "source"), ", ", nnz, " nonzero counts"));
       if (S_n > kMaxComponents || program_init[static_cast<std::size_t>(T)].rows() > kMaxComponents) {
         throw std::runtime_error("generative: more than " + std::to_string(kMaxComponents) +
                                  " sources or programs per type");
@@ -948,6 +1085,9 @@ GenerativeResult fit_generative(
         }
         std::vector<double> wrow(blk.totals.begin(), blk.totals.end());
         for (int j = 0; j < S_n; ++j) {
+          if (progress.due()) {
+            progress.emit(msg("  joint dose fit: source ", j + 1, "/", S_n));
+          }
           if (ref[static_cast<std::size_t>(j)] < 0) continue;
           const auto row_guide = row_guide_content(kept, guides[static_cast<std::size_t>(j)]);
           std::vector<double> yrate(static_cast<std::size_t>(n), 0.0);
@@ -1028,6 +1168,22 @@ GenerativeResult fit_generative(
         for (int j = 0; j < S_n; ++j) {
           plist[static_cast<std::size_t>(j)].lam_cell = lam_rows[static_cast<std::size_t>(j)];
           plist[static_cast<std::size_t>(j)].cross_attributed = cross[static_cast<std::size_t>(j)];
+        }
+        if (progress.on()) {
+          int n_dosed = 0;
+          double prior_mol = 0.0;
+          for (int j = 0; j < S_n; ++j) {
+            double s = 0.0;
+            for (int i = 0; i < n; ++i) {
+              s += lam_rows[static_cast<std::size_t>(j)][static_cast<std::size_t>(i)] *
+                  blk.totals[static_cast<std::size_t>(i)];
+            }
+            n_dosed += s > 0.0 ? 1 : 0;
+            prior_mol += s;
+          }
+          progress.emit(msg("  dose prior (", joint_dose ? "joint" : "marginal", "): ", n_dosed,
+                            " of ", S_n, " sources with an accepted dose-response, ",
+                            whole(prior_mol), " molecules of prior contamination"));
         }
       }
 
@@ -1162,6 +1318,9 @@ GenerativeResult fit_generative(
         // Lloyd iterations with weights
         std::vector<int> assign(static_cast<std::size_t>(n), 0);
         for (int it = 0; it < 10; ++it) {
+          if (progress.due()) {
+            progress.emit(msg("  program clustering: iteration ", it + 1, "/10"));
+          }
           std::vector<double> cn(cent.size(), 0.0);
           for (std::size_t k = 0; k < cent.size(); ++k) {
             for (const double v : cent[k]) cn[k] += v * v;
@@ -1310,6 +1469,20 @@ GenerativeResult fit_generative(
         }
       }
 
+      {
+        int n_induced_genes = 0;
+        for (int j = 0; j < S_n; ++j) {
+          for (int g = 0; g < G; ++g) n_induced_genes += M(j, g) > 0.0 ? 1 : 0;
+        }
+        progress.emit(msg("  ", count_of(K, cluster_programs ? "clustered expression program"
+                                                             : "expression program"),
+                          "; ",
+                          use_ambient ? msg("ambient background fraction ", lam_a)
+                                      : std::string("no ambient term"),
+                          "; induced-expression screen: ",
+                          count_of(n_induced_genes, "source-gene pair"), " retained"));
+      }
+
       // ---- expectation-maximization on the nonzero pattern ------------------
       const std::size_t bn = blk.value.size();
       std::vector<double> Theta(static_cast<std::size_t>(n) * K, 0.0);
@@ -1438,8 +1611,23 @@ GenerativeResult fit_generative(
       };
 
       double ll_prev = -std::numeric_limits<double>::infinity();
-      const auto em_pass = [&](int n_iter, bool update_F) {
+      // Each pass reports its iteration count and final log-likelihood; the
+      // relative change is that between the last two log-likelihood
+      // evaluations (every ten iterations), the quantity the convergence
+      // test compares with 1e-7.
+      const auto em_pass = [&](int n_iter, bool update_F, const std::string& label) {
+        int iters_done = 0;
+        bool converged = false;
+        double rel_change = std::numeric_limits<double>::quiet_NaN();
         for (int it = 0; it < n_iter; ++it) {
+          iters_done = it + 1;
+          if (progress.due()) {
+            progress.emit(msg("  ", label, ": iteration ", it + 1, "/", n_iter,
+                              std::isfinite(ll_prev) ? msg(", log-likelihood ", whole(ll_prev))
+                                                     : std::string(),
+                              std::isfinite(rel_change) ? msg(", relative change ", rel_change)
+                                                        : std::string()));
+          }
           compute_rates();
           const bool check_ll = (it + 1) % 10 == 0 || it == n_iter - 1;
           const double exp_tot = check_ll ? expected_total() : 0.0;
@@ -1599,12 +1787,22 @@ GenerativeResult fit_generative(
             const double ll = lsum - exp_tot;
             const double gain = ll - ll_prev;
             ll_prev = ll;
-            if (it > 10 && std::abs(gain) < 1e-7 * std::abs(ll)) break;
+            rel_change = std::isfinite(gain) ? std::abs(gain) / std::max(std::abs(ll), 1e-300)
+                                             : std::numeric_limits<double>::quiet_NaN();
+            if (it > 10 && std::abs(gain) < 1e-7 * std::abs(ll)) {
+              converged = true;
+              break;
+            }
           }
         }
+        progress.emit(msg("  ", label, ": ", iters_done, " iterations, log-likelihood ",
+                          whole(ll_prev),
+                          std::isfinite(rel_change) ? msg(", relative change ", rel_change)
+                                                    : std::string(),
+                          converged ? " (converged)" : " (iteration limit)"));
       };
 
-      em_pass(opt.em_iterations, true);
+      em_pass(opt.em_iterations, true, "expectation-maximization");
 
       // Top-up passes: re-measure the residual exposure gradient of the guide
       // genes on the kept counts (excluding induced-support genes, whose
@@ -1668,9 +1866,16 @@ GenerativeResult fit_generative(
             added += extra * blk.totals[static_cast<std::size_t>(i)];
           }
         }
-        if (added < 1e-4 * t_all) break;
+        const bool stop = added < 1e-4 * t_all;
+        progress.emit(msg("  dose-prior refinement ", topup + 1, "/", opt.topup_passes,
+                          ": the residual exposure gradient added ", whole(added),
+                          " molecules to the prior (", 100.0 * added / std::max(t_all, 1.0),
+                          "% of the type's molecules)",
+                          stop ? "; below 0.01%, refinement ends" : ""));
+        if (stop) break;
         for (std::size_t q = 0; q < Alpha.size(); ++q) Alpha[q] = std::max(Alpha[q], Lam[q]);
-        em_pass(opt.topup_em_iterations, false);
+        em_pass(opt.topup_em_iterations, false,
+                msg("expectation-maximization after refinement ", topup + 1));
       }
 
       // Final split, own fractions, removed mass, and per-pair outputs.
@@ -1687,6 +1892,13 @@ GenerativeResult fit_generative(
               std::max(rate_nz[static_cast<std::size_t>(p)], 1e-300);
           own_den[static_cast<std::size_t>(g)] += blk.value[static_cast<std::size_t>(p)];
         }
+      }
+      if (progress.on()) {
+        double removed_mol = 0.0;
+        for (std::size_t p = 0; p < bn; ++p) removed_mol += blk.value[p] - kept[p];
+        progress.emit(msg("Finished ", block_label, ": ", whole(removed_mol), " of ", whole(t_all),
+                          " molecules (", 100.0 * removed_mol / std::max(t_all, 1.0),
+                          "%) attributed to contamination and ambient background"));
       }
       auto& of_new = own_frac_new[static_cast<std::size_t>(T)];
       of_new.assign(static_cast<std::size_t>(G), 0.0);
@@ -1765,6 +1977,18 @@ GenerativeResult fit_generative(
     own_frac = std::move(own_frac_new);
   }
 
+  if (progress.on()) {
+    double removed_mol = 0.0;
+    double total_mol = 0.0;
+    for (std::size_t p = 0; p < counts_values.size(); ++p) {
+      removed_mol += result.removed[p];
+      total_mol += counts_values[p];
+    }
+    progress.emit(msg("Generative fit finished: ", whole(removed_mol), " of ", whole(total_mol),
+                      " molecules (", 100.0 * removed_mol / std::max(total_mol, 1.0),
+                      "%) removed with induced expression retained; ",
+                      count_of(result.induced.size(), "induced source-gene pair")));
+  }
   return result;
 }
 

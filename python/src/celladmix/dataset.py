@@ -67,7 +67,13 @@ def _fit_param_diff(manifest: dict, requested: dict, annotation_hash: str) -> li
 
 
 class CellAdmix:
-    """A cellAdmix dataset backed by a Xenium bundle and an on-disk cache."""
+    """A cellAdmix dataset backed by a Xenium or Atera bundle and an on-disk cache.
+
+    ``source`` is a Xenium output directory (``experiment.xenium`` with Parquet
+    tables) or an Atera output directory (``experiment.spatial`` with zipped
+    Zarr stores); the Atera stores are converted once into Xenium-layout tables
+    under ``output_dir`` (see :mod:`celladmix.atera`).
+    """
 
     def __init__(
         self,
@@ -204,8 +210,8 @@ class CellAdmix:
 
     def ensure_store(self, *, force: bool = False, materialize_molecules: bool = True, verbose: bool = True):
         """Build or reuse the on-disk input store."""
-        if self.format != "xenium":
-            raise NotImplementedError("Python v1 currently implements Xenium stores")
+        if self.format not in ("xenium", "atera"):
+            raise NotImplementedError("Python v1 currently implements Xenium and Atera stores")
         if self.source is None:
             raise ValueError(
                 "Cannot build an input store without a source path. "
@@ -214,7 +220,7 @@ class CellAdmix:
         # The C++ store builder owns parsing and parquet materialization; the
         # Python layer only normalizes user options and paths.
         return _core.build_xenium_store(
-            str(self.source),
+            str(self.xenium_source(verbose=verbose)),
             str(self.store_dir),
             cell_filter=self.cell_filter,
             gene_filter=self.gene_filter,
@@ -225,6 +231,23 @@ class CellAdmix:
             force=force,
             num_threads=self.num_threads,
         )
+
+    def xenium_source(self, *, force: bool = False, verbose: bool = True) -> Path:
+        """The Xenium bundle the store builder reads for this dataset's source.
+
+        A Xenium source is returned unchanged. An Atera output directory
+        (``experiment.spatial`` with Zarr stores) is converted once into
+        Xenium-layout Parquet tables under ``<output_dir>/atera_xenium``, which
+        are reused while the Atera files are unchanged.
+        """
+        from . import atera
+
+        if not atera.is_atera_bundle(self.source):
+            if self.format == "atera":
+                raise ValueError(f"Not an Atera output directory: {self.source}")
+            return self.source
+        return atera.ensure_xenium_tables(
+            self.source, self.output_dir / atera.CACHE_DIRNAME, force=force, verbose=verbose)
 
     def fit(
         self,
