@@ -22,31 +22,45 @@ reference — is defined in [audit.md](audit.md).
 
 ## The model
 
-For each annotated target cell type, the observed count of cell $c$ at
-gene $g$ is modeled as a Poisson draw with expected value
+For each annotated target cell type, the observed count $y_{cg}$ of
+cell $c$ at gene $g$ is modeled as a Poisson draw whose expected value
+adds up the four origins of the molecules inside the cell's segmentation
+boundary:
+
+![The model: a target cell's molecules and the formula that decomposes them](figures/generative_model.png)
+
+**The model.** A target cell (blue) overlaps a neighboring source cell
+(red), so its segmentation boundary (dashed) collects the cell's own
+expression programs (blue), molecules admixed from the neighbor (red),
+background (grey), and the cell's own response induced by the neighbor
+(green). The formula gives each origin a term, in the same colors:
 
 $$y_{cg} \sim \mathrm{Poisson}\Big(t_c \big[ \textstyle\sum_k \theta_{ck} F_{kg}
-\;+\; \sum_S \alpha_{cS}\, \psi_{Sg} \;+\; \beta_c\, a_g \;+\;
-\sum_S u_{cS}\, \rho_{cS}\, m_{Sg} \;+\; \epsilon_g \big]\Big)$$
+\;+\; \sum_s \alpha_{cs}\, P_{sg} \;+\; \beta_c\, A_g \;+\;
+\sum_s \lambda_{cs}\, \rho_{cs}\, M_{sg} \;+\; \varepsilon_g \big]\Big)$$
 
-where $t_c$ is the cell's total molecule count, so every bracketed
-quantity is a fraction of the cell's content (Figure 1a). The
-components, and where each one's parameters come from:
+Indices are $c$ for cells, $g$ for genes, $k$ for expression programs and
+$s$ for source cell types; per-cell weights are lower-case Greek letters
+and gene profiles capital Latin letters. $t_c$ is the cell's total
+molecule count, so every bracketed quantity is a fraction of the cell's
+content (Figure 1a). The components, and where each one's parameters
+come from:
 
-- **Own expression** ($\theta_{ck}$, $F_{kg}$): the target type's
-  expression programs — gene profiles $F_k$ with per-cell weights
-  $\theta_{ck}$, initialized from the profiles of factor-labeled
+- **Own programs** ($\theta_{ck}$, $F_{kg}$): the target type's
+  expression programs (the molecular factors) — gene profiles $F_k$
+  with per-cell weights $\theta_{ck}$, initialized from the profiles of factor-labeled
   molecules of the type's own NMF factors. The programs are re-estimated
   during fitting, but predominantly from lightly contaminated cells
   (each cell's contribution is down-weighted by its prior contamination
   fraction): without this, a program shared between source and target
-  absorbs the transferred material as if it were a cell state, and the
+  absorbs the admixed molecules as if they were a cell state, and the
   affected pair's removal collapses.
-- **Contamination** ($\alpha_{cS}$, $\psi_{Sg}$): one term per detected
-  source type. The profile $\psi_S$ is the cytoplasmic expression
+- **Admixed molecules** ($\alpha_{cs}$, $P_{sg}$): one term per detected
+  source type, the contamination the correction removes. The profile
+  $P_s$ is the cytoplasmic expression
   profile of the source cells that actually border the target type
   (within 30 µm, widening when sparse) — cell states are not uniform
-  across a tissue, and material transferred from activated interface
+  across a tissue, and molecules admixed from activated interface
   cells carries their elevated activation-gene share; against a global
   profile those genes would be misread as induced. The profile is zeroed
   on target-owned genes (a gene is *owned* by the cell type in which it
@@ -54,7 +68,8 @@ components, and where each one's parameters come from:
   type's cells together), where contamination is indistinguishable from own
   expression: it is deliberately left in place, which makes removal
   of the target's own markers structurally impossible. The per-cell
-  fraction $\alpha_{cS}$ has a prior mean given by the pair's
+  fraction $\alpha_{cs}$ has a prior mean $\lambda_{cs}$, the cell's
+  exposure to the source, given by the pair's
   dose–response: the source's marker content in the target cells, fitted
   monotonically along an ordered exposure axis. Exposed cells sit on that
   axis by their number of source neighbors; unexposed cells by how many
@@ -78,18 +93,20 @@ components, and where each one's parameters come from:
   stays tied to the demonstrated spatial signal (with an unbounded
   update, the model keeps finding the true contamination even after the
   spatial covariates are scrambled, and the permutation control fails).
-- **Ambient background** ($\beta_c$, $a_g$): restricted to the strict
+- **Background** ($\beta_c$, $A_g$): ambient molecules, restricted to the strict
   genes (essentially absent from the target natively), with profile and
   level measured on target cells far from any source cell, and a bounded
   per-cell scale. This is the component that removes the
   exposure-independent baseline of strict genes.
-- **Induced expression** ($u_{cS}$, $\rho_{cS}$, $m_{Sg}$): a sparse
-  term active only on genes selected by the proportionality screen
-  (next section). The per-cell activity $\rho_{cS}$ concentrates the
-  induced content in the cells that actually respond. This content is
-  retained; the genes' proportional (transferred) share is still
+- **Induced by neighbors** ($\lambda_{cs}$, $\rho_{cs}$, $M_{sg}$): a
+  sparse term whose induction profile $M_s$ is active only on genes
+  selected by the proportionality screen (next section). The response
+  scales with the cell's exposure $\lambda_{cs}$, the same dose prior
+  that sets the admixed share, and the per-cell strength $\rho_{cs}$
+  concentrates the induced content in the cells that actually respond. This content is
+  retained; the genes' proportional (admixed) share is still
   removed.
-- **Uniform floor** ($\epsilon_g$): 0.2% of cell content spread over
+- **Uniform floor** ($\varepsilon_g$): 0.2% of cell content spread over
   all genes, keeping the division of each count well-defined where every
   structured component is near zero.
 
@@ -97,7 +114,7 @@ components, and where each one's parameters come from:
 
 **Figure 1. The components, fitted on the pancreas exocrine → ductal
 pair.** **(a)** A target cell's observed counts are a mixture of its own
-expression programs (blue), material transferred from bordering source
+expression programs (blue), molecules admixed from bordering source
 cells (red), ambient background (grey), and the cell's own transcription
 induced by the neighborhood (green). **(b)** The fitted composition of
 ductal-cell content, stratified by the number of exocrine cells among

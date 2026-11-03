@@ -1,0 +1,37 @@
+% The generative model's formula with the components colored and tagged
+% beneath, and the named quantities pointed out above. Notation: c cell,
+% g gene, k expression program, s source cell type. Built by
+% 14_model_figure.py (two pdflatex passes for the overlay).
+\documentclass[border={6pt 6pt 30pt 6pt}]{standalone}
+\usepackage[T1]{fontenc}
+\usepackage{helvet}\renewcommand{\familydefault}{\sfdefault}
+\usepackage{amsmath}
+\usepackage{sansmath}\sansmath
+\usepackage{xcolor}
+\usepackage{tikz}
+\definecolor{own}{HTML}{2E86C1}\definecolor{adm}{HTML}{C0392B}\definecolor{bg}{HTML}{7F8C8D}\definecolor{ind}{HTML}{27AE60}
+% a symbol as a named node, so that a label can point at it
+\newcommand{\sym}[3]{\tikz[remember picture,baseline=(#1.base)]{\node[inner sep=0.5pt,outer sep=1pt,text=#2] (#1) {$#3$};}}
+\begin{document}
+\begin{minipage}{15.5cm}
+\vspace*{1.6cm}\centering
+\large
+$\displaystyle
+y_{cg} \sim \mathrm{Poisson}\Big( t_c \Big[\;
+{\color{own}\underbrace{\textstyle\sum_k \theta_{ck}\,\sym{F}{own}{F_{kg}}}_{\substack{\text{own}\\\text{programs}}}} \;+\;
+{\color{adm}\underbrace{\textstyle\sum_s \alpha_{cs}\,\sym{P}{adm}{P_{sg}}}_{\substack{\text{admixed}\\\text{from neighbors}}}} \;+\;
+{\color{bg}\underbrace{\beta_c\,A_g}_{\text{background}}} \;+\;
+{\color{ind}\underbrace{\textstyle\sum_s \sym{L}{ind}{\lambda_{cs}}\,\sym{R}{ind}{\rho_{cs}}\,\sym{M}{ind}{M_{sg}}}_{\substack{\text{induced}\\\text{by neighbors}}}}
+\;+\; \underbrace{\varepsilon_g}_{\text{floor}}
+\;\Big] \Big)$
+\end{minipage}
+\begin{tikzpicture}[remember picture,overlay,font=\small,every node/.style={inner sep=1pt}]
+\node[own] (tF) at ([yshift=0.95cm,xshift=-0.5cm]F.north) {molecular factors};
+\node[adm] (tP) at ([yshift=0.95cm]P.north) {cytoplasmic profile};
+\node[ind] (tL) at ([yshift=0.95cm,xshift=-1.1cm]L.north) {exposure};
+\node[ind] (tR) at ([yshift=1.5cm,xshift=-0.35cm]R.north) {strength};
+\node[ind] (tM) at ([yshift=0.95cm,xshift=0.7cm]M.north) {induction profile};
+\foreach \t/\s/\c in {tF/F/own, tP/P/adm, tL/L/ind, tR/R/ind, tM/M/ind}
+  \draw[\c, line width=0.5pt, shorten >=1.5pt, shorten <=1.5pt] (\t.south) -- (\s.north);
+\end{tikzpicture}
+\end{document}
