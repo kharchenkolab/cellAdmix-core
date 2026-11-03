@@ -385,7 +385,9 @@ shared by all samples, applying every rule in every sample unless
 own restarts carry its program; the audit runs per sample. Per-factor coverage and recurrence
 tables and a loss-gap table show how well the shared space represents each
 sample. See
-[multisample.md](multisample.md) for the method and the diagnostics.
+[multisample.md](multisample.md) for the method and the diagnostics, and
+the [two-replicate example](../examples/xenium_breast_replicates/breast_replicates_multisample.md)
+for a rendered walkthrough with every diagnostic explained.
 
 ## Clustering and Annotation
 

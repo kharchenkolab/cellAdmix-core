@@ -1,0 +1,633 @@
+---
+title: "Multi-Sample Processing: Two Xenium Breast Replicates"
+output:
+  github_document:
+    toc: true
+    toc_depth: 2
+    html_preview: false
+---
+
+```{r setup, include=FALSE}
+extra_lib <- Sys.getenv("CELLADMIX_R_LIB", "")
+if (nzchar(extra_lib)) {
+  .libPaths(c(extra_lib, .libPaths()))
+}
+
+library(cellAdmixCore)
+library(ggplot2)
+library(cowplot)
+
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = TRUE,
+  fig.align = "center", dpi = 96, fig.retina = 2)
+options(width = 110, scipen = 999)
+show <- function(df, digits = 3) knitr::kable(df, digits = digits, row.names = FALSE)
+```
+
+Two serial sections of the same tissue, processed one at a time, come
+out of the cleanup looking different: each section's NMF finds its own
+set of factors, each section's scoring produces its own rules, and the
+two cleanups then remove different molecules from the same cell types.
+This notebook runs the two 10x Genomics Xenium breast cancer replicates
+through the multi-sample workflow, which treats all samples by one
+procedure: a shared set of gene programs built from the factorizations
+of every sample (the consensus factorization), one rule set from the
+pooled evidence of all samples, and a correction that votes with the
+same ensemble in every sample. The audit then verifies the cleanup in
+each sample on its own.
+
+The notebook also explains every diagnostic table the workflow produces,
+because the diagnostics are how one judges whether the shared treatment
+suited the samples at hand. The closing section lists what to report from
+a pilot run on new data. The method and the diagnostics are described in
+[docs/multisample.md](../../docs/multisample.md); the single-sample
+workflow is in the
+[pancreas quickstart](../xenium_pancreas_membrane_377_full/pancreas_quickstart.md).
+
+## Inputs
+
+The two replicates are the Xenium FFPE human breast cancer sections
+published by 10x Genomics (Janesick et al., 2023). Place each bundle in
+`data/rep1` and `data/rep2`:
+
+```bash
+B=https://cf.10xgenomics.com/samples/xenium/1.0.1
+curl -O $B/Xenium_FFPE_Human_Breast_Cancer_Rep1/Xenium_FFPE_Human_Breast_Cancer_Rep1_outs.zip
+curl -O $B/Xenium_FFPE_Human_Breast_Cancer_Rep2/Xenium_FFPE_Human_Breast_Cancer_Rep2_outs.zip
+mkdir -p data/rep1 data/rep2
+unzip -q Xenium_FFPE_Human_Breast_Cancer_Rep1_outs.zip -d data/rep1
+unzip -q Xenium_FFPE_Human_Breast_Cancer_Rep2_outs.zip -d data/rep2
+```
+
+The cell-type labels ship with this example under `annotations/`: the
+supervised labels that 10x published with the dataset for both sections
+(the `Cell_Barcode_Type_Matrices` supplement), as one `cell_id`,
+`cell_type` table per replicate. Cells the authors left `Unlabeled` are
+dropped from the annotation, so they are neither a source nor a target
+type. The samples must share one gene panel and one annotation scheme;
+the same labels do not have to be present in every sample.
+
+```{r inputs}
+read_labels <- function(path) {
+  labels <- read.csv(path, stringsAsFactors = FALSE)
+  labels <- labels[labels$cell_type != "Unlabeled", ]
+  setNames(labels$cell_type, labels$cell_id)
+}
+labels <- list(
+  rep1 = read_labels(file.path("annotations", "rep1_annotation.csv.gz")),
+  rep2 = read_labels(file.path("annotations", "rep2_annotation.csv.gz")))
+
+table(labels$rep1)
+```
+
+Each sample is an ordinary cellAdmix dataset with its own output
+directory, which holds that sample's cache: the prepared molecule store,
+its fits, and later the shared-profile fits and corrections. The
+collection groups the datasets under sample names, which prefix the cell
+ids of every combined output.
+
+```{r construct}
+datasets <- list(
+  rep1 = cellAdmix("data/rep1", output_dir = "out/rep1", annotation = labels$rep1, num_threads = 8),
+  rep2 = cellAdmix("data/rep2", output_dir = "out/rep2", annotation = labels$rep2, num_threads = 8))
+
+collection <- cellAdmixCollection(datasets)
+show(collection$samples())
+```
+
+## Per-sample fits
+
+The consensus is built from the ordinary per-sample fits, so the first
+step is the same as in the single-sample workflow, once per sample. The
+rank is derived from the number of annotated cell types, and ten NMF
+restarts are run per sample; the restarts are the material of the
+consensus and of the ensemble correction later on. These sections will be
+cleaned with bridge scoring, which pairs with the `ls_nmf` factorization;
+on these replicates it removed more admixture at lower own-marker loss
+than membrane scoring did (see [docs/multisample.md](../../docs/multisample.md)).
+
+```{r fit}
+collection$fit(nmf_variant = "ls_nmf")
+```
+
+The stability plot of each fit shows how reproducibly each factor was
+re-found across the sample's restarts: the y-axis is the correlation of
+the factor's gene ownership (the share of each gene's molecules the
+factor claims) with its best match in the other restarts, and the x-axis
+is the factor's share of all labeled molecules. A stable variant such as
+`ls_nmf` puts most factors above 0.5. Stability is reported, never used
+to drop factors; what matters for the next step is that the two samples'
+restarts agree with themselves to a similar degree, since the consensus
+keeps the programs that recur across restarts.
+
+```{r stability, fig.width=10.4, fig.height=4.2}
+plot_grid(
+  collection$fits$rep1$plot_stability() + ggtitle("rep1"),
+  collection$fits$rep2$plot_stability() + ggtitle("rep2"),
+  ncol = 2)
+```
+
+## Consensus factorization
+
+The consensus pools the factors of every restart of every sample,
+clusters them into recurring programs, keeps the programs that recur in
+at least half of some sample's restarts (`min_recurrence = 0.5`, the
+majority rule), takes the per-gene median of each program's members as
+its shared profile, and then labels every sample's molecules against the
+shared profiles. The result is one factor index that means the same
+thing in every sample. The fixed-profile labeling of each sample is
+cached in that sample's output directory under a run id derived from the
+profiles, so the step is reused as long as the per-sample fits do not
+change.
+
+```{r consensus}
+consensus <- collection$fit_consensus()
+consensus
+```
+
+The summary lines read as follows. **Factors** is the size of the shared
+space, to be compared with the per-sample rank: a shared space of about
+one rank means the two samples found largely the same programs; a much
+larger one means many programs were specific to one sample; a much
+smaller one means few programs recurred. **From one sample only** counts
+the shared factors whose cluster contains restarts of a single sample.
+**Sample coverage per factor** is the fraction of samples contributing
+to a factor's cluster, so a median of 1 says the typical shared program
+was found in every sample. **Unreproduced components** are pooled
+factors that no second restart reproduced; they are listed, not used.
+**Primary factors in the shared space** counts, over all samples, the
+factors of the selected restart (the restart that serves as the sample's
+own fit) that joined a shared factor, with the median correlation of
+their gene ownership with the shared profile they joined.
+
+### Factors
+
+One row per shared factor:
+
+- `samples` and `coverage`: the number and fraction of samples whose
+  restarts contributed to the cluster.
+- `restarts`: how many restarts, over all samples, carried the program
+  (each restart contributes at most one factor to a cluster);
+  `components` counts the contributed factors before that restriction,
+  so a value above `restarts` means some restart split the program in
+  two.
+- `max_recurrence`: the largest fraction of any one sample's restarts
+  carrying the program; the majority rule kept the factors with a value
+  of at least 0.5.
+- `agreement`: the mean ownership correlation within the cluster, so
+  how alike the contributing factors were.
+
+```{r factors}
+show(consensus$factors)
+```
+
+### Recurrence per sample
+
+The recurrence table gives, per shared factor and sample, the number of
+that sample's restarts that carried the program and the fraction of its
+restarts (`recurrence`). A zero marks a program the sample never found
+on its own; molecules labeled with that factor in the sample are then
+nearest-profile assignments rather than evidence of the program, which
+matters for the rule application discussed below.
+
+```{r recurrence, fig.width=9.0, fig.height=2.4}
+recurrence <- consensus$recurrence()
+ggplot(recurrence, aes(x = factor(consensus_factor), y = sample, fill = recurrence)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient(low = "grey95", high = "steelblue4", limits = c(0, 1)) +
+  labs(x = "shared factor", y = NULL, fill = "share of\nrestarts") +
+  theme_minimal(base_size = 11) +
+  theme(panel.grid = element_blank())
+```
+
+### Matching of each sample's own factors
+
+The matching table follows each sample's primary factors (the factors of
+its selected restart) into the shared space: `consensus_factor` is the
+shared factor whose cluster the primary factor joined (`NA` and
+`matched = FALSE` when none), `correlation` is the ownership correlation
+of the primary factor with that shared profile, `agreement` its mean
+correlation with the other members of the cluster, and `own_stability`
+its stability within the sample's own restarts. A primary factor that
+did not enter the shared space is a program the sample's own restarts
+mostly did not reproduce either, as its `own_stability` shows; such a
+program is absent from the shared space and will not be cleaned. The
+unreproduced components are listed in full with their sample, restart,
+and factor index; those from a primary restart (`selected`) are the
+unmatched rows of the matching table.
+
+```{r matching}
+matching <- consensus$matching
+show(matching[!matching$matched | matching$correlation < 0.8, ])
+unreproduced <- consensus$unreproduced
+cat(nrow(unreproduced), "unreproduced components; from a primary restart:\n")
+show(unreproduced[unreproduced$selected, ])
+```
+
+### Representation of each sample
+
+The loss table asks whether the shared profiles describe each sample as
+well as its own factorization does. `own_loss` is the fit objective of
+the sample's training rows under its own profiles, `consensus_loss` the
+same objective under the shared profiles, and `loss_gap` their relative
+difference. The yardstick is `restart_spread`, the relative spread of
+the objective across the sample's own restarts: a gap within the spread
+means the consensus fits the sample as well as one of its own restarts
+would.
+
+```{r loss}
+show(consensus$loss, digits = 4)
+```
+
+The stability table places each sample's within-sample restart
+stability next to the agreement of its restarts, aligned to the shared
+factors, with the consensus profiles. The two numbers being close says
+the shared profiles are as representative of a sample's restarts as the
+restarts are of each other.
+
+```{r stability-table}
+show(consensus$stability())
+```
+
+Factor usage compares how the samples use the shared factors. For every
+cell type, `sample_usage()` gives the share of the type's molecules
+labeled with each factor in each sample, and `usage_divergence()`
+reduces this to one number per type: half the sum of absolute
+differences between a sample's usage distribution and the pooled one,
+maximized over samples, so 0 means identical usage and 1 means disjoint
+factors. For replicates the divergences are small; a type with a large
+value either differs between the samples in reality (regional sections,
+different patients) or is labeled with different factors in the two
+samples, which points to a sample effect in the factorization.
+
+```{r usage}
+show(head(consensus$usage_divergence(), 8))
+```
+
+### Per-sample summary and flags
+
+`diagnostics()` gathers the above into one row per sample. The two
+flags report; nothing is gated on them.
+
+- `representation_flag` is set when `loss_gap` exceeds
+  `restart_spread`: the shared profiles reconstruct the sample's
+  neighborhood compositions worse than one of its own restarts would.
+  This describes reconstruction, not cleanup; a compact shared space can
+  reconstruct the neighborhoods of an unstable factorization poorly and
+  still remove its admixture well, so the per-sample audit below remains
+  the arbiter.
+- `shared_factors_flag` is set when fewer than half of the sample's
+  primary factors entered the shared space (`shared_fraction`). It fires
+  when the sample's own restarts disagree among themselves (low
+  `within_sample_stability`): the shared space then holds fewer programs
+  than the sample's own fit, and admixture programs among the lost ones
+  are not cleaned. The first remedy is a more stable NMF variant or more
+  restarts; lowering `min_recurrence` admits the less reproducible
+  programs at the price of more own-marker removal.
+- `max_usage_divergence` and `divergent_cell_type` name the cell type
+  whose factor usage differs most between this sample and the pool.
+
+```{r diagnostics}
+show(consensus$diagnostics(), digits = 4)
+```
+
+## Pooled scoring and rules
+
+Scoring runs per sample: bridge scoring measures, for every target cell
+type, source cell type, and factor, whether the factor's molecules in
+target cells sit closer to source cells than the target's other
+molecules do. The per-sample score tables are then pooled per target,
+source, and factor: pair counts are summed, mean scores are weighted by
+pair count, and the one-sided p-values are combined by Stouffer's method
+with weights proportional to the square root of each sample's pair count.
+The caps on the number of scored pairs are split between the samples in
+proportion to their size, so a two-sample collection scores twice the
+pairs of one sample.
+
+```{r score}
+score <- consensus$score_bridge()
+pooled <- score$summary()
+show(head(pooled[order(pooled$p_value, -pooled$mean_score), ], 8))
+```
+
+In the pooled summary, `n_pairs` is the number of target-source cell
+pairs the evidence rests on, `mean_score` and `mean_null_score` the
+proximity statistic and its permutation null, and `n_samples` the number
+of samples that contributed pairs. `sample_summaries()` holds the
+per-sample tables the pool was built from, one row per sample, target,
+source, and factor.
+
+The rules select the pooled rows below the p-value threshold and add
+two kinds of report. `sample_support` is the fraction of samples whose
+own evidence reaches the threshold for the rule, with those samples named
+in `samples_significant`; a rule with support 0.5 in a two-sample
+collection rests on one sample's evidence alone. It is a report, not a
+gate: in replicates, the rules missing in one sample are the ones that
+sample's own scoring under-powered, and applying them there is the point
+of the pooled treatment. The native-factor check (`native_check`) vetoes
+rules whose factor is a program of the target type itself, judged on
+pooled evidence: when target cells far from any source still express the
+factor's genes, removing those molecules would remove native expression,
+and `keep` is set to `FALSE`.
+
+```{r rules}
+rules <- score$rules()
+cat(nrow(rules), "candidate rules;", sum(rules$keep), "kept\n")
+table(native_check = rules$native_check, keep = rules$keep)
+table(sample_support = rules$sample_support[rules$keep])
+```
+
+The verdicts of the native-factor check: `native_median` when target
+cells with no source cell among their neighbors still carry the factor
+in more than a tenth of their molecules at the median; `native_outlier`
+when the share of such distant target cells expressing the factor is an
+outlier among the cell types; `no_gradient` when the factor's share in
+target cells does not rise with exposure to the source; and
+`no_exposed_cells` when too few target cells touch the source to judge.
+A vetoed rule is kept in the table for inspection and not applied.
+
+## Correction
+
+The correction removes the molecules matched by the rules with a vote
+across ensemble members, exactly as in the single-sample workflow, with
+one difference: the ensemble is shared. The restart profiles of all
+samples, aligned to the shared factors and interleaved, form one member
+pool; every member labels every sample's molecules, is scored in every
+sample, and its evidence is pooled like the primary evidence, so one
+member rule set votes in every sample. A molecule is removed when at
+least 30% of the members remove it. By default every rule is applied in
+every sample. The per-sample steps (labeling each sample with every
+member, scoring every member in every sample, the vote in each sample)
+run concurrently within a thread budget, here 32 threads.
+
+```{r correct}
+correction <- score$correct(rules = rules, num_threads = 32)
+correction
+```
+
+The rules carried by the correction gain two columns: `support`, the
+fraction of ensemble members whose own rules contain the rule's source
+and target pair, and `samples_without_program`, the samples none of whose
+restarts carry the rule's program (empty for a program every sample
+found). Under the default the rules on single-sample programs are applied
+in every sample; the column records where that happened.
+
+```{r correction-rules}
+applied <- correction$rules[correction$rules$keep, ]
+summary(applied$support)
+table(samples_without_program = applied$samples_without_program)
+```
+
+The correction summary reports, per sample and cell type, the number
+of cells, how many were modified, molecule counts before and after, the
+fraction of molecules removed, and the median removal per modified cell.
+The `all` row is the sample total. A fraction above a few tens of percent
+for a cell type is not alarming in itself when the type is small and
+embedded in another (immune cells in tumor, for instance); the audit
+below says whether what was removed was admixture.
+
+```{r correction-summary}
+removal <- correction$summary()
+show(removal[removal$cell_type == "all", ])
+```
+
+For replicates the per-type removal fractions should track each other,
+which is the direct reading of whether the two sections were cleaned
+alike:
+
+```{r removal-by-type, fig.width=7.5, fig.height=5.0}
+by_type <- removal[removal$cell_type != "all", ]
+ggplot(by_type, aes(x = reorder(cell_type, fraction_molecules_removed),
+    y = fraction_molecules_removed, fill = sample)) +
+  geom_col(position = position_dodge(width = 0.7), width = 0.65) +
+  coord_flip() +
+  scale_fill_manual(values = c(rep1 = "steelblue4", rep2 = "darkorange3")) +
+  labs(x = NULL, y = "fraction of molecules removed", fill = NULL) +
+  theme_minimal(base_size = 11)
+```
+
+## Audit
+
+The audit estimates, in each sample and before any correction, how much
+of every target cell type's expression leaked in from each source type,
+using only the spatial exposure structure: the expression of a source's
+marker genes in target cells as a function of their exposure to source
+cells, against a reference of unexposed target cells. `rate` is the
+estimated share of the target type's molecules that came from the
+source, `admixed_molecules` the corresponding molecule count, and
+`detected` whether the pair's exposure gradient is significant. The
+pooled table sums the molecule counts over samples and records in how
+many samples the pair was detected (`n_samples_detected`); the per-sample
+table is available with `by_sample = TRUE`. The messages name the genes
+the audit dropped from a source's marker panel because their excess in
+exposed target cells far exceeds what the source's own expression could
+contribute: such excess is more likely expression induced in the target
+by the contact than transferred molecules, and it would inflate the
+leakage estimate.
+
+```{r audit}
+audit <- consensus$audit_admixture()
+pairs <- audit$pairs(detected_only = TRUE)
+show(head(pairs, 10))
+```
+
+The admixture maps show the same estimates per sample as source-by-target
+matrices. Replicates should show the same pattern of pairs; a pair
+present in one map only is a difference between the sections, whether
+real or technical.
+
+```{r audit-maps, fig.width=12.5, fig.height=5.4}
+plot_grid(
+  audit$audits$rep1$plot_map() + ggtitle("rep1"),
+  audit$audits$rep2$plot_map() + ggtitle("rep2"),
+  ncol = 2)
+```
+
+### Verification of the cleanup
+
+The audit re-measures the same exposure gradients on the corrected
+counts of each sample. Its summary has one row per sample:
+
+- `detected_pairs` and `estimated_admixed_molecules`: the size of the
+  problem in the sample before the correction.
+- `leakage_removed_overall`: the fraction of the estimated admixed
+  molecules that the correction removed, summed over detected pairs.
+- `median_pair_sensitivity`: the median, over detected pairs, of the
+  fraction of each pair's leakage that was removed; it tells whether the
+  cleanup reached the typical pair, not just the largest ones.
+- `own_marker_false_removal`: the fraction of the molecules of each cell
+  type's own marker genes, in cells far from any source of them, that the
+  correction removed. These molecules are almost surely genuine, so this
+  is the price of the cleanup; `worst_false_removal` names the type that
+  paid the most.
+
+The method warns when a detected pair kept more than 80% of its leakage
+and when a type lost more than a quarter of its own markers. In our
+benchmarks a good cleanup removes 0.6 to 0.7 of the leakage with a
+median pair sensitivity near 0.9 and own-marker false removal of 1 to 3%.
+
+```{r verify, warning=TRUE}
+report <- audit$evaluate(correction)
+show(report$summary())
+```
+
+The warnings list the detected pairs of which the correction removed
+less than a fifth. On these sections they are of one kind: pairs of cell
+types that share their expression program, such as the two T-cell
+subsets, the two DCIS states, the two myoepithelial states, the two
+macrophage populations, invasive tumor and its proliferating state, DCIS
+and the myoepithelial cells lining the same ducts, or dendritic cells and
+T cells. Molecules of such a source inside a target cell carry a program
+the target expresses itself, so no factor separates them from the
+target's own molecules, and a rule on that factor would remove native
+expression, which is what the native-factor check vetoes. Their leakage
+stays, and the audit reports it rather than hiding it. The same pairs are
+listed for both replicates, which is itself a sign that the two sections
+were treated alike. A negative sensitivity means the pair's exposure
+gradient was slightly steeper after the correction than before, which
+happens for small pairs when removals in the surrounding types shift the
+reference; it reads as no removal.
+
+The pairs table of the report gives every detected pair's sensitivity
+per sample; its lower end shows which pairs the rules did not cover.
+
+```{r verify-pairs}
+report_pairs <- report$pairs()
+report_pairs <- report_pairs[order(report_pairs$sensitivity), ]
+show(head(report_pairs[, c("sample", "source", "target", "admixed_molecules", "sensitivity")], 8))
+```
+
+Two plots per sample complete the verification: the admixture remaining
+after the correction, pair by pair, next to the estimate before it, and
+the exposure gradients of the marker expression before and after, which
+should flatten.
+
+```{r verify-plots, fig.width=12.5, fig.height=8.0}
+plot_grid(
+  audit$audits$rep1$plot_remaining(list(corrected = correction$corrections$rep1)) + ggtitle("rep1"),
+  audit$audits$rep2$plot_remaining(list(corrected = correction$corrections$rep2)) + ggtitle("rep2"),
+  audit$audits$rep1$plot_exposure(correction = correction$corrections$rep1),
+  audit$audits$rep2$plot_exposure(correction = correction$corrections$rep2),
+  ncol = 2, align = "hv", axis = "tblr")
+```
+
+### Correction diagnostics per sample
+
+`diagnostics(report)` on the correction summarizes, per sample, where
+the sample's cleanup came from and what the audit made of it:
+
+- `rules_applied`: the number of rules applied in the sample.
+- `rules_without_local_evidence` and `removed_without_local_evidence`:
+  the rules the sample's own scoring did not support at the threshold,
+  and the fraction of the sample's removed molecules attributable to them
+  (a removed molecule is attributed to the rule of its cell's type and
+  its primary factor label). For replicates a moderate fraction is the
+  intended uniform treatment; when the samples are not replicates it is
+  a point to examine.
+- `rules_on_absent_programs` and `removed_via_absent_programs`: the
+  rules whose program none of the sample's own restarts carries, and the
+  fraction of the removal attributable to them. Such removal cleans the
+  sample of a program it does not have; it is near zero for replicates
+  and becomes substantial when samples differ in composition, which is
+  the case for `apply_rules = "where_present"` described below.
+- `molecules_removed`, then the audit's leakage removed, median pair
+  sensitivity, and own-marker false removal, with `false_removal_flag`
+  when a sample's false removal exceeds twice the median across samples.
+
+```{r correction-diagnostics}
+show(correction$diagnostics(report), digits = 4)
+```
+
+## Replicate agreement
+
+The purpose of the shared treatment is that corresponding cell types in
+the two sections stay comparable after the cleanup. One direct measure
+is the correlation of the two replicates' pseudobulk expression per cell
+type, before and after the correction. A cleanup that treats the
+replicates alike leaves this correlation close to where the uncorrected
+data had it or raises it; separate per-sample processing lowers it
+markedly.
+
+```{r agreement, fig.width=6.5, fig.height=4.6}
+pseudobulk <- function(counts, cell_labels) {
+  cell_labels <- cell_labels[intersect(colnames(counts), names(cell_labels))]
+  groups <- Matrix::fac2sparse(factor(cell_labels))
+  as.matrix(counts[, names(cell_labels), drop = FALSE] %*% Matrix::t(groups))
+}
+replicate_agreement <- function(get_counts) {
+  pb <- lapply(c("rep1", "rep2"), function(s) pseudobulk(get_counts(s), labels[[s]]))
+  genes <- intersect(rownames(pb[[1]]), rownames(pb[[2]]))
+  types <- intersect(colnames(pb[[1]]), colnames(pb[[2]]))
+  sapply(types, function(t) cor(log1p(pb[[1]][genes, t]), log1p(pb[[2]][genes, t])))
+}
+agreement <- data.frame(
+  cell_type = names(replicate_agreement(function(s) consensus$counts(sample = s))),
+  uncorrected = replicate_agreement(function(s) consensus$counts(sample = s)),
+  corrected = replicate_agreement(function(s) correction$counts(sample = s)))
+show(agreement)
+
+ggplot(agreement, aes(x = uncorrected, y = corrected)) +
+  geom_abline(slope = 1, intercept = 0, color = "grey70") +
+  geom_point(color = "steelblue4", size = 2.4) +
+  labs(x = "replicate correlation, uncorrected", y = "replicate correlation, corrected") +
+  theme_minimal(base_size = 11)
+```
+
+## Use the corrected counts
+
+The combined matrix carries cell ids prefixed with the sample name, the
+convention of Seurat's `merge()`; the per-sample accessor returns the
+sample's original ids.
+
+```{r export}
+combined <- correction$counts()
+dim(combined)
+head(colnames(combined), 3)
+rep1_counts <- correction$counts(sample = "rep1")
+dim(rep1_counts)
+```
+
+## Samples that are not replicates
+
+When the samples differ in composition (regional sections, different
+patients), a program found by one sample's restarts may be absent from
+another's. Under the default `apply_rules = "everywhere"` the rule is
+still applied there, where it removes the molecules labeled with the
+nearest shared profile. `score$correct(rules = rules, apply_rules =
+"where_present")` applies each rule only in the samples whose own
+restarts carry its program. On replicates this costs sensitivity and
+replicate agreement, since corresponding regions are no longer cleaned
+alike; the per-sample `removed_via_absent_programs` says how much of a
+sample's removal the choice would change. See
+[docs/multisample.md](../../docs/multisample.md) for the measured
+trade-off.
+
+## What to report from a pilot run
+
+The tables and figures above are the material for judging a run on new
+data. A report back should include:
+
+1. `collection$samples()`: the samples, their annotated cell counts and
+   number of cell types, and the thread settings and run time.
+2. The printed consensus summary and `consensus$diagnostics()`: the
+   size of the shared space against the rank, the single-sample factors,
+   the loss gap against the restart spread, the shared fraction of
+   primary factors, both flags, and the most divergent cell type with its
+   divergence.
+3. `consensus$factors` with the recurrence heatmap, and the stability
+   plots of the per-sample fits.
+4. The rule counts: candidates, kept, the native-check table, and the
+   `sample_support` distribution of the kept rules.
+5. `correction$summary()` for the `all` rows and the per-type removal
+   plot, which shows whether the samples were cleaned alike.
+6. `report$summary()` and `correction$diagnostics(report)`, with any
+   warnings printed by `evaluate()`, and the admixture maps and
+   verification plots.
+7. The replicate-agreement table when the samples are replicates.
+
+Points to flag explicitly: either flag set in `consensus$diagnostics()`;
+own-marker false removal above about 5% or a `false_removal_flag`;
+median pair sensitivity below about 0.7; samples whose removal fraction
+for the same cell type differs by more than a few percentage points; many
+shared factors from one sample only, or a large `removed_via_absent_programs`,
+which say the samples differ in composition and raise the question of
+`apply_rules = "where_present"`.

@@ -280,7 +280,9 @@ sample. A single
 dataset can be fitted against given profiles with
 `ds.fit(nmf_fixed_h=profiles, nmf_fixed_h_members=members)`, where
 `profiles` is a factor-by-gene frame with gene columns. See
-[multisample.md](multisample.md) for the method and the diagnostics.
+[multisample.md](multisample.md) for the method and the diagnostics, and
+the [two-replicate example](../examples/xenium_breast_replicates/breast_replicates_multisample.md)
+for a rendered walkthrough with every diagnostic explained.
 
 ## SpatialData API
 

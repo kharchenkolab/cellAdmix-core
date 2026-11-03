@@ -3,7 +3,7 @@ name: celladmix-multisample
 description: The multi-sample collection API of cellAdmix - processing several samples that share one annotation scheme with one shared factor space, pooled rules with per-sample support, a shared ensemble correction, per-sample audits, and the diagnostics. Use when a task involves replicates or a cohort of sections.
 ---
 
-Use this skill when several samples (replicate sections, a cohort) must be corrected by the same procedure so that they do not diverge for pipeline reasons, when you meet the `CellAdmixCollection` family of objects, or when combined outputs carry sample-prefixed cell ids. `docs/multisample.md` is the authoritative description; this skill stays at the level of that page and does not describe internals (`r/R/collection.R`, `python/src/celladmix/collection.py`).
+Use this skill when several samples (replicate sections, a cohort) must be corrected by the same procedure so that they do not diverge for pipeline reasons, when you meet the `CellAdmixCollection` family of objects, or when combined outputs carry sample-prefixed cell ids. `docs/multisample.md` is the authoritative description; this skill stays at the level of that page and does not describe internals (`r/R/collection.R`, `python/src/celladmix/collection.py`). A rendered worked example with every diagnostic explained and a reporting checklist for pilot runs: `examples/xenium_breast_replicates/breast_replicates_multisample.md` (R) and `breast_replicates_multisample_python.ipynb` (Python) in the same folder.
 
 ## Aim
 

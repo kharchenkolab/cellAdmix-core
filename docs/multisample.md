@@ -244,6 +244,14 @@ joint factorization, are the remaining options.
 
 ## Usage
 
+A worked example on the two Xenium breast replicates, with every
+diagnostic table explained and a checklist for reporting on a pilot run,
+is rendered as
+[breast_replicates_multisample.md](../examples/xenium_breast_replicates/breast_replicates_multisample.md)
+(R) and
+[breast_replicates_multisample_python.ipynb](../examples/xenium_breast_replicates/breast_replicates_multisample_python.ipynb)
+(Python).
+
 R:
 
 ```r
@@ -273,14 +281,24 @@ correction$diagnostics(report)                       # rules without local evide
 Python:
 
 ```python
-collection = ca.CellAdmixCollection({"rep1": ds1, "rep2": ds2})
-consensus = collection.fit_consensus()
-score = consensus.score_bridge()
-rules = score.rules()
-correction = score.correct(rules=rules)
-counts, genes, cells = correction.counts()          # cells "<sample>_<cell_id>"
+collection = ca.CellAdmixCollection({"rep1": ds1, "rep2": ds2})  # sample_allocation="proportional"
+consensus = collection.fit_consensus()              # per-sample fits, matching, projection
+consensus.loss                                      # loss gap per sample
+consensus.factors                                   # coverage and recurrence per shared factor
+consensus.recurrence()                              # per factor and sample
+consensus.matching                                  # each sample's primary factors in the shared space
+score = consensus.score_bridge()                    # per-sample scores, pooled summary
+rules = score.rules()                               # pooled rules with sample_support
+correction = score.correct(rules=rules)             # per-sample ensemble corrections
+score.correct(rules=rules, apply_rules="where_present")  # skip rules on programs a sample lacks
+correction.summary()                                # removal per cell type per sample
+counts, genes, cells = correction.counts()          # combined; cells "<sample>_<cell_id>"
+counts, genes, cells = correction.counts(sample="rep1")  # one sample, original cell ids
 audit = consensus.audit_admixture()
-audit.evaluate(correction).summary()
+report = audit.evaluate(correction)
+report.summary()                                    # per-sample cleanup verification
+consensus.diagnostics()                             # per-sample representation flags
+correction.diagnostics(report)                      # rules without local evidence, audit per sample
 ```
 
 Cell ids of combined outputs are prefixed with the sample name and an
