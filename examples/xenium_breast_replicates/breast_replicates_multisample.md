@@ -116,13 +116,13 @@ is the factor’s share of all labeled molecules. A stable variant such as
 `ls_nmf` puts most factors above 0.5. Stability is reported, never used
 to drop factors; what matters for the next step is that the two samples’
 restarts agree with themselves to a similar degree, since the consensus
-keeps the programs that recur across restarts.
+keeps the programs that recur across restarts. The figure has one panel
+per sample; with many samples, raise `ncol` and the figure height.
 
 ``` r
-plot_grid(
-  collection$fits$rep1$plot_stability() + ggtitle("rep1"),
-  collection$fits$rep2$plot_stability() + ggtitle("rep2"),
-  ncol = 2)
+plot_grid(plotlist = lapply(names(collection$fits), function(sample) {
+  collection$fits[[sample]]$plot_stability() + ggtitle(sample)
+}), ncol = 2)
 ```
 
 <img src="breast_replicates_multisample_files/figure-gfm/stability-1.png" alt="" width="998.4" style="display: block; margin: auto;" />
@@ -472,6 +472,21 @@ target cells does not rise with exposure to the source; and
 `no_exposed_cells` when too few target cells touch the source to judge.
 A vetoed rule is kept in the table for inspection and not applied.
 
+The pooled evidence is drawn like a single sample’s scoring matrix. Rows
+are cell types, columns the shared factors, and the color is the
+significance of the pooled evidence that the factor’s molecules in cells
+of that type sit closer to another type’s cells than the type’s own
+molecules do. `S` marks the type the factor is called from as its
+source, `*` marks a removal call (the factor’s molecules will be removed
+from that cell type), and `(*)` a call the native-factor check vetoed
+because the factor is a program of the type itself.
+
+``` r
+score$plot_heatmap()
+```
+
+<img src="breast_replicates_multisample_files/figure-gfm/score-heatmap-1.png" alt="" width="1056" style="display: block; margin: auto;" />
+
 ## Correction
 
 The correction removes the molecules matched by the rules with a vote
@@ -542,17 +557,15 @@ show(removal[removal$cell_type == "all", ])
 | rep2   | all        |   118710 |             114693 |                     0.966 |          29089452 |         21960277 |            7129175 |                        0.245 |                                   38 |                                          0.220 |
 
 For replicates the per-type removal fractions should track each other,
-which is the direct reading of whether the two sections were cleaned
-alike:
+which is the direct reading of whether the sections were cleaned alike.
+One point per sample, so the plot reads the same with many samples:
 
 ``` r
 by_type <- removal[removal$cell_type != "all", ]
-ggplot(by_type, aes(x = reorder(cell_type, fraction_molecules_removed),
-    y = fraction_molecules_removed, fill = sample)) +
-  geom_col(position = position_dodge(width = 0.7), width = 0.65) +
-  coord_flip() +
-  scale_fill_manual(values = c(rep1 = "steelblue4", rep2 = "darkorange3")) +
-  labs(x = NULL, y = "fraction of molecules removed", fill = NULL) +
+ggplot(by_type, aes(x = fraction_molecules_removed,
+    y = reorder(cell_type, fraction_molecules_removed), color = sample)) +
+  geom_point(size = 2.4) +
+  labs(x = "fraction of molecules removed", y = NULL, color = NULL) +
   theme_minimal(base_size = 11)
 ```
 
@@ -602,18 +615,6 @@ show(head(pairs, 10))
 | Endothelial             | Stromal         |             700757 | 0.034 | TRUE     |          2 |                    2 |
 | B\_Cells                | Stromal         |             655970 | 0.032 | TRUE     |          2 |                    2 |
 | Myoepi\_ACTA2+          | DCIS\_1         |             614022 | 0.090 | TRUE     |          2 |                    2 |
-
-The admixture maps show the same estimates per sample as
-source-by-target matrices, one row per sample on one color scale.
-Replicates should show the same pattern of pairs; a pair present in one
-row only is a difference between the sections, whether real or
-technical.
-
-``` r
-audit$plot_map()
-```
-
-<img src="breast_replicates_multisample_files/figure-gfm/audit-maps-1.png" alt="" width="720" style="display: block; margin: auto;" />
 
 ### Verification of the cleanup
 
@@ -793,11 +794,15 @@ exposure gradient was slightly steeper after the correction than before,
 which happens for small pairs when removals in the surrounding types
 shift the reference; it reads as no removal.
 
-The admixture maps after the correction show what the cleanup left: each
-pair’s estimate scaled by the share of its leakage that remains, next to
-the estimate before, one row per sample on one color scale. The cells
+The admixture maps show each sample’s estimates before the correction as
+a source-by-target matrix next to what the cleanup left: each pair’s
+estimate scaled by the share of its leakage that remains, one row per
+sample on one color scale. Replicates should show the same pattern of
+pairs in the before column; a pair present in one row only is a
+difference between the sections, whether real or technical. The cells
 that stay dark in the after column are the uncovered pairs the warnings
-list; the others should fade in both rows alike.
+list; the others should fade in both rows alike. With many samples,
+`samples` selects the rows to draw.
 
 ``` r
 report$plot_map()
@@ -825,21 +830,26 @@ show(head(report_pairs[, c("sample", "source", "target", "admixed_molecules", "s
 | rep1   | CD4+\_T\_Cells    | T\_Cell\_&\_Tumor\_Hybrid |               2629 |     \-0.052 |
 | rep2   | CD4+\_T\_Cells    | CD8+\_T\_Cells            |             145545 |     \-0.044 |
 
-Two plots per sample complete the verification: the admixture remaining
-after the correction, pair by pair, next to the estimate before it, and
-the exposure gradients of the marker expression before and after, which
-should flatten.
+Two further views complete the verification and read the same with any
+number of samples. The first is the estimated admixture of each sample’s
+molecules before and after the correction, as bars grouped by sample.
+The second is each sample’s exposure profile: the admixture-marker rate
+in target cells against the number of source cells among their nearest
+neighbors, pooled over the detected pairs, which rises with exposure
+before the correction and should flatten after it; the shaded band
+between the two curves is the admixture removed at each exposure level.
 
 ``` r
-plot_grid(
-  audit$audits$rep1$plot_remaining(list(corrected = correction$corrections$rep1)) + ggtitle("rep1"),
-  audit$audits$rep2$plot_remaining(list(corrected = correction$corrections$rep2)) + ggtitle("rep2"),
-  audit$audits$rep1$plot_exposure(correction = correction$corrections$rep1),
-  audit$audits$rep2$plot_exposure(correction = correction$corrections$rep2),
-  ncol = 2, align = "hv", axis = "tblr")
+report$plot_remaining()
 ```
 
-<img src="breast_replicates_multisample_files/figure-gfm/verify-plots-1.png" alt="" width="1200" style="display: block; margin: auto;" />
+<img src="breast_replicates_multisample_files/figure-gfm/remaining-1.png" alt="" width="624" style="display: block; margin: auto;" />
+
+``` r
+report$plot_exposure()
+```
+
+<img src="breast_replicates_multisample_files/figure-gfm/exposure-1.png" alt="" width="998.4" style="display: block; margin: auto;" />
 
 ### Correction diagnostics per sample
 
@@ -880,12 +890,13 @@ show(correction$diagnostics(report), digits = 4)
 ## Replicate agreement
 
 The purpose of the shared treatment is that corresponding cell types in
-the two sections stay comparable after the cleanup. One direct measure
-is the correlation of the two replicates’ pseudobulk expression per cell
-type, before and after the correction. A cleanup that treats the
-replicates alike leaves this correlation close to where the uncorrected
-data had it or raises it; separate per-sample processing lowers it
-markedly.
+the sections stay comparable after the cleanup. One direct measure is,
+per cell type, the correlation of each sample’s pseudobulk expression
+with the pooled profile of the other samples, averaged over the samples
+(for two replicates, their mutual correlation), before and after the
+correction. A cleanup that treats the replicates alike leaves this
+correlation close to where the uncorrected data had it or raises it;
+separate per-sample processing lowers it markedly.
 
 ``` r
 pseudobulk <- function(counts, cell_labels) {
@@ -894,10 +905,15 @@ pseudobulk <- function(counts, cell_labels) {
   as.matrix(counts[, names(cell_labels), drop = FALSE] %*% Matrix::t(groups))
 }
 replicate_agreement <- function(get_counts) {
-  pb <- lapply(c("rep1", "rep2"), function(s) pseudobulk(get_counts(s), labels[[s]]))
-  genes <- intersect(rownames(pb[[1]]), rownames(pb[[2]]))
-  types <- intersect(colnames(pb[[1]]), colnames(pb[[2]]))
-  sapply(types, function(t) cor(log1p(pb[[1]][genes, t]), log1p(pb[[2]][genes, t])))
+  pb <- lapply(names(labels), function(s) pseudobulk(get_counts(s), labels[[s]]))
+  names(pb) <- names(labels)
+  genes <- Reduce(intersect, lapply(pb, rownames))
+  types <- Reduce(intersect, lapply(pb, colnames))
+  # each sample against the pooled profile of the other samples, averaged
+  sapply(types, function(t) mean(sapply(names(pb), function(s) {
+    others <- Reduce(`+`, lapply(pb[setdiff(names(pb), s)], function(m) m[genes, t]))
+    cor(log1p(pb[[s]][genes, t]), log1p(others))
+  })))
 }
 agreement <- data.frame(
   cell_type = names(replicate_agreement(function(s) consensus$counts(sample = s))),
@@ -929,9 +945,10 @@ show(agreement)
 | T\_Cell\_&\_Tumor\_Hybrid   |       0.976 |     0.974 |
 
 ``` r
-ggplot(agreement, aes(x = uncorrected, y = corrected)) +
+ggplot(agreement, aes(x = uncorrected, y = corrected, label = cell_type)) +
   geom_abline(slope = 1, intercept = 0, color = "grey70") +
   geom_point(color = "steelblue4", size = 2.4) +
+  ggrepel::geom_text_repel(size = 2.8, max.overlaps = Inf, seed = 1) +
   labs(x = "replicate correlation, uncorrected", y = "replicate correlation, corrected") +
   theme_minimal(base_size = 11)
 ```
@@ -993,13 +1010,15 @@ data. A report back should include:
     type with its divergence.
 3.  `consensus$factors` with the recurrence heatmap, and the stability
     plots of the per-sample fits.
-4.  The rule counts: candidates, kept, the native-check table, and the
-    `sample_support` distribution of the kept rules.
+4.  The rule counts: candidates, kept, the native-check table, the
+    `sample_support` distribution of the kept rules, and the pooled
+    scoring matrix.
 5.  `correction$summary()` for the `all` rows and the per-type removal
     plot, which shows whether the samples were cleaned alike.
 6.  `report$summary()` and `correction$diagnostics(report)`, with any
     warnings printed by `evaluate()`, the admixture maps before and
-    after the correction, and the verification plots.
+    after the correction, the remaining-admixture bars, and the exposure
+    profiles.
 7.  The replicate-agreement table when the samples are replicates.
 
 Points to flag explicitly: either flag set in `consensus$diagnostics()`;
