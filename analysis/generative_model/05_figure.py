@@ -172,7 +172,7 @@ for panel, gene, subtitle in [(2, "AMY2A", "(c) AMY2A: transferred, removed"),
         ax.legend(frameon=False, fontsize=8)
     ax.set_title(subtitle, fontsize=10)
 
-fig.savefig(os.path.join(OUT, "generative_fig1.png"), dpi=150,
+fig.savefig(os.path.join(os.path.dirname(os.path.abspath(__file__)), "figures", "pancreas_components.png"), dpi=150,
             bbox_inches="tight")
 print("fig1 done")
 
@@ -321,7 +321,7 @@ axb.set_title("(b) the screen: ductal → exocrine", fontsize=10)
 axb.legend(frameon=False, fontsize=8, loc="lower right")
 
 fig2.tight_layout()
-fig2.savefig(os.path.join(OUT, "generative_fig2.png"), dpi=150,
+fig2.savefig(os.path.join(OUT, "generative_fig3.png"), dpi=150,
              bbox_inches="tight")
 print("fig2 done")
 
@@ -348,7 +348,7 @@ ax.legend(frameon=False, fontsize=8, loc="lower right")
 ax.annotate("indistinguishable\nfrom transfer", (1.1, 0.32), fontsize=8,
             color="grey", ha="left")
 fig3.tight_layout()
-fig3.savefig(os.path.join(OUT, "generative_fig3.png"), dpi=150,
+fig3.savefig(os.path.join(OUT, "generative_fig4.png"), dpi=150,
              bbox_inches="tight")
 print("fig3 done")
 
@@ -387,6 +387,6 @@ for ax, (src, tgt), title in [
     ax.set_title(title, fontsize=10)
     ax.legend(frameon=False, fontsize=7.5, loc="upper left")
 fig4.tight_layout()
-fig4.savefig(os.path.join(OUT, "generative_fig4.png"), dpi=150,
+fig4.savefig(os.path.join(OUT, "generative_fig5.png"), dpi=150,
              bbox_inches="tight")
 print("fig4 done")

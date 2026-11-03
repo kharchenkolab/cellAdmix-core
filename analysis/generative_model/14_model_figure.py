@@ -3,7 +3,7 @@ illustration beside the model's formula, its components colored as in the
 illustration and its named quantities pointed out.
 
 Needs pdflatex (with the standalone, sansmath and tikz packages) and
-pdftoppm. Writes docs/figures/generative_model.png.
+pdftoppm. Writes docs/figures/generative_fig1.png.
 """
 import subprocess
 import tempfile
@@ -12,7 +12,7 @@ from pathlib import Path
 from PIL import Image
 
 HERE = Path(__file__).resolve().parent
-OUT = HERE.parents[1] / "docs" / "figures" / "generative_model.png"
+OUT = HERE.parents[1] / "docs" / "figures" / "generative_fig1.png"
 FORMULA_WIDTH = 1100  # pixels of the formula; the illustration sits to its left
 CELLS_SCALE = 1.25  # the illustration's height relative to the formula's
 GAP = 40
