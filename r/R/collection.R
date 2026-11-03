@@ -1460,8 +1460,10 @@ CellAdmixCollectionCleanupReport <- R6::R6Class(
 }
 
 # Short content hash of a numeric matrix, for run ids tied to the profiles.
+# The values are rounded to five decimals first, so that floating-point noise
+# between two computations of the same consensus does not change the id.
 .celladmix_matrix_hash <- function(x) {
-  bytes <- as.numeric(serialize(signif(as.numeric(x), 8), NULL, ascii = FALSE))
+  bytes <- as.numeric(serialize(round(as.numeric(x), 5), NULL, ascii = FALSE))
   sprintf("%08x", as.integer(sum(bytes * ((seq_along(bytes) %% 251) + 1)) %% 2147483647))
 }
 

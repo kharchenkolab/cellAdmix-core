@@ -1268,7 +1268,9 @@ def _profiles_hash(profiles: pd.DataFrame, members: list) -> str:
 
 
 def _matrix_hash(frame: pd.DataFrame) -> str:
-    values = np.round(frame.to_numpy(dtype=float), 8)
+    # Rounded to five decimals first, so that floating-point noise between two
+    # computations of the same consensus does not change the id.
+    values = np.round(frame.to_numpy(dtype=float), 5)
     return hashlib.sha1(values.tobytes()).hexdigest()[:8]
 
 
