@@ -1,0 +1,338 @@
+---
+title: "Multi-Sample Diagnostics: Each Sample Against the Consensus"
+output:
+  github_document:
+    toc: true
+    toc_depth: 2
+    html_preview: false
+---
+
+```{r setup, include=FALSE}
+extra_lib <- Sys.getenv("CELLADMIX_R_LIB", "")
+if (nzchar(extra_lib)) {
+  .libPaths(c(extra_lib, .libPaths()))
+}
+
+library(cellAdmixCore)
+library(ggplot2)
+library(cowplot)
+
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+  fig.align = "center", dpi = 96, fig.retina = 2)
+options(width = 110, scipen = 999)
+tile_theme <- theme_minimal(base_size = 10) +
+  theme(panel.grid = element_blank(), axis.text.x = element_text(angle = 40, hjust = 1))
+```
+
+This page draws the diagnostic panels of the multi-sample workflow for
+the two Xenium breast replicates: for every stage, each sample's own
+result against the consensus. It is the companion of the
+[worked example](breast_replicates_multisample.md), which explains the
+workflow and the tables the panels are built from; the panels here are
+the views that separate the ways a shared treatment can fail. Every
+panel puts the samples on one axis, so the figures read the same with
+two sections or twenty.
+
+The objects are rebuilt from the caches the worked example left in the
+samples' output directories.
+
+```{r objects, results="hide"}
+read_labels <- function(path) {
+  labels <- read.csv(path, stringsAsFactors = FALSE)
+  labels <- labels[labels$cell_type != "Unlabeled", ]
+  setNames(labels$cell_type, labels$cell_id)
+}
+labels <- list(
+  rep1 = read_labels(file.path("annotations", "rep1_annotation.csv.gz")),
+  rep2 = read_labels(file.path("annotations", "rep2_annotation.csv.gz")))
+datasets <- list(
+  rep1 = cellAdmix("data/rep1", output_dir = "out/rep1", annotation = labels$rep1, num_threads = 8),
+  rep2 = cellAdmix("data/rep2", output_dir = "out/rep2", annotation = labels$rep2, num_threads = 8))
+collection <- cellAdmixCollection(datasets)
+collection$fit(nmf_variant = "ls_nmf")
+consensus <- collection$fit_consensus()
+score <- consensus$score_bridge()
+rules <- score$rules()
+correction <- score$correct(rules = rules, num_threads = 32)
+audit <- consensus$audit_admixture()
+report <- audit$evaluate(correction)
+samples <- consensus$samples()
+```
+
+## Factor space
+
+```{r factor-space, fig.width=13, fig.height=10}
+# (a) each sample's restarts and primary factor against every shared factor
+recurrence <- consensus$recurrence()
+matching <- consensus$matching
+key <- function(df) paste(df$sample, df$consensus_factor)
+recurrence$correlation <- matching$correlation[match(key(recurrence), key(matching))]
+recurrence$label <- ifelse(is.na(recurrence$correlation), "", sub("^0", "", sprintf("%.2f", recurrence$correlation)))
+p_map <- ggplot(recurrence, aes(x = factor(consensus_factor), y = sample, fill = recurrence)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = label), size = 2.1) +
+  scale_fill_gradient(low = "grey97", high = "steelblue4", limits = c(0, 1), name = "share of\nrestarts") +
+  labs(x = "shared factor", y = NULL, title = "Shared factors in each sample",
+    subtitle = "fill: share of the sample's restarts carrying the program;\ntext: ownership correlation of the sample's primary factor with the shared profile") +
+  tile_theme + theme(axis.text.x = element_text(angle = 0, hjust = 0.5))
+
+# (b) every primary factor: its molecule share against its own stability
+importance <- function(fit) {
+  cells <- fit$cell_factors()
+  cols <- grep("^factor_[0-9]+_fraction$", names(cells), value = TRUE)
+  weights <- cells$transcript_count
+  data.frame(sample_factor = as.integer(sub("^factor_([0-9]+)_fraction$", "\\1", cols)),
+    importance = vapply(cols, function(col) sum(cells[[col]] * weights) / sum(weights), numeric(1)))
+}
+primaries <- do.call(rbind, lapply(samples, function(s) {
+  imp <- importance(consensus$own_fits[[s]])
+  m <- matching[matching$sample == s, ]
+  m$importance <- imp$importance[match(m$sample_factor, imp$sample_factor)]
+  m
+}))
+primaries$status <- ifelse(primaries$matched, "in the shared space", "not reproduced")
+p_lost <- ggplot(primaries, aes(x = 100 * importance, y = own_stability, color = status, shape = sample)) +
+  geom_point(size = 2.4, alpha = 0.85) +
+  ggrepel::geom_text_repel(data = primaries[!primaries$matched, ],
+    aes(label = paste0(sample, " f", sample_factor)), size = 2.6, show.legend = FALSE) +
+  scale_color_manual(values = c("in the shared space" = "steelblue4", "not reproduced" = "firebrick")) +
+  labs(x = "share of the sample's molecules (%)", y = "stability within the sample's restarts",
+    color = NULL, shape = NULL, title = "Each sample's primary factors",
+    subtitle = "a program the consensus dropped is harmless when small and unstable") +
+  theme_classic(base_size = 10) + theme(legend.position = "bottom", legend.box = "vertical")
+
+# (c) representation cost and shared fraction per sample
+diagnostics <- consensus$diagnostics()
+p_cost <- ggplot(diagnostics, aes(x = sample)) +
+  geom_hline(yintercept = 0, color = "grey70") +
+  geom_linerange(aes(ymin = -100 * restart_spread, ymax = 100 * restart_spread), color = "grey55", linewidth = 2.5, alpha = 0.5) +
+  geom_point(aes(y = 100 * loss_gap, color = representation_flag), size = 3) +
+  geom_text(aes(y = 100 * restart_spread, label = sprintf("%d of %d primaries shared", primary_factors_shared, primary_factors)),
+    vjust = -0.8, size = 2.7) +
+  scale_color_manual(values = c("FALSE" = "steelblue4", "TRUE" = "firebrick"), guide = "none") +
+  scale_y_continuous(expand = expansion(mult = c(0.2, 0.5))) +
+  labs(x = NULL, y = "loss gap (%)", title = "Representation cost per sample",
+    subtitle = "point: loss under the shared profiles relative to the sample's own;\nbar: the spread of the sample's own restarts") +
+  theme_classic(base_size = 10)
+
+# (d) factor usage divergence per cell type and sample
+divergence <- consensus$usage_divergence(by_sample = TRUE)
+p_usage <- ggplot(divergence, aes(x = sample, y = reorder(cell_type, divergence), fill = divergence)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = sprintf("%.2f", divergence)), size = 2.4) +
+  scale_fill_gradient(low = "grey97", high = "darkorange3", name = "usage\ndivergence") +
+  labs(x = NULL, y = NULL, title = "Factor usage against the pool",
+    subtitle = "half the L1 distance between the sample's and the pooled usage") +
+  tile_theme
+
+plot_grid(p_map, p_lost, p_cost, p_usage, ncol = 2, labels = "auto", rel_heights = c(1, 1.15))
+```
+
+**Figure 1. Each sample's factorization against the consensus.** (a) For
+every shared factor, the share of each sample's restarts that found the
+program and, written in the tile, how closely the sample's own primary
+factor matches the shared profile. A dark tile with a high number is a
+program every sample finds in the same form; a dark tile with a low
+number is a program the sample finds but in a different form (a split or
+a chimera in one of the fits); a pale tile is a program the sample
+rarely or never finds on its own. (b) Every primary factor of every
+sample by its share of the sample's molecules and its stability across
+the sample's own restarts; the factors the consensus did not keep are
+named. A dropped program that is small and unstable costs nothing; a
+dropped program that is large or stable is a sample-specific program
+that will not be cleaned. (c) The loss gap of each sample under the
+shared profiles against the spread of its own restarts; a point inside
+or below the bar means the consensus describes the sample as well as one
+of its own restarts would. (d) For every cell type and sample, how far the
+sample's use of the shared factors for that type departs from the pooled
+use; a column that stands out marks a sample in which a type is labeled
+differently, a sample effect in the labeling.
+
+## Shared profiles that fit least well
+
+```{r profiles, fig.width=13, fig.height=4.6}
+genes <- colnames(consensus$profiles)
+own_loading <- function(s, shared_factor) {
+  m <- matching[which(matching$sample == s & matching$consensus_factor == shared_factor), ]
+  if (!nrow(m)) return(NULL)
+  h <- consensus$own_fits[[s]]$loadings()
+  colnames(h) <- consensus$own_fits[[s]]$run$genes
+  h[m$sample_factor[[1]], genes]
+}
+shared <- consensus$factors
+joined_by_all <- as.integer(names(which(table(matching$consensus_factor[matching$matched]) == length(samples))))
+shared <- shared[shared$consensus_factor %in% joined_by_all, ]
+worst <- head(shared$consensus_factor[order(shared$agreement)], 3)
+profile_panels <- lapply(worst, function(k) {
+  df <- do.call(rbind, lapply(samples, function(s) {
+    own <- own_loading(s, k)
+    if (is.null(own)) return(NULL)
+    data.frame(sample = s, gene = genes, consensus = consensus$profiles[k, ], own = own)
+  }))
+  if (is.null(df)) return(NULL)
+  df$difference <- abs(df$own - df$consensus)
+  marked <- do.call(rbind, lapply(split(df, df$sample), function(d) head(d[order(-d$difference), ], 5)))
+  ggplot(df, aes(x = consensus, y = own, color = sample)) +
+    geom_abline(slope = 1, intercept = 0, color = "grey70") +
+    geom_point(size = 1.2, alpha = 0.6) +
+    ggrepel::geom_text_repel(data = marked, aes(label = gene), size = 2.5, max.overlaps = Inf, show.legend = FALSE) +
+    labs(x = "shared profile loading", y = "sample's own primary loading", color = NULL,
+      title = sprintf("shared factor %d (agreement %.2f)", k,
+        shared$agreement[shared$consensus_factor == k])) +
+    theme_classic(base_size = 10) + theme(legend.position = "bottom")
+})
+plot_grid(plotlist = Filter(Negate(is.null), profile_panels), ncol = 3)
+```
+
+**Figure 2. The shared profiles with the lowest within-cluster
+agreement among those every sample's primary factor joined**, each as
+the gene loadings of every sample's own primary factor against the
+shared profile, with the five genes each sample disagrees on most named. Genes off the diagonal in one sample only are
+what that sample's version of the program carries that the consensus
+does not, or the reverse; they say whether the disagreement is a
+biological difference between the sections or a factorization artifact
+such as a split program.
+
+## Scoring: per-sample evidence against the pooled call
+
+```{r scoring, fig.width=14, fig.height=9}
+p_thresh <- 0.1
+pooled <- score$summary()
+per_sample <- score$sample_summaries()
+n_samples <- length(samples)
+
+# (a) pooled significance per cell type and factor, with the number of
+# samples whose own evidence passes the threshold written in each call
+cell_pooled <- aggregate(neg_log10_p ~ target_cell_type + factor, pooled, max)
+cell_sample <- aggregate(p_value ~ sample + target_cell_type + factor, per_sample, min)
+cell_sample$passes <- cell_sample$p_value < p_thresh
+support <- aggregate(passes ~ target_cell_type + factor, cell_sample, sum)
+cell_pooled$passing <- support$passes[match(paste(cell_pooled$target_cell_type, cell_pooled$factor),
+  paste(support$target_cell_type, support$factor))]
+kept_calls <- unique(paste(rules$factor[rules$keep], rules$target_cell_type[rules$keep]))
+candidate_calls <- unique(paste(rules$factor, rules$target_cell_type))
+cell_key <- paste(cell_pooled$factor, cell_pooled$target_cell_type)
+cell_pooled$label <- ifelse(cell_key %in% kept_calls, sprintf("%d/%d", cell_pooled$passing, n_samples),
+  ifelse(cell_key %in% candidate_calls, sprintf("(%d/%d)", cell_pooled$passing, n_samples), ""))
+cell_pooled$fill <- pmin(cell_pooled$neg_log10_p, 6)
+p_calls <- ggplot(cell_pooled, aes(x = factor(factor), y = target_cell_type, fill = fill)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = label), size = 2.3) +
+  scale_fill_gradient(low = "white", high = "firebrick", limits = c(0, 6), name = "pooled\n-log10 p") +
+  labs(x = "shared factor", y = NULL, title = "Removal calls and their support",
+    subtitle = sprintf("text: samples passing p < %g, of %d; in parentheses: vetoed by the native-factor check", p_thresh, n_samples)) +
+  tile_theme + theme(axis.text.x = element_text(angle = 0, hjust = 0.5))
+
+# (b) the kept rules that lack local evidence in at least one sample
+partial <- rules[rules$keep & rules$sample_support < 1, ]
+partial$rule <- sprintf("f%d %s → %s", partial$factor, partial$source_cell_type, partial$target_cell_type)
+rule_key <- function(df) paste(df$factor, df$source_cell_type, df$target_cell_type)
+local <- do.call(rbind, lapply(samples, function(s) {
+  ps <- per_sample[per_sample$sample == s, ]
+  data.frame(sample = s, rule = partial$rule, pooled = partial$neg_log10_p,
+    local = ps$neg_log10_p[match(rule_key(partial), rule_key(ps))])
+}))
+local$local[is.na(local$local)] <- 0
+local$rule <- factor(local$rule, levels = partial$rule[order(partial$neg_log10_p)])
+p_partial <- ggplot(local, aes(x = sample, y = rule, fill = pmin(local, 6))) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = sprintf("%.1f", local)), size = 2.3) +
+  geom_vline(xintercept = seq_len(n_samples) + 0.5, color = "white") +
+  scale_fill_gradient(low = "white", high = "firebrick", limits = c(0, 6), name = "sample\n-log10 p") +
+  labs(x = NULL, y = NULL, title = "Kept rules without local evidence in some sample",
+    subtitle = sprintf("%d of %d kept rules; rows ordered by pooled significance", nrow(partial), sum(rules$keep))) +
+  tile_theme + theme(axis.text.x = element_text(angle = 0, hjust = 0.5))
+
+plot_grid(p_calls, p_partial, ncol = 2, labels = "auto", rel_widths = c(1.35, 1))
+```
+
+**Figure 3. Pooled calls against each sample's own evidence.** (a) The
+pooled scoring matrix with each removal call annotated by the number of
+samples whose own scoring passes the threshold for that cell type and
+factor; a call carried by few samples rests on the pool, which is the
+intended uniform treatment of replicates but a point to examine in a
+cohort. Calls in parentheses were proposed by the scores and vetoed by
+the native-factor check. (b) The kept rules that at least one sample's
+own scoring does not support, with each sample's significance; a sample
+whose column is pale throughout is the one whose cleanup rests most on
+the other samples' evidence.
+
+## Correction and verification per sample
+
+```{r cleanup, fig.width=14, fig.height=10}
+# (a) share of each sample's removal attributed to each shared factor
+removal_by_factor <- do.call(rbind, lapply(samples, function(s) {
+  removed <- cellAdmixCore:::.celladmix_removed_by_type_factor(consensus$fits[[s]], correction$corrections[[s]])
+  by_factor <- aggregate(removed ~ factor, removed, sum)
+  data.frame(sample = s, factor = by_factor$factor, share = by_factor$removed / sum(by_factor$removed))
+}))
+p_factor <- ggplot(removal_by_factor, aes(x = factor(factor), y = sample, fill = 100 * share)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = sprintf("%.0f", 100 * share)), size = 2.4) +
+  scale_fill_gradient(low = "grey97", high = "darkorange3", name = "% of the\nsample's\nremoval") +
+  labs(x = "shared factor", y = NULL, title = "Removal attributed to each shared factor",
+    subtitle = "a factor dark in one sample only removes a program that sample's restarts may not carry") +
+  tile_theme + theme(axis.text.x = element_text(angle = 0, hjust = 0.5))
+
+# (b) cleanup sensitivity of the largest pairs in every sample
+pairs <- report$pairs()
+pair_size <- aggregate(admixed_molecules ~ source + target, pairs, sum)
+top <- head(pair_size[order(-pair_size$admixed_molecules), ], 30)
+pairs$pair <- paste(pairs$source, "→", pairs$target)
+top_pairs <- pairs[paste(pairs$source, pairs$target) %in% paste(top$source, top$target), ]
+top_pairs$pair <- factor(top_pairs$pair, levels = rev(paste(top$source, "→", top$target)))
+p_sens <- ggplot(top_pairs, aes(x = sample, y = pair, fill = pmax(pmin(sensitivity, 1), 0))) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = sprintf("%.2f", sensitivity)), size = 2.3) +
+  scale_fill_gradient(low = "white", high = "seagreen4", limits = c(0, 1), name = "sensitivity") +
+  labs(x = NULL, y = NULL, title = "Cleanup sensitivity of the 30 largest pairs",
+    subtitle = "pale in every sample: a pair the rules do not cover; pale in one: that sample's problem") +
+  tile_theme + theme(axis.text.x = element_text(angle = 0, hjust = 0.5))
+
+# (c) own-marker false removal per cell type and sample
+false_removal <- do.call(rbind, lapply(samples, function(s) {
+  fr <- report$reports[[s]]$false_removal()
+  fr$sample <- s
+  fr
+}))
+p_false <- ggplot(false_removal, aes(x = 100 * false_removal, y = reorder(cell_type, false_removal), color = sample)) +
+  geom_vline(xintercept = 0, color = "grey70") +
+  geom_point(size = 2.4) +
+  labs(x = "own-marker false removal (%)", y = NULL, color = NULL,
+    title = "Own-marker false removal per cell type",
+    subtitle = "molecules of a type's own markers removed from its cells far from any source") +
+  theme_minimal(base_size = 10) + theme(legend.position = "bottom")
+
+# (d) the headline verification numbers per sample
+headline <- report$summary()
+headline <- rbind(
+  data.frame(sample = headline$sample, measure = "leakage removed", value = headline$leakage_removed_overall),
+  data.frame(sample = headline$sample, measure = "median pair sensitivity", value = headline$median_pair_sensitivity),
+  data.frame(sample = headline$sample, measure = "own-marker false removal", value = headline$own_marker_false_removal))
+headline$measure <- factor(headline$measure, levels = c("leakage removed", "median pair sensitivity", "own-marker false removal"))
+limits <- data.frame(measure = rep(levels(headline$measure), each = 2),
+  value = c(0, 1, 0, 1, 0, max(0.05, max(headline$value[headline$measure == "own-marker false removal"]))))
+limits$measure <- factor(limits$measure, levels = levels(headline$measure))
+p_headline <- ggplot(headline, aes(x = sample, y = value)) +
+  geom_blank(data = limits, aes(y = value), inherit.aes = FALSE) +
+  geom_point(size = 3, color = "steelblue4") +
+  facet_wrap(~measure, scales = "free_y") +
+  labs(x = NULL, y = NULL, title = "Verification summary per sample") +
+  theme_classic(base_size = 10)
+
+plot_grid(p_factor, p_sens, p_false, p_headline, ncol = 2, labels = "auto", rel_heights = c(1, 1.2))
+```
+
+**Figure 4. The correction and its verification in each sample.** (a)
+How each sample's removal distributes over the shared factors; a factor
+that takes a large share in one sample only is removing a program that
+sample's own restarts may not carry, the quantity the correction
+diagnostics report as removal via absent programs. (b) The cleanup
+sensitivity of the largest cell-type pairs in every sample: a row that is
+pale in all samples is a pair the rules do not cover, a method
+limitation; a cell that is pale in one sample is that sample's problem.
+(c) The own-marker false removal of every cell type in every sample, one
+point per sample. The two hybrid types of this annotation lose most of
+their own markers: their markers are those of the two types each
+combines, which the correction treats as admixture in them. (d) The three headline numbers of the verification per
+sample.

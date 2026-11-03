@@ -35,6 +35,7 @@ This folder contains user-facing documentation for `cellAdmix-core`.
 - [Seurat Xenium integration tutorial](../examples/xenium_pancreas_membrane_377_full/pancreas_seurat_integration.md)
 - [Xenium breast 5K membrane scoring tutorial](../examples/xenium_breast_membrane_5k_full/breast_5k_membrane_scoring.md)
 - [Multi-sample processing of two Xenium breast replicates](../examples/xenium_breast_replicates/breast_replicates_multisample.md)
+- [Multi-sample diagnostics on the breast replicates](../examples/xenium_breast_replicates/breast_replicates_diagnostics.md)
 - [Standalone Xenium pancreas tutorial](../examples/xenium_pancreas_membrane_377_full/pancreas_python_standalone.ipynb)
 - [SpatialData Xenium integration tutorial](../examples/xenium_pancreas_membrane_377_full/pancreas_spatialdata_integration.ipynb)
 - [Standalone Xenium breast 5K tutorial](../examples/xenium_breast_membrane_5k_full/breast_5k_python_standalone.ipynb)

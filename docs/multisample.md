@@ -250,7 +250,11 @@ is rendered as
 [breast_replicates_multisample.md](../examples/xenium_breast_replicates/breast_replicates_multisample.md)
 (R) and
 [breast_replicates_multisample_python.ipynb](../examples/xenium_breast_replicates/breast_replicates_multisample_python.ipynb)
-(Python).
+(Python). Its companion page
+[breast_replicates_diagnostics.md](../examples/xenium_breast_replicates/breast_replicates_diagnostics.md)
+draws the diagnostic panels that set each sample's own factorization,
+scoring evidence, correction and audit against the consensus, with the
+samples on one axis so the figures read the same with many samples.
 
 R:
 

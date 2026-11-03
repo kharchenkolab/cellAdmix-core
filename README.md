@@ -149,6 +149,7 @@ notebooks.
 - [Seurat Xenium integration tutorial](examples/xenium_pancreas_membrane_377_full/pancreas_seurat_integration.md): the same pancreas dataset, using Seurat for cell-level state and cellAdmix for molecule-complete fitting, scoring, and correction.
 - [Xenium breast 5K membrane scoring tutorial](examples/xenium_breast_membrane_5k_full/breast_5k_membrane_scoring.md): the full-scale 5K-panel workflow behind the timing benchmark above.
 - [Multi-sample processing of two Xenium breast replicates](examples/xenium_breast_replicates/breast_replicates_multisample.md): two replicate sections through the consensus factorization, pooled rules, shared-ensemble correction, and per-sample audits, with every diagnostic table explained and a checklist for reporting on a pilot run.
+- [Multi-sample diagnostics on the breast replicates](examples/xenium_breast_replicates/breast_replicates_diagnostics.md): the companion page of diagnostic panels that set each sample's own factorization, scoring evidence, correction and audit against the consensus.
 
 ### Python Examples
 
