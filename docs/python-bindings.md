@@ -306,6 +306,15 @@ streaming reads and membrane-image discovery.
 - [Standalone Xenium breast 5K workflow](../examples/xenium_breast_membrane_5k_full/breast_5k_python_standalone.ipynb) -
   the same core workflow on a full 5K-panel dataset (82.1M molecules,
   688K cells after QC).
+- [Generative correction on CosMx NSCLC](../examples/cosmx_nsclc_giotto/nsclc_generative.ipynb) -
+  fits the generative admixture model, maps the admixture between cell
+  types, and compares the volcano of neighborhood-associated expression
+  changes before and after correction; the Python counterpart of the R page
+  [nsclc_generative.md](../examples/cosmx_nsclc_giotto/nsclc_generative.md).
+  It attaches to the input store the R page builds from the CosMx molecule
+  table.
+- [Generative correction on Xenium breast 5K](../examples/xenium_breast_membrane_5k_full/breast_5k_generative.ipynb) -
+  the same characterization on the 5K-panel dataset.
 
 These notebooks are intended as starting templates. The SpatialData notebook
 needs a Python 3.11+ environment with `spatialdata`, `spatialdata-io`, and

@@ -57,3 +57,5 @@ See `docs/python-batch.md` for details.
 - [Standalone Xenium pancreas tutorial](../examples/xenium_pancreas_membrane_377_full/pancreas_python_standalone.ipynb)
 - [SpatialData Xenium integration tutorial](../examples/xenium_pancreas_membrane_377_full/pancreas_spatialdata_integration.ipynb)
 - [Standalone Xenium breast 5K tutorial](../examples/xenium_breast_membrane_5k_full/breast_5k_python_standalone.ipynb)
+- [Generative correction on CosMx NSCLC](../examples/cosmx_nsclc_giotto/nsclc_generative.ipynb)
+- [Generative correction on Xenium breast 5K](../examples/xenium_breast_membrane_5k_full/breast_5k_generative.ipynb)

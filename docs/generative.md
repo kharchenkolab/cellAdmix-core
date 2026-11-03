@@ -623,6 +623,10 @@ the decomposition of individual cells and molecule-level views of a
 contaminated cell — and the same characterization on
 [CosMx NSCLC](../examples/cosmx_nsclc_giotto/nsclc_generative.md) and
 [Xenium breast 5K](../examples/xenium_breast_membrane_5k_full/breast_5k_generative.ipynb).
+The NSCLC analysis is also given with the Python bindings
+([nsclc_generative.ipynb](../examples/cosmx_nsclc_giotto/nsclc_generative.ipynb)),
+step for step alongside the R page; both compare the volcano of
+neighborhood-associated changes before and after correction.
 
 The three correctors order naturally by need. The exposure-regression
 corrector is the simplest and fastest way to flatten exposure-linked

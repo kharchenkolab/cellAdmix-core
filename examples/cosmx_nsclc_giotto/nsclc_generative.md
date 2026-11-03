@@ -18,9 +18,9 @@ switched on in response to its neighborhood; the contamination and
 ambient shares are removed, the induced expression retained
 ([docs/generative.md](../../docs/generative.md)). This page runs it on
 the CosMx NSCLC dataset and characterizes both sides of the separation:
-the pattern of material moving between cell types, and the induced
-programs the correction preserves. One platform note applies throughout:
-this CosMx export carries no nucleus-overlap flag, so the model uses
+the pattern of admixture between cell types, and the induced programs
+the correction preserves. One platform note applies throughout: this
+CosMx export carries no nucleus-overlap flag, so the model uses
 whole-cell rather than cytoplasmic source profiles.
 
 ``` r
@@ -152,21 +152,21 @@ head(induced[order(-induced$excess),
     ## 28  macrophage   fibroblast  DUSP5  5209.542 3.296008 10.064316
     ## 16 endothelial   fibroblast COL4A1  4278.497 3.739442 14.421808
 
-The contrast between a transferred and an induced gene, for the pair
-with the strongest induced signal — the observed rise of the transferred
-gene is flattened to the unexposed level, while the induced gene keeps
-its gradient:
+The contrast between an admixed and an induced gene, for the pair with
+the strongest induced signal — the observed rise of the admixed gene is
+flattened to the unexposed level, while the induced gene keeps its
+gradient:
 
 ``` r
 ind_top <- induced[order(-induced$excess), ][1, ]
 mk <- audit$markers(ind_top$source, ind_top$target)
-transfer_gene <- setdiff(mk$pool, induced$gene)[1]
+admixed_gene <- setdiff(mk$pool, induced$gene)[1]
 before <- ds$counts()
 after <- correction$counts()
 t_cells <- model$composition(ind_top$source, ind_top$target)$cell_id
 expo_t <- generative_exposure(cells_xy, cell_annotation, ind_top$source)
 generative_plot_gene_contrast(before, after, t_cells, expo_t,
-  c(transfer_gene, ind_top$gene),
+  c(admixed_gene, ind_top$gene),
   sprintf("%s cells among 15 nearest neighbors", ind_top$source),
   sprintf("rate in %s cells (per 1,000 molecules)", ind_top$target))
 ```
@@ -177,18 +177,24 @@ Beyond the genes the model retains by its own screen, the corrected
 counts support the general question of which genes — of any ownership,
 in either direction — change in the target cells with the source’s
 proximity, tested jointly across all sources
-([docs/generative.md](../../docs/generative.md), Figure 4). Filled
-points are genes with essentially none of their content removed as
-transfer and no meaningful share of the source’s transfer profile; open
-grey points are entangled with the transfer split:
+([docs/generative.md](../../docs/generative.md), Figure 5). The same
+test on the observed counts shows what the correction changes. On the
+left (observed counts), red points are associations reported before
+correction but not after: the admixture accounts for them. Green and
+purple points remain reported after correction. On the right (corrected
+counts), filled points are genes with essentially none of their content
+removed as admixture and no meaningful share of the source’s admixture
+profile; open grey points are entangled with the admixture split. A
+change is reported at six standard errors (dotted line) and at least a
+4% change per neighboring cell:
 
 ``` r
 changes <- generative_induced_changes(before, after, model, cells_xy,
   cell_annotation, ind_top$target)
-generative_plot_volcano(changes, ind_top$source)
+generative_plot_volcano_pair(changes, ind_top$source)
 ```
 
-<img src="nsclc_generative_files/figure-gfm/volcano-1.png" alt="" width="652.8" style="display: block; margin: auto;" />
+<img src="nsclc_generative_files/figure-gfm/volcano-1.png" alt="" width="1056" style="display: block; margin: auto;" />
 
 ## Verification
 
@@ -223,5 +229,5 @@ report$plot_cleanup()
 
 The model never removes a target type’s own marker genes, and induced
 expression is only recognizable when disproportionate to the source’s
-transfer profile — see the identifiability limit in
+admixture profile — see the identifiability limit in
 [docs/generative.md](../../docs/generative.md).

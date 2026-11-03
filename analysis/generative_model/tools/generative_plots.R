@@ -87,7 +87,7 @@ generative_plot_burden <- function(before, after, annotation) {
 }
 
 # Mean composition of the target type's content by exposure bin (own
-# expression, contamination, ambient, induced): docs/generative.md Figure 1b.
+# expression, contamination, ambient, induced): analysis/generative_model/figures/pancreas_components.png, panel b.
 generative_plot_composition <- function(model, target, exposure, x_label) {
   comp_all <- model$composition(target = target)
   cont <- tapply(comp_all$contamination, comp_all$cell_id, sum)
@@ -197,9 +197,11 @@ generative_plot_dose_vs_fitted <- function(model, source, target, exposure, lege
 # Neighborhood-associated expression changes on the corrected counts: every
 # gene of the target type fitted with a Poisson regression on all sources'
 # exposures jointly (quasi errors), with the two guards of
-# docs/generative.md Figure 4 - the fraction of the gene's content removed
-# as transfer, and its share of each source's interface-local transfer
-# profile. Returns one row per gene and source.
+# docs/generative.md Figure 5 - the fraction of the gene's content removed
+# as admixture, and its share of each source's interface-local admixture
+# profile. The identical regression on the observed counts is reported
+# alongside (log_fold_observed, z_observed). Returns one row per gene and
+# source.
 generative_induced_changes <- function(before, after, model, cells_xy, annotation,
                                        target, neighbor_k = 15L, exposure_cap = 4,
                                        min_counts = 100) {
@@ -209,14 +211,16 @@ generative_induced_changes <- function(before, after, model, cells_xy, annotatio
     pmin(generative_exposure(cells_xy, annotation, src, neighbor_k)[cells], exposure_cap))
   removed_frac <- 1 - Matrix::rowSums(after[, cells]) / pmax(Matrix::rowSums(before[, cells]), 1)
   K <- after[, cells]
+  B <- before[, cells]
+  ok <- Matrix::colSums(K) > 10
+  K <- K[, ok]; B <- B[, ok]; E <- E[ok, , drop = FALSE]
   t_kept <- Matrix::colSums(K)
-  ok <- t_kept > 10
-  K <- K[, ok]; E <- E[ok, , drop = FALSE]; t_kept <- t_kept[ok]
+  t_obs <- Matrix::colSums(B)
   X <- cbind(1, E)
-  fit_gene <- function(y) {
-    beta <- c(log(max(sum(y), 0.5) / sum(t_kept)), numeric(ncol(E)))
+  fit_gene <- function(y, tot) {
+    beta <- c(log(max(sum(y), 0.5) / sum(tot)), numeric(ncol(E)))
     for (it in 1:25) {
-      mu <- t_kept * exp(pmin(pmax(X %*% beta, -30), 5))
+      mu <- tot * exp(pmin(pmax(X %*% beta, -30), 5))
       H <- crossprod(X, X * as.numeric(mu))
       step <- tryCatch(solve(H + diag(1e-8, ncol(X)), crossprod(X, y - mu)),
         error = function(e) NULL)
@@ -224,7 +228,7 @@ generative_induced_changes <- function(before, after, model, cells_xy, annotatio
       beta <- beta + step
       if (max(abs(step)) < 1e-6) break
     }
-    mu <- t_kept * exp(pmin(pmax(X %*% beta, -30), 5))
+    mu <- tot * exp(pmin(pmax(X %*% beta, -30), 5))
     disp <- max(sum((y - mu)^2 / pmax(mu, 1e-9)) / max(length(y) - ncol(X), 1), 1)
     se <- sqrt(pmax(diag(solve(crossprod(X, X * as.numeric(mu)) + diag(1e-8, ncol(X)))),
       1e-300) * disp)
@@ -239,10 +243,12 @@ generative_induced_changes <- function(before, after, model, cells_xy, annotatio
   rows <- lapply(rownames(K), function(g) {
     y <- as.numeric(K[g, ])
     if (sum(y) < min_counts) return(NULL)
-    f <- fit_gene(y)
-    if (is.null(f)) return(NULL)
+    f <- fit_gene(y, t_kept)
+    f0 <- fit_gene(as.numeric(B[g, ]), t_obs)
+    if (is.null(f) || is.null(f0)) return(NULL)
     data.frame(gene = g, source = pairs$source,
       log_fold_per_neighbor = f[, "beta"], z = f[, "z"],
+      log_fold_observed = f0[, "beta"], z_observed = f0[, "z"],
       removed_frac = removed_frac[[g]],
       psi_share_e4 = vapply(psi, function(p) p[[g]] * 1e4, 0),
       stringsAsFactors = FALSE)
@@ -253,34 +259,90 @@ generative_induced_changes <- function(before, after, model, cells_xy, annotatio
   out
 }
 
-# Volcano of the changes for one source: docs/generative.md Figure 4.
+# Volcano of the changes for one source on the corrected counts:
+# docs/generative.md Figure 5.
 generative_plot_volcano <- function(changes, source, z_cap = 60, label_n = 7,
                                     source_label = NULL) {
   d <- changes[changes$source == source & is.finite(changes$z), ]
   src <- source_label %||% generative_short_label(source)
   d$lfc <- d$log_fold_per_neighbor / log(2)
   d$zc <- pmin(abs(d$z), z_cap)
-  d$tier <- ifelse(!d$clean, "transfer-entangled",
-    ifelse(d$z > 0, paste("increased near", src), paste("decreased near", src)))
+  up <- paste("increased near", src)
+  down <- paste("decreased near", src)
+  ent <- "entangled with the admixture split"
+  d$tier <- factor(ifelse(!d$clean, ent, ifelse(d$z > 0, up, down)), c(up, down, ent))
   lab <- d[d$clean, ]
   lab <- lab[order(-lab$zc), ][seq_len(min(label_n, sum(d$clean))), ]
-  ggplot(d, aes(lfc, zc)) +
-    geom_point(data = d[!d$clean, ], shape = 1, size = 1.3, color = "#b6b6b6") +
-    geom_point(data = d[d$clean, ], aes(color = tier), size = 1.5) +
+  ggplot(d, aes(lfc, zc, color = tier, shape = tier)) +
+    geom_point(data = d[!d$clean, ], size = 1.3) +
+    geom_point(data = d[d$clean, ], size = 1.5) +
     geom_hline(yintercept = 6, color = "grey50", linetype = "13") +
-    ggrepel::geom_text_repel(data = lab, aes(label = gene), size = 3) +
-    scale_color_manual(values = stats::setNames(c("#1e8449", "#7d3c98"),
-      c(paste("increased near", src), paste("decreased near", src))), name = NULL) +
+    ggrepel::geom_text_repel(data = lab, aes(label = gene), size = 3, color = "black",
+      show.legend = FALSE) +
+    scale_color_manual(values = stats::setNames(c("#1e8449", "#7d3c98", "#b6b6b6"),
+      c(up, down, ent)), name = NULL, drop = FALSE) +
+    scale_shape_manual(values = stats::setNames(c(16, 16, 1), c(up, down, ent)),
+      name = NULL, drop = FALSE) +
     labs(x = sprintf("fold change per %s neighbor (log2)", src),
       y = sprintf("significance |z| (capped at %d)", z_cap)) +
     theme_classic(base_size = 11)
+}
+
+# The same test before and after correction, side by side on one scale.
+# Left, the observed counts: red marks genes reported there (|z| >= z_min,
+# at least a 4% change per neighbor) that are no longer reported on the
+# corrected counts - associations explained by the removed admixture;
+# green/purple mark genes reported in both. Right, the corrected counts,
+# drawn as generative_plot_volcano.
+generative_plot_volcano_pair <- function(changes, source, z_cap = 60, z_min = 6,
+                                         label_n = 6, source_label = NULL) {
+  d <- changes[changes$source == source & is.finite(changes$z) &
+    is.finite(changes$z_observed), ]
+  src <- source_label %||% generative_short_label(source)
+  min_lf <- log(1.04)
+  called <- function(z, lf) abs(z) >= z_min & abs(lf) >= min_lf
+  d$before <- called(d$z_observed, d$log_fold_observed)
+  d$after <- called(d$z, d$log_fold_per_neighbor)
+  up <- paste("increased near", src)
+  down <- paste("decreased near", src)
+  lost <- "reported before correction only"
+  none <- "not reported"
+  d$status <- factor(ifelse(d$before & !d$after, lost,
+    ifelse(d$before, ifelse(d$z_observed > 0, up, down), none)), c(up, down, lost, none))
+  d$x0 <- d$log_fold_observed / log(2)
+  d$y0 <- pmin(abs(d$z_observed), z_cap)
+  xr <- range(c(d$x0, d$log_fold_per_neighbor / log(2)))
+  yr <- c(0, max(c(d$y0, pmin(abs(d$z), z_cap))) * 1.05)
+  lab0 <- d[d$status == lost, ]
+  lab0 <- lab0[order(-lab0$y0), ][seq_len(min(label_n, nrow(lab0))), ]
+  bottom <- theme(legend.position = "bottom", legend.direction = "vertical",
+    plot.title = element_text(size = 11))
+  left <- ggplot(d, aes(x0, y0, color = status, shape = status)) +
+    geom_point(data = d[d$status == none, ], size = 1.3) +
+    geom_point(data = d[d$status != none, ], size = 1.5) +
+    geom_hline(yintercept = z_min, color = "grey50", linetype = "13") +
+    ggrepel::geom_text_repel(data = lab0, aes(label = gene), size = 3,
+      color = "#c0392b", max.overlaps = Inf, show.legend = FALSE) +
+    scale_color_manual(values = stats::setNames(c("#1e8449", "#7d3c98", "#c0392b", "#b6b6b6"),
+      c(up, down, lost, none)), name = NULL, drop = FALSE) +
+    scale_shape_manual(values = stats::setNames(c(16, 16, 16, 1), c(up, down, lost, none)),
+      name = NULL, drop = FALSE) +
+    coord_cartesian(xlim = xr, ylim = yr) +
+    labs(title = "observed counts", x = sprintf("fold change per %s neighbor (log2)", src),
+      y = sprintf("significance |z| (capped at %d)", z_cap)) +
+    theme_classic(base_size = 11) + bottom
+  right <- generative_plot_volcano(changes, source, z_cap = z_cap, label_n = label_n,
+    source_label = source_label) +
+    coord_cartesian(xlim = xr, ylim = yr) +
+    labs(title = "after correction") + bottom
+  patchwork::wrap_plots(left, right, nrow = 1)
 }
 
 # The proportionality screen for one pair: measured exposure-linked excess
 # of each source-owned gene against the excess expected from transfer, with
 # the significance bound and the flagged genes drawn at both expectations
 # (open ring: average source profile; filled: bordering cells' profile):
-# docs/generative.md Figure 2a.
+# docs/generative.md Figure 3a.
 generative_plot_transfer_screen <- function(before, model, cells_xy, annotation,
                                             source, target, exposure, z = 8,
                                             profile_cv = 0.15, label_excess = 5e4) {
@@ -336,7 +398,7 @@ generative_plot_transfer_screen <- function(before, model, cells_xy, annotation,
 # Per-bin rates of chosen genes in the target cells, observed and retained,
 # with exact intervals, the removed band, and an optional third series (for
 # example the correction that also removes the induced share):
-# docs/generative.md Figure 1c/d.
+# analysis/generative_model/figures/pancreas_components.png, panels c and d.
 generative_plot_gene_contrast <- function(before, after, cells, exposure, genes,
                                           x_label, y_label, after_alt = NULL,
                                           alt_label = "induced share also removed") {

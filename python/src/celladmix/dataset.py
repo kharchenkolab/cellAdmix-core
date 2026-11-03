@@ -209,9 +209,25 @@ class CellAdmix:
         return self
 
     def ensure_store(self, *, force: bool = False, materialize_molecules: bool = True, verbose: bool = True):
-        """Build or reuse the on-disk input store."""
+        """Build or reuse the on-disk input store.
+
+        Stores are built from Xenium and Atera output. A completed store of
+        any other input format (built by the R package, e.g. from a CosMx
+        molecule table) is reused as is.
+        """
         if self.format not in ("xenium", "atera"):
-            raise NotImplementedError("Python v1 currently implements Xenium and Atera stores")
+            manifest = None
+            if not force and self.store_dir.exists():
+                try:
+                    manifest = _core.read_input_store_manifest(str(self.store_dir))
+                except Exception:
+                    manifest = None
+            if manifest is not None and (manifest.get("has_molecules") or not materialize_molecules):
+                return manifest
+            raise NotImplementedError(
+                f"The Python bindings build input stores from Xenium and Atera output; "
+                f"build the {self.format!r} store with the R package and attach it with "
+                f"CellAdmix.attach_existing()")
         if self.source is None:
             raise ValueError(
                 "Cannot build an input store without a source path. "

@@ -83,7 +83,7 @@ def generative_plot_burden(before, after, cells, annotation, ax=None):
 
 def generative_plot_composition(model, target, exposure, x_label, ax=None):
     """Mean composition of the target type's content by exposure bin
-    (docs/generative.md Figure 1b)."""
+    (analysis/generative_model/figures/pancreas_components.png, panel b)."""
     import matplotlib.pyplot as plt
 
     comp = model.composition(target=target)
@@ -149,7 +149,9 @@ def generative_induced_changes(before, after, genes, cells, model, cells_xy, ann
     """Neighborhood-associated expression changes on the corrected counts:
     every gene of the target type fitted with a Poisson regression on all
     sources' exposures jointly (quasi errors), with the two guards of
-    docs/generative.md Figure 4. One row per gene and source."""
+    docs/generative.md Figure 5. The identical regression on the observed
+    counts is reported alongside (log_fold_observed, z_observed). One row
+    per gene and source."""
     from celladmix.audit import _interface_profile
     from celladmix._score_utils import source_nearest_distance
 
@@ -167,14 +169,16 @@ def generative_induced_changes(before, after, genes, cells, model, cells_xy, ann
     t_kept = np.asarray(after_t.sum(axis=0)).ravel()
     ok = t_kept > 10
     K = after_t[:, ok].tocsr()
+    B = before_t[:, ok].tocsr()
     E = E[ok]
     t_kept = t_kept[ok]
+    t_obs = np.asarray(B.sum(axis=0)).ravel()
     X = np.column_stack([np.ones(len(t_kept)), E])
 
-    def fit_gene(y):
-        beta = np.zeros(X.shape[1]); beta[0] = np.log(max(y.sum(), 0.5) / t_kept.sum())
+    def fit_gene(y, tot):
+        beta = np.zeros(X.shape[1]); beta[0] = np.log(max(y.sum(), 0.5) / tot.sum())
         for _ in range(25):
-            mu = t_kept * np.exp(np.clip(X @ beta, -30, 5))
+            mu = tot * np.exp(np.clip(X @ beta, -30, 5))
             try:
                 step = np.linalg.solve(X.T @ (X * mu[:, None]) + 1e-8 * np.eye(X.shape[1]),
                                        X.T @ (y - mu))
@@ -183,7 +187,7 @@ def generative_induced_changes(before, after, genes, cells, model, cells_xy, ann
             beta += step
             if np.abs(step).max() < 1e-6:
                 break
-        mu = t_kept * np.exp(np.clip(X @ beta, -30, 5))
+        mu = tot * np.exp(np.clip(X @ beta, -30, 5))
         disp = max(((y - mu) ** 2 / np.maximum(mu, 1e-9)).sum() / max(len(y) - X.shape[1], 1), 1.0)
         cov = np.linalg.inv(X.T @ (X * mu[:, None]) + 1e-8 * np.eye(X.shape[1]))
         se = np.sqrt(np.maximum(np.diag(cov), 1e-300) * disp)
@@ -218,21 +222,43 @@ def generative_induced_changes(before, after, genes, cells, model, cells_xy, ann
         y = np.asarray(K[gi].todense()).ravel()
         if y.sum() < min_counts:
             continue
-        f = fit_gene(y)
-        if f is None:
+        f = fit_gene(y, t_kept)
+        f0 = fit_gene(np.asarray(B[gi].todense()).ravel(), t_obs)
+        if f is None or f0 is None:
             continue
         beta, z = f
+        beta0, z0 = f0
         for j, s in enumerate(sources):
             rows.append(dict(gene=gindex[gi], source=s, log_fold_per_neighbor=float(beta[j]),
-                             z=float(z[j]), removed_frac=float(removed_frac[gi]),
+                             z=float(z[j]), log_fold_observed=float(beta0[j]),
+                             z_observed=float(z0[j]), removed_frac=float(removed_frac[gi]),
                              psi_share_e4=float(psi[j][gi] * 1e4)))
     out = pd.DataFrame(rows)
     out["clean"] = (out.removed_frac < 0.10) & (out.psi_share_e4 < 20)
     return out
 
 
+def _label_points(ax, xs, ys, labels, color="black", fontsize=7.5):
+    """Label points, moving a label down past the labels already placed
+    when the two would overlap (offsets in points, with a leader line)."""
+    ax.figure.canvas.draw()
+    to_pt = 72.0 / ax.figure.dpi
+    placed = []
+    for x, y, lab in sorted(zip(xs, ys, labels), key=lambda t: -t[1]):
+        px, py = ax.transData.transform((x, y)) * to_pt
+        w = 0.62 * fontsize * len(str(lab))
+        dy = 2.0
+        while any(abs(px - qx) < (w + qw) / 2 + 4 and abs(py + dy - qy) < fontsize + 1
+                  for qx, qy, qw in placed):
+            dy -= fontsize + 1
+        placed.append((px, py + dy, w))
+        ax.annotate(lab, (x, y), xytext=(4, dy), textcoords="offset points", fontsize=fontsize,
+                    color=color, va="bottom",
+                    arrowprops=None if dy >= 0 else dict(arrowstyle="-", color="#999999", lw=0.5))
+
+
 def generative_plot_volcano(changes, source, z_cap=60, label_n=7, ax=None):
-    """Volcano of the changes for one source (docs/generative.md Figure 4)."""
+    """Volcano of the changes for one source (docs/generative.md Figure 5)."""
     import matplotlib.pyplot as plt
 
     d = changes[(changes.source == source) & np.isfinite(changes.z)].copy()
@@ -243,17 +269,66 @@ def generative_plot_volcano(changes, source, z_cap=60, label_n=7, ax=None):
         _, ax = plt.subplots(figsize=(6.8, 5))
     ent = d[~d.clean]
     ax.scatter(ent.lfc, ent.zc, s=12, facecolors="none", edgecolors="#b6b6b6", lw=0.8,
-               label="transfer-entangled")
+               label="entangled with the admixture split")
     up = d[d.clean & (d.z > 0)]; dn = d[d.clean & (d.z < 0)]
     ax.scatter(up.lfc, up.zc, s=14, color="#1e8449", lw=0, label=f"increased near {src}")
     ax.scatter(dn.lfc, dn.zc, s=14, color="#7d3c98", lw=0, label=f"decreased near {src}")
     ax.axhline(6, color="grey", lw=0.7, ls=":")
-    for r in d[d.clean].sort_values("zc", ascending=False).head(label_n).itertuples():
-        ax.annotate(r.gene, (r.lfc, r.zc), fontsize=7.5, xytext=(4, 2), textcoords="offset points")
+    lab = d[d.clean].sort_values("zc", ascending=False).head(label_n)
+    _label_points(ax, lab.lfc, lab.zc, lab.gene)
     ax.set_xlabel(f"fold change per {src} neighbor (log2)")
     ax.set_ylabel(f"significance |z| (capped at {z_cap})")
     ax.legend(frameon=False, fontsize=7.5, loc="upper left")
     return ax
+
+
+def generative_plot_volcano_pair(changes, source, z_cap=60, z_min=6, label_n=6, axes=None):
+    """The same test before and after correction, side by side on one scale.
+    Left, the observed counts: red marks genes reported there (|z| >= z_min,
+    at least a 4% change per neighbor) that are no longer reported on the
+    corrected counts - associations explained by the removed admixture;
+    green/purple mark genes reported in both. Right, the corrected counts,
+    drawn as generative_plot_volcano."""
+    import matplotlib.pyplot as plt
+
+    d = changes[(changes.source == source) & np.isfinite(changes.z)
+                & np.isfinite(changes.z_observed)].copy()
+    src = _short(source)
+    min_lf = np.log(1.04)
+    before = (d.z_observed.abs() >= z_min) & (d.log_fold_observed.abs() >= min_lf)
+    after = (d.z.abs() >= z_min) & (d.log_fold_per_neighbor.abs() >= min_lf)
+    d["x0"] = d.log_fold_observed / np.log(2)
+    d["y0"] = np.minimum(d.z_observed.abs(), z_cap)
+    if axes is None:
+        _, axes = plt.subplots(1, 2, figsize=(11, 5), sharex=True, sharey=True)
+    # fix the shared limits first, so that the labels are placed on the final scale
+    x1 = d.log_fold_per_neighbor / np.log(2)
+    lo, hi = min(d.x0.min(), x1.min()), max(d.x0.max(), x1.max())
+    top = max(d.y0.max(), np.minimum(d.z.abs(), z_cap).max()) * 1.05
+    for a in axes:
+        a.set_xlim(lo - 0.05 * (hi - lo), hi + 0.12 * (hi - lo))
+        a.set_ylim(-0.02 * top, top)
+    ax = axes[0]
+    rest = d[~before]
+    ax.scatter(rest.x0, rest.y0, s=12, facecolors="none", edgecolors="#b6b6b6", lw=0.8,
+               label="not reported")
+    kept = d[before & after]
+    up, dn = kept[kept.z_observed > 0], kept[kept.z_observed < 0]
+    ax.scatter(up.x0, up.y0, s=14, color="#1e8449", lw=0, label=f"increased near {src}")
+    ax.scatter(dn.x0, dn.y0, s=14, color="#7d3c98", lw=0, label=f"decreased near {src}")
+    lost = d[before & ~after]
+    ax.scatter(lost.x0, lost.y0, s=14, color="#c0392b", lw=0,
+               label="reported before correction only")
+    ax.axhline(z_min, color="grey", lw=0.7, ls=":")
+    lab = lost.sort_values("y0", ascending=False).head(label_n)
+    _label_points(ax, lab.x0, lab.y0, lab.gene, color="#c0392b")
+    ax.set_xlabel(f"fold change per {src} neighbor (log2)")
+    ax.set_ylabel(f"significance |z| (capped at {z_cap})")
+    ax.set_title("observed counts")
+    ax.legend(frameon=False, fontsize=7.5, loc="upper left")
+    generative_plot_volcano(changes, source, z_cap=z_cap, label_n=label_n, ax=axes[1])
+    axes[1].set_title("after correction")
+    return axes
 
 
 def generative_plot_gene_contrast(before, after, genes_all, cells_all, cells, exposure,
@@ -261,7 +336,7 @@ def generative_plot_gene_contrast(before, after, genes_all, cells_all, cells, ex
                                   alt_label="induced share also removed", axes=None):
     """Per-bin rates of chosen genes in the target cells, observed and
     retained, with exact intervals, the removed band and an optional third
-    series (docs/generative.md Figure 1c/d)."""
+    series (analysis/generative_model/figures/pancreas_components.png, panels c and d)."""
     import matplotlib.pyplot as plt
 
     gindex = pd.Index([str(g) for g in genes_all])
