@@ -7,5 +7,8 @@
 The \link{CellAdmixCleanupReport} of every sample, with stacked summaries.
 \code{plot_map()} draws, one row per sample, the admixture map before the
 correction next to the admixture that remains after it, all panels on one
-color scale.
+color scale; \code{plot_remaining()} the estimated admixture of each sample's
+molecules before and after the correction as bars grouped by sample; and
+\code{plot_exposure()} each sample's exposure profile before and after the
+correction, one panel per sample. Each takes \code{samples} to draw a subset.
 }

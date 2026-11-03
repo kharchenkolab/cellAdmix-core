@@ -246,6 +246,12 @@ test_that("a consensus factorization pools two samples end to end", {
   if (requireNamespace("ggplot2", quietly = TRUE)) {
     expect_s3_class(audit$plot_map(), "ggplot")
     expect_s3_class(report$plot_map(), "ggplot")
+    expect_s3_class(report$plot_map(samples = "a"), "ggplot")
+    expect_s3_class(report$plot_remaining(), "ggplot")
+    expect_s3_class(report$plot_exposure(), "ggplot")
+    grDevices::pdf(NULL)
+    expect_no_error(score$plot_heatmap())
+    grDevices::dev.off()
   }
   expect_equal(report$samples(), c("a", "b"))
   expect_true("sample" %in% names(report$summary()))

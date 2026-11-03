@@ -280,7 +280,18 @@ test_that("the generative correction removes planted admixture", {
   if (requireNamespace("ggplot2", quietly = TRUE)) {
     expect_s3_class(report$plot_map(), "ggplot")
     expect_s3_class(report$plot_map(value = "molecules"), "ggplot")
+    expect_s3_class(audit$plot_exposure(correction = correction), "ggplot")
+    expect_s3_class(audit$plot_exposure("A", "B", correction = correction), "ggplot")
+    expect_s3_class(audit$plot_remaining(list(corrected = correction)), "ggplot")
   }
+  remaining <- audit$remaining(list(corrected = correction))
+  expect_equal(remaining$state, c("uncorrected", "corrected"))
+  expect_lt(remaining$estimate[[2]], remaining$estimate[[1]])
+  exposure <- audit$exposure(correction = correction)
+  expect_setequal(as.character(unique(exposure$state)), c("before", "after cleanup"))
+  expect_true(all(c("bin", "rate", "rate_lo", "rate_hi") %in% names(exposure)))
+  pair <- audit$exposure("A", "B", correction = correction)
+  expect_true(all(c("reference_rate", "reference_kind") %in% names(pair)))
 })
 
 test_that("the dataset-level audit matches the fit-level audit and runs NMF-free", {

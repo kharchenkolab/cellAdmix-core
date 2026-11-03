@@ -195,6 +195,8 @@ audit.pairs()                       # per-pair admixture rates and molecule esti
 audit.plot_map()                    # admixture-rate map (% of target-type molecules)
 audit.plot_exposure()               # pooled excess-exposure profile, 95% intervals
 audit.plot_remaining({"membrane": correction})
+audit.exposure(correction=correction)   # per-bin table behind plot_exposure()
+audit.remaining({"membrane": correction})  # table behind plot_remaining()
 
 report = audit.evaluate(correction) # per-pair sensitivity, false removal,
 report.summary()                    # warnings for pairs left largely

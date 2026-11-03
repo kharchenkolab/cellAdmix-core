@@ -65,7 +65,7 @@ Fields: `name`, `fit`, `score_name`, `run`, `params`, `rules` (the applied rules
 
 ## Audit objects
 
-`CellAdmixAudit`: `pairs(detected_only = FALSE)`, `markers(source, target)`, `plot_map(value = c("rate","molecules"), detected_only = TRUE)`, `plot_exposure(source = NULL, target = NULL, correction = NULL, strict = TRUE)`, `plot_remaining(corrections = list())`, `plot_reference(source, target)`, `evaluate(correction, warn_uncovered = TRUE)`, `fit_generative(init = NULL, n_programs = 4L, seed = 1L, num_threads = NULL, ...)`, `correct_generative(name = "generative", ...)`. `CellAdmixCleanupReport`: `pairs()`, `false_removal()`, `summary()`, `plot_cleanup()`, `plot_map(value = c("rate","molecules"))` (before and after the correction, one color scale). See `celladmix-audit-and-stability` and `celladmix-generative`.
+`CellAdmixAudit`: `pairs(detected_only = FALSE)`, `markers(source, target)`, `plot_map(value = c("rate","molecules"), detected_only = TRUE)`, `plot_exposure(source = NULL, target = NULL, correction = NULL, strict = TRUE)`, `plot_remaining(corrections = list())`, `exposure(source = NULL, target = NULL, correction = NULL, strict = TRUE)` and `remaining(corrections = list())` (the tables behind the two plots), `plot_reference(source, target)`, `evaluate(correction, warn_uncovered = TRUE)`, `fit_generative(init = NULL, n_programs = 4L, seed = 1L, num_threads = NULL, ...)`, `correct_generative(name = "generative", ...)`. `CellAdmixCleanupReport`: `pairs()`, `false_removal()`, `summary()`, `plot_cleanup()`, `plot_map(value = c("rate","molecules"))` (before and after the correction, one color scale). See `celladmix-audit-and-stability` and `celladmix-generative`.
 
 ## Multi-sample objects
 

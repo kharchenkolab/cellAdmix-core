@@ -69,7 +69,7 @@ audit$pairs(by_sample = FALSE, detected_only = FALSE)   # pooled per-pair table,
 audit$evaluate(correction)$summary()                    # per-sample cleanup verification
 ```
 
-`CellAdmixCollectionAudit` runs the audit per sample and pools the per-pair estimates; `plot_map()` draws each sample's pre-correction admixture map, one row per sample, on one color scale. `evaluate()` returns a `CellAdmixCollectionCleanupReport` with `samples()`, `summary()`, `pairs()`, and `plot_map()`, which puts each sample's map before the correction next to the admixture remaining after it.
+`CellAdmixCollectionAudit` runs the audit per sample and pools the per-pair estimates; `plot_map()` draws each sample's pre-correction admixture map, one row per sample, on one color scale. `evaluate()` returns a `CellAdmixCollectionCleanupReport` with `samples()`, `summary()`, `pairs()`, `plot_map()` (each sample's map before the correction next to the admixture remaining after it), `plot_remaining()` (estimated admixture per sample before and after, grouped bars) and `plot_exposure()` (exposure profiles before and after, one panel per sample); each takes `samples` to draw a subset. `CellAdmixCollectionScore$plot_heatmap()` draws the pooled scoring matrix like a single sample's, with removal calls and native-check vetoes marked.
 
 ## Diagnostics
 

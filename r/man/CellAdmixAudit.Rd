@@ -8,5 +8,8 @@ Created by \code{\link[=celladmix_audit_admixture]{celladmix_audit_admixture()}}
 Holds per-cell-type-pair admixture-rate and admixed-molecule estimates
 (extrapolated from a conservative, directly measured marker-pool
 excess), plotting methods, and the \code{evaluate()} method that verifies a
-correction against the same measurements.
+correction against the same measurements. \code{exposure()} and \code{remaining()}
+return the tables behind \code{plot_exposure()} and \code{plot_remaining()}; given a
+correction, the exposure plot shades the band between the curves before
+and after it, the admixture the correction removed at each exposure level.
 }

@@ -275,7 +275,13 @@ report$plot_map()                     # admixture maps before and after the corr
 audit$plot_exposure("Exocrine epithelial", "Endothelial",
   correction = correction)            # one pair's dose-response curves (Figure 1a)
 audit$plot_remaining(list(membrane = correction))  # estimated admixture left
+audit$exposure(correction = correction)   # the per-bin table behind plot_exposure()
+audit$remaining(list(membrane = correction))  # the table behind plot_remaining()
 ```
+
+With a correction, the exposure profile shades the band between the
+curve before the correction and the curve after it: the admixture the
+correction removed at each exposure level.
 
 The Python bindings expose the same objects and methods —
 `fit.audit_admixture()`, `audit.plot_map()`, `audit.evaluate(correction)`,

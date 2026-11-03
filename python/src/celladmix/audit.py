@@ -541,45 +541,45 @@ class CellAdmixAudit:
         mk = np.asarray(matrix[genes][:, d["cols"]].sum(axis=0)).ravel()
         return _bin_rates(mk, self._totals[d["cols"]], np.asarray(d["bins"]))
 
+    def exposure(self, source=None, target=None, correction=None, strict=True) -> pd.DataFrame:
+        """The table drawn by ``plot_exposure()``: per exposure bin (source-type
+        cells among the nearest neighbors), the admixture-marker rate with its
+        95% interval, before and, given a correction, after it. Without a pair
+        the rates are each detected pair's excess over its own ambient
+        reference, pooled; for one pair they are the raw rates, with the pair's
+        ambient reference rate and kind in ``reference_rate`` and
+        ``reference_kind``."""
+        if (source is None) != (target is None):
+            raise ValueError("Provide both source and target, or neither for the cumulative view")
+        states = [("before", self._matrix)]
+        if correction is not None:
+            after, genes, cells = correction.counts()
+            after = _align_counts(after, pd.Index(genes),
+                pd.Index([str(c) for c in cells]), self._genes, self._cells)
+            states.append(("after cleanup", after))
+        frames = []
+        for name, mat in states:
+            rates = self._state_rates(mat, source, target, strict).copy()
+            rates["state"] = name
+            frames.append(rates)
+        df = pd.concat(frames, ignore_index=True)
+        if source is not None:
+            d = self._pair(source, target)
+            genes = d["strict"] if strict and len(d["strict"]) >= 2 else d["pool"]
+            mk0 = np.asarray(self._matrix[genes][:, d["cols"]].sum(axis=0)).ravel()
+            df["reference_rate"] = float(mk0[d["ref_mask"]].sum()) / max(
+                float(self._totals[d["cols"]][d["ref_mask"]].sum()), 1.0)
+            df["reference_kind"] = d["reference_kind"]
+        return df
+
     def plot_exposure(self, source=None, target=None, correction=None,
                       strict=True, ax=None):
         import matplotlib.pyplot as plt
 
         if ax is None:
             _, ax = plt.subplots(figsize=(4.6, 3.6))
-        states = [("before", self._matrix, "#c0392b")]
-        if correction is not None:
-            after, genes, cells = correction.counts()
-            after = _align_counts(after, pd.Index(genes),
-                pd.Index([str(c) for c in cells]), self._genes, self._cells)
-            states.append(("after cleanup", after, "#2980b9"))
-        pooled = source is None
-        for name, mat, color in states:
-            rates = self._state_rates(mat, source, target, strict)
-            x = np.arange(len(BIN_LABELS))
-            ax.errorbar(x, rates["rate"] * 1e3,
-                yerr=[(rates["rate"] - rates["rate_lo"]) * 1e3,
-                      (rates["rate_hi"] - rates["rate"]) * 1e3],
-                fmt="o-", ms=4, capsize=2, color=color, label=name)
-            if name == "before" and not pooled:
-                ax.axhline(rates["rate"].iloc[0] * 1e3, ls=":", c="grey", lw=0.8)
-                d = self._pair(source, target)
-                genes = d["strict"] if strict and len(d["strict"]) >= 2 else d["pool"]
-                mk0 = np.asarray(self._matrix[genes][:, d["cols"]].sum(axis=0)).ravel()
-                r_ref = float(mk0[d["ref_mask"]].sum()) / max(
-                    float(self._totals[d["cols"]][d["ref_mask"]].sum()), 1.0)
-                ax.axhline(r_ref * 1e3, ls="--", c="0.25", lw=0.9)
-        ax.set_xticks(range(len(BIN_LABELS)), BIN_LABELS)
-        ax.set_xlabel("source-type cells among nearest neighbors")
-        ax.set_ylabel("excess admixture-marker rate over pair ambient reference\n(per 1,000 molecules)"
-            if pooled else "admixture-marker rate (per 1,000 molecules)\n"
-            "(dotted: zero-neighbor rate; dashed: ambient reference)")
-        title = ("Admixture exposure profile (pooled over detected pairs)"
-            if source is None else f"{source} → {target}")
-        ax.set_title(title, fontsize=10)
-        if correction is not None:
-            ax.legend(frameon=False, fontsize=8)
-        return ax
+        return _draw_exposure(ax, self.exposure(source, target, correction, strict),
+                              pooled=source is None, source=source, target=target)
 
     def plot_reference(self, source, target, ax=None):
         import matplotlib.pyplot as plt
@@ -605,9 +605,10 @@ class CellAdmixAudit:
         ax.set_title(f"{source} → {target}: ambient reference", fontsize=10)
         return ax
 
-    def plot_remaining(self, corrections=None, ax=None):
-        import matplotlib.pyplot as plt
-
+    def remaining(self, corrections=None) -> pd.DataFrame:
+        """The table drawn by ``plot_remaining()``: the estimated admixture of
+        the dataset, as % of all molecules before any correction, uncorrected
+        and after each given correction, with 95% intervals."""
         corrections = corrections or {}
         states = {"uncorrected": self._matrix}
         for name, corr in corrections.items():
@@ -636,17 +637,14 @@ class CellAdmixAudit:
             ys.append(100 * tot / denom)
             los.append(100 * max(tot - 1.96 * np.sqrt(var), 0) / denom)
             his.append(100 * (tot + 1.96 * np.sqrt(var)) / denom)
+        return pd.DataFrame({"state": list(states), "estimate": ys, "lo": los, "hi": his})
+
+    def plot_remaining(self, corrections=None, ax=None):
+        import matplotlib.pyplot as plt
+
         if ax is None:
             _, ax = plt.subplots(figsize=(4.4, 3.4))
-        x = np.arange(len(states))
-        ax.bar(x, ys, width=0.6, color="#34495e", alpha=0.9)
-        ax.errorbar(x, ys, yerr=[np.array(ys) - los, np.array(his) - ys],
-            fmt="none", ecolor="black", capsize=3, lw=0.8)
-        ax.set_xticks(x, list(states))
-        ax.set_ylabel("estimated admixture (% of all molecules)")
-        ax.set_title("Remaining admixture by correction\n"
-            "estimate over detected pairs; 95% intervals", fontsize=9.5)
-        return ax
+        return _draw_remaining(ax, self.remaining(corrections))
 
     # ---- verification ----
     def evaluate(self, correction, warn_uncovered=True):
@@ -733,6 +731,70 @@ def _align_counts(matrix, genes, cells, ref_genes, ref_cells):
     sub = matrix[np.flatnonzero(gmask)][:, np.flatnonzero(cmask)]
     out[np.ix_(gi[gmask], ci[cmask])] = sub.todense()
     return out.tocsc()
+
+
+def _draw_exposure(ax, df: pd.DataFrame, pooled: bool, source=None, target=None):
+    """The exposure profile drawn by ``plot_exposure()``: the before curve, the
+    after curve when present with the band between the two (the admixture the
+    correction removed), 95% error bars, and for one pair its zero-neighbor and
+    ambient reference lines."""
+    colors = {"before": "#c0392b", "after cleanup": "#2980b9"}
+    x = np.arange(len(BIN_LABELS))
+    states = [s for s in ("before", "after cleanup") if s in set(df["state"])]
+    curves = {s: df[df["state"] == s].set_index("bin").reindex(BIN_LABELS) for s in states}
+    if "after cleanup" in curves:
+        before, after = curves["before"]["rate"].to_numpy(), curves["after cleanup"]["rate"].to_numpy()
+        ax.fill_between(x, np.minimum(before, after) * 1e3, np.maximum(before, after) * 1e3,
+                        color="#c0392b", alpha=0.12, linewidth=0)
+    for name in states:
+        rates = curves[name]
+        ax.errorbar(x, rates["rate"] * 1e3,
+            yerr=[(rates["rate"] - rates["rate_lo"]) * 1e3, (rates["rate_hi"] - rates["rate"]) * 1e3],
+            fmt="o-", ms=4, capsize=2, color=colors[name], label=name)
+    if not pooled:
+        ax.axhline(curves["before"]["rate"].iloc[0] * 1e3, ls=":", c="grey", lw=0.8)
+        ax.axhline(float(df["reference_rate"].iloc[0]) * 1e3, ls="--", c="0.25", lw=0.9)
+    ax.set_xticks(range(len(BIN_LABELS)), BIN_LABELS)
+    ax.set_xlabel("source-type cells among nearest neighbors")
+    ax.set_ylabel("excess admixture-marker rate over pair ambient reference\n(per 1,000 molecules)"
+        if pooled else "admixture-marker rate (per 1,000 molecules)\n"
+        "(dotted: zero-neighbor rate; dashed: ambient reference)")
+    ax.set_title("Admixture exposure profile (pooled over detected pairs)"
+        if pooled else f"{source} \u2192 {target}", fontsize=10)
+    if "after cleanup" in curves:
+        ax.legend(frameon=False, fontsize=8, title="shaded: admixture removed", title_fontsize=8)
+    return ax
+
+
+def _draw_remaining(ax, df: pd.DataFrame):
+    """Bars of the estimated admixture per state (uncorrected and after each
+    correction); with a ``sample`` column the states are grouped by sample."""
+    states = list(dict.fromkeys(df["state"]))
+    if "sample" in df.columns:
+        samples = list(dict.fromkeys(df["sample"]))
+        palette = ["#95a5a6", "#34495e", "#2980b9", "#8e44ad", "#e67e22"]
+        width = 0.7 / len(states)
+        x = np.arange(len(samples))
+        for k, state in enumerate(states):
+            rows = df[df["state"] == state].set_index("sample").reindex(samples)
+            pos = x - 0.35 + width * (k + 0.5)
+            ax.bar(pos, rows["estimate"], width=width * 0.92, color=palette[k % len(palette)],
+                   alpha=0.9, label=state)
+            ax.errorbar(pos, rows["estimate"],
+                yerr=[rows["estimate"] - rows["lo"], rows["hi"] - rows["estimate"]],
+                fmt="none", ecolor="black", capsize=2, lw=0.8)
+        ax.set_xticks(x, samples, rotation=40, ha="right")
+        ax.legend(frameon=False, fontsize=8)
+    else:
+        x = np.arange(len(states))
+        ax.bar(x, df["estimate"], width=0.6, color="#34495e", alpha=0.9)
+        ax.errorbar(x, df["estimate"], yerr=[df["estimate"] - df["lo"], df["hi"] - df["estimate"]],
+            fmt="none", ecolor="black", capsize=3, lw=0.8)
+        ax.set_xticks(x, states)
+    ax.set_ylabel("estimated admixture (% of all molecules)")
+    ax.set_title("Remaining admixture by correction\n"
+        "estimate over detected pairs; 95% intervals", fontsize=9.5)
+    return ax
 
 
 def _audit_pairs(audit, detected_only: bool = True) -> pd.DataFrame:

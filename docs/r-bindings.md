@@ -237,6 +237,8 @@ audit$plot_map()                   # admixture-rate map (% of target-type molecu
 audit$plot_exposure()              # pooled excess-exposure profile, 95% intervals
 audit$plot_exposure("Exocrine epithelial", "Endothelial", correction = correction)
 audit$plot_remaining(list(membrane = correction))  # admixture left per correction
+audit$exposure(correction = correction)            # per-bin table behind plot_exposure()
+audit$remaining(list(membrane = correction))       # table behind plot_remaining()
 ```
 
 The audit can also correct the admixture it measures, through the

@@ -396,7 +396,10 @@ celladmix_audit_admixture <- function(fit, annotation = NULL, neighbor_k = 15L,
 #' Holds per-cell-type-pair admixture-rate and admixed-molecule estimates
 #' (extrapolated from a conservative, directly measured marker-pool
 #' excess), plotting methods, and the `evaluate()` method that verifies a
-#' correction against the same measurements.
+#' correction against the same measurements. `exposure()` and `remaining()`
+#' return the tables behind `plot_exposure()` and `plot_remaining()`; given a
+#' correction, the exposure plot shades the band between the curves before
+#' and after it, the admixture the correction removed at each exposure level.
 #' @export
 CellAdmixAudit <- R6::R6Class(
   "CellAdmixAudit",
@@ -647,9 +650,13 @@ CellAdmixAudit <- R6::R6Class(
             linewidth = 0.35))
     },
 
-    plot_exposure = function(source = NULL, target = NULL, correction = NULL,
-                             strict = TRUE) {
-      .celladmix_require_ggplot2()
+    exposure = function(source = NULL, target = NULL, correction = NULL, strict = TRUE) {
+      # The table drawn by plot_exposure(): per exposure bin (source-type cells
+      # among the nearest neighbors), the admixture-marker rate with its 95%
+      # interval, before and, given a correction, after it. Without a pair the
+      # rates are each detected pair's excess over its own ambient reference,
+      # pooled; for one pair they are the raw rates, with the pair's ambient
+      # reference rate and kind in `reference_rate` and `reference_kind`.
       counts_after <- if (!is.null(correction)) correction$counts() else NULL
       if (is.null(source) != is.null(target)) {
         stop("Provide both source and target, or neither for the cumulative view")
@@ -708,61 +715,33 @@ CellAdmixAudit <- R6::R6Class(
       df <- build(private$.counts, "before")
       if (!is.null(counts_after)) {
         df <- rbind(df, build(counts_after, "after cleanup"))
-        df$state <- factor(df$state, levels = c("before", "after cleanup"))
       }
+      df$state <- factor(df$state, levels = c("before", "after cleanup"))
       df$bin <- factor(df$bin, levels = c("0", "1", "2", "3+"))
-      r0 <- df$rate[df$bin == "0" & df$state == "before"]
-      r_ref <- if (!pooled) {
+      if (!pooled) {
         d <- private$.pair(source, target)
         genes <- if (strict && length(d$strict) >= 2) d$strict else d$pool
         counts_g <- .celladmix_audit_mcount(private$.counts, genes, d$T_cells)
-        sum(counts_g[d$ref_mask]) /
+        df$reference_rate <- sum(counts_g[d$ref_mask]) /
           max(sum(private$.totals[d$T_cells][d$ref_mask]), 1)
-      } else NA_real_
-      title <- if (pooled) {
-        "Admixture exposure profile (pooled over detected pairs)"
-      } else {
-        sprintf("%s → %s", source, target)
+        df$reference_kind <- d$reference_kind
       }
-      ylab <- if (pooled) {
-        "excess admixture-marker rate over pair ambient reference\n(per 1,000 molecules)"
-      } else {
-        "admixture-marker rate (per 1,000 molecules)"
-      }
-      subtitle <- if (pooled) {
-        "each pair's excess over its own ambient reference, pooled;\nerror bars: 95% intervals"
-      } else {
-        paste0("error bars: 95% Poisson intervals (often narrower than the symbols);\n",
-          "dotted: zero-neighbor rate; dashed: ambient reference (",
-          private$.pair(source, target)$reference_kind, ")")
-      }
-      cols <- c("before" = "#c0392b", "after cleanup" = "#2980b9")
-      p <- ggplot2::ggplot(df, ggplot2::aes(x = bin, group = state)) +
-        ggplot2::geom_ribbon(ggplot2::aes(ymin = rate_lo * 1e3, ymax = rate_hi * 1e3,
-          fill = state), alpha = 0.25) +
-        ggplot2::geom_errorbar(ggplot2::aes(ymin = rate_lo * 1e3,
-          ymax = rate_hi * 1e3, color = state), width = 0.12, linewidth = 0.4) +
-        ggplot2::geom_line(ggplot2::aes(y = rate * 1e3, color = state)) +
-        ggplot2::geom_point(ggplot2::aes(y = rate * 1e3, color = state), size = 1.8)
-      if (!pooled) {
-        p <- p + ggplot2::geom_hline(yintercept = r0 * 1e3, linetype = "dotted",
-          color = "grey40") +
-          ggplot2::geom_hline(yintercept = r_ref * 1e3, linetype = "dashed",
-            color = "grey25")
-      }
-      p +
-        ggplot2::scale_color_manual(values = cols, name = NULL) +
-        ggplot2::scale_fill_manual(values = cols, name = NULL) +
-        ggplot2::labs(x = "source-type cells among nearest neighbors",
-          y = ylab,
-          title = title,
-          subtitle = subtitle) +
-        ggplot2::theme_classic(base_size = 10) +
-        ggplot2::theme(legend.position = if (is.null(counts_after)) "none" else "bottom")
+      rownames(df) <- NULL
+      df
     },
 
-    plot_remaining = function(corrections = list()) {
+    plot_exposure = function(source = NULL, target = NULL, correction = NULL,
+                             strict = TRUE) {
       .celladmix_require_ggplot2()
+      .celladmix_plot_exposure(
+        self$exposure(source, target, correction = correction, strict = strict),
+        pooled = is.null(source), source = source, target = target)
+    },
+
+    remaining = function(corrections = list()) {
+      # The table drawn by plot_remaining(): the estimated admixture of the
+      # dataset, as % of all molecules before any correction, uncorrected and
+      # after each given correction, with 95% intervals.
       if (length(corrections) && is.null(names(corrections))) {
         stop("corrections must be a named list, e.g. list(membrane = corr)")
       }
@@ -789,22 +768,19 @@ CellAdmixAudit <- R6::R6Class(
       states <- c(list(uncorrected = private$.counts),
         lapply(corrections, function(x) x$counts()))
       est <- t(vapply(states, state_excess, c(excess = 0, sd = 0)))
-      # fixed denominator: all molecules before correction, so bars read as
-      # the estimated admixed fraction of the dataset's molecules
+      # fixed denominator: all molecules before correction, so the values read
+      # as the estimated admixed fraction of the dataset's molecules
       denom <- max(sum(private$.totals), 1)
-      df <- data.frame(state = factor(rownames(est), levels = rownames(est)),
-        y = est[, "excess"] / denom,
-        lo = pmax(est[, "excess"] - 1.96 * est[, "sd"], 0) / denom,
-        hi = (est[, "excess"] + 1.96 * est[, "sd"]) / denom)
-      ggplot2::ggplot(df, ggplot2::aes(x = state, y = 100 * y)) +
-        ggplot2::geom_col(fill = "#34495e", width = 0.6, alpha = 0.9) +
-        ggplot2::geom_errorbar(ggplot2::aes(ymin = 100 * lo, ymax = 100 * hi),
-          width = 0.15, linewidth = 0.4) +
-        ggplot2::labs(x = NULL,
-          y = "estimated admixture (% of all molecules)",
-          title = "Remaining admixture by correction",
-          subtitle = "estimate over detected cell-type pairs;\nerror bars: 95% intervals") +
-        ggplot2::theme_classic(base_size = 10)
+      data.frame(state = rownames(est),
+        estimate = 100 * est[, "excess"] / denom,
+        lo = 100 * pmax(est[, "excess"] - 1.96 * est[, "sd"], 0) / denom,
+        hi = 100 * (est[, "excess"] + 1.96 * est[, "sd"]) / denom,
+        stringsAsFactors = FALSE, row.names = NULL)
+    },
+
+    plot_remaining = function(corrections = list()) {
+      .celladmix_require_ggplot2()
+      .celladmix_plot_remaining(self$remaining(corrections))
     },
 
     plot_reference = function(source, target) {
@@ -993,6 +969,103 @@ CellAdmixCleanupReport <- R6::R6Class(
 )
 
 scales_comma <- function(x) format(x, big.mark = ",", scientific = FALSE)
+
+# The exposure profile drawn by plot_exposure(): the before curve, the after
+# curve when present with the band between the two (the admixture the
+# correction removed), 95% error bars, and for one pair its zero-neighbor and
+# ambient reference lines. A `sample` column in `df` gives one panel per sample.
+.celladmix_plot_exposure <- function(df, pooled, source = NULL, target = NULL, ncol = NULL) {
+  by_sample <- "sample" %in% names(df)
+  keys <- if (by_sample) "sample" else character()
+  has_after <- "after cleanup" %in% as.character(df$state)
+  band <- NULL
+  if (has_after) {
+    before <- df[df$state == "before", c(keys, "bin", "rate"), drop = FALSE]
+    after <- df[df$state == "after cleanup", c(keys, "bin", "rate"), drop = FALSE]
+    band <- merge(before, after, by = c(keys, "bin"), suffixes = c("_before", "_after"))
+    band$lower <- pmin(band$rate_before, band$rate_after)
+    band$upper <- pmax(band$rate_before, band$rate_after)
+  }
+  lines <- NULL
+  if (!pooled) {
+    first <- df[df$state == "before" & df$bin == "0", , drop = FALSE]
+    lines <- data.frame(first[, keys, drop = FALSE], zero_neighbor = first$rate,
+      reference = first$reference_rate)
+  }
+  title <- if (pooled) {
+    "Admixture exposure profile (pooled over detected pairs)"
+  } else {
+    sprintf("%s \u2192 %s", source, target)
+  }
+  ylab <- if (pooled) {
+    "excess admixture-marker rate over pair ambient reference\n(per 1,000 molecules)"
+  } else {
+    "admixture-marker rate (per 1,000 molecules)"
+  }
+  subtitle <- if (pooled) {
+    paste0("each pair's excess over its own ambient reference, pooled;\n",
+      if (has_after) "shaded: admixture removed; " else "", "error bars: 95% intervals")
+  } else {
+    paste0("error bars: 95% Poisson intervals (often narrower than the symbols);\n",
+      if (has_after) "shaded: admixture removed; " else "",
+      "dotted: zero-neighbor rate; dashed: ambient reference (",
+      paste(unique(df$reference_kind), collapse = "/"), ")")
+  }
+  cols <- c("before" = "#c0392b", "after cleanup" = "#2980b9")
+  p <- ggplot2::ggplot(df, ggplot2::aes(x = bin, group = state))
+  if (!is.null(band)) {
+    p <- p + ggplot2::geom_ribbon(data = band,
+      ggplot2::aes(x = bin, ymin = lower * 1e3, ymax = upper * 1e3, group = 1),
+      fill = "#c0392b", alpha = 0.12, inherit.aes = FALSE)
+  }
+  if (!is.null(lines)) {
+    p <- p +
+      ggplot2::geom_hline(data = lines, ggplot2::aes(yintercept = zero_neighbor * 1e3),
+        linetype = "dotted", color = "grey40") +
+      ggplot2::geom_hline(data = lines, ggplot2::aes(yintercept = reference * 1e3),
+        linetype = "dashed", color = "grey25")
+  }
+  p <- p +
+    ggplot2::geom_errorbar(ggplot2::aes(ymin = rate_lo * 1e3, ymax = rate_hi * 1e3,
+      color = state), width = 0.12, linewidth = 0.4) +
+    ggplot2::geom_line(ggplot2::aes(y = rate * 1e3, color = state)) +
+    ggplot2::geom_point(ggplot2::aes(y = rate * 1e3, color = state), size = 1.8) +
+    ggplot2::scale_color_manual(values = cols, name = NULL) +
+    ggplot2::labs(x = "source-type cells among nearest neighbors", y = ylab,
+      title = title, subtitle = subtitle) +
+    ggplot2::theme_classic(base_size = 10) +
+    ggplot2::theme(legend.position = if (has_after) "bottom" else "none")
+  if (by_sample) p <- p + ggplot2::facet_wrap(~sample, ncol = ncol)
+  p
+}
+
+# Bars of the estimated admixture per state (uncorrected and after each
+# correction); with a `sample` column in `df` the states are grouped by sample.
+.celladmix_plot_remaining <- function(df) {
+  df$state <- factor(df$state, levels = unique(df$state))
+  by_sample <- "sample" %in% names(df)
+  p <- if (by_sample) {
+    palette <- rep(c("#95a5a6", "#34495e", "#2980b9", "#8e44ad", "#e67e22"),
+      length.out = nlevels(df$state))
+    dodge <- ggplot2::position_dodge(width = 0.7)
+    ggplot2::ggplot(df, ggplot2::aes(x = sample, y = estimate, fill = state)) +
+      ggplot2::geom_col(position = dodge, width = 0.65, alpha = 0.9) +
+      ggplot2::geom_errorbar(ggplot2::aes(ymin = lo, ymax = hi), position = dodge,
+        width = 0.2, linewidth = 0.4) +
+      ggplot2::scale_fill_manual(values = stats::setNames(palette, levels(df$state)), name = NULL) +
+      ggplot2::theme_classic(base_size = 10) +
+      ggplot2::theme(legend.position = "bottom",
+        axis.text.x = ggplot2::element_text(angle = 40, hjust = 1))
+  } else {
+    ggplot2::ggplot(df, ggplot2::aes(x = state, y = estimate)) +
+      ggplot2::geom_col(fill = "#34495e", width = 0.6, alpha = 0.9) +
+      ggplot2::geom_errorbar(ggplot2::aes(ymin = lo, ymax = hi), width = 0.15, linewidth = 0.4) +
+      ggplot2::theme_classic(base_size = 10)
+  }
+  p + ggplot2::labs(x = NULL, y = "estimated admixture (% of all molecules)",
+    title = "Remaining admixture by correction",
+    subtitle = "estimate over detected cell-type pairs;\nerror bars: 95% intervals")
+}
 
 # The before-and-after frame of a cleanup report: per detected pair, the
 # audit's estimate before the correction and what remains after it, as the

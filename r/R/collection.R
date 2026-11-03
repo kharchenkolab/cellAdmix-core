@@ -575,7 +575,9 @@ CellAdmixConsensusFit <- R6::R6Class(
 #' forked worker processes, as many at a time as fit a thread budget given
 #' the threads each job uses: `num_threads` sets the budget (default: the
 #' `CELLADMIX_NUM_THREADS` environment variable, or else the number of
-#' available cores).
+#' available cores). `plot_heatmap()` draws the pooled evidence like a single
+#' sample's scoring matrix: rows are cell types, columns the shared factors,
+#' with the removal calls and the vetoes of the native-factor check marked.
 #' @export
 CellAdmixCollectionScore <- R6::R6Class(
   "CellAdmixCollectionScore",
@@ -639,6 +641,25 @@ CellAdmixCollectionScore <- R6::R6Class(
           outlier_min_frac = native_outlier_min_frac, neighbor_k = neighbor_k)
       }
       rules
+    },
+
+    plot_heatmap = function(..., p_thresh = 0.1, adjust_p = FALSE, native_check = TRUE) {
+      # The pooled summary drawn like a single sample's; removal calls the
+      # native-factor check rejects are marked, as in the single-sample plot.
+      vetoed <- NULL
+      if (isTRUE(native_check)) {
+        flagged <- tryCatch(self$rules(p_thresh = p_thresh, adjust_p = adjust_p),
+          error = function(e) NULL)
+        vetoed <- .celladmix_vetoed_calls(flagged)
+      }
+      summary <- self$summary()
+      if (identical(self$method, "membrane")) {
+        celladmix_plot_membrane_heatmap(summary, p_thresh = p_thresh, adjust_p = adjust_p,
+          vetoed_calls = vetoed, ...)
+      } else {
+        celladmix_plot_bridge_heatmap(summary, p_thresh = p_thresh, adjust_p = adjust_p,
+          vetoed_calls = vetoed, ...)
+      }
     },
 
     correct = function(rules = NULL, name = NULL, p_thresh = 0.1, adjust_p = FALSE,
@@ -1073,8 +1094,9 @@ CellAdmixCollectionCorrection <- R6::R6Class(
 #'
 #' One [CellAdmixAudit] per sample, with pooled per-pair estimates and
 #' per-sample cleanup verification. `plot_map()` draws each sample's
-#' admixture map before any correction, one row per sample, on one color
-#' scale; the map after a correction is `evaluate(correction)$plot_map()`.
+#' admixture map before any correction, one row per sample (`samples`
+#' selects a subset), on one color scale; the map after a correction is
+#' `evaluate(correction)$plot_map()`.
 #' @export
 CellAdmixCollectionAudit <- R6::R6Class(
   "CellAdmixCollectionAudit",
@@ -1121,10 +1143,11 @@ CellAdmixCollectionAudit <- R6::R6Class(
       pooled[order(-pooled$admixed_molecules), , drop = FALSE]
     },
 
-    plot_map = function(value = c("rate", "molecules"), detected_only = TRUE) {
+    plot_map = function(value = c("rate", "molecules"), detected_only = TRUE, samples = NULL) {
       .celladmix_require_ggplot2()
       value <- match.arg(value)
       pairs <- self$pairs(by_sample = TRUE, detected_only = detected_only)
+      if (!is.null(samples)) pairs <- pairs[pairs$sample %in% samples, , drop = FALSE]
       df <- data.frame(sample = pairs$sample, source = pairs$source, target = pairs$target,
         fill = if (identical(value, "rate")) 100 * pairs$rate else pairs$admixed_molecules,
         stringsAsFactors = FALSE)
@@ -1151,7 +1174,10 @@ CellAdmixCollectionAudit <- R6::R6Class(
 #' The [CellAdmixCleanupReport] of every sample, with stacked summaries.
 #' `plot_map()` draws, one row per sample, the admixture map before the
 #' correction next to the admixture that remains after it, all panels on one
-#' color scale.
+#' color scale; `plot_remaining()` the estimated admixture of each sample's
+#' molecules before and after the correction as bars grouped by sample; and
+#' `plot_exposure()` each sample's exposure profile before and after the
+#' correction, one panel per sample. Each takes `samples` to draw a subset.
 #' @export
 CellAdmixCollectionCleanupReport <- R6::R6Class(
   "CellAdmixCollectionCleanupReport",
@@ -1165,16 +1191,52 @@ CellAdmixCollectionCleanupReport <- R6::R6Class(
     pairs = function() {
       .celladmix_stack_samples(lapply(self$reports, function(report) report$pairs()))
     },
-    plot_map = function(value = c("rate", "molecules")) {
+    plot_map = function(value = c("rate", "molecules"), samples = NULL) {
       .celladmix_require_ggplot2()
       value <- match.arg(value)
-      frames <- lapply(names(self$reports), function(sample) {
+      frames <- lapply(private$selected(samples), function(sample) {
         df <- .celladmix_cleanup_map_frame(self$reports[[sample]], value)
         df$sample <- rep(sample, nrow(df))
         df
       })
       .celladmix_plot_pair_maps(do.call(rbind, frames), value,
         subtitle_suffix = ", before and after the correction")
+    },
+    plot_remaining = function(samples = NULL) {
+      # The estimated admixture of each sample's molecules before and after
+      # the correction, as bars grouped by sample.
+      .celladmix_require_ggplot2()
+      frames <- lapply(private$selected(samples), function(sample) {
+        report <- self$reports[[sample]]
+        df <- report$audit$remaining(list(corrected = report$correction))
+        df$sample <- rep(sample, nrow(df))
+        df
+      })
+      .celladmix_plot_remaining(do.call(rbind, frames))
+    },
+    plot_exposure = function(source = NULL, target = NULL, strict = TRUE, samples = NULL,
+                             ncol = NULL) {
+      # Each sample's exposure profile before and after the correction, one
+      # panel per sample; samples without a detected pair are left out.
+      .celladmix_require_ggplot2()
+      frames <- lapply(private$selected(samples), function(sample) {
+        report <- self$reports[[sample]]
+        df <- tryCatch(report$audit$exposure(source, target, correction = report$correction,
+          strict = strict), error = function(e) NULL)
+        if (!is.null(df)) df$sample <- rep(sample, nrow(df))
+        df
+      })
+      frames <- Filter(Negate(is.null), frames)
+      if (!length(frames)) {
+        return(.celladmix_empty_plot("No detected admixture pairs"))
+      }
+      .celladmix_plot_exposure(do.call(rbind, frames), pooled = is.null(source),
+        source = source, target = target, ncol = ncol)
+    }
+  ),
+  private = list(
+    selected = function(samples) {
+      if (is.null(samples)) names(self$reports) else intersect(as.character(samples), names(self$reports))
     }
   )
 )

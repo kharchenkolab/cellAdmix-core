@@ -266,6 +266,7 @@ consensus$recurrence()                               # per factor and sample
 consensus$matching                                   # each sample's primary factors in the shared space
 score <- consensus$score_bridge()                    # per-sample scores, pooled summary
 rules <- score$rules()                               # pooled rules with sample_support
+score$plot_heatmap()                                 # pooled scoring matrix with calls and vetoes
 correction <- score$correct(rules = rules)           # per-sample ensemble corrections
 score$correct(rules = rules, apply_rules = "where_present")  # skip rules on programs a sample lacks
 correction$summary()                                 # removal per cell type per sample
@@ -276,6 +277,8 @@ audit$plot_map()                                     # admixture map per sample,
 report <- audit$evaluate(correction)
 report$summary()                                     # per-sample cleanup verification
 report$plot_map()                                    # before and after maps, one row per sample
+report$plot_remaining()                              # admixture left per sample, grouped bars
+report$plot_exposure()                               # exposure profiles before and after, one panel per sample
 consensus$diagnostics()                              # per-sample representation flags
 correction$diagnostics(report)                       # rules without local evidence, audit per sample
 ```
@@ -291,6 +294,7 @@ consensus.recurrence()                              # per factor and sample
 consensus.matching                                  # each sample's primary factors in the shared space
 score = consensus.score_bridge()                    # per-sample scores, pooled summary
 rules = score.rules()                               # pooled rules with sample_support
+score.plot_heatmap()                                # pooled scoring matrix with calls and vetoes
 correction = score.correct(rules=rules)             # per-sample ensemble corrections
 score.correct(rules=rules, apply_rules="where_present")  # skip rules on programs a sample lacks
 correction.summary()                                # removal per cell type per sample
@@ -301,6 +305,8 @@ audit.plot_map()                                    # admixture map per sample, 
 report = audit.evaluate(correction)
 report.summary()                                    # per-sample cleanup verification
 report.plot_map()                                   # before and after maps, one row per sample
+report.plot_remaining()                             # admixture left per sample, grouped bars
+report.plot_exposure()                              # exposure profiles before and after, one panel per sample
 consensus.diagnostics()                             # per-sample representation flags
 correction.diagnostics(report)                      # rules without local evidence, audit per sample
 ```

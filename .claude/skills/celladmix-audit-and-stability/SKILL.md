@@ -33,7 +33,11 @@ audit$plot_exposure()                                # pooled excess-exposure pr
 audit$plot_exposure("Exocrine epithelial", "Endothelial", correction = correction)
 audit$plot_reference("Exocrine epithelial", "Endothelial")   # the reference ladder
 audit$plot_remaining(list(membrane = correction))    # estimated admixture left per correction
+audit$exposure(correction = correction)              # the per-bin table behind plot_exposure()
+audit$remaining(list(membrane = correction))         # the table behind plot_remaining()
 ```
+
+With a correction, `plot_exposure()` shades the band between the before and after curves (the admixture removed at each exposure level), in both bindings.
 
 Python mirrors every call (`fit.audit_admixture()`, `audit.pairs()`, `audit.plot_map()`, ...).
 

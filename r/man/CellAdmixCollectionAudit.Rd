@@ -6,6 +6,7 @@
 \description{
 One \link{CellAdmixAudit} per sample, with pooled per-pair estimates and
 per-sample cleanup verification. \code{plot_map()} draws each sample's
-admixture map before any correction, one row per sample, on one color
-scale; the map after a correction is \code{evaluate(correction)$plot_map()}.
+admixture map before any correction, one row per sample (\code{samples}
+selects a subset), on one color scale; the map after a correction is
+\code{evaluate(correction)$plot_map()}.
 }

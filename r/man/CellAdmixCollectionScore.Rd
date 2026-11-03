@@ -29,5 +29,7 @@ the vote in each sample) are independent jobs that run concurrently in
 forked worker processes, as many at a time as fit a thread budget given
 the threads each job uses: \code{num_threads} sets the budget (default: the
 \code{CELLADMIX_NUM_THREADS} environment variable, or else the number of
-available cores).
+available cores). \code{plot_heatmap()} draws the pooled evidence like a single
+sample's scoring matrix: rows are cell types, columns the shared factors,
+with the removal calls and the vetoes of the native-factor check marked.
 }

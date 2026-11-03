@@ -276,9 +276,13 @@ class CollectionTests(unittest.TestCase):
         if audit.pairs()["detected"].any():
             self.assertEqual(audit.plot_map().shape, (2, 1))
             self.assertEqual(report.plot_map().shape, (2, 2))
+            self.assertEqual(report.plot_map(samples=["a"]).shape, (1, 2))
+            self.assertIsNotNone(report.plot_remaining())
+            self.assertEqual(report.plot_exposure().ndim, 2)
         else:
             with self.assertRaises(ValueError):
                 audit.plot_map()
+        self.assertIsNotNone(score.plot_heatmap())
 
         again = self.collection.fit_consensus()
         self.assertEqual(again.params["run_id"], consensus.params["run_id"])

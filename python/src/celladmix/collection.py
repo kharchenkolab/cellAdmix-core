@@ -493,6 +493,24 @@ class CellAdmixCollectionScore:
                                                   native_outlier_min_frac, neighbor_k)
         return rules
 
+    def plot_heatmap(self, *, p_thresh: float = 0.1, adjust_p: bool = False,
+                     native_check: bool = True, **kwargs):
+        """The pooled evidence drawn like a single sample's scoring matrix:
+        rows cell types, columns shared factors; removal calls the
+        native-factor check rejects are marked ``(*)``."""
+        from ._score_utils import vetoed_calls_from_rules
+        from .plotting import plot_score_heatmap
+
+        vetoed = None
+        if native_check:
+            try:
+                flagged = self.rules(p_thresh=p_thresh, adjust_p=adjust_p)
+            except Exception:
+                flagged = None
+            vetoed = vetoed_calls_from_rules(flagged)
+        return plot_score_heatmap(self.summary, p_thresh=p_thresh, adjust_p=adjust_p,
+                                  vetoed_calls=vetoed, **kwargs)
+
     def correct(self, rules=None, *, name: Optional[str] = None, p_thresh: float = 0.1,
                 adjust_p: bool = False, targets=None, ensemble: Optional[int] = None,
                 vote: float = 0.3, apply_rules: str = "everywhere",
@@ -930,13 +948,15 @@ class CellAdmixCollectionAudit:
             pooled = pooled[pooled["detected"]]
         return pooled.sort_values("admixed_molecules", ascending=False).reset_index(drop=True)
 
-    def plot_map(self, value: str = "rate", detected_only: bool = True, axes=None):
+    def plot_map(self, value: str = "rate", detected_only: bool = True, samples=None, axes=None):
         """Each sample's admixture map before any correction, one row per
-        sample, on one color scale; returns the axes array."""
+        sample (``samples`` selects a subset), on one color scale; returns the
+        axes array."""
         from .audit import _audit_pairs, _plot_pair_maps
 
-        return _plot_pair_maps([[(sample, _audit_pairs(audit, detected_only))]
-                                for sample, audit in self.audits.items()], value, axes)
+        chosen = list(self.audits) if samples is None else [s for s in samples if s in self.audits]
+        return _plot_pair_maps([[(sample, _audit_pairs(self.audits[sample], detected_only))]
+                                for sample in chosen], value, axes)
 
     def evaluate(self, correction, **kwargs):
         corrections = correction.corrections if isinstance(correction, CellAdmixCollectionCorrection) else correction
@@ -970,14 +990,66 @@ class CellAdmixCollectionCleanupReport:
         out = pd.concat(frames, ignore_index=True)
         return out[["sample"] + [c for c in out.columns if c != "sample"]]
 
-    def plot_map(self, value: str = "rate", axes=None):
+    def _selected(self, samples) -> list:
+        return list(self.reports) if samples is None else [s for s in samples if s in self.reports]
+
+    def plot_map(self, value: str = "rate", samples=None, axes=None):
         """Per sample, the admixture map before the correction next to what
         remains after it, all panels on one color scale; returns the axes array."""
         from .audit import _audit_pairs, _plot_pair_maps, _remaining_pairs
 
-        return _plot_pair_maps([[(f"{s}: before correction", _audit_pairs(report.audit)),
-                                 (f"{s}: after correction", _remaining_pairs(report))]
-                                for s, report in self.reports.items()], value, axes)
+        return _plot_pair_maps([[(f"{s}: before correction", _audit_pairs(self.reports[s].audit)),
+                                 (f"{s}: after correction", _remaining_pairs(self.reports[s]))]
+                                for s in self._selected(samples)], value, axes)
+
+    def plot_remaining(self, samples=None, ax=None):
+        """The estimated admixture of each sample's molecules before and after
+        the correction, as bars grouped by sample."""
+        import matplotlib.pyplot as plt
+
+        from .audit import _draw_remaining
+
+        frames = []
+        for s in self._selected(samples):
+            report = self.reports[s]
+            frames.append(report.audit.remaining({"corrected": report.correction}).assign(sample=s))
+        if ax is None:
+            _, ax = plt.subplots(figsize=(max(4.4, 0.9 * len(frames) + 2.5), 3.6))
+        return _draw_remaining(ax, pd.concat(frames, ignore_index=True))
+
+    def plot_exposure(self, source=None, target=None, strict: bool = True, samples=None,
+                      ncols: int = 4, axes=None):
+        """Each sample's exposure profile before and after the correction, one
+        panel per sample in a grid of ``ncols`` columns; samples without a
+        detected pair are left out. Returns the axes array."""
+        import matplotlib.pyplot as plt
+
+        from .audit import _draw_exposure
+
+        frames = {}
+        for s in self._selected(samples):
+            report = self.reports[s]
+            try:
+                frames[s] = report.audit.exposure(source, target, report.correction, strict)
+            except ValueError:
+                continue
+        if not frames:
+            raise ValueError("No detected admixture pairs")
+        n = len(frames)
+        ncols = max(1, min(ncols, n))
+        nrows = -(-n // ncols)
+        if axes is None:
+            fig, axes = plt.subplots(nrows, ncols, figsize=(4.8 * ncols, 3.8 * nrows),
+                                     squeeze=False, layout="constrained")
+        else:
+            axes = np.asarray(axes).reshape(nrows, ncols)
+        flat = axes.ravel()
+        for ax, (s, df) in zip(flat, frames.items()):
+            _draw_exposure(ax, df, pooled=source is None, source=source, target=target)
+            ax.set_title(s if source is None else f"{s}: {source} \u2192 {target}", fontsize=10)
+        for ax in flat[n:]:
+            ax.set_axis_off()
+        return axes
 
 
 # ---- consensus helpers -------------------------------------------------------
