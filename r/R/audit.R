@@ -924,7 +924,10 @@ CellAdmixAudit <- R6::R6Class(
 #'
 #' Created by `audit$evaluate(correction)`: per-pair cleanup sensitivity
 #' against the audit's leakage estimates, plus own-marker false-removal
-#' rates per cell type.
+#' rates per cell type. `plot_map()` draws the audit's admixture map before
+#' the correction next to the admixture that remains after it, on one color
+#' scale; a pair's remaining admixture is its estimate times the share of
+#' its exposure-linked excess the correction left.
 #' @export
 CellAdmixCleanupReport <- R6::R6Class(
   "CellAdmixCleanupReport",
@@ -958,6 +961,13 @@ CellAdmixCleanupReport <- R6::R6Class(
       )
     },
 
+    plot_map = function(value = c("rate", "molecules")) {
+      .celladmix_require_ggplot2()
+      value <- match.arg(value)
+      .celladmix_plot_pair_maps(.celladmix_cleanup_map_frame(self, value), value,
+        subtitle_suffix = ", before and after the correction")
+    },
+
     plot_cleanup = function() {
       .celladmix_require_ggplot2()
       p <- private$.pairs
@@ -983,6 +993,65 @@ CellAdmixCleanupReport <- R6::R6Class(
 )
 
 scales_comma <- function(x) format(x, big.mark = ",", scientific = FALSE)
+
+# The before-and-after frame of a cleanup report: per detected pair, the
+# audit's estimate before the correction and what remains after it, as the
+# admixture rate in percent or as molecules. A pair's remaining admixture is
+# its estimate times the share of its exposure-linked excess the correction
+# left; a pair whose sensitivity could not be measured is shown unchanged.
+.celladmix_cleanup_map_frame <- function(report, value) {
+  before <- report$audit$pairs(detected_only = TRUE)
+  if (is.null(before) || !nrow(before)) {
+    return(data.frame(source = character(), target = character(), stage = character(),
+      fill = numeric(), stringsAsFactors = FALSE))
+  }
+  after <- report$pairs()
+  sensitivity <- after$sensitivity[match(paste(before$source, before$target, sep = "\r"),
+    paste(after$source, after$target, sep = "\r"))]
+  left <- 1 - pmax(sensitivity, 0)
+  left[is.na(left)] <- 1
+  amount <- if (identical(value, "rate")) 100 * before$rate else before$admixed_molecules
+  stage <- function(name, fill) {
+    data.frame(source = before$source, target = before$target, stage = rep(name, nrow(before)),
+      fill = fill, stringsAsFactors = FALSE)
+  }
+  rbind(stage("before correction", amount), stage("after correction", amount * left))
+}
+
+# Admixture maps in the style of the audit's own map: `df` holds source,
+# target, and the fill (the rate in percent or the molecule estimate), with an
+# optional `sample` column that becomes the facet rows and an optional `stage`
+# column that becomes the facet columns; every panel shares one color scale.
+.celladmix_plot_pair_maps <- function(df, value, subtitle_suffix = "") {
+  if (!nrow(df)) {
+    return(.celladmix_empty_plot("No detected admixture pairs"))
+  }
+  if ("stage" %in% names(df)) {
+    df$stage <- factor(df$stage, levels = c("before correction", "after correction"))
+  }
+  if (identical(value, "rate")) {
+    df$label <- sprintf("%.1f", df$fill)
+    legend_name <- "% of target-type\nmolecules"
+    subtitle <- paste0("estimated admixture rate: molecules leaked from source,\nas % of the target type's molecules", subtitle_suffix)
+  } else {
+    df$label <- ifelse(df$fill >= 1000, sprintf("%.0fk", df$fill / 1000), sprintf("%.0f", df$fill))
+    legend_name <- "admixed\nmolecules"
+    subtitle <- paste0("cell text: estimated admixed molecules", subtitle_suffix)
+  }
+  p <- ggplot2::ggplot(df, ggplot2::aes(x = target, y = source, fill = fill)) +
+    ggplot2::geom_tile(color = "white", linewidth = 0.4) +
+    ggplot2::geom_text(ggplot2::aes(label = label), size = 2.6) +
+    ggplot2::scale_fill_gradient(low = "#fff5eb", high = "#d94801", name = legend_name) +
+    ggplot2::labs(x = "target cell type", y = "source cell type",
+      title = "Estimated admixture by cell-type pair", subtitle = subtitle) +
+    ggplot2::theme_minimal(base_size = 10) +
+    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 40, hjust = 1),
+      panel.grid = ggplot2::element_blank(),
+      panel.border = ggplot2::element_rect(fill = NA, color = "grey35", linewidth = 0.35))
+  rows <- if ("sample" %in% names(df)) ggplot2::vars(sample) else NULL
+  cols <- if ("stage" %in% names(df)) ggplot2::vars(stage) else NULL
+  if (is.null(rows) && is.null(cols)) p else p + ggplot2::facet_grid(rows = rows, cols = cols)
+}
 
 #' Generative Admixture Model
 #'

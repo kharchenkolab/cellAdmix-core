@@ -277,6 +277,10 @@ test_that("the generative correction removes planted admixture", {
   p <- report$pairs()
   ab <- p[p$source == "A" & p$target == "B", ]
   expect_gt(ab$sensitivity, 0.5)
+  if (requireNamespace("ggplot2", quietly = TRUE)) {
+    expect_s3_class(report$plot_map(), "ggplot")
+    expect_s3_class(report$plot_map(value = "molecules"), "ggplot")
+  }
 })
 
 test_that("the dataset-level audit matches the fit-level audit and runs NMF-free", {

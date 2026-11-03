@@ -1072,7 +1072,9 @@ CellAdmixCollectionCorrection <- R6::R6Class(
 #' Per-Sample Admixture Audits of a Consensus Fit
 #'
 #' One [CellAdmixAudit] per sample, with pooled per-pair estimates and
-#' per-sample cleanup verification.
+#' per-sample cleanup verification. `plot_map()` draws each sample's
+#' admixture map before any correction, one row per sample, on one color
+#' scale; the map after a correction is `evaluate(correction)$plot_map()`.
 #' @export
 CellAdmixCollectionAudit <- R6::R6Class(
   "CellAdmixCollectionAudit",
@@ -1119,6 +1121,16 @@ CellAdmixCollectionAudit <- R6::R6Class(
       pooled[order(-pooled$admixed_molecules), , drop = FALSE]
     },
 
+    plot_map = function(value = c("rate", "molecules"), detected_only = TRUE) {
+      .celladmix_require_ggplot2()
+      value <- match.arg(value)
+      pairs <- self$pairs(by_sample = TRUE, detected_only = detected_only)
+      df <- data.frame(sample = pairs$sample, source = pairs$source, target = pairs$target,
+        fill = if (identical(value, "rate")) 100 * pairs$rate else pairs$admixed_molecules,
+        stringsAsFactors = FALSE)
+      .celladmix_plot_pair_maps(df, value)
+    },
+
     evaluate = function(correction, ...) {
       corrections <- if (inherits(correction, "CellAdmixCollectionCorrection")) {
         correction$corrections
@@ -1137,6 +1149,9 @@ CellAdmixCollectionAudit <- R6::R6Class(
 #' Per-Sample Cleanup Reports
 #'
 #' The [CellAdmixCleanupReport] of every sample, with stacked summaries.
+#' `plot_map()` draws, one row per sample, the admixture map before the
+#' correction next to the admixture that remains after it, all panels on one
+#' color scale.
 #' @export
 CellAdmixCollectionCleanupReport <- R6::R6Class(
   "CellAdmixCollectionCleanupReport",
@@ -1149,6 +1164,17 @@ CellAdmixCollectionCleanupReport <- R6::R6Class(
     },
     pairs = function() {
       .celladmix_stack_samples(lapply(self$reports, function(report) report$pairs()))
+    },
+    plot_map = function(value = c("rate", "molecules")) {
+      .celladmix_require_ggplot2()
+      value <- match.arg(value)
+      frames <- lapply(names(self$reports), function(sample) {
+        df <- .celladmix_cleanup_map_frame(self$reports[[sample]], value)
+        df$sample <- rep(sample, nrow(df))
+        df
+      })
+      .celladmix_plot_pair_maps(do.call(rbind, frames), value,
+        subtitle_suffix = ", before and after the correction")
     }
   )
 )

@@ -891,7 +891,9 @@ class CellAdmixCollectionCorrection:
 
 class CellAdmixCollectionAudit:
     """One audit per sample, with pooled per-pair estimates and per-sample
-    cleanup verification."""
+    cleanup verification. ``plot_map()`` draws each sample's admixture map
+    before any correction, one row per sample, on one color scale; the map
+    after a correction is ``evaluate(correction).plot_map()``."""
 
     def __init__(self, consensus, audits):
         self.consensus = consensus
@@ -928,6 +930,14 @@ class CellAdmixCollectionAudit:
             pooled = pooled[pooled["detected"]]
         return pooled.sort_values("admixed_molecules", ascending=False).reset_index(drop=True)
 
+    def plot_map(self, value: str = "rate", detected_only: bool = True, axes=None):
+        """Each sample's admixture map before any correction, one row per
+        sample, on one color scale; returns the axes array."""
+        from .audit import _audit_pairs, _plot_pair_maps
+
+        return _plot_pair_maps([[(sample, _audit_pairs(audit, detected_only))]
+                                for sample, audit in self.audits.items()], value, axes)
+
     def evaluate(self, correction, **kwargs):
         corrections = correction.corrections if isinstance(correction, CellAdmixCollectionCorrection) else correction
         reports = {s: audit.evaluate(corrections[s], **kwargs) for s, audit in self.audits.items()}
@@ -935,7 +945,10 @@ class CellAdmixCollectionAudit:
 
 
 class CellAdmixCollectionCleanupReport:
-    """The cleanup report of every sample, with stacked summaries."""
+    """The cleanup report of every sample, with stacked summaries.
+    ``plot_map()`` draws, one row per sample, the admixture map before the
+    correction next to the admixture that remains after it, all panels on one
+    color scale."""
 
     def __init__(self, reports):
         self.reports = reports
@@ -956,6 +969,15 @@ class CellAdmixCollectionCleanupReport:
         frames = [report.pairs().assign(sample=s) for s, report in self.reports.items()]
         out = pd.concat(frames, ignore_index=True)
         return out[["sample"] + [c for c in out.columns if c != "sample"]]
+
+    def plot_map(self, value: str = "rate", axes=None):
+        """Per sample, the admixture map before the correction next to what
+        remains after it, all panels on one color scale; returns the axes array."""
+        from .audit import _audit_pairs, _plot_pair_maps, _remaining_pairs
+
+        return _plot_pair_maps([[(f"{s}: before correction", _audit_pairs(report.audit)),
+                                 (f"{s}: after correction", _remaining_pairs(report))]
+                                for s, report in self.reports.items()], value, axes)
 
 
 # ---- consensus helpers -------------------------------------------------------

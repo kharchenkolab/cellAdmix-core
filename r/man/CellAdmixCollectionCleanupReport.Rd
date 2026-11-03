@@ -5,4 +5,7 @@
 \title{Per-Sample Cleanup Reports}
 \description{
 The \link{CellAdmixCleanupReport} of every sample, with stacked summaries.
+\code{plot_map()} draws, one row per sample, the admixture map before the
+correction next to the admixture that remains after it, all panels on one
+color scale.
 }

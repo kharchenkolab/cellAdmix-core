@@ -271,6 +271,14 @@ class CollectionTests(unittest.TestCase):
         report = audit.evaluate(correction)
         self.assertEqual(report.samples(), ["a", "b"])
         self.assertIn("sample", report.summary().columns)
+        import matplotlib
+        matplotlib.use("Agg")
+        if audit.pairs()["detected"].any():
+            self.assertEqual(audit.plot_map().shape, (2, 1))
+            self.assertEqual(report.plot_map().shape, (2, 2))
+        else:
+            with self.assertRaises(ValueError):
+                audit.plot_map()
 
         again = self.collection.fit_consensus()
         self.assertEqual(again.params["run_id"], consensus.params["run_id"])

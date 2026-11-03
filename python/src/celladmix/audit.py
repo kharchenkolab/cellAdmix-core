@@ -735,8 +735,99 @@ def _align_counts(matrix, genes, cells, ref_genes, ref_cells):
     return out.tocsc()
 
 
+def _audit_pairs(audit, detected_only: bool = True) -> pd.DataFrame:
+    """An audit's pairs table, empty with the map's columns when the audit found no pair."""
+    pairs = audit.pairs()
+    if pairs.empty:
+        return pd.DataFrame(columns=["source", "target", "rate", "admixed_molecules", "detected"])
+    return pairs[pairs["detected"]] if detected_only else pairs
+
+
+def _pair_grid(pairs: pd.DataFrame, value: str):
+    """Sources-by-targets grid of a pairs table's rate (in percent) or molecule estimate."""
+    sources = sorted(pairs["source"].unique())
+    targets = sorted(pairs["target"].unique())
+    amount = (100 * pairs["rate"] if value == "rate" else pairs["admixed_molecules"]).to_numpy(dtype=float)
+    grid = np.full((len(sources), len(targets)), np.nan)
+    for source, target, v in zip(pairs["source"], pairs["target"], amount):
+        grid[sources.index(source), targets.index(target)] = v
+    return grid, sources, targets
+
+
+def _remaining_pairs(report) -> pd.DataFrame:
+    """The audit's detected pairs with rate and molecules scaled by the share of
+    the exposure-linked excess the correction left; a pair whose sensitivity could
+    not be measured is left unchanged."""
+    before = _audit_pairs(report.audit).copy()
+    after = report.pairs()
+    sensitivity = after.set_index(["source", "target"])["sensitivity"] if len(after) else pd.Series(dtype=float)
+    keys = pd.MultiIndex.from_arrays([before["source"], before["target"]])
+    left = 1 - sensitivity.reindex(keys).clip(lower=0).fillna(0).to_numpy()
+    before["rate"] = before["rate"].to_numpy() * left
+    before["admixed_molecules"] = before["admixed_molecules"].to_numpy() * left
+    return before
+
+
+def _draw_pair_map(ax, grid, sources, targets, value, vmax, title):
+    if grid.size == 0:
+        ax.text(0.5, 0.5, "No detected admixture pairs", ha="center", va="center", transform=ax.transAxes)
+        ax.set_axis_off()
+        ax.set_title(title, fontsize=10)
+        return None
+    im = ax.imshow(grid, cmap="Oranges", aspect="auto", vmin=0, vmax=vmax)
+    for i in range(grid.shape[0]):
+        for j in range(grid.shape[1]):
+            v = grid[i, j]
+            if np.isnan(v):
+                continue
+            text = f"{v:.1f}" if value == "rate" else (f"{v / 1000:.0f}k" if v >= 1000 else f"{v:.0f}")
+            ax.text(j, i, text, ha="center", va="center", fontsize=7)
+    ax.set_xticks(range(len(targets)), targets, rotation=40, ha="right")
+    ax.set_yticks(range(len(sources)), sources)
+    ax.set_xlabel("target cell type")
+    ax.set_ylabel("source cell type")
+    ax.set_title(title, fontsize=10)
+    for spine in ax.spines.values():
+        spine.set_visible(True)
+        spine.set_color("grey")
+    return im
+
+
+def _plot_pair_maps(panels, value, axes=None):
+    """Admixture maps in the style of ``CellAdmixAudit.plot_map``: ``panels`` is
+    a list of rows, each a list of ``(title, pairs table)``; every panel shares
+    one color scale. Returns the axes array (rows x columns)."""
+    import matplotlib.pyplot as plt
+
+    grids = [[(title, *_pair_grid(pairs, value)) for title, pairs in row] for row in panels]
+    filled = [grid for row in grids for _, grid, _, _ in row if grid.size]
+    if not filled:
+        raise ValueError("No detected admixture pairs")
+    vmax = max(np.nanmax(grid) for grid in filled)
+    n_rows, n_cols = len(grids), max(len(row) for row in grids)
+    if axes is None:
+        fig, axes = plt.subplots(n_rows, n_cols, figsize=(6.5 * n_cols, 5.2 * n_rows),
+                                 squeeze=False, layout="constrained")
+    else:
+        axes = np.asarray(axes).reshape(n_rows, n_cols)
+        fig = axes[0, 0].figure
+    image = None
+    for row_axes, row in zip(axes, grids):
+        for ax, (title, grid, sources, targets) in zip(row_axes, row):
+            image = _draw_pair_map(ax, grid, sources, targets, value, vmax, title) or image
+    fig.colorbar(image, ax=axes.ravel().tolist(), fraction=0.02, pad=0.02,
+                 label="% of target-type molecules" if value == "rate" else "admixed molecules")
+    return axes
+
+
 class CellAdmixCleanupReport:
-    """Per-pair cleanup verification produced by ``audit.evaluate()``."""
+    """Per-pair cleanup verification produced by ``audit.evaluate()``.
+
+    ``plot_map()`` draws the audit's admixture map before the correction next
+    to the admixture that remains after it, on one color scale; a pair's
+    remaining admixture is its estimate times the share of its exposure-linked
+    excess the correction left.
+    """
 
     def __init__(self, audit, correction, pairs, false_removal):
         self.audit = audit
@@ -761,6 +852,12 @@ class CellAdmixCleanupReport:
             own_marker_false_removal=float(
                 (fr["false_removal"] * fr["own_marker_molecules"]).sum() /
                 max(fr["own_marker_molecules"].sum(), 1)))
+
+    def plot_map(self, value="rate", axes=None):
+        """Admixture maps before and after the correction, side by side, on
+        one color scale; returns the two axes."""
+        return _plot_pair_maps([[("before correction", _audit_pairs(self.audit)),
+                                 ("after correction", _remaining_pairs(self))]], value, axes)
 
     def plot_cleanup(self, ax=None):
         import matplotlib.pyplot as plt

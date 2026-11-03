@@ -6,5 +6,8 @@
 \description{
 Created by \code{audit$evaluate(correction)}: per-pair cleanup sensitivity
 against the audit's leakage estimates, plus own-marker false-removal
-rates per cell type.
+rates per cell type. \code{plot_map()} draws the audit's admixture map before
+the correction next to the admixture that remains after it, on one color
+scale; a pair's remaining admixture is its estimate times the share of
+its exposure-linked excess the correction left.
 }

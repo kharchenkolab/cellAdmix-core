@@ -243,6 +243,10 @@ test_that("a consensus factorization pools two samples end to end", {
   expect_true(all(c("admixed_molecules", "rate", "n_samples") %in% names(pooled_pairs)))
   expect_true(all(c("source", "target") %in% names(by_sample)))
   report <- audit$evaluate(correction)
+  if (requireNamespace("ggplot2", quietly = TRUE)) {
+    expect_s3_class(audit$plot_map(), "ggplot")
+    expect_s3_class(report$plot_map(), "ggplot")
+  }
   expect_equal(report$samples(), c("a", "b"))
   expect_true("sample" %in% names(report$summary()))
 

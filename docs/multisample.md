@@ -272,8 +272,10 @@ correction$summary()                                 # removal per cell type per
 correction$counts()                                  # combined; columns "<sample>_<cell_id>"
 correction$counts(sample = "rep1")                   # one sample, original cell ids
 audit <- consensus$audit_admixture()
+audit$plot_map()                                     # admixture map per sample, before correction
 report <- audit$evaluate(correction)
 report$summary()                                     # per-sample cleanup verification
+report$plot_map()                                    # before and after maps, one row per sample
 consensus$diagnostics()                              # per-sample representation flags
 correction$diagnostics(report)                       # rules without local evidence, audit per sample
 ```
@@ -295,8 +297,10 @@ correction.summary()                                # removal per cell type per 
 counts, genes, cells = correction.counts()          # combined; cells "<sample>_<cell_id>"
 counts, genes, cells = correction.counts(sample="rep1")  # one sample, original cell ids
 audit = consensus.audit_admixture()
+audit.plot_map()                                    # admixture map per sample, before correction
 report = audit.evaluate(correction)
 report.summary()                                    # per-sample cleanup verification
+report.plot_map()                                   # before and after maps, one row per sample
 consensus.diagnostics()                             # per-sample representation flags
 correction.diagnostics(report)                      # rules without local evidence, audit per sample
 ```

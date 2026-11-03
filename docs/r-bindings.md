@@ -291,6 +291,7 @@ type loses more than 25% of its own-marker molecules.
 report <- audit$evaluate(correction)
 report$summary()
 report$plot_cleanup()
+report$plot_map()                  # admixture maps before and after the correction
 ```
 
 The reported rates and molecule counts include the contamination present

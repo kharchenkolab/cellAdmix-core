@@ -200,6 +200,7 @@ report = audit.evaluate(correction) # per-pair sensitivity, false removal,
 report.summary()                    # warnings for pairs left largely
 report.plot_cleanup()               # uncorrected and for severe own-marker
                                     # over-removal (>25%)
+report.plot_map()                   # admixture maps before and after the correction
 ```
 
 The audit can also correct the admixture it measures, through the

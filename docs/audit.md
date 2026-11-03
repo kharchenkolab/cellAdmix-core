@@ -270,6 +270,7 @@ correction <- fit$correct(fit$score_membrane())  # molecule-vote ensemble cleanu
 report <- audit$evaluate(correction)  # per-pair sensitivity, own-marker false removal
 report$summary()
 report$plot_cleanup()                 # sensitivity bars, molecule counts (Figure 1c)
+report$plot_map()                     # admixture maps before and after the correction
 
 audit$plot_exposure("Exocrine epithelial", "Endothelial",
   correction = correction)            # one pair's dose-response curves (Figure 1a)
