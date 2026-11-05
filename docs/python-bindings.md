@@ -202,9 +202,9 @@ audit.plot_exposure()               # pooled excess-exposure profile, 95% interv
 audit.plot_remaining({"membrane": correction})
 
 report = audit.evaluate(correction) # per-pair sensitivity, false removal,
-report.summary()                    # warnings for pairs left largely
-report.plot_cleanup()               # uncorrected and for severe own-marker
-                                    # over-removal (>25%)
+report.summary()                    # the excess yardstick; warnings for
+report.yardstick()                  # pairs left largely uncorrected and
+report.plot_cleanup()               # for severe own-marker over-removal
 ```
 
 The audit can also correct the admixture it measures, through the

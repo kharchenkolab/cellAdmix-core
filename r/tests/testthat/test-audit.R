@@ -273,10 +273,28 @@ test_that("the generative correction removes planted admixture", {
     expect_gt(removed_i, 0.5 * removed_default)
     expect_lt(removed_i, 2 * removed_default)
   }
-  report <- audit$evaluate(correction)
+  report <- audit$evaluate(correction, yardstick_min_molecules = 50)
   p <- report$pairs()
   ab <- p[p$source == "A" & p$target == "B", ]
   expect_gt(ab$sensitivity, 0.5)
+  # the excess yardstick: the A-marker molecules planted into B cells near
+  # the boundary lie entirely above their level in B cells far from A, and
+  # the correction removes most of them
+  yg <- report$yardstick_genes()
+  a_in_b <- yg[yg$cell_type == "B" & yg$gene %in% genes_a, ]
+  expect_equal(nrow(a_in_b), 3)
+  expect_true(all(a_in_b$shedding_type == "A"))
+  expect_true(all(a_in_b$excess_share > 0.5))
+  expect_true(all(a_in_b$removed_share > 0.5))
+  y <- report$yardstick()
+  expect_true("all" %in% y$cell_type)
+  s <- report$summary()
+  expect_true(all(c("yardstick_excess_share", "yardstick_removed_share",
+    "yardstick_deviation") %in% names(s)))
+  identity_correction <- list(counts = function() before)
+  y0 <- audit$evaluate(identity_correction, warn_uncovered = FALSE,
+    yardstick_min_molecules = 50)$yardstick()
+  expect_equal(y0$removed_share[y0$cell_type == "all"], 0, tolerance = 1e-9)
 })
 
 test_that("the generative fit reports progress only when verbose", {

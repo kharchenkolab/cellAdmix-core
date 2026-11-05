@@ -237,9 +237,29 @@ certain:
   exposes losses of shared genes (e.g. CFTR, genuinely expressed by both
   exocrine and ductal cells) that pooled rates average away.
 
+- **The excess yardstick.** The two metrics above sample the easiest
+  molecules; a third reads the whole panel. For every gene a type
+  expresses, the class that sheds it is the other type expressing it
+  most, and the gene's level in the type's reference cells for that
+  class (the audited pair's reference stratum, out of reach of transfer
+  from it) is what the type would carry without admixture. The share of
+  the gene's content above that level is the excess, and a correction
+  should remove at least that much: one that removes much less leaves
+  transfer in place, one that removes much more takes own expression.
+  Genuine spatial variation of own expression also produces excess, so
+  the yardstick is read per type and over all genes, molecule-weighted,
+  with the mean absolute deviation of removal from excess, not gene by
+  gene. On pancreas the generative correction removes 0.21 of the
+  content of the 1,534 type–gene pairs the yardstick covers against an
+  excess of 0.25, with a deviation of 0.16: it removes slightly more than
+  the excess in exocrine cells (0.12 against 0.11) and less in ductal
+  (0.22 against 0.34), immune (0.34 against 0.41) and endothelial cells
+  (0.35 against 0.41), where the far cells of a type differ from its
+  exposed cells in state as well as in exposure.
+
 The two gene sets bracket the unmeasurable middle (shared and
 non-distinctive genes), and all headline results below are reported in
-these terms.
+these terms, with the yardstick as the panel-wide check on the amount.
 
 ## Running the audit
 

@@ -282,7 +282,10 @@ audit$evaluate(correction)
 
 `audit$evaluate(correction)` verifies a correction against the same
 measurements: per-pair cleanup sensitivity, the own-marker false-removal
-rate per cell type (removal of near-surely-genuine molecules), a warning
+rate per cell type (removal of near-surely-genuine molecules), the excess
+yardstick (per cell type, the share of the shed genes' content above the
+level in the type's reference cells against the share removed; see
+[audit.md](audit.md)), a warning
 for any detected pair whose molecules the correction measurably failed to
 remove (based on the corrected counts themselves, since ensemble members
 can remove molecules for pairs absent from the primary rule list and rules
@@ -292,6 +295,7 @@ type loses more than 25% of its own-marker molecules.
 ```r
 report <- audit$evaluate(correction)
 report$summary()
+report$yardstick()
 report$plot_cleanup()
 ```
 

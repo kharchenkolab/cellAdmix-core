@@ -136,6 +136,34 @@ class GenerativeCorrectionTests(unittest.TestCase):
         with self.assertRaises(Exception):
             self.audit.fit_generative(num_threads=2, dose_mode="bogus")
 
+    def test_evaluate_reports_the_excess_yardstick(self):
+        model = self.audit.fit_generative(num_threads=2)
+        report = self.audit.evaluate(model.correct(), yardstick_min_molecules=50)
+        genes = report.yardstick_genes()
+        # the A-marker molecules planted into B cells near the boundary lie
+        # entirely above their level in B cells far from A, and the
+        # generative correction removes most of them
+        a_in_b = genes[(genes.cell_type == "B") & genes.gene.str.startswith("a")]
+        self.assertEqual(len(a_in_b), 3)
+        self.assertTrue((a_in_b.shedding_type == "A").all())
+        self.assertTrue((a_in_b.excess_share > 0.5).all())
+        self.assertTrue((a_in_b.removed_share > 0.5).all())
+        by_type = report.yardstick()
+        self.assertIn("all", set(by_type.cell_type))
+        for key in ("yardstick_excess_share", "yardstick_removed_share",
+                    "yardstick_deviation"):
+            self.assertIn(key, report.summary())
+        # a correction that removes nothing has a removed share of zero
+        audit = self.audit
+
+        class Identity:
+            def counts(self):
+                return audit._matrix, audit._genes, audit._cells
+        y0 = audit.evaluate(Identity(), warn_uncovered=False,
+                            yardstick_min_molecules=50).yardstick()
+        self.assertAlmostEqual(
+            float(y0[y0.cell_type == "all"].removed_share.iloc[0]), 0.0)
+
     def test_neighbor_profiles_split_the_fraction_over_the_source_neighbors(self):
         before, genes, cells = self.fit.counts()
         b_cells = np.array([self.audit._ctypes.get(c) == "B" for c in cells])

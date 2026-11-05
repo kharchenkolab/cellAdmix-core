@@ -386,6 +386,7 @@ celladmix_audit_admixture <- function(fit, annotation = NULL, neighbor_k = 15L,
   }
   CellAdmixAudit$new(cells = cells, pair_defs = pair_defs, counts = counts,
     totals = totals, cell_types = cell_types, native_markers = native_markers,
+    profiles = profiles,
     params = list(neighbor_k = neighbor_k, n_pool = n_pool, q_thresh = q_thresh,
       min_excess = min_excess))
 }
@@ -404,7 +405,7 @@ CellAdmixAudit <- R6::R6Class(
     params = NULL,
 
     initialize = function(cells, pair_defs, counts, totals, cell_types,
-                          native_markers, params = list()) {
+                          native_markers, params = list(), profiles = NULL) {
       self$params <- params
       private$.default_init <- "clusters"
       private$.cells <- cells
@@ -413,6 +414,8 @@ CellAdmixAudit <- R6::R6Class(
       private$.totals <- totals
       private$.cell_types <- cell_types
       private$.native_markers <- native_markers
+      private$.profiles <- if (is.null(profiles))
+        .celladmix_audit_profiles(counts, cell_types) else profiles
     },
 
     pairs = function(detected_only = FALSE) {
@@ -845,7 +848,8 @@ CellAdmixAudit <- R6::R6Class(
         ggplot2::theme_classic(base_size = 10)
     },
 
-    evaluate = function(correction, warn_uncovered = TRUE) {
+    evaluate = function(correction, warn_uncovered = TRUE,
+                        yardstick_min_molecules = 200) {
       counts_after <- correction$counts()
       rows <- list()
       for (d in private$.pair_defs) {
@@ -908,15 +912,70 @@ CellAdmixAudit <- R6::R6Class(
             missed$source[[i]], missed$target[[i]]), call. = FALSE)
         }
       }
+      yardstick_genes <- private$.yardstick_genes(counts_after,
+        yardstick_min_molecules)
       CellAdmixCleanupReport$new(audit = self, correction = correction,
-        pairs = pairs, false_removal = fr)
+        pairs = pairs, false_removal = fr,
+        yardstick = .celladmix_audit_yardstick_by_type(yardstick_genes),
+        yardstick_genes = yardstick_genes)
     }
   ),
   private = list(
     .cells = NULL,
     .default_init = "clusters",
     .pair_defs = NULL, .counts = NULL, .totals = NULL,
-    .cell_types = NULL, .native_markers = NULL,
+    .cell_types = NULL, .native_markers = NULL, .profiles = NULL,
+    # Per cell type and gene: the share of the gene's content in the
+    # type's cells above its level in the type's reference cells for the
+    # class that sheds the gene (the audited pair's reference stratum, out
+    # of reach of transfer from that class), and the share the correction
+    # removed. A gene's shedding class is the other type expressing it
+    # most; genes whose shedding class has no audited pair into the type,
+    # or with fewer than min_molecules molecules in it, are left out.
+    .yardstick_genes = function(counts_after, min_molecules = 200) {
+      counts <- private$.counts
+      profiles <- private$.profiles
+      types <- colnames(profiles)
+      empty <- data.frame(cell_type = character(), gene = character(),
+        shedding_type = character(), molecules = numeric(),
+        excess_share = numeric(), removed_share = numeric(),
+        stringsAsFactors = FALSE)
+      rows <- list()
+      for (t in types) {
+        defs <- Filter(function(d) d$target == t, private$.pair_defs)
+        if (!length(defs)) next
+        T_cells <- defs[[1]]$T_cells
+        tot <- private$.totals[T_cells]
+        total <- sum(tot)
+        content <- Matrix::rowSums(counts[, T_cells, drop = FALSE])
+        kept <- stats::setNames(rep(0, nrow(counts)), rownames(counts))
+        common_g <- intersect(rownames(counts), rownames(counts_after))
+        common_c <- intersect(T_cells, colnames(counts_after))
+        kept[common_g] <- Matrix::rowSums(
+          counts_after[common_g, common_c, drop = FALSE])
+        others <- setdiff(types, t)
+        shedding <- others[max.col(profiles[, others, drop = FALSE],
+          ties.method = "first")]
+        for (d in defs) {
+          mask <- d$ref_mask
+          far_total <- sum(tot[mask])
+          genes <- which(shedding == d$source & content >= min_molecules)
+          if (far_total <= 0 || !length(genes)) next
+          far <- Matrix::rowSums(counts[, T_cells[mask], drop = FALSE])
+          expected_own <- far[genes] / far_total * total
+          rows[[length(rows) + 1]] <- data.frame(cell_type = t,
+            gene = rownames(counts)[genes], shedding_type = d$source,
+            molecules = as.numeric(content[genes]),
+            excess_share = pmin(pmax(1 - expected_own / content[genes], 0), 1),
+            removed_share = 1 - as.numeric(kept[genes]) / as.numeric(content[genes]),
+            stringsAsFactors = FALSE)
+        }
+      }
+      if (!length(rows)) return(empty)
+      out <- do.call(rbind, rows)
+      rownames(out) <- NULL
+      out
+    },
     .pair = function(source, target) {
       d <- private$.pair_defs[[paste(source, target, sep = " -> ")]]
       if (is.null(d)) {
@@ -928,11 +987,34 @@ CellAdmixAudit <- R6::R6Class(
   )
 )
 
+# The excess yardstick per cell type: molecule-weighted excess and removed
+# shares over the type's genes, the mean absolute deviation of removal from
+# excess, and a row over all types.
+.celladmix_audit_yardstick_by_type <- function(genes) {
+  empty <- data.frame(cell_type = character(), genes = integer(),
+    molecules = numeric(), excess_share = numeric(), removed_share = numeric(),
+    deviation = numeric(), stringsAsFactors = FALSE)
+  if (!nrow(genes)) return(empty)
+  one <- function(t, d) {
+    w <- d$molecules
+    data.frame(cell_type = t, genes = nrow(d), molecules = sum(w),
+      excess_share = sum(d$excess_share * w) / sum(w),
+      removed_share = sum(d$removed_share * w) / sum(w),
+      deviation = sum(abs(d$removed_share - d$excess_share) * w) / sum(w),
+      stringsAsFactors = FALSE)
+  }
+  by_type <- lapply(split(genes, genes$cell_type), function(d) one(d$cell_type[[1]], d))
+  out <- rbind(do.call(rbind, by_type), one("all", genes))
+  rownames(out) <- NULL
+  out
+}
+
 #' Cleanup Verification Report
 #'
 #' Created by `audit$evaluate(correction)`: per-pair cleanup sensitivity
-#' against the audit's leakage estimates, plus own-marker false-removal
-#' rates per cell type.
+#' against the audit's leakage estimates, own-marker false-removal rates
+#' per cell type, and the excess yardstick (`yardstick()`, per cell type;
+#' `yardstick_genes()`, gene by gene).
 #' @export
 CellAdmixCleanupReport <- R6::R6Class(
   "CellAdmixCleanupReport",
@@ -940,19 +1022,33 @@ CellAdmixCleanupReport <- R6::R6Class(
     audit = NULL,
     correction = NULL,
 
-    initialize = function(audit, correction, pairs, false_removal) {
+    initialize = function(audit, correction, pairs, false_removal,
+                          yardstick = NULL, yardstick_genes = NULL) {
       self$audit <- audit
       self$correction <- correction
       private$.pairs <- pairs
       private$.false_removal <- false_removal
+      private$.yardstick_genes <- if (is.null(yardstick_genes))
+        data.frame() else yardstick_genes
+      private$.yardstick <- if (is.null(yardstick))
+        .celladmix_audit_yardstick_by_type(private$.yardstick_genes) else yardstick
     },
 
     pairs = function() private$.pairs,
     false_removal = function() private$.false_removal,
+    # The excess yardstick per cell type and over all: for the genes shed
+    # into the type by its audited sources, the molecule-weighted share of
+    # their content above the level in the type's reference cells (what a
+    # correction should at least remove), the share the correction removed,
+    # and the mean absolute deviation between the two.
+    yardstick = function() private$.yardstick,
+    yardstick_genes = function() private$.yardstick_genes,
 
     summary = function() {
       p <- private$.pairs
       fr <- private$.false_removal
+      y <- private$.yardstick
+      y_all <- if (nrow(y)) y[y$cell_type == "all", , drop = FALSE] else y
       total <- sum(p$admixed_molecules)
       removed <- sum(p$admixed_molecules * pmax(p$sensitivity, 0), na.rm = TRUE)
       list(
@@ -962,7 +1058,10 @@ CellAdmixCleanupReport <- R6::R6Class(
         median_pair_sensitivity = stats::median(p$sensitivity, na.rm = TRUE),
         own_marker_false_removal = sum(fr$false_removal * fr$own_marker_molecules) /
           max(sum(fr$own_marker_molecules), 1),
-        worst_false_removal = fr$cell_type[which.max(fr$false_removal)]
+        worst_false_removal = fr$cell_type[which.max(fr$false_removal)],
+        yardstick_excess_share = if (nrow(y_all)) y_all$excess_share[[1]] else NA_real_,
+        yardstick_removed_share = if (nrow(y_all)) y_all$removed_share[[1]] else NA_real_,
+        yardstick_deviation = if (nrow(y_all)) y_all$deviation[[1]] else NA_real_
       )
     },
 
@@ -987,7 +1086,8 @@ CellAdmixCleanupReport <- R6::R6Class(
         ggplot2::theme_classic(base_size = 9)
     }
   ),
-  private = list(.pairs = NULL, .false_removal = NULL)
+  private = list(.pairs = NULL, .false_removal = NULL, .yardstick = NULL,
+    .yardstick_genes = NULL)
 )
 
 scales_comma <- function(x) format(x, big.mark = ",", scientific = FALSE)

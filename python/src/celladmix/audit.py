@@ -654,7 +654,11 @@ class CellAdmixAudit:
         return ax
 
     # ---- verification ----
-    def evaluate(self, correction, warn_uncovered=True):
+    def evaluate(self, correction, warn_uncovered=True, yardstick_min_molecules=200):
+        """Verify a correction against the audit's measurements: per-pair
+        cleanup sensitivity, the own-marker false-removal rate per cell
+        type, and the excess yardstick (``yardstick_min_molecules`` is the
+        least content a gene needs in a type to enter it)."""
         after, genes, cells = correction.counts()
         after = _align_counts(after, pd.Index(genes),
             pd.Index([str(c) for c in cells]), self._genes, self._cells)
@@ -699,6 +703,8 @@ class CellAdmixAudit:
             fr_rows.append(dict(cell_type=t, own_marker_molecules=before,
                 false_removal=1 - post / max(before, 1)))
         false_removal = pd.DataFrame(fr_rows)
+        yardstick_genes = self._yardstick_genes(after, yardstick_min_molecules)
+        yardstick = _yardstick_by_type(yardstick_genes)
         severe = false_removal[(false_removal["false_removal"] > 0.25)
             & (false_removal["own_marker_molecules"] >= OWN_MARKER_WARN_MIN)]
         for _, row in severe.iterrows():
@@ -718,7 +724,70 @@ class CellAdmixAudit:
                         f"of the estimated ~{r['admixed_molecules']:,} admixed "
                         f"molecules from {r['source']} into {r['target']}",
                         stacklevel=2)
-        return CellAdmixCleanupReport(self, correction, pairs, false_removal)
+        return CellAdmixCleanupReport(self, correction, pairs, false_removal,
+            yardstick, yardstick_genes)
+
+    def _yardstick_genes(self, after, min_molecules=200):
+        """Per cell type and gene: the share of the gene's content in the
+        type's cells that lies above its level in the type's reference
+        cells for the class that sheds the gene (the audited pair's
+        reference stratum, out of reach of transfer from that class), and
+        the share the correction removed. A gene's shedding class is the
+        other type expressing it most; genes whose shedding class has no
+        audited pair into the type, or with fewer than ``min_molecules``
+        molecules in it, are left out."""
+        columns = ["cell_type", "gene", "shedding_type", "molecules",
+                   "excess_share", "removed_share"]
+        rows = []
+        types = np.array(self._types)
+        for ti, t in enumerate(self._types):
+            pairs_in = {d["source"]: d for d in self._pairs.values()
+                        if d["target"] == t}
+            if not pairs_in:
+                continue
+            cols = next(iter(pairs_in.values()))["cols"]
+            tot = self._totals[cols]
+            total = float(tot.sum())
+            content = np.asarray(self._matrix[:, cols].sum(axis=1)).ravel()
+            kept = np.asarray(after[:, cols].sum(axis=1)).ravel()
+            others = np.array([i for i in range(len(types)) if i != ti])
+            shedding = types[others[np.argmax(self._profiles[:, others], axis=1)]]
+            for source, d in pairs_in.items():
+                mask = np.asarray(d["ref_mask"], dtype=bool)
+                far_total = float(tot[mask].sum())
+                genes = np.flatnonzero((shedding == source)
+                                       & (content >= min_molecules))
+                if far_total <= 0 or len(genes) == 0:
+                    continue
+                far = np.asarray(self._matrix[:, cols[mask]].sum(axis=1)).ravel()
+                for g in genes:
+                    expected_own = far[g] / far_total * total
+                    rows.append(dict(cell_type=t, gene=str(self._genes[g]),
+                        shedding_type=source, molecules=float(content[g]),
+                        excess_share=float(min(max(
+                            1.0 - expected_own / content[g], 0.0), 1.0)),
+                        removed_share=float(1.0 - kept[g] / content[g])))
+        return pd.DataFrame(rows, columns=columns)
+
+
+def _yardstick_by_type(genes):
+    """The excess yardstick per cell type: molecule-weighted excess and
+    removed shares over the type's genes, the mean absolute deviation of
+    removal from excess, and a row over all types."""
+    columns = ["cell_type", "genes", "molecules", "excess_share",
+               "removed_share", "deviation"]
+    if not len(genes):
+        return pd.DataFrame(columns=columns)
+    rows = []
+    groups = list(genes.groupby("cell_type")) + [("all", genes)]
+    for t, d in groups:
+        w = d["molecules"].to_numpy()
+        rows.append(dict(cell_type=t, genes=len(d), molecules=float(w.sum()),
+            excess_share=float(np.average(d["excess_share"], weights=w)),
+            removed_share=float(np.average(d["removed_share"], weights=w)),
+            deviation=float(np.average(
+                np.abs(d["removed_share"] - d["excess_share"]), weights=w))))
+    return pd.DataFrame(rows, columns=columns)
 
 
 def _align_counts(matrix, genes, cells, ref_genes, ref_cells):
@@ -739,11 +808,16 @@ def _align_counts(matrix, genes, cells, ref_genes, ref_cells):
 class CellAdmixCleanupReport:
     """Per-pair cleanup verification produced by ``audit.evaluate()``."""
 
-    def __init__(self, audit, correction, pairs, false_removal):
+    def __init__(self, audit, correction, pairs, false_removal,
+                 yardstick=None, yardstick_genes=None):
         self.audit = audit
         self.correction = correction
         self._pairs = pairs
         self._false_removal = false_removal
+        self._yardstick_genes = (yardstick_genes if yardstick_genes is not None
+                                 else pd.DataFrame())
+        self._yardstick = (yardstick if yardstick is not None
+                           else _yardstick_by_type(self._yardstick_genes))
 
     def pairs(self):
         return self._pairs
@@ -751,17 +825,36 @@ class CellAdmixCleanupReport:
     def false_removal(self):
         return self._false_removal
 
+    def yardstick(self):
+        """The excess yardstick per cell type and over all: for the genes
+        shed into the type by its audited sources, the molecule-weighted
+        share of their content above the level in the type's reference
+        cells (what a correction should at least remove), the share the
+        correction removed, and the mean absolute deviation between the
+        two."""
+        return self._yardstick
+
+    def yardstick_genes(self):
+        """The excess yardstick gene by gene (cell type, gene, shedding
+        type, molecules, excess share, removed share)."""
+        return self._yardstick_genes
+
     def summary(self):
         p, fr = self._pairs, self._false_removal
         total = p["admixed_molecules"].sum()
         removed = (p["admixed_molecules"] * p["sensitivity"].clip(lower=0)).sum()
+        y = self._yardstick
+        y_all = y[y["cell_type"] == "all"] if len(y) else y
         return dict(detected_pairs=len(p),
             estimated_admixed_molecules=int(total),
             leakage_removed_overall=removed / max(total, 1),
             median_pair_sensitivity=float(p["sensitivity"].median()),
             own_marker_false_removal=float(
                 (fr["false_removal"] * fr["own_marker_molecules"]).sum() /
-                max(fr["own_marker_molecules"].sum(), 1)))
+                max(fr["own_marker_molecules"].sum(), 1)),
+            yardstick_excess_share=float(y_all["excess_share"].iloc[0]) if len(y_all) else float("nan"),
+            yardstick_removed_share=float(y_all["removed_share"].iloc[0]) if len(y_all) else float("nan"),
+            yardstick_deviation=float(y_all["deviation"].iloc[0]) if len(y_all) else float("nan"))
 
     def plot_cleanup(self, ax=None):
         import matplotlib.pyplot as plt
