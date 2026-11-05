@@ -280,13 +280,18 @@ test_that("the generative correction removes planted admixture", {
   expect_false(any(a_rows$called))
   det2 <- model$detect_responses(source = "A", target = "B", kernels = "both",
     range_um = c(20, 60), verbose = FALSE)
-  expect_true(all(c("range_rate", "range_z", "range_share") %in% names(det2)))
+  expect_true(all(c("range_rate", "range_z", "range_share", "contact_called") %in% names(det2)))
+  range_only <- det2[det2$gene == "a1", ]
+  range_only$called <- TRUE; range_only$contact_called <- FALSE; range_only$range_rate <- 0.5
+  expect_equal(sum(abs(model$retain_responses(range_only)$correct()$counts() - after)), 0, tolerance = 1e-9)
+  kept_range <- model$retain_responses(range_only, range_term = TRUE)$correct()$counts()
+  expect_gt(sum(kept_range[genes_a, b_cells] - after[genes_a, b_cells]), 0)
   # retention of what was called changes nothing here; a response declared
   # on a1 reduces a1's removal in B cells and nothing else
   same <- model$retain_responses(det)
   expect_equal(sum(abs(same$correct()$counts() - after)), 0, tolerance = 1e-9)
   forced <- det[det$gene == "a1", ]
-  forced$called <- TRUE; forced$contact_rate <- 0.5
+  forced$called <- TRUE; forced$contact_called <- TRUE; forced$contact_rate <- 0.5
   kept <- model$retain_responses(forced)
   after_kept <- kept$correct()$counts()
   expect_lt(sum(before["a1", b_cells] - after_kept["a1", b_cells]),

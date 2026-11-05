@@ -1295,6 +1295,7 @@ CellAdmixGenerativeModel <- R6::R6Class(
           row$range_share <- response_r / pmax(response_all, 1e-9)
           row$range_in_um <- range_um[[1]]; row$range_out_um <- range_um[[2]]
         }
+        row$contact_called <- !is.na(z) & z >= z_min & share >= min_share
         row$called <- significant & share >= min_share
         rows[[length(rows) + 1]] <- row
       }
@@ -1303,7 +1304,7 @@ CellAdmixGenerativeModel <- R6::R6Class(
       out
     },
 
-    retain_responses = function(responses) {
+    retain_responses = function(responses, range_term = FALSE) {
       # Keep the responses the contact term called: for each called pair
       # and gene in responses (a table from detect_responses), the response
       # molecules in every target cell - the fitted rate per source cell
@@ -1312,7 +1313,14 @@ CellAdmixGenerativeModel <- R6::R6Class(
       # gene, and nothing else changes. Returns a new model whose
       # corrections carry the retained responses; the removal without
       # retention is unchanged.
+      # Only genes called on the contact term are kept, and only their
+      # contact part: on real tissue the range term also absorbs regional
+      # differences and material from cells outside the section, so its
+      # part is kept only with range_term = TRUE.
       called <- if ("called" %in% names(responses)) responses[responses$called, , drop = FALSE] else responses
+      if (!range_term && "contact_called" %in% names(called)) {
+        called <- called[called$contact_called, , drop = FALSE]
+      }
       comp <- private$.components
       counts <- private$.counts
       removed <- private$.removed
@@ -1320,7 +1328,7 @@ CellAdmixGenerativeModel <- R6::R6Class(
       position@x <- as.numeric(seq_along(counts@x))
       expo <- private$.exposure()
       pos <- match(colnames(counts), as.character(comp$cell_table$cell_id))
-      with_range <- "range_rate" %in% names(called)
+      with_range <- range_term && "range_rate" %in% names(called)
       if (nrow(called)) {
         for (key in unique(paste(called$source, called$target, sep = " -> "))) {
           rows <- called[paste(called$source, called$target, sep = " -> ") == key, , drop = FALSE]

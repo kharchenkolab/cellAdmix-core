@@ -193,10 +193,17 @@ class GenerativeCorrectionTests(unittest.TestCase):
         self.assertTrue({"range_rate", "range_z", "range_share"} <= set(det2.columns))
         forced = det2[det2.gene == "a1"].copy()
         forced["called"] = True
+        forced["contact_called"] = True
         forced["contact_rate"] = 0.2
         forced["range_rate"] = 0.1
-        kept = model.retain_responses(forced)
+        kept = model.retain_responses(forced, range_term=True)
+        contact_only = model.retain_responses(forced)
+        self.assertLess(float(kept._removed.sum()), float(contact_only._removed.sum()) + 1e-9)
         self.assertLess(float(kept._removed.sum()), float(model._removed.sum()))
+        # a gene called on the range term alone is not kept by default
+        range_only = forced.assign(contact_called=False)
+        same = model.retain_responses(range_only)
+        self.assertAlmostEqual(float(np.abs(same._removed - model._removed).sum()), 0.0)
 
     def test_retained_responses_reduce_the_removal_of_the_called_genes_only(self):
         model = self.audit.fit_generative(num_threads=2)
@@ -208,6 +215,7 @@ class GenerativeCorrectionTests(unittest.TestCase):
         # the exposed B cells and leaves every other gene's removal as it was
         forced = det[det.gene == "a0"].copy()
         forced["called"] = True
+        forced["contact_called"] = True
         forced["contact_rate"] = 0.5
         kept = model.retain_responses(forced)
         before, genes, cells = self.fit.counts()

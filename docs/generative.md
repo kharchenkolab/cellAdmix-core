@@ -348,7 +348,11 @@ induced molecules removed from 0.42 to 0.34 and from 0.80 to 0.68,
 where the screen's own retention keeps almost none of them; it is
 partial because the rate the regression attributes to contact is the
 part of the response the admixed expectation does not already absorb.
-With `kernels="both"` the regression carries a second term, the
+On the pancreas section the retention keeps 18,000 molecules, mostly
+CFTR in ductal cells next to acini (14,300 of the 16,500 the model
+removed) and FXYD2, PROX1 and CA4, and none of the T-cell genes in
+fibroblasts. Only genes called on the contact term are kept, and only
+their contact part, for the reason below. With `kernels="both"` the regression carries a second term, the
 source's density between 20 and 60 micrometers of the cell, so that the
 mode of a response is read where it can be: on a simulated section with
 responses planted in both modes, the density-driven genes load on the
@@ -356,8 +360,15 @@ range term (range share 0.82 to 0.99) and the level-driven gene on the
 contact term (0.03), and a response from a thin source too small for
 the contact term is found through the range term, at no false call. On
 real tissue a range claim on a gene the receiving type barely expresses
-is where material from sources above or below the section sits, so the
-range reading is for genes the type expresses on its own.
+is where material from sources above or below the section sits, and on
+the pancreas section the range term reads mostly this and regional
+differences: it carries four fifths of the molecules the instrument
+calls, and it calls the same genes against several unrelated sources
+(EPCAM in ductal cells against endothelial, immune and fibroblast
+neighbors; the T-cell genes in fibroblasts against immune, endothelial,
+mural and ductal neighbors). The range term is therefore a reading of
+the mode on simulated or well-understood pairs, and
+`retain_responses()` keeps its part only with `range_term=True`.
 
 ## The interface-activation finding
 
