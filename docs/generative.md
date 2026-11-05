@@ -325,7 +325,18 @@ expectation enters as fitted and the calls rise to 16 of 20, but a
 profile error on a gene then reads as a response (one false call among
 the planted pairs' clean genes per section), so the free scale is the
 default and the fixed one the sensitive reading. The run costs about a
-minute per pair on a section of 150,000 cells. What the instrument
+minute per pair on a section of 150,000 cells. On the pancreas section
+the free scale calls CFTR, PROX1, FXYD2 and PPP1R1B in ductal cells
+next to acini at about a third of their content (the screen flags CFTR
+and PROX1), does not call the activation genes on the exocrine side
+(admixture from the bordering ductal cells, as Figure 3b shows), and
+leaves the T-cell genes in fibroblasts at the threshold, where the
+fixed scale reads the interface profile's mismatch with the actual
+T-cell neighbors as a response. On real tissue a target-owned gene's
+exposure-linked change can be a cell-state gradient as well as a
+response to contact, and the instrument reads both: its share is what
+tracks the neighbor count beyond the fitted expectation, whatever the
+cause. What the instrument
 calls can be kept: `model.retain_responses(responses)` takes, for each
 called pair and gene, the response molecules in every target cell (the
 fitted rate per source cell times the cell's source-neighbor count) out
