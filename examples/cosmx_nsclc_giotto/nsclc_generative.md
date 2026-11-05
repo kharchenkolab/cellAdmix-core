@@ -1,16 +1,6 @@
 Generative Admixture Correction on CosMx NSCLC
 ================
 
--   <a href="#the-admixture-pattern-between-cell-types"
-    id="toc-the-admixture-pattern-between-cell-types">The admixture pattern
-    between cell types</a>
--   <a href="#correcting-with-the-generative-model"
-    id="toc-correcting-with-the-generative-model">Correcting with the
-    generative model</a>
--   <a href="#the-induction-pattern" id="toc-the-induction-pattern">The
-    induction pattern</a>
--   <a href="#verification" id="toc-verification">Verification</a>
-
 The generative model corrects admixture by decomposing each cell’s
 counts into the cell’s own expression, contamination from each
 neighboring cell type, ambient background, and expression the cell
@@ -100,7 +90,7 @@ model
     ## cellAdmix generative model
     ##   pairs: 27 
     ##   induced genes retained: 88 
-    ##   removed molecules (expected): 3,390,467 
+    ##   removed molecules (expected): 4,036,320 
     ##   initialization: nmf_factors
 
 ``` r
@@ -110,7 +100,7 @@ correction <- model$correct()
 The per-cell decomposition of the largest pair’s target type, averaged
 by exposure to the source, and the pair’s contamination fraction in
 space (the figure helpers are those of the model documentation, in
-[analysis/generative_model/tools/generative_plots.R](../../analysis/generative_model/tools/generative_plots.R)):
+[analysis/generative\_model/tools/generative\_plots.R](../../analysis/generative_model/tools/generative_plots.R)):
 
 ``` r
 top_pair <- pairs[order(-pairs$admixed_molecules), ][1, ]
@@ -141,16 +131,16 @@ head(induced[order(-induced$excess),
 ```
 
     ##         source       target   gene    excess     fold         z
-    ## 36 endothelial immune other HSPA1A 10822.071 4.115143 17.490986
-    ## 37 endothelial immune other HSPA1B  9197.786 4.069398 16.710038
-    ## 43  macrophage immune other   GLUL  7484.991 2.531707  9.664492
-    ## 46  macrophage immune other   SRGN  7152.531 5.427592 20.806496
-    ## 41  macrophage immune other   NPPC  6637.024 2.434147  8.265181
-    ## 84  macrophage    malignant  DUSP5  5885.255 7.805129 24.148237
-    ## 20 endothelial   fibroblast COL4A2  5441.595 4.089366 15.346591
-    ## 5   macrophage  endothelial  DUSP5  5257.256 6.922909 16.729099
-    ## 28  macrophage   fibroblast  DUSP5  5209.542 3.296008 10.064316
-    ## 16 endothelial   fibroblast COL4A1  4278.497 3.739442 14.421808
+    ## 36 endothelial immune other HSPA1A 10822.071 4.115171 17.491108
+    ## 37 endothelial immune other HSPA1B  9197.786 4.069436 16.710196
+    ## 43  macrophage immune other   GLUL  7484.991 2.531707  9.664497
+    ## 46  macrophage immune other   SRGN  7152.531 5.427596 20.806507
+    ## 41  macrophage immune other   NPPC  6637.024 2.434149  8.265193
+    ## 84  macrophage    malignant  DUSP5  5885.255 7.805135 24.148246
+    ## 20 endothelial   fibroblast COL4A2  5441.595 4.089372 15.346613
+    ## 5   macrophage  endothelial  DUSP5  5257.256 6.922913 16.729102
+    ## 28  macrophage   fibroblast  DUSP5  5209.542 3.296008 10.064315
+    ## 16 endothelial   fibroblast COL4A1  4278.497 3.739438 14.421793
 
 The contrast between an admixed and an induced gene, for the pair with
 the strongest induced signal — the observed rise of the admixed gene is
@@ -212,16 +202,25 @@ report$summary()
     ## [1] 4381180
     ## 
     ## $leakage_removed_overall
-    ## [1] 0.9688949
+    ## [1] 0.9926342
     ## 
     ## $median_pair_sensitivity
-    ## [1] 0.997736
+    ## [1] 1
     ## 
     ## $own_marker_false_removal
     ## [1] 0
     ## 
     ## $worst_false_removal
     ## [1] "endothelial"
+    ## 
+    ## $yardstick_excess_share
+    ## [1] 0.1338335
+    ## 
+    ## $yardstick_removed_share
+    ## [1] 0.1387287
+    ## 
+    ## $yardstick_deviation
+    ## [1] 0.1526104
 
 ``` r
 report$plot_cleanup()

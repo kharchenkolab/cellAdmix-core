@@ -249,8 +249,10 @@ class GenerativeCorrectionTests(unittest.TestCase):
         model = self.audit.fit_generative(num_threads=2, alpha_prior_strength=0)
         strength = model.pairs.set_index(["source", "target"]).prior_strength
         self.assertTrue(((strength >= 5.0) & (strength <= 1000.0)).all())
-        fixed = self.audit.fit_generative(num_threads=2)
+        fixed = self.audit.fit_generative(num_threads=2, alpha_prior_strength=300)
         self.assertTrue((fixed.pairs.prior_strength == 300.0).all())
+        default = self.audit.fit_generative(num_threads=2)
+        self.assertTrue(np.allclose(default.pairs.prior_strength, model.pairs.prior_strength))
         # a section where the planted amount varies from cell to cell gets a
         # weaker prior for the same pair than one where it is uniform
         from celladmix import CellAdmix

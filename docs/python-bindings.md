@@ -95,10 +95,10 @@ the amount, the rounded cap and the number of molecules restored. The cap
 trades recall for specificity: on a simulated pancreas section with a
 known origin per molecule the ten-member vote recalls 0.79 of the
 admixed molecules at 9.9% own-molecule loss and 3.3% own-marker removal,
-and capped at the generative amount 0.71 at 3.5% and none, the precision
-of the removal rising from 0.82 to 0.92 (at twice the amount 0.76, 4.8%
-and still none, since the model's profiles are zero on the genes a
-target type owns); the vote and the model place their removal in
+and capped at the generative amount 0.73 at 3.5% and none, the precision
+of the removal rising from 0.82 to 0.92 (the own-marker removal stays at
+none at a larger `cap_scale` too, since the model's profiles are zero on
+the genes a target type owns); the vote and the model place their removal in
 different cells, and a strict cap only ever cuts.
 
 `correct()` warns when a rule set removes more than 60% of a cell type's

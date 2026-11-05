@@ -249,13 +249,14 @@ certain:
   Genuine spatial variation of own expression also produces excess, so
   the yardstick is read per type and over all genes, molecule-weighted,
   with the mean absolute deviation of removal from excess, not gene by
-  gene. On pancreas the generative correction removes 0.21 of the
+  gene. On pancreas the generative correction removes 0.22 of the
   content of the 1,534 type–gene pairs the yardstick covers against an
-  excess of 0.25, with a deviation of 0.16: it removes slightly more than
-  the excess in exocrine cells (0.12 against 0.11) and less in ductal
-  (0.22 against 0.34), immune (0.34 against 0.41) and endothelial cells
-  (0.35 against 0.41), where the far cells of a type differ from its
-  exposed cells in state as well as in exposure.
+  excess of 0.25, with a deviation of 0.17: it removes more than the
+  excess in exocrine cells (0.14 against 0.11) and fibroblasts (0.29
+  against 0.28) and less in ductal (0.22 against 0.34), immune (0.38
+  against 0.41) and endothelial cells (0.38 against 0.41), where the far
+  cells of a type differ from its exposed cells in state as well as in
+  exposure.
 
 The two gene sets bracket the unmeasurable middle (shared and
 non-distinctive genes), and all headline results below are reported in

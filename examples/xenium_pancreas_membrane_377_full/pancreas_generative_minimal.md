@@ -45,7 +45,7 @@ model
     ## cellAdmix generative model
     ##   pairs: 39 
     ##   induced genes retained: 28 
-    ##   removed molecules (expected): 1,267,446 
+    ##   removed molecules (expected): 1,377,429 
     ##   initialization: nmf_factors
 
 ``` r
@@ -69,17 +69,17 @@ head(model$induced[order(-model$induced$excess), ], 5)
 ```
 
     ##                 source                  target   gene     excess   expected
-    ## 4  Exocrine epithelial Ductal/tumor epithelial   CFTR 110866.738 23889.0282
-    ## 6  Exocrine epithelial Ductal/tumor epithelial  PROX1  11709.747  3526.6236
-    ## 8     Fibroblast / CAF Ductal/tumor epithelial SEMA3C   4181.181   540.1284
-    ## 25    Fibroblast / CAF                  Immune  PMP22   3183.480  1029.5056
-    ## 9     Fibroblast / CAF Ductal/tumor epithelial  BASP1   2750.508  1179.0758
+    ## 4  Exocrine epithelial Ductal/tumor epithelial   CFTR 110866.738 23889.1121
+    ## 6  Exocrine epithelial Ductal/tumor epithelial  PROX1  11709.747  3526.6392
+    ## 8     Fibroblast / CAF Ductal/tumor epithelial SEMA3C   4181.181   540.1279
+    ## 25    Fibroblast / CAF                  Immune  PMP22   3183.480  1029.5030
+    ## 9     Fibroblast / CAF Ductal/tumor epithelial  BASP1   2750.508  1179.0664
     ##            z     fold
-    ## 4  24.154536 4.640906
-    ## 6  15.121326 3.320385
-    ## 8  22.477142 7.741087
-    ## 25 10.279787 3.092241
-    ## 9   8.124338 2.332766
+    ## 4  24.154428 4.640890
+    ## 6  15.121233 3.320370
+    ## 8  22.477149 7.741094
+    ## 25 10.279813 3.092249
+    ## 9   8.124441 2.332785
 
 And it is verified like any other correction, against the audit’s own
 measurements:
@@ -96,13 +96,22 @@ report$summary()
     ## [1] 1574854
     ## 
     ## $leakage_removed_overall
-    ## [1] 0.974216
+    ## [1] 0.9888346
     ## 
     ## $median_pair_sensitivity
-    ## [1] 0.9933523
+    ## [1] 1
     ## 
     ## $own_marker_false_removal
     ## [1] 0
     ## 
     ## $worst_false_removal
     ## [1] "Ductal/tumor epithelial"
+    ## 
+    ## $yardstick_excess_share
+    ## [1] 0.2510698
+    ## 
+    ## $yardstick_removed_share
+    ## [1] 0.2227697
+    ## 
+    ## $yardstick_deviation
+    ## [1] 0.1672097

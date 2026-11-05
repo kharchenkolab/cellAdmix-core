@@ -86,17 +86,19 @@ come from:
   no signal drifts upward. The
   posterior update weighs a cell's own counts against the prior by
   pseudo-molecules: a cell with t molecules gives its counts the weight
-  t / (t + s), with s = 300 by default (`alpha_prior_strength`). With
-  `alpha_prior_strength = 0`, s is estimated per pair from the spread of
+  t / (t + s). The strength s is estimated per pair from the spread of
   the cells' fractions around the prior, net of counting noise, as the
-  pseudo-count of a beta distribution with that spread, and reported per
-  pair (`prior_strength` in the model's pair table). On simulated
-  pancreas sections the spread is wide on every pair, the estimates come
-  out at 5 to 15, and recall rises by 2 to 3 points over the default at
-  equal or lower own-molecule loss; on the pancreas section the model
-  then removes 22% of molecules instead of 20.5%, more of the T-cell
-  genes in fibroblasts and also more of the myeloid genes the interface
-  profile over-predicts. The
+  pseudo-count of a beta distribution with that spread: a first pass at
+  s = 10 gives the fractions, the estimate (bounded to 5–1000) replaces
+  it, and a second pass refits. It is reported per pair
+  (`prior_strength` in the model's pair table); a positive
+  `alpha_prior_strength` fixes it instead. On simulated pancreas
+  sections the spread is wide on every pair and the estimates come out
+  at 5 to 15; against a fixed s = 300 the recall of admixed molecules
+  rises by 2 to 3 points at equal or lower own-molecule loss, and on the
+  pancreas section the model removes 22% of molecules instead of 20.5%,
+  more of the T-cell genes in fibroblasts and also more of the myeloid
+  genes the interface profile over-predicts. The
   posterior update is also bounded — at most
   five-fold the prior, exactly zero where the prior is zero — so removal
   stays tied to the demonstrated spatial signal (with an unbounded
@@ -128,7 +130,7 @@ over those neighbors under a Dirichlet prior whose shape follows the
 centroid distance and which the counts attributed to each neighbor's
 profile update. This is off by default because it changes nothing that
 can be measured: on four simulated sections with known transfer the
-recall of admixed molecules and the own-molecule loss stay within half a
+recall of admixed molecules and the own-molecule loss stay within a
 point of the pair-profile model, and on the pancreas section the removed
 mass, the own-marker removal, the share of source-owned genes among the
 genes rising with a source and the excess yardstick are unchanged. The
@@ -145,16 +147,16 @@ of the whole malignant profile, is 2.0% of a fibroblast's molecules
 with no malignant cell among its 240 nearest neighbors and rises
 steadily as malignant cells come closer, to 9.7% with four or more
 among the 15 nearest. The prior is this dose–response measured above
-the deepest stratum, and the fitted admixture fraction follows it: 7.6%
+the deepest stratum, and the fitted admixture fraction follows it: 7.9%
 of the molecules of fibroblasts with four or more malignant neighbors,
-and 1.3% over all 13,151 fibroblasts. The three genes beneath show the
+and 1.4% over all 13,151 fibroblasts. The three genes beneath show the
 three outcomes the model distinguishes. KRT19, a malignant marker that
 fibroblasts do not express, is removed at every stratum: the
 exposure-linked part by the admixture term, the baseline of 2.8 per
 10,000 by the background term. MMP7 is also a malignant gene, but
 fibroblasts near malignant cells carry 3.4 times the excess that
 admixture from the bordering malignant cells can deliver; the screen
-flags it, and the fibroblasts keep 35 of their 42 molecules per 10,000
+flags it, and the fibroblasts keep 34 of their 42 molecules per 10,000
 at four or more neighbors. DCN, a fibroblast gene, falls from 78 to 37
 per 10,000 as malignant cells come closer; as a gene of the target's
 own, it has no admixture component, and the correction leaves its
@@ -327,21 +329,21 @@ admixed expectation, whose amount follows the dose prior per exposure
 stratum; a response is a free rate per source cell. On three simulated
 pancreas sections with planted responses the instrument calls no gene
 falsely among 2,200 clean source-owned genes per section, where the
-screen flags 5 to 20, and calls 11 of the 20 planted genes whose
+screen flags 5 to 20, and calls 12 of the 20 planted genes whose
 induced molecules make at least 0.3 of their content, where the screen
 flags one. The misses are genes the source profile itself carries
 (the free per-gene scale of the admixed expectation absorbs a
 contact-proportional response there), genes the target's own programs
 already carry in the exposed cells' state, and plants of a few thousand
 molecules from thin sources. With `copy_scale="fixed"` the admixed
-expectation enters as fitted and the calls rise to 16 of 20, but a
-profile error on a gene then reads as a response (29 false calls among
+expectation enters as fitted and the calls rise to 15 of 20, but a
+profile error on a gene then reads as a response (21 false calls among
 2,200 clean genes over one section's 40 pairs, on a handful of genes
 whose interface profile errs), so the free scale is the default and the
 fixed one the sensitive reading. The run costs about a
 minute per pair on a section of 150,000 cells. On the pancreas section
 the free scale calls CFTR, PROX1, FXYD2 and PPP1R1B in ductal cells
-next to acini at about a third of their content (the screen flags CFTR
+next to acini at a third to a half of their content (the screen flags CFTR
 and PROX1), does not call the activation genes on the exocrine side
 (admixture from the bordering ductal cells, as Figure 3b shows), and
 leaves the T-cell genes in fibroblasts at the threshold, where the
@@ -357,7 +359,7 @@ fitted rate per source cell times the cell's source-neighbor count) out
 of the cell's removal of that gene and changes nothing else, so the
 recall of admixed molecules and the own-molecule loss stay as they
 were. On the simulated sections this lowers the share of the planted
-induced molecules removed from 0.42 to 0.34 and from 0.80 to 0.68,
+induced molecules removed from 0.48 to 0.37 and from 0.86 to 0.72,
 where the screen's own retention keeps almost none of them; it is
 partial because the rate the regression attributes to contact is the
 part of the response the admixed expectation does not already absorb.
@@ -365,12 +367,22 @@ With `kernels="both"` the regression carries a second term, the
 source's density between 20 and 60 micrometers of the cell, so that the
 mode of a response is read where it can be: on a simulated section with
 responses planted in both modes, the density-driven genes load on the
-range term (range share 0.82 to 0.99) and the level-driven gene on the
-contact term (0.03), and a response from a thin source too small for
-the contact term is found through the range term, at no false call. On
-real tissue a range claim on a gene the receiving type barely expresses
-is where material from sources above or below the section sits, so the
-range reading is for genes the type expresses on its own.
+range term (range share 0.82 to 0.98) and the level-driven gene on the
+contact term (0.01). Over all pairs of three simulated sections the two
+terms call no gene falsely among 2,200 clean source-owned genes per
+section, and retention of both lowers the share of the planted induced
+molecules removed further, to 0.29 and 0.60 on the two sections above;
+splitting the evidence over two terms can also leave a contact response
+just under the threshold (z 5.9 for one plant). The simulations carry
+no regional expression that follows tissue composition and no material
+from cells above or below the section, and on the pancreas section the
+range term carries 211,000 of the 305,000 response molecules and calls
+the same gene in one type against several unrelated sources (EPCAM in
+ductal cells against endothelial, immune and fibroblast neighbors;
+CD3E in fibroblasts against endothelial neighbors), which reads such
+regional structure rather than a response. On real tissue the range
+term's calls are candidates to be checked, and retention of them is a
+choice the analyst makes on that evidence.
 
 ## The interface-activation finding
 
@@ -657,8 +669,8 @@ gene in one cell nothing tells a transferred molecule from an own one
 where source cells lie above or below the target, and position adds
 under a point of precision where they lie beside it, so the draw is
 random; on a simulated pancreas section with a known origin per
-molecule it recalls 0.80 of the admixed molecules at a precision of
-0.85 and removes no own-marker molecule, where the ten-member molecule
+molecule it recalls 0.83 of the admixed molecules at a precision of
+0.86 and removes no own-marker molecule, where the ten-member molecule
 vote of the factor-based cleanup recalls 0.79 at 0.82 and removes 3.3%. The dose prior's estimation is set by three options —
 `dose_mode` (`"joint"`, or `"marginal"` for one source at a time),
 `dose_ladder` (the rungs stratifying unexposed cells; empty for a single

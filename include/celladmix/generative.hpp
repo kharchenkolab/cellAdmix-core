@@ -25,14 +25,14 @@ struct GenerativeOptions {
   // Contamination fraction: prior strength (pseudo-molecules), cap on the
   // per-cell update relative to the dose prior, and cap on the prior itself.
   // A cell with t molecules weights its own counts by t / (t + strength)
-  // against the pair's dose prior. With alpha_prior_strength = 0 the
-  // strength is estimated per pair: a first pass at alpha_strength_start
+  // against the pair's dose prior. With alpha_prior_strength = 0 (the
+  // default) the strength is estimated per pair: a first pass at alpha_strength_start
   // gives each cell's fraction as its counts attribute it, the between-cell
   // variance of that fraction around the prior (net of binomial counting
   // variance) gives the beta prior's pseudo-count, mean(l (1 - l)) /
   // variance - 1, bounded to [alpha_strength_min, alpha_strength_max], and
-  // the fit continues with it.
-  double alpha_prior_strength = 300.0;
+  // the fit continues with it. A positive value fixes the strength.
+  double alpha_prior_strength = 0.0;
   double alpha_strength_start = 10.0;
   double alpha_strength_min = 5.0;
   double alpha_strength_max = 1000.0;
