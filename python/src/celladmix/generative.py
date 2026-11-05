@@ -221,7 +221,6 @@ class GenerativeModel:
                     response_molecules=float(response_all[g]), response_share=float(share[g]),
                     screen_flagged=(s, t, str(genes[g])) in flagged)
                 significant = bool(np.isfinite(z[g]) and z[g] >= z_min)
-                row["contact_called"] = significant and share[g] >= min_share
                 if both:
                     row.update(range_rate=float(b_r[g]), range_se=float(se[3][g]), range_z=float(z_r[g]),
                                range_share=float(response_r[g] / max(response_all[g], 1e-9)),
@@ -264,30 +263,24 @@ class GenerativeModel:
                                     rules, name, retain_induced,
                                     cell_types=self._cell_types)
 
-    def retain_responses(self, responses, range_term=False):
+    def retain_responses(self, responses):
         """Keep the responses the contact term called: for each called pair
         and gene in ``responses`` (a table from :meth:`detect_responses`),
         the response molecules in every target cell, the fitted rate per
-source cell times the cell's source-neighbor count, are taken out
-        of the cell's removal of that gene, and nothing else changes. Only
-        genes called on the contact term are kept, and only their contact
-        part: on real tissue the range term (``kernels="both"``) also
-        absorbs regional differences and material from cells outside the
-        section, so its part is kept only with ``range_term=True``.
+        source cell times the cell's source-neighbor count, are taken out
+        of the cell's removal of that gene, and nothing else changes.
         Returns a new model whose corrections carry the retained
         responses; the removal without retention is unchanged."""
         from scipy import sparse
 
         called = responses[responses["called"]] if "called" in responses.columns else responses
-        if not range_term and "contact_called" in called.columns:
-            called = called[called["contact_called"]]
         removed = self._removed.copy()
         matrix = self._matrix
         position = sparse.csc_matrix(
             (np.arange(matrix.nnz) + 1, matrix.indices, matrix.indptr), shape=matrix.shape)
         gene_index = pd.Index(np.asarray(self._genes).astype(str))
         exposure, types, pos = self._exposure()
-        with_range = range_term and "range_rate" in called.columns
+        with_range = "range_rate" in called.columns
         for (s, t), rows in called.groupby(["source", "target"]):
             if t not in self._components.get("cells_of", {}) or s not in types:
                 continue
