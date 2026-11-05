@@ -340,6 +340,7 @@ model.realize(nmf_fit)             # a molecule-level corrected store: the
                                    # removal drawn at random per cell and gene
 model.expectation("Ductal/tumor epithelial")  # the fitted components per cell and gene
 model.detect_responses()           # responses on a contact term, per pair and gene
+model.retain_responses(responses)  # ... kept in the correction
 ```
 
 The `init` argument selects the expression-program initialization: an

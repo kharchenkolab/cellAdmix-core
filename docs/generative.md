@@ -325,7 +325,27 @@ expectation enters as fitted and the calls rise to 16 of 20, but a
 profile error on a gene then reads as a response (one false call among
 the planted pairs' clean genes per section), so the free scale is the
 default and the fixed one the sensitive reading. The run costs about a
-minute per pair on a section of 150,000 cells.
+minute per pair on a section of 150,000 cells. What the instrument
+calls can be kept: `model.retain_responses(responses)` takes, for each
+called pair and gene, the response molecules in every target cell (the
+fitted rate per source cell times the cell's source-neighbor count) out
+of the cell's removal of that gene and changes nothing else, so the
+recall of admixed molecules and the own-molecule loss stay as they
+were. On the simulated sections this lowers the share of the planted
+induced molecules removed from 0.42 to 0.34 and from 0.80 to 0.68,
+where the screen's own retention keeps almost none of them; it is
+partial because the rate the regression attributes to contact is the
+part of the response the admixed expectation does not already absorb.
+With `kernels="both"` the regression carries a second term, the
+source's density between 20 and 60 micrometers of the cell, so that the
+mode of a response is read where it can be: on a simulated section with
+responses planted in both modes, the density-driven genes load on the
+range term (range share 0.82 to 0.99) and the level-driven gene on the
+contact term (0.03), and a response from a thin source too small for
+the contact term is found through the range term, at no false call. On
+real tissue a range claim on a gene the receiving type barely expresses
+is where material from sources above or below the section sits, so the
+range reading is for genes the type expresses on its own.
 
 ## The interface-activation finding
 

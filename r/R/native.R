@@ -834,6 +834,19 @@
   )
 }
 
+.celladmix_cell_type_counts_within <- function(x, y, type_codes, n_types, r_in, r_out) {
+  .Call(
+    "_cellAdmixCore_celladmix_cell_type_counts_within",
+    as.numeric(x),
+    as.numeric(y),
+    as.integer(type_codes),
+    as.integer(n_types),
+    as.numeric(r_in),
+    as.numeric(r_out),
+    PACKAGE = "cellAdmixCore"
+  )
+}
+
 .celladmix_cell_nearest_type_distance <- function(x, y, type_codes, n_types) {
   .Call(
     "_cellAdmixCore_celladmix_cell_nearest_type_distance",

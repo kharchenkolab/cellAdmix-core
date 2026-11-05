@@ -186,6 +186,39 @@ class GenerativeCorrectionTests(unittest.TestCase):
         a = det[det.gene.str.startswith("a")]
         self.assertGreater(float(a.admixed_fit.sum()), 0.0)
         self.assertFalse(bool(a.called.any()))
+        # two kernels: the range term's columns are reported and a declared
+        # response on both terms is retained through both
+        det2 = model.detect_responses(source="A", target="B", kernels="both",
+                                      range_um=(20.0, 60.0))
+        self.assertTrue({"range_rate", "range_z", "range_share"} <= set(det2.columns))
+        forced = det2[det2.gene == "a1"].copy()
+        forced["called"] = True
+        forced["contact_rate"] = 0.2
+        forced["range_rate"] = 0.1
+        kept = model.retain_responses(forced)
+        self.assertLess(float(kept._removed.sum()), float(model._removed.sum()))
+
+    def test_retained_responses_reduce_the_removal_of_the_called_genes_only(self):
+        model = self.audit.fit_generative(num_threads=2)
+        det = model.detect_responses(source="A", target="B")
+        # no response is planted, so the retention of what was called changes nothing
+        same = model.retain_responses(det)
+        self.assertAlmostEqual(float(np.abs(same._removed - model._removed).sum()), 0.0)
+        # a response declared on a0 takes its molecules out of a0's removal in
+        # the exposed B cells and leaves every other gene's removal as it was
+        forced = det[det.gene == "a0"].copy()
+        forced["called"] = True
+        forced["contact_rate"] = 0.5
+        kept = model.retain_responses(forced)
+        before, genes, cells = self.fit.counts()
+        rem_before = (before - model.correct().counts()[0]).toarray()
+        rem_after = (before - kept.correct().counts()[0]).toarray()
+        a0 = list(genes).index("a0")
+        self.assertLess(rem_after[a0].sum(), rem_before[a0].sum())
+        others = [i for i in range(len(genes)) if i != a0]
+        self.assertAlmostEqual(float(np.abs(rem_after[others] - rem_before[others]).sum()), 0.0)
+        self.assertTrue((rem_after >= -1e-9).all())
+        self.assertEqual(len(kept.retained_responses), 1)
 
     def test_realized_molecule_correction_follows_the_count_level_removal(self):
         model = self.audit.fit_generative(num_threads=2)

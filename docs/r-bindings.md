@@ -258,6 +258,7 @@ model$correct(retain_induced = FALSE)  # ... or removed along with contamination
 audit$evaluate(correction)         # verified like any other correction
 model$expectation("Ductal/tumor epithelial")  # the fitted components per cell and gene
 model$detect_responses()           # responses on a contact term, per pair and gene
+model$retain_responses(responses)  # ... kept in the correction
 ```
 
 The molecule-level realization of the correction (`model.realize()`)

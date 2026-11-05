@@ -278,6 +278,21 @@ test_that("the generative correction removes planted admixture", {
   a_rows <- det[det$gene %in% genes_a, ]
   expect_gt(sum(a_rows$admixed_fit), 0)
   expect_false(any(a_rows$called))
+  det2 <- model$detect_responses(source = "A", target = "B", kernels = "both",
+    range_um = c(20, 60), verbose = FALSE)
+  expect_true(all(c("range_rate", "range_z", "range_share") %in% names(det2)))
+  # retention of what was called changes nothing here; a response declared
+  # on a1 reduces a1's removal in B cells and nothing else
+  same <- model$retain_responses(det)
+  expect_equal(sum(abs(same$correct()$counts() - after)), 0, tolerance = 1e-9)
+  forced <- det[det$gene == "a1", ]
+  forced$called <- TRUE; forced$contact_rate <- 0.5
+  kept <- model$retain_responses(forced)
+  after_kept <- kept$correct()$counts()
+  expect_lt(sum(before["a1", b_cells] - after_kept["a1", b_cells]),
+    sum(before["a1", b_cells] - after["a1", b_cells]))
+  other <- setdiff(rownames(before), "a1")
+  expect_equal(sum(abs(after_kept[other, ] - after[other, ])), 0, tolerance = 1e-9)
   c2 <- model$correct()
   expect_equal(sum(abs(c2$counts() - after)), 0, tolerance = 1e-6)
   removed_default <- sum(before) - sum(after)

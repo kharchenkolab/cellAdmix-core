@@ -679,6 +679,24 @@ PYBIND11_MODULE(_core, m) {
       py::arg("k") = 15);
 
   m.def(
+      "cell_type_counts_within",
+      [](const std::vector<double>& x,
+         const std::vector<double>& y,
+         const std::vector<int>& type_codes,
+         int n_types,
+         double r_in,
+         double r_out) {
+        return dense_matrix_to_dict(
+            celladmix::cell_type_counts_within(x, y, type_codes, n_types, r_in, r_out));
+      },
+      py::arg("x"),
+      py::arg("y"),
+      py::arg("type_codes"),
+      py::arg("n_types"),
+      py::arg("r_in"),
+      py::arg("r_out"));
+
+  m.def(
       "cell_nearest_type_distance",
       [](const std::vector<double>& x,
          const std::vector<double>& y,

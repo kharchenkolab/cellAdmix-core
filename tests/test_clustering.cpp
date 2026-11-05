@@ -127,6 +127,28 @@ TEST_CASE("Cell clustering can subsample the clustering cell set") {
   REQUIRE_EQ(result.umap.cols(), 2);
 }
 
+TEST_CASE("Cell type counts within an annulus exclude the cell and the inner disc") {
+  const std::vector<double> x = {0.0, 1.0, 3.0, 6.0, 10.0};
+  const std::vector<double> y = {0.0, 0.0, 0.0, 0.0, 0.0};
+  const std::vector<int> types = {0, 1, 1, 0, -1};
+  const auto counts = cell_type_counts_within(x, y, types, 2, 2.0, 7.5);
+  REQUIRE_EQ(counts.rows(), 5);
+  // cell 0: cell 1 at 1 is inside the inner disc, cells 2 (type 1) and 3
+  // (type 0) lie within (2, 7.5]; the unlabeled cell at 10 is beyond
+  REQUIRE_EQ(counts(0, 0), 1.0);
+  REQUIRE_EQ(counts(0, 1), 1.0);
+  // cell 4 at 10: cells 3 (4 away) and 2 (7 away) are within (2, 7.5]
+  REQUIRE_EQ(counts(4, 0), 1.0);
+  REQUIRE_EQ(counts(4, 1), 1.0);
+  bool threw = false;
+  try {
+    cell_type_counts_within(x, y, types, 2, 7.0, 2.0);
+  } catch (const std::exception&) {
+    threw = true;
+  }
+  REQUIRE(threw);
+}
+
 TEST_CASE("Cell nearest neighbors are ordered by distance and exclude the cell") {
   const std::vector<double> x = {0.0, 1.0, 3.0, 6.0};
   const std::vector<double> y = {0.0, 0.0, 0.0, 0.0};

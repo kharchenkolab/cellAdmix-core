@@ -191,6 +191,19 @@ CellAdmixScore <- R6::R6Class(
   list(counts = counts, types = types)
 }
 
+# Annotated cell types among the cells between r_in and r_out of each cell,
+# per 1000 square micrometers of the annulus (a density).
+.celladmix_source_range_density <- function(cells, annotation, r_in = 20, r_out = 60) {
+  types <- sort(unique(as.character(annotation[!is.na(annotation)])))
+  codes <- match(as.character(annotation[as.character(cells$cell_id)]), types)
+  codes[is.na(codes)] <- 0L
+  counts <- .celladmix_cell_type_counts_within(
+    cells$x, cells$y, codes - 1L, length(types), r_in, r_out)
+  colnames(counts) <- types
+  area <- pi * (r_out^2 - r_in^2) / 1000
+  list(counts = counts / area, types = types)
+}
+
 # Distance from every cell to the nearest cell of each annotated type.
 .celladmix_source_nearest_distance <- function(cells, annotation) {
   types <- sort(unique(as.character(annotation[!is.na(annotation)])))

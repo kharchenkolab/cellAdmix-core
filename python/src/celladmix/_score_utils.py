@@ -167,6 +167,35 @@ def source_exposure_counts(cells: pd.DataFrame, annotation, *, neighbor_k: int =
     return counts, types
 
 
+def source_range_density(cells: pd.DataFrame, annotation, *, r_in: float = 20.0,
+                         r_out: float = 60.0):
+    """Annotated cell types among the cells between ``r_in`` and ``r_out``
+    (micrometers) of each cell, per 1000 square micrometers of the annulus.
+
+    Returns ``(density, types)`` with density aligned to the rows of
+    ``cells``.
+    """
+    from . import _core
+
+    types = sorted(map(str, pd.Series(annotation).dropna().unique()))
+    type_index = {t: i for i, t in enumerate(types)}
+    codes = [
+        type_index.get(str(annotation.get(str(c), None)), -1)
+        for c in cells["cell_id"].astype(str)
+    ]
+    raw = _core.cell_type_counts_within(
+        cells["x"].astype(float).tolist(),
+        cells["y"].astype(float).tolist(),
+        codes,
+        len(types),
+        float(r_in),
+        float(r_out),
+    )
+    counts = np.asarray(raw["data"], dtype=float).reshape(raw["rows"], raw["cols"])
+    area = np.pi * (float(r_out) ** 2 - float(r_in) ** 2) / 1000.0
+    return counts / area, types
+
+
 def source_nearest_distance(cells: pd.DataFrame, annotation):
     """Distance from every cell to the nearest cell of each annotated type.
 

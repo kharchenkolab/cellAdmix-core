@@ -131,6 +131,7 @@ class GenerativeModel:
 
     def detect_responses(self, source=None, target=None, z_min=6.0,
                          min_share=0.0, n_iter=200, copy_scale="free",
+                         kernels="contact", range_um=(20.0, 60.0),
                          verbose=True):
         """Detect neighborhood-induced responses with a contact term on the
         fitted expectation. For each pair (or the pairs selected by
@@ -149,18 +150,22 @@ class GenerativeModel:
         expectation enters with a free per-gene scale, which absorbs a
         contact-proportional response on genes the source profile carries;
         with ``"fixed"`` it enters as fitted, so such a response loads on
-        the contact term and a profile error does too. Returns one row
-        per pair and gene."""
+        the contact term and a profile error does too. With
+        ``kernels="both"`` a second term, the source cells between
+        ``range_um[0]`` and ``range_um[1]`` micrometers of the cell per
+        1000 square micrometers, is fitted beside the contact term, so
+        that a response driven by the source's density at range loads on
+        it; the table then carries ``range_rate``, ``range_se``,
+        ``range_z`` and ``range_share`` (the range term's share of the
+        response), and a gene is called on either term's z. Returns one
+        row per pair and gene."""
         import time
-        from ._score_utils import source_exposure_counts
-
-        audit = self._audit
-        cells_table = audit._cells_table
-        ann = audit._ctypes[audit._ctypes != "None"]
-        exposure, types = source_exposure_counts(
-            cells_table, ann, neighbor_k=self._components["neighbor_k"])
-        pos = pd.Index(cells_table["cell_id"].astype(str)).get_indexer(
-            [str(c) for c in self._cells])
+        exposure, types, pos = self._exposure()
+        both = kernels == "both"
+        if both:
+            density, _, _ = self._range(tuple(range_um))
+        elif kernels != "contact":
+            raise ValueError("kernels must be \"contact\" or \"both\"")
         genes = np.asarray(self._genes)
         flagged = {(r.source, r.target, r.gene) for r in self.induced.itertuples()} \
             if len(self.induced.columns) else set()
@@ -180,30 +185,49 @@ class GenerativeModel:
                 if s2 != s:
                     fixed = fixed + I
             t0 = time.time()
+            covariates = np.column_stack([contact] + ([density[pos[cols], types.index(s)]] if both else []))
             if copy_scale == "fixed":
                 scales, se = _poisson_scales(Y, fixed + E["admixed"][s], E["own"],
-                                             np.zeros_like(E["own"]), contact, n_iter)
-                a, b = scales[0], scales[2]
+                                             np.zeros_like(E["own"]), covariates, n_iter)
                 gamma = np.ones(len(genes))
             else:
-                scales, se = _poisson_scales(Y, fixed, E["own"], E["admixed"][s], contact, n_iter)
-                a, gamma, b = scales
+                scales, se = _poisson_scales(Y, fixed, E["own"], E["admixed"][s], covariates, n_iter)
+                gamma = scales[1]
+            a, b = scales[0], scales[2]
             if verbose:
                 print(f"[detect_responses] {s} -> {t}: {len(cols)} cells, "
                       f"{time.time() - t0:.0f}s", flush=True)
-            z = np.where(se[2] > 0, b / np.where(se[2] > 0, se[2], 1.0), np.nan)
+
+            def z_of(rate, err):
+                return np.where(err > 0, rate / np.where(err > 0, err, 1.0), np.nan)
+
+            z = z_of(b, se[2])
             observed = Y.sum(axis=0)
             response = b * contact.sum()
-            share = response / np.maximum(observed, 1e-9)
+            if both:
+                b_r = scales[3]
+                z_r = z_of(b_r, se[3])
+                response_r = b_r * covariates[:, 1].sum()
+                response_all = response + response_r
+            else:
+                response_all = response
+            share = response_all / np.maximum(observed, 1e-9)
             for g in range(len(genes)):
-                rows.append(dict(
+                row = dict(
                     source=s, target=t, gene=str(genes[g]), observed=float(observed[g]),
                     own_fit=float(a[g] * E["own"][:, g].sum()),
                     admixed_fit=float(gamma[g] * E["admixed"][s][:, g].sum()),
                     contact_rate=float(b[g]), contact_se=float(se[2][g]), z=float(z[g]),
-                    response_molecules=float(response[g]), response_share=float(share[g]),
-                    screen_flagged=(s, t, str(genes[g])) in flagged,
-                    called=bool(np.isfinite(z[g]) and z[g] >= z_min and share[g] >= min_share)))
+                    response_molecules=float(response_all[g]), response_share=float(share[g]),
+                    screen_flagged=(s, t, str(genes[g])) in flagged)
+                significant = bool(np.isfinite(z[g]) and z[g] >= z_min)
+                if both:
+                    row.update(range_rate=float(b_r[g]), range_se=float(se[3][g]), range_z=float(z_r[g]),
+                               range_share=float(response_r[g] / max(response_all[g], 1e-9)),
+                               range_in_um=float(range_um[0]), range_out_um=float(range_um[1]))
+                    significant = significant or bool(np.isfinite(z_r[g]) and z_r[g] >= z_min)
+                row["called"] = significant and share[g] >= min_share
+                rows.append(row)
         return pd.DataFrame(rows)
 
     def composition(self, source=None, target=None):
@@ -239,6 +263,86 @@ class GenerativeModel:
                                     rules, name, retain_induced,
                                     cell_types=self._cell_types)
 
+    def retain_responses(self, responses):
+        """Keep the responses the contact term called: for each called pair
+        and gene in ``responses`` (a table from :meth:`detect_responses`),
+        the response molecules in every target cell, the fitted rate per
+        source cell times the cell's source-neighbor count, are taken out
+        of the cell's removal of that gene, and nothing else changes.
+        Returns a new model whose corrections carry the retained
+        responses; the removal without retention is unchanged."""
+        from scipy import sparse
+
+        called = responses[responses["called"]] if "called" in responses.columns else responses
+        removed = self._removed.copy()
+        matrix = self._matrix
+        position = sparse.csc_matrix(
+            (np.arange(matrix.nnz) + 1, matrix.indices, matrix.indptr), shape=matrix.shape)
+        gene_index = pd.Index(np.asarray(self._genes).astype(str))
+        exposure, types, pos = self._exposure()
+        with_range = "range_rate" in called.columns
+        for (s, t), rows in called.groupby(["source", "target"]):
+            if t not in self._components.get("cells_of", {}) or s not in types:
+                continue
+            cols = self._components["cells_of"][t]
+            contact = exposure[pos[cols], types.index(s)].astype(float)
+            if with_range:
+                r0 = rows.iloc[0]
+                density, _, _ = self._range((float(r0.range_in_um), float(r0.range_out_um)))
+                at_range = density[pos[cols], types.index(s)]
+            for r in rows.itertuples():
+                g = gene_index.get_loc(str(r.gene))
+                response = r.contact_rate * contact
+                if with_range:
+                    response = response + r.range_rate * at_range
+                p = np.asarray(position[g, cols].todense()).ravel() - 1
+                ok = p >= 0
+                removed[p[ok]] = np.maximum(removed[p[ok]] - response[ok], 0.0)
+        model = GenerativeModel(self._audit, self._matrix, self._genes, self._cells,
+                                removed, self._removed_strict, self.pairs, self.induced,
+                                self._composition, self._ambient_scale, self.n_programs,
+                                self.whole_cell_profiles, self.init,
+                                components=self._components)
+        model.retained_responses = called.reset_index(drop=True)
+        return model
+
+    def _range(self, range_um):
+        """Source cells between range_um[0] and range_um[1] micrometers of
+        each cell per 1000 square micrometers, per column of the count
+        matrix: the densities, the types and the row of each column in the
+        cell table."""
+        from ._score_utils import source_range_density
+
+        cache = getattr(self, "_range_cache", {})
+        key = (float(range_um[0]), float(range_um[1]))
+        if key not in cache:
+            audit = self._audit
+            cells_table = audit._cells_table
+            ann = audit._ctypes[audit._ctypes != "None"]
+            density, types = source_range_density(cells_table, ann, r_in=key[0], r_out=key[1])
+            pos = pd.Index(cells_table["cell_id"].astype(str)).get_indexer(
+                [str(c) for c in self._cells])
+            cache[key] = (density, types, pos)
+            self._range_cache = cache
+        return cache[key]
+
+    def _exposure(self):
+        """Source cells among each cell's nearest neighbors (the exposure
+        count), per column of the count matrix: the counts, the types and
+        the row of each column in the cell table."""
+        from ._score_utils import source_exposure_counts
+
+        if not hasattr(self, "_exposure_cache"):
+            audit = self._audit
+            cells_table = audit._cells_table
+            ann = audit._ctypes[audit._ctypes != "None"]
+            exposure, types = source_exposure_counts(
+                cells_table, ann, neighbor_k=self._components["neighbor_k"])
+            pos = pd.Index(cells_table["cell_id"].astype(str)).get_indexer(
+                [str(c) for c in self._cells])
+            self._exposure_cache = (exposure, types, pos)
+        return self._exposure_cache
+
     def realize(self, fit, name="generative", seed=0, retain_induced=True):
         """A molecule-level correction: the model's removal in every cell
         and gene, rounded stochastically, drawn at random from the cell's
@@ -260,43 +364,56 @@ class GenerativeModel:
                 f"removed_expected={removed:,.0f}, init={self.init!r})")
 
 
-def _poisson_scales(Y, fixed, own, copy, contact, n_iter=200, tol=1e-6):
+def _poisson_scales(Y, fixed, own, copy, covariates, n_iter=200, tol=1e-6):
     """Non-negative Poisson regression of every gene at once:
-    E[y] = fixed + a * own + gamma * copy + b * contact, by multiplicative
-    updates; returns the scales (3 x genes) and their standard errors from
-    the Fisher information."""
+    E[y] = fixed + a * own + gamma * copy + sum_j b_j * covariate_j, by
+    multiplicative updates; ``covariates`` is a cells x m matrix of per-cell
+    terms shared by all genes. Returns the scales ((2 + m) x genes) and
+    their standard errors from the Fisher information."""
     n_genes = Y.shape[1]
+    C = np.asarray(covariates, dtype=float)
+    if C.ndim == 1:
+        C = C[:, None]
+    m = C.shape[1]
     a = np.full(n_genes, 0.1)
     gamma = np.full(n_genes, 0.1)
-    b = np.full(n_genes, 0.1)
+    b = np.full((m, n_genes), 0.1)
     col_own = own.sum(axis=0)
     col_copy = copy.sum(axis=0)
-    col_contact = float(contact.sum())
-    contact_col = contact[:, None]
+    col_c = C.sum(axis=0)
+
+    def predict(a, gamma, b):
+        mu = fixed + own * a + copy * gamma
+        for j in range(m):
+            mu = mu + C[:, j:j + 1] * b[j]
+        return mu
+
     for _ in range(n_iter):
-        mu = fixed + own * a + copy * gamma + contact_col * b
-        ratio = Y / np.maximum(mu, 1e-12)
+        ratio = Y / np.maximum(predict(a, gamma, b), 1e-12)
         a_new = np.where(col_own > 0, a * (own * ratio).sum(axis=0) / np.maximum(col_own, 1e-12), 0.0)
         g_new = np.where(col_copy > 0, gamma * (copy * ratio).sum(axis=0) / np.maximum(col_copy, 1e-12), 0.0)
-        b_new = (b * (contact @ ratio) / col_contact) if col_contact > 0 else np.zeros(n_genes)
+        b_new = np.zeros_like(b)
+        for j in range(m):
+            if col_c[j] > 0:
+                b_new[j] = b[j] * (C[:, j] @ ratio) / col_c[j]
         change = max(np.max(np.abs(a_new - a) / np.maximum(a, 1e-8)),
                      np.max(np.abs(g_new - gamma) / np.maximum(gamma, 1e-8)),
                      np.max(np.abs(b_new - b) / np.maximum(b, 1e-8)))
         a, gamma, b = a_new, g_new, b_new
         if change < tol:
             break
-    mu = fixed + own * a + copy * gamma + contact_col * b
-    w = 1.0 / np.maximum(mu, 1e-12)
-    info = np.zeros((n_genes, 3, 3))
-    info[:, 0, 0] = (own * own * w).sum(axis=0)
-    info[:, 0, 1] = info[:, 1, 0] = (own * copy * w).sum(axis=0)
-    info[:, 0, 2] = info[:, 2, 0] = (own * contact_col * w).sum(axis=0)
-    info[:, 1, 1] = (copy * copy * w).sum(axis=0)
-    info[:, 1, 2] = info[:, 2, 1] = (copy * contact_col * w).sum(axis=0)
-    info[:, 2, 2] = (contact_col * contact_col * w).sum(axis=0)
+    w = 1.0 / np.maximum(predict(a, gamma, b), 1e-12)
+    # the design per gene: own and copy (cells x genes) and the covariates
+    design = [own, copy] + [C[:, j:j + 1] for j in range(m)]
+    k = 2 + m
+    info = np.zeros((n_genes, k, k))
+    for p_ in range(k):
+        for q in range(p_, k):
+            v = (design[p_] * design[q] * w).sum(axis=0)
+            info[:, p_, q] = info[:, q, p_] = v
     cov = np.linalg.pinv(info)
-    se = np.sqrt(np.maximum(np.stack([cov[:, 0, 0], cov[:, 1, 1], cov[:, 2, 2]]), 0.0))
-    return np.stack([a, gamma, b]), se
+    se = np.sqrt(np.maximum(np.stack([cov[:, i, i] for i in range(k)]), 0.0))
+    return np.vstack([a[None, :], gamma[None, :], b]), se
 
 
 def fit_generative(audit, *, init=None, n_programs=4, num_threads=None,

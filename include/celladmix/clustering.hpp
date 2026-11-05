@@ -103,6 +103,18 @@ DenseMatrix cell_nearest_type_rank(
     int n_types,
     int max_k);
 
+// Count cell types among the cells whose centroids lie farther than r_in
+// and at most r_out from each cell (2D, the cell itself excluded).
+// Unlabeled cells contribute no counts. Returns a dense cells x n_types
+// matrix.
+DenseMatrix cell_type_counts_within(
+    const std::vector<double>& x,
+    const std::vector<double>& y,
+    const std::vector<int>& type_codes,
+    int n_types,
+    double r_in,
+    double r_out);
+
 // The k nearest neighbor cells of every cell (2D centroids, the cell itself
 // excluded) in order of distance: index and distance as row-major cells x k
 // arrays, -1 and infinity where fewer than k other cells exist.

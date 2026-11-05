@@ -1386,6 +1386,52 @@ DenseMatrix cell_neighbor_type_counts(
   return counts;
 }
 
+DenseMatrix cell_type_counts_within(
+    const std::vector<double>& x,
+    const std::vector<double>& y,
+    const std::vector<int>& type_codes,
+    int n_types,
+    double r_in,
+    double r_out) {
+  const std::size_t n = x.size();
+  if (y.size() != n || type_codes.size() != n) {
+    throw std::runtime_error("cell_type_counts_within inputs must have equal length");
+  }
+  if (n_types <= 0 || r_in < 0.0 || !(r_out > r_in)) {
+    throw std::runtime_error("cell_type_counts_within requires positive n_types and 0 <= r_in < r_out");
+  }
+  DenseMatrix counts(static_cast<int>(n), n_types, 0.0);
+  if (n < 2) {
+    return counts;
+  }
+  CellPointAdaptor adaptor;
+  adaptor.x = &x;
+  adaptor.y = &y;
+  CellKdTree tree(2, adaptor, nanoflann::KDTreeSingleIndexAdaptorParams(10));
+  tree.buildIndex();
+  const double r_out2 = r_out * r_out;
+  const double r_in2 = r_in * r_in;
+  std::vector<nanoflann::ResultItem<int, double>> matches;
+  nanoflann::SearchParameters params;
+  params.sorted = false;
+  for (std::size_t i = 0; i < n; ++i) {
+    const double query[2] = {x[i], y[i]};
+    matches.clear();
+    tree.radiusSearch(query, r_out2, matches, params);
+    for (const auto& m : matches) {
+      const std::size_t j = static_cast<std::size_t>(m.first);
+      if (j == i || m.second <= r_in2) {
+        continue;
+      }
+      const int code = type_codes[j];
+      if (code >= 0 && code < n_types) {
+        counts(static_cast<int>(i), code) += 1.0;
+      }
+    }
+  }
+  return counts;
+}
+
 CellNeighbors cell_nearest_neighbors(
     const std::vector<double>& x,
     const std::vector<double>& y,
