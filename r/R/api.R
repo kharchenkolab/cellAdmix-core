@@ -3044,6 +3044,10 @@ celladmix_plot_coherence_heatmap <- function(
 #'   least `min_votes` member labelings remove them.
 #' @param min_votes Minimum number of member votes required to remove a
 #'   molecule.
+#' @param limit Optional list with `cell_ids`, `genes`, `amounts`, `scale`
+#'   and `seed`: the removal in every cell and gene is capped at `scale`
+#'   times the amount (rounded stochastically), the molecules with the
+#'   fewest votes restored first.
 #'
 #' @return A `celladmix_correction_run` object.
 #' @keywords internal
@@ -3056,7 +3060,8 @@ celladmix_correct <- function(
     annotation_col = c("merged_annotation", "cell_type", "cluster_label", "cluster"),
     cell_id_col = "cell_id",
     rule_member = NULL,
-    min_votes = 1L
+    min_votes = 1L,
+    limit = NULL
   ) {
   if (!inherits(run, "celladmix_run")) {
     stop("celladmix_correct() expects a celladmix_run")
@@ -3070,7 +3075,7 @@ celladmix_correct <- function(
   out_dir <- out_dir %||% file.path(run$paths$corrected_dir, paste0("corrected_", format(Sys.time(), "%Y%m%d_%H%M%S")))
   .celladmix_make_run_object(
     .celladmix_correct_run(run$path, rules, out_dir = out_dir, cell_types = cell_types,
-      rule_member = rule_member, min_votes = min_votes),
+      rule_member = rule_member, min_votes = min_votes, limit = limit),
     class = "celladmix_correction_run"
   )
 }

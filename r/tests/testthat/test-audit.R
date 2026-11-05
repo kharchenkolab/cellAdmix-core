@@ -397,3 +397,47 @@ test_that("the dataset-level audit matches the fit-level audit and runs NMF-free
   ab <- p[p$source == "A" & p$target == "B", ]
   expect_gt(ab$sensitivity, 0.5)
 })
+
+test_that("the molecule-level realization and the cap follow the count-level removal", {
+  fit <- make_audit_fit()
+  audit <- fit$audit_admixture(neighbor_k = 6L, min_target_cells = 50L,
+    min_reference_cells = 20L, min_excess = 50)
+  model <- audit$fit_generative(num_threads = 2L)
+  before <- fit$counts()
+  expected <- model$correct()$counts()
+  # realization: per cell and gene the realized removal is the expected one
+  # up to the rounding of a fraction
+  realized <- model$realize(fit, name = "generative_molecules", seed = 3L)
+  got <- realized$counts()
+  got <- got[rownames(before), colnames(before)]
+  diff <- abs(as.matrix(before - got) - as.matrix(before - expected))
+  expect_lte(max(diff), 1 + 1e-9)
+  removed_expected <- sum(before - expected)
+  expect_lt(abs(sum(before - got) - removed_expected), 0.1 * removed_expected + 5)
+  expect_equal(realized$run$n_removed, sum(before - got))
+  expect_true(!is.null(realized$run$realization))
+  # the cap: both factors removed from B cells empties them without it;
+  # with it the removal per cell and gene stays within the amount + 1
+  rules <- data.frame(factor = c(1L, 2L), target_cell_type = c("B", "B"),
+    stringsAsFactors = FALSE)
+  uncapped <- celladmix_correct(fit$run, rules, out_dir = tempfile("cap_none_"))
+  amounts <- cellAdmixCore:::.celladmix_removal_amounts(model)
+  capped <- celladmix_correct(fit$run, rules, out_dir = tempfile("cap_model_"),
+    limit = c(amounts, list(scale = 1, seed = 0)))
+  removed_capped <- as.matrix(before - celladmix_collect_counts_sparse(capped)[rownames(before), colnames(before)])
+  removed_uncapped <- as.matrix(before - celladmix_collect_counts_sparse(uncapped)[rownames(before), colnames(before)])
+  amount <- as.matrix(model$removal())[rownames(before), colnames(before)]
+  expect_true(all(removed_capped <= floor(amount) + 1 + 1e-9))
+  expect_true(all(removed_capped <= removed_uncapped + 1e-9))
+  expect_gt(sum(removed_uncapped), sum(removed_capped))
+  expect_gt(sum(removed_capped), 0)
+  expect_true(!is.null(capped$cap))
+  expect_equal(capped$cap$restored, uncapped$n_removed - capped$n_removed)
+  # a cap above every removal reproduces the uncapped correction
+  huge <- list(removed = Matrix::Matrix(1e6, nrow(before), ncol(before),
+    dimnames = dimnames(before), sparse = TRUE))
+  same <- celladmix_correct(fit$run, rules, out_dir = tempfile("cap_huge_"),
+    limit = c(cellAdmixCore:::.celladmix_removal_amounts(huge), list(scale = 1, seed = 0)))
+  expect_equal(same$n_removed, uncapped$n_removed)
+  expect_equal(same$cap$restored, 0)
+})

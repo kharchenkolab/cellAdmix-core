@@ -17,6 +17,7 @@
 
 #include "celladmix/bridge.hpp"
 #include "celladmix/clustering.hpp"
+#include "celladmix/count_removal.hpp"
 #include "celladmix/generative.hpp"
 #include "celladmix/input_store.hpp"
 #include "celladmix/membrane.hpp"
@@ -1076,7 +1077,12 @@ PYBIND11_MODULE(_core, m) {
          const std::vector<std::string>& annotation_cell_ids,
          const std::vector<std::string>& annotation_labels,
          const std::vector<int>& rule_members,
-         int min_votes) {
+         int min_votes,
+         const std::vector<std::string>& limit_cell_ids,
+         const std::vector<std::string>& limit_genes,
+         const std::vector<double>& limit_amounts,
+         double limit_scale,
+         unsigned int limit_seed) {
         if (factors.size() != target_cell_types.size()) {
           throw std::runtime_error("factors and target_cell_types must have the same length");
         }
@@ -1154,6 +1160,22 @@ PYBIND11_MODULE(_core, m) {
           keep_mask[i] = votes[i] < min_votes;
         }
 
+        // Optional limit per cell and gene (a count-level removal amount):
+        // molecules removed beyond it are restored, fewest votes first.
+        py::dict limit_info;
+        const bool limited = !limit_amounts.empty();
+        if (limited) {
+          const celladmix::CountRemoval amounts{limit_cell_ids, limit_genes, limit_amounts};
+          auto limit = celladmix::limit_removal(run_data.transcripts, votes, keep_mask,
+                                                amounts, limit_scale, limit_seed);
+          keep_mask = std::move(limit.keep_mask);
+          limit_info["amount_molecules"] = limit.amount_molecules;
+          limit_info["cap_molecules"] = limit.limit_molecules;
+          limit_info["restored"] = limit.restored;
+          limit_info["seed"] = limit_seed;
+          limit_info["scale"] = limit_scale;
+        }
+
         celladmix::RunManifest manifest;
         {
           // Writing corrected parquet files can be slow on large runs.
@@ -1175,6 +1197,7 @@ PYBIND11_MODULE(_core, m) {
         out["vote_histogram"] = vote_histogram;
         out["correction_summary_parquet"] =
             celladmix::correction_summary_parquet_path(manifest.paths.root_dir);
+        if (limited) out["cap"] = limit_info;
         return out;
       },
       py::arg("run_path"),
@@ -1184,7 +1207,46 @@ PYBIND11_MODULE(_core, m) {
       py::arg("annotation_cell_ids") = std::vector<std::string>{},
       py::arg("annotation_labels") = std::vector<std::string>{},
       py::arg("rule_members") = std::vector<int>{},
-      py::arg("min_votes") = 1);
+      py::arg("min_votes") = 1,
+      py::arg("limit_cell_ids") = std::vector<std::string>{},
+      py::arg("limit_genes") = std::vector<std::string>{},
+      py::arg("limit_amounts") = std::vector<double>{},
+      py::arg("limit_scale") = 1.0,
+      py::arg("limit_seed") = 0u);
+
+  m.def(
+      "realize_run",
+      [](const std::string& run_path,
+         const std::string& out_dir,
+         const std::vector<std::string>& cell_ids,
+         const std::vector<std::string>& genes,
+         const std::vector<double>& amounts,
+         unsigned int seed) {
+        auto run_data = celladmix::load_run_data(run_path);
+        const celladmix::CountRemoval removal{cell_ids, genes, amounts};
+        auto drawn = celladmix::draw_removal(run_data.transcripts, removal, seed);
+        celladmix::RunManifest manifest;
+        {
+          py::gil_scoped_release release;
+          manifest = celladmix::write_corrected_run(out_dir, run_path, run_data, drawn.keep_mask);
+        }
+        auto out = manifest_to_dict(manifest);
+        out["n_removed"] = drawn.removed;
+        py::dict info;
+        info["amount_molecules"] = drawn.amount_molecules;
+        info["removed"] = drawn.removed;
+        info["seed"] = seed;
+        out["realization"] = info;
+        out["correction_summary_parquet"] =
+            celladmix::correction_summary_parquet_path(manifest.paths.root_dir);
+        return out;
+      },
+      py::arg("run_path"),
+      py::arg("out_dir"),
+      py::arg("cell_ids"),
+      py::arg("genes"),
+      py::arg("amounts"),
+      py::arg("seed") = 0u);
 
   m.def(
       "ensemble_prepare",

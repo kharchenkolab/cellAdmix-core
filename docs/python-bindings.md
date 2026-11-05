@@ -88,9 +88,10 @@ to admixture there, times `cap_scale` (default 1), rounded stochastically
 removes more of a gene from a cell than that amount the surplus is
 restored, the molecules with the fewest votes first. `cap` also accepts a
 `(removed_matrix, genes, cell_ids)` triple in genes × cells orientation
-for any other count-level removal. The corrected store is rewritten with
-the restored molecules and `correction.manifest["cap"]` records the
-amount, the rounded cap and the number of molecules restored. The cap
+for any other count-level removal. The cap is applied in the core before
+the corrected store is written (the R bindings take the same `cap`
+argument in `fit$correct()`), and `correction.manifest["cap"]` records
+the amount, the rounded cap and the number of molecules restored. The cap
 trades recall for specificity: on a simulated pancreas section with a
 known origin per molecule the ten-member vote recalls 0.79 of the
 admixed molecules at 9.9% own-molecule loss and 3.3% own-marker removal,

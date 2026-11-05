@@ -69,6 +69,7 @@ add_library(celladmix_core
   src/generative.cpp
   src/bridge.cpp
   src/coherence.cpp
+  src/count_removal.cpp
   src/domains.cpp
   src/graph.cpp
   src/input_store.cpp
@@ -114,6 +115,7 @@ endif()
 if (CELLADMIX_BUILD_TESTS)
   add_executable(celladmix_core_tests
     tests/test_clustering.cpp
+    tests/test_count_removal.cpp
     tests/test_generative.cpp
     tests/test_main.cpp
     tests/test_bridge.cpp

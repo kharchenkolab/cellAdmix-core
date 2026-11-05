@@ -191,7 +191,13 @@ CellAdmixFit <- R6::R6Class(
 
     correct = function(score, name = NULL, p_thresh = 0.1, adjust_p = FALSE,
                        targets = NULL, rules = NULL, ensemble = NULL,
-                       vote = 0.3, ...) {
+                       vote = 0.3, cap = NULL, cap_scale = 1, cap_seed = 0L, ...) {
+      # cap limits the removal in every cell and gene to a count-level
+      # amount: a fitted generative model (audit$fit_generative()) or a list
+      # with a genes x cells matrix `removed`. The vote still decides which
+      # molecules go; where it removes more of a gene from a cell than
+      # cap_scale times the amount (rounded stochastically with cap_seed),
+      # the surplus is restored, the molecules with the fewest votes first.
       score_obj <- if (inherits(score, "CellAdmixScore")) {
         score
       } else if (is.character(score) && length(score) == 1L) {
@@ -240,12 +246,16 @@ CellAdmixFit <- R6::R6Class(
         }
       }
 
+      limit <- if (is.null(cap)) NULL else
+        c(.celladmix_removal_amounts(cap), list(scale = as.numeric(cap_scale),
+          seed = as.numeric(cap_seed)))
       if (is.null(member_rules)) {
         corrected <- celladmix_correct(
           self$run,
           rules = rules,
           out_dir = out_dir,
-          annotation = score_obj$annotation_vector()
+          annotation = score_obj$annotation_vector(),
+          limit = limit
         )
       } else {
         min_votes <- max(1L, as.integer(ceiling(vote * length(members))))
@@ -255,7 +265,8 @@ CellAdmixFit <- R6::R6Class(
           out_dir = out_dir,
           annotation = score_obj$annotation_vector(),
           rule_member = member_rules$member,
-          min_votes = min_votes
+          min_votes = min_votes,
+          limit = limit
         )
         rules$support <- .celladmix_rule_support(rules, member_rules$pair_sets)
         message(sprintf(

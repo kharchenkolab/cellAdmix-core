@@ -597,7 +597,8 @@
 }
 
 .celladmix_correct_run <- function(path, rules, out_dir, cell_types = NULL,
-                                   rule_member = NULL, min_votes = 1L) {
+                                   rule_member = NULL, min_votes = 1L,
+                                   limit = NULL) {
   .Call(
     "_cellAdmixCore_celladmix_correct_run",
     path,
@@ -606,6 +607,20 @@
     cell_types,
     if (is.null(rule_member)) NULL else as.integer(rule_member),
     as.integer(min_votes),
+    limit,
+    PACKAGE = "cellAdmixCore"
+  )
+}
+
+.celladmix_realize_run <- function(path, out_dir, cell_ids, genes, amounts, seed = 0L) {
+  .Call(
+    "_cellAdmixCore_celladmix_realize_run",
+    path,
+    as.character(out_dir[[1]]),
+    as.character(cell_ids),
+    as.character(genes),
+    as.numeric(amounts),
+    as.numeric(seed),
     PACKAGE = "cellAdmixCore"
   )
 }

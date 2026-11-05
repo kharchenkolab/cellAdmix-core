@@ -6,6 +6,7 @@ CORE_SOURCES = \
 	../../src/clustering.cpp \
 	../../src/generative.cpp \
 	../../src/coherence.cpp \
+	../../src/count_removal.cpp \
 	../../src/domains.cpp \
 	../../src/graph.cpp \
 	../../src/input_store.cpp \

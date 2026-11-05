@@ -636,7 +636,7 @@ without refitting: `model$correct()` keeps the induced expression,
 `model$correct(retain_induced = FALSE)` removes the fitted induced
 share along with the contamination — the direct demonstration of what
 retention protects. `correct_generative()` remains as the one-call
-convenience. In Python the fitted model also writes a molecule-level
+convenience. The fitted model also writes a molecule-level
 correction, `model.realize(nmf_fit)`: a corrected molecule store in the
 layout of the factor-based cleanup, with the removal in every cell and
 gene drawn at random over the cell's molecules of that gene. Within one

@@ -1353,6 +1353,33 @@ CellAdmixGenerativeModel <- R6::R6Class(
       model
     },
 
+    realize = function(fit, name = "generative", seed = 0L, retain_induced = TRUE) {
+      # A molecule-level correction: the model's removal in every cell and
+      # gene, rounded stochastically, drawn at random from the cell's
+      # molecules of that gene and written as a corrected store under the
+      # fit's run (corrected/<name>, the layout of the factor-based cleanup)
+      # by the native writer. fit is the NMF fit the audit was built from.
+      # Within one gene in one cell nothing tells a transferred molecule
+      # from an own one on stacked pairs, and position adds under a point
+      # of precision on lateral ones, so the draw is random.
+      amounts <- .celladmix_removal_amounts(self, retain_induced = retain_induced)
+      name <- .celladmix_clean_name(name, "correction")
+      out_dir <- file.path(fit$run$paths$corrected_dir, name)
+      run <- .celladmix_make_run_object(
+        .celladmix_realize_run(fit$run$path, out_dir, amounts$cell_ids,
+          amounts$genes, amounts$amounts, seed),
+        class = "celladmix_correction_run")
+      CellAdmixCorrection$new(name, fit, NULL, run,
+        params = list(realization = TRUE, seed = seed, retain_induced = retain_induced))
+    },
+
+    removal = function(retain_induced = TRUE) {
+      # The model's removal as a genes x cells matrix (fractional molecules).
+      out <- private$.counts
+      out@x <- if (retain_induced) private$.removed else private$.removed_strict
+      out
+    },
+
     composition = function(source = NULL, target = NULL) {
       d <- private$.composition
       if (!is.null(source)) d <- d[d$source == source, , drop = FALSE]
@@ -1412,6 +1439,23 @@ CellAdmixGenerativeModel <- R6::R6Class(
       private$.range_cache[[key]]
     })
 )
+
+# Per (cell, gene) removal amounts as a list of cell_ids, genes and amounts
+# from a fitted generative model or a list with a genes x cells matrix
+# `removed` (dimnames: genes, cells).
+.celladmix_removal_amounts <- function(source, retain_induced = TRUE) {
+  m <- if (inherits(source, "CellAdmixGenerativeModel")) {
+    source$removal(retain_induced = retain_induced)
+  } else if (is.list(source) && !is.null(source$removed)) {
+    source$removed
+  } else {
+    stop("cap must be a fitted generative model or a list with a matrix `removed`")
+  }
+  m <- methods::as(m, "TsparseMatrix")
+  ok <- m@x > 0
+  list(cell_ids = colnames(m)[m@j[ok] + 1L], genes = rownames(m)[m@i[ok] + 1L],
+    amounts = as.numeric(m@x[ok]))
+}
 
 # Non-negative Poisson regression of every gene at once,
 # E[y] = fixed + a * own + gamma * copy + b * contact, by multiplicative

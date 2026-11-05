@@ -31,6 +31,7 @@
 
 #include "celladmix/clustering.hpp"
 #include "celladmix/coherence.hpp"
+#include "celladmix/count_removal.hpp"
 #include "celladmix/generative.hpp"
 #include "celladmix/domains.hpp"
 #include "celladmix/input_store.hpp"
@@ -5271,7 +5272,8 @@ extern "C" SEXP _cellAdmixCore_celladmix_correct_run(
     SEXP out_dir_sexp,
     SEXP cell_types_sexp,
     SEXP rule_member_sexp,
-    SEXP min_votes_sexp) {
+    SEXP min_votes_sexp,
+    SEXP limit_sexp) {
   try {
     auto run_data = celladmix::load_run_data(as<std::string>(path_sexp));
     const DataFrame rules = as<DataFrame>(rules_sexp);
@@ -5419,6 +5421,30 @@ extern "C" SEXP _cellAdmixCore_celladmix_correct_run(
       keep_mask[i] = votes[i] < min_votes;
     }
 
+    // Optional limit per cell and gene (a count-level removal amount, a
+    // list with cell_ids, genes, amounts, scale, seed): molecules removed
+    // beyond it are restored, fewest votes first.
+    List limit_info;
+    const bool limited = !Rf_isNull(limit_sexp);
+    if (limited) {
+      const List lim(limit_sexp);
+      const celladmix::CountRemoval amounts{
+          as<std::vector<std::string>>(lim["cell_ids"]),
+          as<std::vector<std::string>>(lim["genes"]),
+          as<std::vector<double>>(lim["amounts"])};
+      const double scale = as<double>(lim["scale"]);
+      const unsigned int seed = static_cast<unsigned int>(as<double>(lim["seed"]));
+      auto limit = celladmix::limit_removal(run_data.transcripts, votes, keep_mask,
+                                            amounts, scale, seed);
+      keep_mask = std::move(limit.keep_mask);
+      limit_info = List::create(
+          Named("amount_molecules") = limit.amount_molecules,
+          Named("cap_molecules") = static_cast<double>(limit.limit_molecules),
+          Named("restored") = static_cast<double>(limit.restored),
+          Named("seed") = static_cast<double>(seed),
+          Named("scale") = scale);
+    }
+
     const auto manifest = celladmix::write_corrected_run(
         as<std::string>(out_dir_sexp),
         as<std::string>(path_sexp),
@@ -5443,11 +5469,48 @@ extern "C" SEXP _cellAdmixCore_celladmix_correct_run(
     out["vote_histogram"] = vote_histogram;
     out["correction_summary"] =
         parquet_table_to_df(celladmix::correction_summary_parquet_path(manifest.paths.root_dir));
+    if (limited) out["cap"] = limit_info;
     return out;
   } catch (std::exception& ex) {
     forward_exception_to_r(ex);
   } catch (...) {
     ::Rf_error("celladmix_correct_run: unknown C++ exception");
+  }
+  return R_NilValue;
+}
+
+extern "C" SEXP _cellAdmixCore_celladmix_realize_run(
+    SEXP path_sexp,
+    SEXP out_dir_sexp,
+    SEXP cell_ids_sexp,
+    SEXP genes_sexp,
+    SEXP amounts_sexp,
+    SEXP seed_sexp) {
+  try {
+    auto run_data = celladmix::load_run_data(as<std::string>(path_sexp));
+    const celladmix::CountRemoval removal{
+        as<std::vector<std::string>>(cell_ids_sexp),
+        as<std::vector<std::string>>(genes_sexp),
+        as<std::vector<double>>(amounts_sexp)};
+    const unsigned int seed = static_cast<unsigned int>(as<double>(seed_sexp));
+    auto drawn = celladmix::draw_removal(run_data.transcripts, removal, seed);
+    const auto manifest = celladmix::write_corrected_run(
+        as<std::string>(out_dir_sexp), as<std::string>(path_sexp), run_data, drawn.keep_mask);
+    auto out = run_manifest_to_r(manifest);
+    out["h"] = load_factor_matrix_from_run(manifest);
+    out["genes"] = manifest.genes;
+    out["n_removed"] = static_cast<double>(drawn.removed);
+    out["realization"] = List::create(
+        Named("amount_molecules") = drawn.amount_molecules,
+        Named("removed") = static_cast<double>(drawn.removed),
+        Named("seed") = static_cast<double>(seed));
+    out["correction_summary"] =
+        parquet_table_to_df(celladmix::correction_summary_parquet_path(manifest.paths.root_dir));
+    return out;
+  } catch (std::exception& ex) {
+    forward_exception_to_r(ex);
+  } catch (...) {
+    ::Rf_error("celladmix_realize_run: unknown C++ exception");
   }
   return R_NilValue;
 }

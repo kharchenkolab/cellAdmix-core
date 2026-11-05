@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import numpy as np
 import pandas as pd
 
@@ -123,7 +121,7 @@ class CellAdmixScore:
         import math
 
         from . import _core
-        from .correction import _store_molecule_votes, cap_correction
+        from .correction import removal_amounts
 
         user_rules = rules is not None
         rules = self.rules(p_thresh=p_thresh) if rules is None else rules
@@ -157,10 +155,11 @@ class CellAdmixScore:
                     members, selected, rules, p_thresh=p_thresh, restrict_pairs=restrict
                 )
 
+        limit = removal_amounts(cap) if cap is not None else None
         if member_rules is None:
-            correction = self.fit.correct(rules, name=name)
+            correction = self.fit.correct(rules, name=name, limit=limit,
+                                          limit_scale=cap_scale, limit_seed=cap_seed)
             if cap is not None:
-                correction = cap_correction(self.fit, correction, cap, seed=cap_seed, scale=cap_scale)
                 print(f"Capped at the count-level amount: {correction.manifest['cap']['restored']:,} "
                       f"molecules restored ({correction.manifest['n_removed']:,} removed).")
             return correction
@@ -171,6 +170,9 @@ class CellAdmixScore:
             name=name,
             rule_members=member_rules["member"],
             min_votes=min_votes,
+            limit=limit,
+            limit_scale=cap_scale,
+            limit_seed=cap_seed,
         )
         rules = rules.copy()
         rules["support"] = _rule_support(rules, member_rules["pair_sets"])
@@ -181,16 +183,6 @@ class CellAdmixScore:
             f"({correction.manifest.get('n_removed', 0):,} molecules)."
         )
         if cap is not None:
-            import pyarrow.parquet as pq
-
-            kept = pq.read_table(Path(correction.run_path) / "molecules.parquet",
-                                 columns=["obs_id"]).column(0).to_numpy()
-            n = int(self.fit.manifest["n_transcripts"])
-            removed = np.ones(n, dtype=bool)
-            removed[kept] = False
-            rows = np.flatnonzero(removed)
-            votes = _store_molecule_votes(self.fit, member_rules, rows)
-            correction = cap_correction(self.fit, correction, cap, votes=votes, seed=cap_seed, scale=cap_scale)
             print(f"Capped at the count-level amount: {correction.manifest['cap']['restored']:,} "
                   f"molecules restored ({correction.manifest['n_removed']:,} removed).")
         return correction

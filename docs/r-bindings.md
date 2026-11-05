@@ -259,10 +259,16 @@ audit$evaluate(correction)         # verified like any other correction
 model$expectation("Ductal/tumor epithelial")  # the fitted components per cell and gene
 model$detect_responses()           # responses on a contact term, per pair and gene
 model$retain_responses(responses)  # ... kept in the correction
+model$realize(nmf_fit)             # a molecule-level corrected store: the
+                                   # removal drawn at random per cell and gene
 ```
 
-The molecule-level realization of the correction (`model.realize()`)
-is available in the Python bindings.
+The factor-based cleanup takes the model's removal as a limit per cell
+and gene, `nmf_fit$correct(score, cap = model)`: the vote still chooses
+which molecules go, and where it removes more of a gene from a cell than
+`cap_scale` times the model's amount the surplus is restored, the
+molecules with the fewest votes first (see
+[python-bindings.md](python-bindings.md) for the measured trade-off).
 
 The `init` argument selects the expression-program initialization: an
 NMF fit's factor-labeled molecules (the recommended configuration, and

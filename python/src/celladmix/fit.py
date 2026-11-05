@@ -338,12 +338,17 @@ class CellAdmixFit:
         return self.score_neighbor_enrichment(**kwargs)
 
     def correct(self, rules: pd.DataFrame, *, name: str = "clean",
-                rule_members=None, min_votes: int = 1):
+                rule_members=None, min_votes: int = 1, limit=None,
+                limit_scale: float = 1.0, limit_seed: int = 0):
         """Remove molecules matching factor/target-cell-type correction rules.
 
         With ``rule_members``, each rule row votes with the labeling of one
         ensemble member (see :meth:`CellAdmixScore.correct`); a molecule is
-        removed when at least ``min_votes`` members remove it.
+        removed when at least ``min_votes`` members remove it. ``limit``
+        (cell identifiers, gene names and amounts, as
+        ``correction.removal_amounts`` returns) caps the removal in every
+        cell and gene at ``limit_scale`` times the amount, restoring the
+        molecules with the fewest votes first.
         """
         from .correction import CellAdmixCorrection
 
@@ -360,6 +365,11 @@ class CellAdmixFit:
             annotation_labels=labels,
             rule_members=[int(m) for m in (rule_members or [])],
             min_votes=int(min_votes),
+            limit_cell_ids=list(limit[0]) if limit is not None else [],
+            limit_genes=list(limit[1]) if limit is not None else [],
+            limit_amounts=list(limit[2]) if limit is not None else [],
+            limit_scale=float(limit_scale),
+            limit_seed=int(limit_seed),
         )
         correction = CellAdmixCorrection(str(out_dir), result, rules=rules)
         # Over-removal guard: a rule set whose factors jointly cover a cell
