@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
@@ -93,6 +95,9 @@ class CellAdmixScore:
         name: str | None = None,
         ensemble: int | None = None,
         vote: float = 0.3,
+        cap=None,
+        cap_seed: int = 0,
+        cap_scale: float = 1.0,
     ):
         """Apply score-derived correction rules to the parent fit.
 
@@ -103,10 +108,22 @@ class CellAdmixScore:
         selected restart only. Rules flagged ``keep=False`` by the
         native-factor check are skipped; when ``rules`` is passed
         explicitly, its source→target pairs restrict every member.
+
+        ``cap`` limits the removal in every cell and gene to a count-level
+        amount: a fitted generative model (``audit.fit_generative()``) or a
+        ``(removed_matrix, genes, cell_ids)`` triple in genes x cells
+        orientation. The vote still decides which molecules go; where it
+        removes more of a gene from a cell than ``cap_scale`` times the
+        amount (rounded stochastically with ``cap_seed``), the surplus molecules are
+        restored, those with the fewest votes first. This keeps the
+        factor-based choice of molecules while the removed quantity per
+        cell and gene follows the count-level model, which is what
+        protects a type's own markers from whole-factor removal.
         """
         import math
 
         from . import _core
+        from .correction import _store_molecule_votes, cap_correction
 
         user_rules = rules is not None
         rules = self.rules(p_thresh=p_thresh) if rules is None else rules
@@ -141,7 +158,12 @@ class CellAdmixScore:
                 )
 
         if member_rules is None:
-            return self.fit.correct(rules, name=name)
+            correction = self.fit.correct(rules, name=name)
+            if cap is not None:
+                correction = cap_correction(self.fit, correction, cap, seed=cap_seed, scale=cap_scale)
+                print(f"Capped at the count-level amount: {correction.manifest['cap']['restored']:,} "
+                      f"molecules restored ({correction.manifest['n_removed']:,} removed).")
+            return correction
 
         min_votes = max(1, math.ceil(vote * len(members)))
         correction = self.fit.correct(
@@ -158,6 +180,19 @@ class CellAdmixScore:
             f"by >= {min_votes} members (vote >= {vote:.2f}) are dropped "
             f"({correction.manifest.get('n_removed', 0):,} molecules)."
         )
+        if cap is not None:
+            import pyarrow.parquet as pq
+
+            kept = pq.read_table(Path(correction.run_path) / "molecules.parquet",
+                                 columns=["obs_id"]).column(0).to_numpy()
+            n = int(self.fit.manifest["n_transcripts"])
+            removed = np.ones(n, dtype=bool)
+            removed[kept] = False
+            rows = np.flatnonzero(removed)
+            votes = _store_molecule_votes(self.fit, member_rules, rows)
+            correction = cap_correction(self.fit, correction, cap, votes=votes, seed=cap_seed, scale=cap_scale)
+            print(f"Capped at the count-level amount: {correction.manifest['cap']['restored']:,} "
+                  f"molecules restored ({correction.manifest['n_removed']:,} removed).")
         return correction
 
     def _score_member(self, member: int) -> "CellAdmixScore":

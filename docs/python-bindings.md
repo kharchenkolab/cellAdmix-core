@@ -78,6 +78,115 @@ correction computes and caches per-member molecule labelings in the run
 directory; runs fitted with `nmf_n_runs=1` (or cached runs whose stores lack
 a restart member pool) fall back to the single-fit correction with a message.
 
+The vote removes whole factors' molecules from a cell type, so where a
+factor carries part of the type's own expression it removes own
+molecules too. `score.correct(..., cap=model)` limits the removal in every
+cell and gene to the amount a fitted generative model
+(`audit.fit_generative()`, see [generative.md](generative.md)) attributes
+to admixture there, times `cap_scale` (default 1), rounded stochastically
+(`cap_seed`): the vote still chooses which molecules go, and where it
+removes more of a gene from a cell than that amount the surplus is
+restored, the molecules with the fewest votes first. `cap` also accepts a
+`(removed_matrix, genes, cell_ids)` triple in genes × cells orientation
+for any other count-level removal. The corrected store is rewritten with
+the restored molecules and `correction.manifest["cap"]` records the
+amount, the rounded cap and the number of molecules restored. The cap
+trades recall for specificity: on a simulated pancreas section with a
+known origin per molecule the ten-member vote recalls 0.79 of the
+admixed molecules at 9.9% own-molecule loss and 3.3% own-marker removal,
+and capped at the generative amount 0.71 at 3.5% and none, the precision
+of the removal rising from 0.82 to 0.92 (at twice the amount 0.76, 4.8%
+and still none, since the model's profiles are zero on the genes a
+target type owns); the vote and the model place their removal in
+different cells, and a strict cap only ever cuts.
+
+`correct()` warns when a rule set removes more than 60% of a cell type's
+molecules — usually a sign that the factorization has no native factor for
+that type; the minimum-molecule gate for the warning is
+`celladmix.fit.OVERREMOVAL_MIN_MOLECULES`.
+
+Default behavior mirrors the R API:
+
+- NMF method: `ls_nmf`.
+- Molecule node potentials: gene-loading based scoring.
+- Rank: `ceil(1.2 * number_of_annotation_labels)`, capped at 30.
+- Xenium control/codeword/non-gene features are excluded during input-store
+  construction. Pass `keep_non_gene=True` only for control-feature diagnostics.
+- NMF restarts: at least 10 by default (more on higher thread counts), with
+  every restart's loadings kept as the ensemble member pool.
+
+### Loading Existing Runs
+
+Persisted runs can be reattached without refitting or manually globbing the
+private run directory layout:
+
+```python
+fit = ca.CellAdmixFit.load("out/runs/fit_rank8_ls_nmf",
+                          source="data",
+                          annotation=cell_annotation)
+```
+
+or, when working from an output directory:
+
+```python
+ds = ca.CellAdmix.attach_existing("out", source="data", annotation=cell_annotation)
+fit = ds.load_fit("fit_rank8_ls_nmf")
+```
+
+The `source` argument is optional when the input-store manifest records a usable
+source path. It is required for methods that need original bundle-side files,
+such as membrane image discovery or cell-boundary plotting, if the path cannot
+be inferred.
+
+### Factor Indexing
+
+The Python public API uses one-based factors throughout:
+
+- integer factor ids are in `1..K` and are stored in a `factor` column;
+- display labels are strings such as `F1`, `F2`, ... in `factor_label`;
+- cell-level columns remain `factor_1_fraction`, `factor_2_fraction`, ...
+  and `dominant_factor` is one-based.
+
+The on-disk `molecules.parquet` file stores the implementation label as a
+zero-based integer. This is an internal detail. Use `fit.molecules(raw=True)`
+only when debugging the persisted parquet representation directly.
+
+### Scoring Additional Molecules
+
+Small same-fit or synthetic molecule tables can be scored against the learned
+factor loadings without refitting:
+
+```python
+scored = fit.score_molecules(
+    new_molecules,              # columns include at least "gene"
+    return_scores=True,
+)
+```
+
+The returned table includes `factor`, `factor_label`, and `factor_margin`.
+With `return_scores=True`, it also includes pre-smoothing soft scores in
+columns `F1..FK`. These scores are the gene-loading molecule potentials used by
+the default pipeline.
+
+This helper only scores the molecule rows supplied by the caller. Molecules
+removed during input-store construction, for example by a strict QV threshold
+or by excluding unassigned molecules, are not recoverable from a completed run
+unless they are supplied separately or the store was built with permissive
+filters.
+
+To also apply the same within-cell hard smoothing used by the fit pipeline:
+
+```python
+scored = fit.score_molecules(new_molecules, smooth=True)
+```
+
+`smooth=True` requires `cell_id`, `x`, and `y` columns. The smoothing step is
+iterative hard-label ICM, not marginal-probability CRF inference, so the
+`F1..FK` columns, when requested, remain the pre-smoothing soft potentials.
+
+Cell-level `factor_K_fraction` values are fractions of molecules assigned to
+each hard factor label after smoothing. They are not soft cell probabilities.
+
 `correct()` warns when a rule set removes more than 60% of a cell type's
 molecules — usually a sign that the factorization has no native factor for
 that type; the minimum-molecule gate for the warning is
