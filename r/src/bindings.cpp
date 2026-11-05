@@ -5018,6 +5018,10 @@ extern "C" SEXP _cellAdmixCore_celladmix_fit_generative(
     set_int("topup_passes", opt.topup_passes);
     set_int("outer_rounds", opt.outer_rounds);
     set_int("neighbor_k", opt.neighbor_k);
+    set_bool("neighbor_profiles", opt.neighbor_profiles);
+    set_double("neighbor_profile_shrink", opt.neighbor_profile_shrink);
+    set_double("neighbor_scale_um", opt.neighbor_scale_um);
+    set_double("neighbor_split_strength", opt.neighbor_split_strength);
     set_bool("use_ambient", opt.use_ambient);
     set_bool("use_induced", opt.use_induced);
     set_int("num_threads", opt.num_threads);

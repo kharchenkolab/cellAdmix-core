@@ -432,6 +432,18 @@ GenerativeResult fit_generative(
       cell_neighbor_type_counts(x, y, type_codes, n_types, opt.neighbor_k);
   progress.emit(msg("Counted the cell types among each cell's ", opt.neighbor_k,
                     " nearest neighbors (exposure)"));
+  const bool use_nb = opt.neighbor_profiles;
+  CellNeighbors knn;
+  if (use_nb) {
+    if (opt.neighbor_profile_shrink < 0.0 || opt.neighbor_scale_um <= 0.0 ||
+        opt.neighbor_split_strength <= 0.0) {
+      throw std::runtime_error("generative: neighbor_profile_shrink must be non-negative, "
+                               "neighbor_scale_um and neighbor_split_strength positive");
+    }
+    knn = cell_nearest_neighbors(x, y, opt.neighbor_k);
+    progress.emit(msg("Listed each cell's ", opt.neighbor_k,
+                      " nearest neighbors (transfer from the actual source neighbors)"));
+  }
   const DenseMatrix nearest_dist = cell_nearest_type_distance(x, y, type_codes, n_types);
   progress.emit("Computed each cell's distance to the nearest cell of every type");
   const DenseMatrix nearest_rank = ladder_n > 0
@@ -1483,6 +1495,149 @@ GenerativeResult fit_generative(
                           count_of(n_induced_genes, "source-gene pair"), " retained"));
       }
 
+      // Transfer from the actual source neighbors: per target cell and
+      // source, the source cells among its neighbor_k nearest neighbors are
+      // the components of the pair's contamination term, each with a
+      // profile of its own (the cell's cytoplasmic counts shrunk toward the
+      // pair's interface-local profile, decontaminated and zeroed as the
+      // pair's) and a prior share of the cell's contamination fraction from
+      // the centroid distance; a cell without such a neighbor keeps the
+      // pair's profile as its single component.
+      std::vector<int> comp_ptr;       // (row * S_n + j) -> component range
+      std::vector<int> comp_prof;      // profile row per component
+      std::vector<float> comp_w;       // prior share of the fraction
+      std::vector<float> comp_pi;      // current share
+      std::vector<float> prof_table;   // profile rows x G, the pair profiles first
+      std::vector<double> prof_share;  // sum of each profile row
+      int max_comp_row = 0;            // most components over a cell's sources
+      if (use_nb) {
+        const std::size_t kk = static_cast<std::size_t>(knn.k);
+        std::vector<int> pair_of_type(static_cast<std::size_t>(n_types), -1);
+        for (int j = 0; j < S_n; ++j) {
+          pair_of_type[static_cast<std::size_t>(plist[static_cast<std::size_t>(j)].spec->source_type)] = j;
+        }
+        std::vector<int> prof_of_cell(static_cast<std::size_t>(n_cells), -1);
+        std::vector<int> prof_cell;  // source cell of each profile row after the pair rows
+        std::vector<int> prof_pair;  // its pair
+        comp_ptr.assign(static_cast<std::size_t>(n) * S_n + 1, 0);
+        std::vector<int> count(static_cast<std::size_t>(S_n), 0);
+        const auto neighbor_pair = [&](int c, std::size_t h) {
+          const int o = knn.index[static_cast<std::size_t>(c) * kk + h];
+          if (o < 0) return std::pair<int, int>{-1, -1};
+          const int t = type_codes[static_cast<std::size_t>(o)];
+          return std::pair<int, int>{o, t < 0 ? -1 : pair_of_type[static_cast<std::size_t>(t)]};
+        };
+        for (int i = 0; i < n; ++i) {
+          const int c = blk.cols[static_cast<std::size_t>(i)];
+          std::fill(count.begin(), count.end(), 0);
+          for (std::size_t h = 0; h < kk; ++h) {
+            const auto [o, j] = neighbor_pair(c, h);
+            if (o < 0) break;
+            if (j < 0) continue;
+            ++count[static_cast<std::size_t>(j)];
+            if (prof_of_cell[static_cast<std::size_t>(o)] < 0) {
+              prof_of_cell[static_cast<std::size_t>(o)] = S_n + static_cast<int>(prof_cell.size());
+              prof_cell.push_back(o);
+              prof_pair.push_back(j);
+            }
+          }
+          int row_comp = 0;
+          for (int j = 0; j < S_n; ++j) {
+            const std::size_t e = static_cast<std::size_t>(i) * S_n + static_cast<std::size_t>(j);
+            const int m = std::max(count[static_cast<std::size_t>(j)], 1);
+            comp_ptr[e + 1] = comp_ptr[e] + m;
+            row_comp += m;
+          }
+          max_comp_row = std::max(max_comp_row, row_comp);
+        }
+        const int n_comp = comp_ptr.back();
+        comp_prof.assign(static_cast<std::size_t>(n_comp), 0);
+        comp_w.assign(static_cast<std::size_t>(n_comp), 1.0f);
+        int n_with_neighbors = 0;
+        for (int i = 0; i < n; ++i) {
+          const int c = blk.cols[static_cast<std::size_t>(i)];
+          std::fill(count.begin(), count.end(), 0);
+          for (std::size_t h = 0; h < kk; ++h) {
+            const auto [o, j] = neighbor_pair(c, h);
+            if (o < 0) break;
+            if (j < 0) continue;
+            const std::size_t q = static_cast<std::size_t>(
+                comp_ptr[static_cast<std::size_t>(i) * S_n + static_cast<std::size_t>(j)] +
+                count[static_cast<std::size_t>(j)]++);
+            comp_prof[q] = prof_of_cell[static_cast<std::size_t>(o)];
+            comp_w[q] = static_cast<float>(
+                std::exp(-knn.distance[static_cast<std::size_t>(c) * kk + h] / opt.neighbor_scale_um));
+          }
+          for (int j = 0; j < S_n; ++j) {
+            const std::size_t e = static_cast<std::size_t>(i) * S_n + static_cast<std::size_t>(j);
+            const int q0 = comp_ptr[e];
+            const int q1 = comp_ptr[e + 1];
+            if (count[static_cast<std::size_t>(j)] == 0) {
+              comp_prof[static_cast<std::size_t>(q0)] = j;  // the pair's profile
+              comp_w[static_cast<std::size_t>(q0)] = 1.0f;
+              continue;
+            }
+            ++n_with_neighbors;
+            double s = 0.0;
+            for (int q = q0; q < q1; ++q) s += comp_w[static_cast<std::size_t>(q)];
+            for (int q = q0; q < q1; ++q) {
+              comp_w[static_cast<std::size_t>(q)] =
+                  static_cast<float>(comp_w[static_cast<std::size_t>(q)] / std::max(s, 1e-300));
+            }
+          }
+        }
+        comp_pi = comp_w;
+        const int n_prof = S_n + static_cast<int>(prof_cell.size());
+        prof_table.assign(static_cast<std::size_t>(n_prof) * G, 0.0f);
+        prof_share.assign(static_cast<std::size_t>(n_prof), 1e-6);
+        for (int j = 0; j < S_n; ++j) {
+          const auto& psi = plist[static_cast<std::size_t>(j)].psi;
+          double s = 0.0;
+          for (int g = 0; g < G; ++g) {
+            prof_table[static_cast<std::size_t>(j) * G + static_cast<std::size_t>(g)] =
+                static_cast<float>(psi[static_cast<std::size_t>(g)]);
+            s += psi[static_cast<std::size_t>(g)];
+          }
+          prof_share[static_cast<std::size_t>(j)] = std::max(s, 1e-6);
+        }
+        if (!prof_cell.empty()) {
+          parallel_rows(static_cast<int>(prof_cell.size()), opt.num_threads, [&](int begin, int end, int) {
+            std::vector<double> prof(static_cast<std::size_t>(G));
+            for (int r = begin; r < end; ++r) {
+              const int o = prof_cell[static_cast<std::size_t>(r)];
+              const auto& ps = plist[static_cast<std::size_t>(prof_pair[static_cast<std::size_t>(r)])];
+              const auto& raw = psi_raw[static_cast<std::size_t>(ps.pair_index)];
+              const auto& of = own_frac[static_cast<std::size_t>(ps.spec->source_type)];
+              const double m = opt.neighbor_profile_shrink;
+              double t_o = 0.0;
+              for (const auto& [g, v] : cyto[static_cast<std::size_t>(o)]) t_o += v;
+              for (int g = 0; g < G; ++g) prof[static_cast<std::size_t>(g)] = m * raw[static_cast<std::size_t>(g)];
+              for (const auto& [g, v] : cyto[static_cast<std::size_t>(o)]) prof[static_cast<std::size_t>(g)] += v;
+              double s = 0.0;
+              for (int g = 0; g < G; ++g) {
+                double v = prof[static_cast<std::size_t>(g)] / std::max(t_o + m, 1e-12);
+                if (!of.empty()) v *= of[static_cast<std::size_t>(g)];
+                prof[static_cast<std::size_t>(g)] = v;
+                s += v;
+              }
+              double share = 0.0;
+              float* row = &prof_table[(static_cast<std::size_t>(S_n) + static_cast<std::size_t>(r)) * G];
+              for (int g = 0; g < G; ++g) {
+                double v = prof[static_cast<std::size_t>(g)] / std::max(s, 1e-12);
+                if (top_type[static_cast<std::size_t>(g)] == T) v = 0.0;
+                row[g] = static_cast<float>(v);
+                share += v;
+              }
+              prof_share[static_cast<std::size_t>(S_n) + static_cast<std::size_t>(r)] = std::max(share, 1e-6);
+            }
+          });
+        }
+        progress.emit(msg("  transfer from the actual source neighbors: ",
+                          count_of(static_cast<int>(prof_cell.size()), "source-cell profile"),
+                          " over ", n_with_neighbors, " cell-source entries with a neighbor, at most ",
+                          max_comp_row, " components per cell"));
+      }
+
       // ---- expectation-maximization on the nonzero pattern ------------------
       const std::size_t bn = blk.value.size();
       std::vector<double> Theta(static_cast<std::size_t>(n) * K, 0.0);
@@ -1566,8 +1721,22 @@ GenerativeResult fit_generative(
               const int g = blk.gene[static_cast<std::size_t>(p)];
               double r = eps_g;
               for (int k = 0; k < K; ++k) r += th[k] * F(k, g);
-              for (int j = 0; j < S_n; ++j) {
-                r += al[j] * plist[static_cast<std::size_t>(j)].psi[static_cast<std::size_t>(g)];
+              if (use_nb) {
+                for (int j = 0; j < S_n; ++j) {
+                  if (al[j] <= 0.0) continue;
+                  const std::size_t e = static_cast<std::size_t>(i) * S_n + static_cast<std::size_t>(j);
+                  double s = 0.0;
+                  for (int q = comp_ptr[e]; q < comp_ptr[e + 1]; ++q) {
+                    s += comp_pi[static_cast<std::size_t>(q)] *
+                        prof_table[static_cast<std::size_t>(comp_prof[static_cast<std::size_t>(q)]) * G +
+                                   static_cast<std::size_t>(g)];
+                  }
+                  r += al[j] * s;
+                }
+              } else {
+                for (int j = 0; j < S_n; ++j) {
+                  r += al[j] * plist[static_cast<std::size_t>(j)].psi[static_cast<std::size_t>(g)];
+                }
               }
               if (lam_a > 0.0) r += bi * a_prof[static_cast<std::size_t>(g)];
               if (any_induced) {
@@ -1591,6 +1760,7 @@ GenerativeResult fit_generative(
         std::vector<double> al_sum(static_cast<std::size_t>(S_n), 0.0);
         std::vector<double> ur_sum(static_cast<std::size_t>(S_n), 0.0);
         double tb = 0.0;
+        double nb_tot = 0.0;
         for (int i = 0; i < n; ++i) {
           const double ti = blk.totals[static_cast<std::size_t>(i)];
           t_sum += ti;
@@ -1599,10 +1769,23 @@ GenerativeResult fit_generative(
           for (int j = 0; j < S_n; ++j) {
             al_sum[static_cast<std::size_t>(j)] += ti * Alpha[static_cast<std::size_t>(i) * S_n + j];
             ur_sum[static_cast<std::size_t>(j)] += ti * U[static_cast<std::size_t>(i) * S_n + j] * Rho[static_cast<std::size_t>(i) * S_n + j];
+            if (use_nb) {
+              const std::size_t e = static_cast<std::size_t>(i) * S_n + static_cast<std::size_t>(j);
+              double sh = 0.0;
+              for (int q = comp_ptr[e]; q < comp_ptr[e + 1]; ++q) {
+                sh += comp_pi[static_cast<std::size_t>(q)] *
+                    prof_share[static_cast<std::size_t>(comp_prof[static_cast<std::size_t>(q)])];
+              }
+              nb_tot += ti * Alpha[static_cast<std::size_t>(i) * S_n + j] * sh;
+            }
           }
         }
         for (int k = 0; k < K; ++k) tot += th_sum[static_cast<std::size_t>(k)] * f_row[static_cast<std::size_t>(k)];
-        for (int j = 0; j < S_n; ++j) tot += al_sum[static_cast<std::size_t>(j)] * share_psi[static_cast<std::size_t>(j)];
+        if (use_nb) {
+          tot += nb_tot;
+        } else {
+          for (int j = 0; j < S_n; ++j) tot += al_sum[static_cast<std::size_t>(j)] * share_psi[static_cast<std::size_t>(j)];
+        }
         if (lam_a > 0.0) tot += tb;  // a_prof sums to one
         if (any_induced) {
           for (int j = 0; j < S_n; ++j) tot += ur_sum[static_cast<std::size_t>(j)] * M_rowsum[static_cast<std::size_t>(j)];
@@ -1653,6 +1836,9 @@ GenerativeResult fit_generative(
           parallel_rows(n, opt.num_threads, [&](int begin, int end, int tid) {
             std::vector<double>* f_acc = update_F ? &f_num_t[static_cast<std::size_t>(tid)] : nullptr;
             std::vector<double>* m_acc = need_M ? &wsum_t[static_cast<std::size_t>(tid)] : nullptr;
+            // per-component dot products and evidence (neighbor profiles)
+            std::vector<double> wq(static_cast<std::size_t>(use_nb ? max_comp_row : 0), 0.0);
+            std::vector<double> eq(wq.size(), 0.0);
             for (int i = begin; i < end; ++i) {
               const double ti = blk.totals[static_cast<std::size_t>(i)];
               double* th = &Theta[static_cast<std::size_t>(i) * K];
@@ -1669,12 +1855,23 @@ GenerativeResult fit_generative(
                 wp[j] = 0.0;
                 wm[j] = 0.0;
               }
+              const int qbase = use_nb ? comp_ptr[static_cast<std::size_t>(i) * S_n] : 0;
+              const int qend = use_nb ? comp_ptr[static_cast<std::size_t>(i + 1) * S_n] : 0;
+              for (int q = qbase; q < qend; ++q) wq[static_cast<std::size_t>(q - qbase)] = 0.0;
               for (int p = blk.rowptr[static_cast<std::size_t>(i)]; p < blk.rowptr[static_cast<std::size_t>(i + 1)]; ++p) {
                 const int g = blk.gene[static_cast<std::size_t>(p)];
                 const double wv = W[static_cast<std::size_t>(p)];
                 for (int k = 0; k < K; ++k) wf[k] += wv * F(k, g);
-                for (int j = 0; j < S_n; ++j) {
-                  wp[j] += wv * plist[static_cast<std::size_t>(j)].psi[static_cast<std::size_t>(g)];
+                if (use_nb) {
+                  for (int q = qbase; q < qend; ++q) {
+                    wq[static_cast<std::size_t>(q - qbase)] += wv *
+                        prof_table[static_cast<std::size_t>(comp_prof[static_cast<std::size_t>(q)]) * G +
+                                   static_cast<std::size_t>(g)];
+                  }
+                } else {
+                  for (int j = 0; j < S_n; ++j) {
+                    wp[j] += wv * plist[static_cast<std::size_t>(j)].psi[static_cast<std::size_t>(g)];
+                  }
                 }
                 if (need_M) {
                   for (int j = 0; j < S_n; ++j) wm[j] += wv * M(j, g);
@@ -1685,10 +1882,35 @@ GenerativeResult fit_generative(
               // the updated weights, matching the reference update order.
               const double tw = ti * w_dose[static_cast<std::size_t>(i)];
               for (int k = 0; k < K; ++k) th[k] *= wf[k];
-              // contamination fractions: bounded evidence update
+              // contamination fractions: bounded evidence update; with
+              // neighbor profiles the evidence is summed over the cell's
+              // source neighbors, and their shares of the fraction are
+              // updated under the Dirichlet prior on the geometric shape.
               for (int j = 0; j < S_n; ++j) {
                 const double lam_ij = Lam[static_cast<std::size_t>(i) * S_n + j];
-                const double ev = al[j] * wp[j] * ti / share_psi[static_cast<std::size_t>(j)];
+                double ev = 0.0;
+                if (use_nb) {
+                  const std::size_t e = static_cast<std::size_t>(i) * S_n + static_cast<std::size_t>(j);
+                  const int q0 = comp_ptr[e];
+                  const int q1 = comp_ptr[e + 1];
+                  for (int q = q0; q < q1; ++q) {
+                    const double ev_q = al[j] * comp_pi[static_cast<std::size_t>(q)] *
+                        wq[static_cast<std::size_t>(q - qbase)] * ti /
+                        prof_share[static_cast<std::size_t>(comp_prof[static_cast<std::size_t>(q)])];
+                    eq[static_cast<std::size_t>(q - qbase)] = ev_q;
+                    ev += ev_q;
+                  }
+                  if (q1 - q0 > 1) {
+                    const double denom = ev + opt.neighbor_split_strength;
+                    for (int q = q0; q < q1; ++q) {
+                      comp_pi[static_cast<std::size_t>(q)] = static_cast<float>(
+                          (eq[static_cast<std::size_t>(q - qbase)] +
+                           opt.neighbor_split_strength * comp_w[static_cast<std::size_t>(q)]) / denom);
+                    }
+                  }
+                } else {
+                  ev = al[j] * wp[j] * ti / share_psi[static_cast<std::size_t>(j)];
+                }
                 double a_new = (ev + opt.alpha_prior_strength * lam_ij) /
                     (ti + opt.alpha_prior_strength);
                 al[j] = std::min(a_new, opt.alpha_cap * lam_ij);

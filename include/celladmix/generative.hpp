@@ -59,6 +59,24 @@ struct GenerativeOptions {
   int outer_rounds = 2;
   // Exposure: number of nearest cells defining each pair's dose covariate.
   int neighbor_k = 15;
+  // Transfer from the actual source neighbors. With neighbor_profiles, a
+  // target cell's contamination profile for a source type is built from
+  // the cytoplasmic counts of the source cells among its neighbor_k
+  // nearest neighbors, each shrunk toward the pair's interface-local
+  // profile by neighbor_profile_shrink pseudo-molecules (then
+  // decontaminated and zeroed on target-owned genes as the pair's profile
+  // is), and the cell's contamination fraction is split over those
+  // neighbors: the split's prior shape is the geometric expectation,
+  // exp(-distance / neighbor_scale_um) per neighbor, held with
+  // neighbor_split_strength pseudo-molecules, and the counts attributed to
+  // each neighbor's profile update it (a very large strength fixes the
+  // split at its prior). Cells with no source neighbor among the
+  // neighbor_k nearest keep the pair's profile. Off, one profile per pair
+  // serves every cell.
+  bool neighbor_profiles = false;
+  double neighbor_profile_shrink = 100.0;
+  double neighbor_scale_um = 10.0;
+  double neighbor_split_strength = 30.0;
   // Expression-program initialization from factor-labeled molecules:
   // minimum molecules for a program and the minimum share of a type's
   // molecules for an unaligned factor to join its programs.

@@ -136,6 +136,30 @@ class GenerativeCorrectionTests(unittest.TestCase):
         with self.assertRaises(Exception):
             self.audit.fit_generative(num_threads=2, dose_mode="bogus")
 
+    def test_neighbor_profiles_split_the_fraction_over_the_source_neighbors(self):
+        before, genes, cells = self.fit.counts()
+        b_cells = np.array([self.audit._ctypes.get(c) == "B" for c in cells])
+        a_genes = [i for i, g in enumerate(genes) if str(g).startswith("a")]
+        def removed_a(model):
+            after, _, _ = model.correct().counts()
+            return float(before[a_genes][:, b_cells].sum()
+                         - after[a_genes][:, b_cells].sum())
+        plain = self.audit.fit_generative(num_threads=2)
+        # profiles from the actual source neighbors with the fraction split
+        # over them (the default strength), and with the split fixed at its
+        # geometric prior: both remove the planted admixture as the pair
+        # profile does
+        free = self.audit.fit_generative(num_threads=2, neighbor_profiles=True)
+        fixed = self.audit.fit_generative(
+            num_threads=2, neighbor_profiles=True, neighbor_split_strength=1e9)
+        for model in (free, fixed):
+            self.assertGreater(removed_a(model), 0.5 * removed_a(plain))
+            self.assertLess(removed_a(model), 2.0 * removed_a(plain))
+            self.assertGreater(float(model.composition("A", "B").contamination.sum()), 0.0)
+        with self.assertRaises(Exception):
+            self.audit.fit_generative(num_threads=2, neighbor_profiles=True,
+                                      neighbor_scale_um=0.0)
+
     def test_progress_messages_follow_verbose(self):
         # The core writes progress to the process's standard output, so it
         # is captured at the file-descriptor level.

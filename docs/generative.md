@@ -106,6 +106,25 @@ come from:
   all genes, keeping the division of each count well-defined where every
   structured component is near zero.
 
+The admixed term can instead be built from the source cells that
+actually neighbor each target cell (`neighbor_profiles`): the profile
+becomes the cytoplasmic counts of the source cells among the cell's 15
+nearest neighbors, each shrunk toward the pair's interface-local profile
+by 100 pseudo-molecules, and the cell's fraction $\alpha_{cs}$ is split
+over those neighbors under a Dirichlet prior whose shape follows the
+centroid distance and which the counts attributed to each neighbor's
+profile update. This is off by default because it changes nothing that
+can be measured: on four simulated sections with known transfer the
+recall of admixed molecules and the own-molecule loss stay within half a
+point of the pair-profile model, and on the pancreas section the removed
+mass, the own-marker removal, the share of source-owned genes among the
+genes rising with a source and the excess yardstick are unchanged. The
+per-cell fraction already absorbs the cell-to-cell variation of
+transfer, and the interface-local profile already carries the border
+state of the source. Taking the neighbors' own counts without the
+shrinkage costs nine points of recall, since a cell's few hundred
+cytoplasmic molecules cover too few genes to serve as a profile.
+
 Figure 2 shows the fitted model on one pair: admixture from malignant
 cells into fibroblasts on the CosMx NSCLC section (fine labels). The
 content of malignant-specific genes in fibroblasts, read as a fraction
