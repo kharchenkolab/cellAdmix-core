@@ -322,9 +322,10 @@ contact-proportional response there), genes the target's own programs
 already carry in the exposed cells' state, and plants of a few thousand
 molecules from thin sources. With `copy_scale="fixed"` the admixed
 expectation enters as fitted and the calls rise to 16 of 20, but a
-profile error on a gene then reads as a response (one false call among
-the planted pairs' clean genes per section), so the free scale is the
-default and the fixed one the sensitive reading. The run costs about a
+profile error on a gene then reads as a response (29 false calls among
+2,200 clean genes over one section's 40 pairs, on a handful of genes
+whose interface profile errs), so the free scale is the default and the
+fixed one the sensitive reading. The run costs about a
 minute per pair on a section of 150,000 cells. On the pancreas section
 the free scale calls CFTR, PROX1, FXYD2 and PPP1R1B in ductal cells
 next to acini at about a third of their content (the screen flags CFTR
