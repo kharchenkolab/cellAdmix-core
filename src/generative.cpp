@@ -437,6 +437,12 @@ GenerativeResult fit_generative(
       cell_neighbor_type_counts(x, y, type_codes, n_types, opt.neighbor_k);
   progress.emit(msg("Counted the cell types among each cell's ", opt.neighbor_k,
                     " nearest neighbors (exposure)"));
+  if (opt.alpha_prior_strength < 0.0 || !(opt.alpha_strength_start > 0.0) ||
+      !(opt.alpha_strength_min > 0.0) || opt.alpha_strength_max < opt.alpha_strength_min) {
+    throw std::runtime_error("generative: alpha_prior_strength must be non-negative (0 to estimate it), "
+                             "alpha_strength_start and alpha_strength_min positive, "
+                             "alpha_strength_max at least alpha_strength_min");
+  }
   const bool use_nb = opt.neighbor_profiles;
   CellNeighbors knn;
   if (use_nb) {
@@ -1650,6 +1656,12 @@ GenerativeResult fit_generative(
       std::vector<double> Lam(static_cast<std::size_t>(n) * S_n, 0.0);
       std::vector<double> U(static_cast<std::size_t>(n) * S_n, 0.0);
       std::vector<double> Rho(static_cast<std::size_t>(n) * S_n, 1.0);
+      // per-pair prior strength of the per-cell fraction, and each cell's
+      // fraction as its counts attribute it at the last update
+      const bool estimate_strength = !(opt.alpha_prior_strength > 0.0);
+      std::vector<double> strength(static_cast<std::size_t>(S_n),
+          estimate_strength ? opt.alpha_strength_start : opt.alpha_prior_strength);
+      std::vector<double> Ev(static_cast<std::size_t>(n) * S_n, 0.0);
       std::vector<double> beta(static_cast<std::size_t>(n), lam_a);
       for (int j = 0; j < S_n; ++j) {
         const auto& ps = plist[static_cast<std::size_t>(j)];
@@ -1916,8 +1928,9 @@ GenerativeResult fit_generative(
                 } else {
                   ev = al[j] * wp[j] * ti / share_psi[static_cast<std::size_t>(j)];
                 }
-                double a_new = (ev + opt.alpha_prior_strength * lam_ij) /
-                    (ti + opt.alpha_prior_strength);
+                Ev[static_cast<std::size_t>(i) * S_n + static_cast<std::size_t>(j)] = ev;
+                const double sj = strength[static_cast<std::size_t>(j)];
+                double a_new = (ev + sj * lam_ij) / (ti + sj);
                 al[j] = std::min(a_new, opt.alpha_cap * lam_ij);
               }
               // ambient scale
@@ -2030,6 +2043,41 @@ GenerativeResult fit_generative(
       };
 
       em_pass(opt.em_iterations, true, "expectation-maximization");
+      if (estimate_strength) {
+        // the between-cell variance of the attributed fraction around the
+        // prior, net of binomial counting variance, molecule-weighted over
+        // the cells with a prior; the beta prior's pseudo-count follows
+        for (int j = 0; j < S_n; ++j) {
+          double w = 0.0, dev = 0.0, noise = 0.0, spread = 0.0;
+          for (int i = 0; i < n; ++i) {
+            const double ti = blk.totals[static_cast<std::size_t>(i)];
+            const double l = Lam[static_cast<std::size_t>(i) * S_n + j];
+            if (!(l > 0.0) || !(ti > 0.0)) continue;
+            const double e = Ev[static_cast<std::size_t>(i) * S_n + j] / ti;
+            w += ti;
+            dev += ti * (e - l) * (e - l);
+            noise += l * (1.0 - l);  // ti * l (1 - l) / ti
+            spread += ti * l * (1.0 - l);
+          }
+          double sj = opt.alpha_strength_max;
+          if (w > 0.0) {
+            const double tau2 = (dev - noise) / w;
+            const double m = spread / w;
+            if (tau2 > 0.0) sj = m / tau2 - 1.0;
+          }
+          strength[static_cast<std::size_t>(j)] =
+              std::min(std::max(sj, opt.alpha_strength_min), opt.alpha_strength_max);
+        }
+        if (progress.on()) {
+          std::ostringstream os;
+          for (int j = 0; j < S_n; ++j) {
+            os << (j ? ", " : "") << type_label(plist[static_cast<std::size_t>(j)].spec->source_type)
+               << " " << whole(strength[static_cast<std::size_t>(j)]);
+          }
+          progress.emit(msg("  prior strength of the per-cell fraction estimated per source: ", os.str()));
+        }
+        em_pass(opt.em_iterations, true, "expectation-maximization with the estimated prior strength");
+      }
 
       // Top-up passes: re-measure the residual exposure gradient of the guide
       // genes on the kept counts (excluding induced-support genes, whose
@@ -2196,6 +2244,7 @@ GenerativeResult fit_generative(
           }
           summary.mean_dose_exposed = n_exposed > 0 ? dose_sum / n_exposed : 0.0;
           summary.cross_attributed_molecules = ps.cross_attributed;
+          summary.prior_strength = strength[static_cast<std::size_t>(j)];
           result.pairs.push_back(summary);
           // the pair's transfer profile and induced profile
           result.pair_profile[static_cast<std::size_t>(pj)] = ps.psi;

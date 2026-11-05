@@ -446,3 +446,15 @@ test_that("the molecule-level realization and the cap follow the count-level rem
   expect_equal(same$n_removed, uncapped$n_removed)
   expect_equal(same$cap$restored, 0)
 })
+
+test_that("the prior strength of the per-cell fraction can be estimated per pair", {
+  fit <- make_audit_fit()
+  audit <- fit$audit_admixture(neighbor_k = 6L, min_target_cells = 50L,
+    min_reference_cells = 20L, min_excess = 50)
+  est <- audit$fit_generative(num_threads = 2L, alpha_prior_strength = 0)
+  expect_true("prior_strength" %in% names(est$pairs))
+  expect_true(all(est$pairs$prior_strength >= 5 & est$pairs$prior_strength <= 1000))
+  fixed <- audit$fit_generative(num_threads = 2L)
+  expect_true(all(fixed$pairs$prior_strength == 300))
+  expect_error(audit$fit_generative(num_threads = 2L, alpha_prior_strength = -1))
+})

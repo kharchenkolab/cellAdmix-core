@@ -601,6 +601,7 @@ CellAdmixAudit <- R6::R6Class(
         mean_dose_exposed = res$pairs$mean_dose_exposed,
         prior_unexposed_molecules = res$pairs$prior_unexposed_molecules,
         cross_attributed_molecules = res$pairs$cross_attributed_molecules,
+        prior_strength = res$pairs$prior_strength,
         stringsAsFactors = FALSE)
 
       # the fitted components, for the model's expectation per cell and gene

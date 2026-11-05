@@ -5022,6 +5022,9 @@ extern "C" SEXP _cellAdmixCore_celladmix_fit_generative(
     };
     set_double("alpha_prior_strength", opt.alpha_prior_strength);
     set_double("alpha_cap", opt.alpha_cap);
+    set_double("alpha_strength_start", opt.alpha_strength_start);
+    set_double("alpha_strength_min", opt.alpha_strength_min);
+    set_double("alpha_strength_max", opt.alpha_strength_max);
     set_double("lambda_max", opt.lambda_max);
     set_double("ambient_prior_strength", opt.ambient_prior_strength);
     set_double("ambient_cap", opt.ambient_cap);
@@ -5147,7 +5150,9 @@ extern "C" SEXP _cellAdmixCore_celladmix_fit_generative(
     std::vector<double> sum_dose;
     std::vector<double> sum_unexposed;
     std::vector<double> sum_cross;
+    std::vector<double> sum_strength;
     for (const auto& row : res.pairs) {
+      sum_strength.push_back(row.prior_strength);
       sum_pair.push_back(row.pair);
       sum_prior.push_back(row.prior_molecules);
       sum_post.push_back(row.posterior_molecules);
@@ -5181,7 +5186,8 @@ extern "C" SEXP _cellAdmixCore_celladmix_fit_generative(
             Named("induced_molecules") = wrap(sum_ind),
             Named("mean_dose_exposed") = wrap(sum_dose),
             Named("prior_unexposed_molecules") = wrap(sum_unexposed),
-            Named("cross_attributed_molecules") = wrap(sum_cross)));
+            Named("cross_attributed_molecules") = wrap(sum_cross),
+            Named("prior_strength") = wrap(sum_strength)));
     // the fitted components (see GenerativeResult)
     const auto nested = [](const std::vector<std::vector<double>>& v) {
       List l(v.size());

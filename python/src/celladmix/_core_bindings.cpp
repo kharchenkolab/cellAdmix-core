@@ -794,6 +794,9 @@ PYBIND11_MODULE(_core, m) {
         }
         set_double("alpha_prior_strength", opt.alpha_prior_strength);
         set_double("alpha_cap", opt.alpha_cap);
+        set_double("alpha_strength_start", opt.alpha_strength_start);
+        set_double("alpha_strength_min", opt.alpha_strength_min);
+        set_double("alpha_strength_max", opt.alpha_strength_max);
         set_double("lambda_max", opt.lambda_max);
         set_double("ambient_prior_strength", opt.ambient_prior_strength);
         set_double("ambient_cap", opt.ambient_cap);
@@ -875,6 +878,7 @@ PYBIND11_MODULE(_core, m) {
           r["mean_dose_exposed"] = row.mean_dose_exposed;
           r["prior_unexposed_molecules"] = row.prior_unexposed_molecules;
           r["cross_attributed_molecules"] = row.cross_attributed_molecules;
+          r["prior_strength"] = row.prior_strength;
           summaries.append(r);
         }
         out["pairs"] = summaries;

@@ -11,9 +11,12 @@ import numpy as np
 import pandas as pd
 
 
-def make_split_bundle(root: Path, seed: int = 11):
+def make_split_bundle(root: Path, seed: int = 11, patchy: bool = False):
     """A split grid: type A on the left, type B on the right, with A-marker
-    molecules planted into B cells in proportion to boundary proximity."""
+    molecules planted into B cells in proportion to boundary proximity.
+    With ``patchy`` the planted amount varies from cell to cell around the
+    same mean (none in half the cells, twice the amount in the other
+    half)."""
     rng = np.random.default_rng(seed)
     genes_a = [f"a{i}" for i in range(3)]
     genes_b = [f"b{i}" for i in range(3)]
@@ -31,6 +34,8 @@ def make_split_bundle(root: Path, seed: int = 11):
             pool = list(rng.choice(own, 60)) + ["h1"] * 10
             if cell_type == "B":
                 n_adm = max(0, 12 - 6 * (gx - side // 2))
+                if patchy:
+                    n_adm = 2 * n_adm if rng.random() < 0.5 else 0
                 pool += list(rng.choice(genes_a, n_adm))
             for gene in pool:
                 molecules.append((
@@ -247,6 +252,30 @@ class GenerativeCorrectionTests(unittest.TestCase):
         removed_got = float((before - got).sum())
         self.assertLess(abs(removed_got - removed_expected), 0.1 * removed_expected + 5)
         self.assertEqual(realized.manifest["n_removed"], int(round(removed_got)))
+
+    def test_prior_strength_is_estimated_per_pair(self):
+        model = self.audit.fit_generative(num_threads=2, alpha_prior_strength=0)
+        strength = model.pairs.set_index(["source", "target"]).prior_strength
+        self.assertTrue(((strength >= 5.0) & (strength <= 1000.0)).all())
+        fixed = self.audit.fit_generative(num_threads=2)
+        self.assertTrue((fixed.pairs.prior_strength == 300.0).all())
+        # a section where the planted amount varies from cell to cell gets a
+        # weaker prior for the same pair than one where it is uniform
+        from celladmix import CellAdmix
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            annotation, _ = make_split_bundle(root / "bundle", patchy=True)
+            ds = CellAdmix(str(root / "bundle"), output_dir=str(root / "out"),
+                           annotation=annotation.set_index("cell_id")["cell_type"], num_threads=2)
+            fit = ds.fit(rank=2, ncv_k=6, graph_k=4, nmf_iterations=20, nmf_n_runs=1,
+                         nmf_train_max_rows=200, seed=11, verbose=False)
+            audit = fit.audit_admixture(neighbor_k=6, min_target_cells=50,
+                                        min_reference_cells=20, min_excess=50)
+            patchy = audit.fit_generative(num_threads=2, alpha_prior_strength=0)
+            s_patchy = patchy.pairs.set_index(["source", "target"]).prior_strength[("A", "B")]
+        self.assertLess(s_patchy, strength[("A", "B")])
+        with self.assertRaises(Exception):
+            self.audit.fit_generative(num_threads=2, alpha_prior_strength=-1)
 
     def test_neighbor_profiles_split_the_fraction_over_the_source_neighbors(self):
         before, genes, cells = self.fit.counts()
