@@ -84,7 +84,20 @@ come from:
   content rises significantly above the unexposed cells' against the
   cell-to-cell variation, since a monotone fit of a covariate carrying
   no signal drifts upward. The
-  posterior update from the cell's own expression is bounded — at most
+  posterior update weighs a cell's own counts against the prior by
+  pseudo-molecules: a cell with t molecules gives its counts the weight
+  t / (t + s), with s = 300 by default (`alpha_prior_strength`). With
+  `alpha_prior_strength = 0`, s is estimated per pair from the spread of
+  the cells' fractions around the prior, net of counting noise, as the
+  pseudo-count of a beta distribution with that spread, and reported per
+  pair (`prior_strength` in the model's pair table). On simulated
+  pancreas sections the spread is wide on every pair, the estimates come
+  out at 5 to 15, and recall rises by 2 to 3 points over the default at
+  equal or lower own-molecule loss; on the pancreas section the model
+  then removes 22% of molecules instead of 20.5%, more of the T-cell
+  genes in fibroblasts and also more of the myeloid genes the interface
+  profile over-predicts. The
+  posterior update is also bounded — at most
   five-fold the prior, exactly zero where the prior is zero — so removal
   stays tied to the demonstrated spatial signal (with an unbounded
   update, the model keeps finding the true contamination even after the
