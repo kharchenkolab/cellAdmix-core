@@ -5133,7 +5133,7 @@ extern "C" SEXP _cellAdmixCore_celladmix_fit_generative(
       sum_unexposed.push_back(row.prior_unexposed_molecules);
       sum_cross.push_back(row.cross_attributed_molecules);
     }
-    return List::create(
+    List out = List::create(
         Named("removed") = wrap(res.removed),
         Named("removed_without_retention") = wrap(res.removed_without_retention),
         Named("n_programs_used") = wrap(res.n_programs_used),
@@ -5159,6 +5159,18 @@ extern "C" SEXP _cellAdmixCore_celladmix_fit_generative(
             Named("mean_dose_exposed") = wrap(sum_dose),
             Named("prior_unexposed_molecules") = wrap(sum_unexposed),
             Named("cross_attributed_molecules") = wrap(sum_cross)));
+    // the fitted components (see GenerativeResult)
+    const auto nested = [](const std::vector<std::vector<double>>& v) {
+      List l(v.size());
+      for (std::size_t i = 0; i < v.size(); ++i) l[i] = wrap(v[i]);
+      return l;
+    };
+    out["type_programs"] = nested(res.type_programs);
+    out["cell_weights"] = nested(res.cell_weights);
+    out["pair_profile"] = nested(res.pair_profile);
+    out["pair_induced_profile"] = nested(res.pair_induced_profile);
+    out["type_ambient_profile"] = nested(res.type_ambient_profile);
+    return out;
   } catch (std::exception& ex) {
     forward_exception_to_r(ex);
   } catch (...) {

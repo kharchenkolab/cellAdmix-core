@@ -72,7 +72,7 @@ class GenerativeModel:
 
     def __init__(self, audit, matrix, genes, cells, removed, removed_strict,
                  pairs, induced, composition, ambient_scale, n_programs,
-                 whole_cell_profiles, init):
+                 whole_cell_profiles, init, components=None):
         self._cell_types = audit._ctypes
         self._audit = audit
         self._matrix = matrix
@@ -87,6 +87,124 @@ class GenerativeModel:
         self.n_programs = n_programs
         self.whole_cell_profiles = whole_cell_profiles
         self.init = init
+        self._components = components or {}
+        self._expectations = {}
+
+    def expectation(self, target):
+        """The model's expectation per cell and gene for the cells of one
+        target type, in molecules, as dense arrays (cells x genes):
+        ``own`` (the cell's expression programs), ``admixed`` (a dict by
+        source type), ``ambient``, ``induced`` (a dict by source type,
+        only sources with induced genes) and ``floor`` (the uniform
+        floor), with ``cells`` the column indices of the cells and
+        ``totals`` their molecule counts."""
+        if target in self._expectations:
+            return self._expectations[target]
+        comp = self._components
+        if target not in comp.get("programs", {}):
+            raise ValueError(f"no fitted pairs into {target!r}")
+        n_genes = len(self._genes)
+        cols = comp["cells_of"][target]
+        totals = np.asarray(self._matrix[:, cols].sum(axis=0)).ravel()
+        cell_ids = pd.Index(np.asarray(self._cells)[cols])
+        own = (comp["weights"][target] @ comp["programs"][target]) * totals[:, None]
+        admixed, induced = {}, {}
+        for (source, t), psi in comp["pair_profile"].items():
+            if t != target:
+                continue
+            d = self._composition[(self._composition["source"] == source)
+                                  & (self._composition["target"] == t)]
+            d = d.set_index("cell_id").reindex(cell_ids)
+            alpha = np.nan_to_num(d["contamination"].to_numpy(dtype=float))
+            admixed[source] = np.outer(alpha * totals, psi)
+            mi = comp["pair_induced_profile"][(source, t)]
+            if mi.sum() > 0:
+                ind = np.nan_to_num(d["induced"].to_numpy(dtype=float))
+                induced[source] = np.outer(ind * totals, mi)
+        ambient = np.outer(self._ambient_scale[cols] * totals,
+                           comp["ambient_profile"].get(target, np.zeros(n_genes)))
+        floor = np.full(own.shape, comp["floor_total"] / n_genes) * totals[:, None]
+        out = dict(cells=cols, totals=totals, own=own, admixed=admixed,
+                   ambient=ambient, induced=induced, floor=floor)
+        self._expectations[target] = out
+        return out
+
+    def detect_responses(self, source=None, target=None, z_min=6.0,
+                         min_share=0.0, n_iter=200, copy_scale="free",
+                         verbose=True):
+        """Detect neighborhood-induced responses with a contact term on the
+        fitted expectation. For each pair (or the pairs selected by
+        ``source`` and ``target``) and each gene, the counts of the target
+        cells are regressed, as a Poisson model with non-negative scales,
+        on the cell's own expectation, the source's admixed expectation and
+        the number of source cells among the cell's nearest neighbors (the
+        exposure count), with the other sources' admixed and induced
+        expectations, the ambient expectation and the floor held fixed; a
+        gene responds when the contact term's z reaches ``z_min`` and the
+        molecules it explains make at least ``min_share`` of the gene's
+        content. The induced term the fit itself carries for the pair is
+        left out, so that the test reads the response from the counts
+        rather than from the screen; ``screen_flagged`` says what the
+        screen made of the gene. With ``copy_scale="free"`` the admixed
+        expectation enters with a free per-gene scale, which absorbs a
+        contact-proportional response on genes the source profile carries;
+        with ``"fixed"`` it enters as fitted, so such a response loads on
+        the contact term and a profile error does too. Returns one row
+        per pair and gene."""
+        import time
+        from ._score_utils import source_exposure_counts
+
+        audit = self._audit
+        cells_table = audit._cells_table
+        ann = audit._ctypes[audit._ctypes != "None"]
+        exposure, types = source_exposure_counts(
+            cells_table, ann, neighbor_k=self._components["neighbor_k"])
+        pos = pd.Index(cells_table["cell_id"].astype(str)).get_indexer(
+            [str(c) for c in self._cells])
+        genes = np.asarray(self._genes)
+        flagged = {(r.source, r.target, r.gene) for r in self.induced.itertuples()} \
+            if len(self.induced.columns) else set()
+        rows = []
+        for (s, t) in self._components["pair_profile"]:
+            if (source is not None and s != source) or (target is not None and t != target):
+                continue
+            E = self.expectation(t)
+            cols = E["cells"]
+            Y = np.asarray(self._matrix[:, cols].todense()).T.astype(float)
+            contact = exposure[pos[cols], types.index(s)].astype(float)
+            fixed = E["ambient"] + E["floor"]
+            for s2, A in E["admixed"].items():
+                if s2 != s:
+                    fixed = fixed + A
+            for s2, I in E["induced"].items():
+                if s2 != s:
+                    fixed = fixed + I
+            t0 = time.time()
+            if copy_scale == "fixed":
+                scales, se = _poisson_scales(Y, fixed + E["admixed"][s], E["own"],
+                                             np.zeros_like(E["own"]), contact, n_iter)
+                a, b = scales[0], scales[2]
+                gamma = np.ones(len(genes))
+            else:
+                scales, se = _poisson_scales(Y, fixed, E["own"], E["admixed"][s], contact, n_iter)
+                a, gamma, b = scales
+            if verbose:
+                print(f"[detect_responses] {s} -> {t}: {len(cols)} cells, "
+                      f"{time.time() - t0:.0f}s", flush=True)
+            z = np.where(se[2] > 0, b / np.where(se[2] > 0, se[2], 1.0), np.nan)
+            observed = Y.sum(axis=0)
+            response = b * contact.sum()
+            share = response / np.maximum(observed, 1e-9)
+            for g in range(len(genes)):
+                rows.append(dict(
+                    source=s, target=t, gene=str(genes[g]), observed=float(observed[g]),
+                    own_fit=float(a[g] * E["own"][:, g].sum()),
+                    admixed_fit=float(gamma[g] * E["admixed"][s][:, g].sum()),
+                    contact_rate=float(b[g]), contact_se=float(se[2][g]), z=float(z[g]),
+                    response_molecules=float(response[g]), response_share=float(share[g]),
+                    screen_flagged=(s, t, str(genes[g])) in flagged,
+                    called=bool(np.isfinite(z[g]) and z[g] >= z_min and share[g] >= min_share)))
+        return pd.DataFrame(rows)
 
     def composition(self, source=None, target=None):
         """Per-cell decomposition for one pair (or all pairs).
@@ -121,11 +239,64 @@ class GenerativeModel:
                                     rules, name, retain_induced,
                                     cell_types=self._cell_types)
 
+    def realize(self, fit, name="generative", seed=0, retain_induced=True):
+        """A molecule-level correction: the model's removal in every cell
+        and gene, rounded stochastically, drawn at random from the cell's
+        molecules of that gene and written as a corrected store under the
+        fit's run (``corrected/<name>``, the layout of the factor-based
+        cleanup). ``fit`` is the NMF fit the audit was built from. Within
+        one gene in one cell nothing tells a transferred molecule from an
+        own one on stacked pairs, and position adds under a point of
+        precision on lateral ones, so the draw is random."""
+        from .correction import realize_correction
+
+        return realize_correction(fit, self, name=name, seed=seed,
+                                  retain_induced=retain_induced)
+
     def __repr__(self):
         removed = float(self._removed.sum())
         return (f"GenerativeModel(pairs={len(self.pairs)}, "
                 f"induced_genes={len(self.induced)}, "
                 f"removed_expected={removed:,.0f}, init={self.init!r})")
+
+
+def _poisson_scales(Y, fixed, own, copy, contact, n_iter=200, tol=1e-6):
+    """Non-negative Poisson regression of every gene at once:
+    E[y] = fixed + a * own + gamma * copy + b * contact, by multiplicative
+    updates; returns the scales (3 x genes) and their standard errors from
+    the Fisher information."""
+    n_genes = Y.shape[1]
+    a = np.full(n_genes, 0.1)
+    gamma = np.full(n_genes, 0.1)
+    b = np.full(n_genes, 0.1)
+    col_own = own.sum(axis=0)
+    col_copy = copy.sum(axis=0)
+    col_contact = float(contact.sum())
+    contact_col = contact[:, None]
+    for _ in range(n_iter):
+        mu = fixed + own * a + copy * gamma + contact_col * b
+        ratio = Y / np.maximum(mu, 1e-12)
+        a_new = np.where(col_own > 0, a * (own * ratio).sum(axis=0) / np.maximum(col_own, 1e-12), 0.0)
+        g_new = np.where(col_copy > 0, gamma * (copy * ratio).sum(axis=0) / np.maximum(col_copy, 1e-12), 0.0)
+        b_new = (b * (contact @ ratio) / col_contact) if col_contact > 0 else np.zeros(n_genes)
+        change = max(np.max(np.abs(a_new - a) / np.maximum(a, 1e-8)),
+                     np.max(np.abs(g_new - gamma) / np.maximum(gamma, 1e-8)),
+                     np.max(np.abs(b_new - b) / np.maximum(b, 1e-8)))
+        a, gamma, b = a_new, g_new, b_new
+        if change < tol:
+            break
+    mu = fixed + own * a + copy * gamma + contact_col * b
+    w = 1.0 / np.maximum(mu, 1e-12)
+    info = np.zeros((n_genes, 3, 3))
+    info[:, 0, 0] = (own * own * w).sum(axis=0)
+    info[:, 0, 1] = info[:, 1, 0] = (own * copy * w).sum(axis=0)
+    info[:, 0, 2] = info[:, 2, 0] = (own * contact_col * w).sum(axis=0)
+    info[:, 1, 1] = (copy * copy * w).sum(axis=0)
+    info[:, 1, 2] = info[:, 2, 1] = (copy * contact_col * w).sum(axis=0)
+    info[:, 2, 2] = (contact_col * contact_col * w).sum(axis=0)
+    cov = np.linalg.pinv(info)
+    se = np.sqrt(np.maximum(np.stack([cov[:, 0, 0], cov[:, 1, 1], cov[:, 2, 2]]), 0.0))
+    return np.stack([a, gamma, b]), se
 
 
 def fit_generative(audit, *, init=None, n_programs=4, num_threads=None,
@@ -289,10 +460,33 @@ def fit_generative(audit, *, init=None, n_programs=4, num_threads=None,
 
     n_programs_used = pd.Series(res["n_programs_used"], index=types)
 
+    # the fitted components, for the model's expectation per cell and gene
+    n_genes = len(genes)
+    programs, weights, cells_of, ambient_profile = {}, {}, {}, {}
+    for ti, t in enumerate(types):
+        progs = np.asarray(res["type_programs"][ti], dtype=float)
+        if progs.size == 0:
+            continue
+        programs[t] = progs.reshape(-1, n_genes)
+        cols = np.flatnonzero(type_codes == ti)
+        cells_of[t] = cols
+        weights[t] = np.array([res["cell_weights"][c] for c in cols], dtype=float).reshape(len(cols), -1)
+        ambient_profile[t] = np.asarray(res["type_ambient_profile"][ti], dtype=float)
+    components = dict(
+        programs=programs, weights=weights, cells_of=cells_of,
+        ambient_profile=ambient_profile,
+        pair_profile={pair_names[j]: np.asarray(res["pair_profile"][j], dtype=float)
+                      for j in range(len(pair_names)) if len(res["pair_profile"][j])},
+        pair_induced_profile={pair_names[j]: np.asarray(res["pair_induced_profile"][j], dtype=float)
+                              for j in range(len(pair_names)) if len(res["pair_induced_profile"][j])},
+        floor_total=float(opts.get("floor_total", 0.002)),
+        neighbor_k=int(opts["neighbor_k"]))
+
     return GenerativeModel(audit, matrix, genes, cells, removed,
                            removed_strict, summaries, induced, composition,
                            ambient, n_programs_used,
-                           bool(res["whole_cell_profiles"]), init_label)
+                           bool(res["whole_cell_profiles"]), init_label,
+                           components=components)
 
 
 def correct_generative(audit, *, name="generative", **kwargs):

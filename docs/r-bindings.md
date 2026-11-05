@@ -256,7 +256,12 @@ model$composition("Exocrine epithelial", "Ductal/tumor epithelial")
 correction <- model$correct()      # corrected counts, induced expression kept
 model$correct(retain_induced = FALSE)  # ... or removed along with contamination
 audit$evaluate(correction)         # verified like any other correction
+model$expectation("Ductal/tumor epithelial")  # the fitted components per cell and gene
+model$detect_responses()           # responses on a contact term, per pair and gene
 ```
+
+The molecule-level realization of the correction (`model.realize()`)
+is available in the Python bindings.
 
 The `init` argument selects the expression-program initialization: an
 NMF fit's factor-labeled molecules (the recommended configuration, and

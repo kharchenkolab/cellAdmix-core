@@ -199,6 +199,24 @@ struct GenerativeResult {
   std::vector<std::vector<double>> pair_induced;
   // Per cell: fitted ambient scale (zero for cells of types without one).
   std::vector<double> ambient_scale;
+  // The fitted components, for instruments that read the model's
+  // expectation per cell and gene: per type its expression programs
+  // (programs x genes, row-major; empty for a type without pairs), per
+  // cell its program weights as fractions of the cell's molecules (empty
+  // for cells of a type without pairs), per pair the decontaminated
+  // transfer profile and the induced profile (each summing to one over
+  // genes; the induced profile is zero without induced genes), and per
+  // type the ambient profile (summing to one; zero without an ambient
+  // tier). The expectation of a cell at a gene is the cell's total times
+  // the sum of its weights by the programs, its pair fractions
+  // (pair_alpha) by the transfer profiles, its ambient scale by the
+  // ambient profile, its pair induced shares (pair_induced) by the
+  // induced profiles, and the uniform floor.
+  std::vector<std::vector<double>> type_programs;
+  std::vector<std::vector<double>> cell_weights;
+  std::vector<std::vector<double>> pair_profile;
+  std::vector<std::vector<double>> pair_induced_profile;
+  std::vector<std::vector<double>> type_ambient_profile;
   std::vector<GenerativeInducedGene> induced;
   std::vector<GenerativePairSummary> pairs;
   // Factor-to-type alignment used for the program initializations

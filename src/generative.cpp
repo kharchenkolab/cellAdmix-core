@@ -377,6 +377,11 @@ GenerativeResult fit_generative(
   result.pair_alpha.resize(pairs.size());
   result.pair_rho.resize(pairs.size());
   result.pair_induced.resize(pairs.size());
+  result.type_programs.resize(static_cast<std::size_t>(n_types));
+  result.cell_weights.resize(static_cast<std::size_t>(n_cells));
+  result.pair_profile.resize(pairs.size());
+  result.pair_induced_profile.resize(pairs.size());
+  result.type_ambient_profile.resize(static_cast<std::size_t>(n_types));
 
   // Per-cell totals and per-type pseudobulk profiles (counts per million).
   std::vector<double> totals(static_cast<std::size_t>(n_cells), 0.0);
@@ -2192,8 +2197,35 @@ GenerativeResult fit_generative(
           summary.mean_dose_exposed = n_exposed > 0 ? dose_sum / n_exposed : 0.0;
           summary.cross_attributed_molecules = ps.cross_attributed;
           result.pairs.push_back(summary);
+          // the pair's transfer profile and induced profile
+          result.pair_profile[static_cast<std::size_t>(pj)] = ps.psi;
+          auto& ind_prof = result.pair_induced_profile[static_cast<std::size_t>(pj)];
+          ind_prof.assign(static_cast<std::size_t>(G), 0.0);
+          if (M_rowsum[static_cast<std::size_t>(j)] > 0.0) {
+            for (int g = 0; g < G; ++g) {
+              ind_prof[static_cast<std::size_t>(g)] = M(j, g) / M_rowsum[static_cast<std::size_t>(j)];
+            }
+          }
         }
         for (const auto& row : induced_rows) result.induced.push_back(row);
+        // the type's programs, each cell's weights and the ambient profile
+        {
+          auto& progs = result.type_programs[static_cast<std::size_t>(T)];
+          progs.assign(static_cast<std::size_t>(K) * G, 0.0);
+          for (int k = 0; k < K; ++k) {
+            for (int g = 0; g < G; ++g) progs[static_cast<std::size_t>(k) * G + static_cast<std::size_t>(g)] = F(k, g);
+          }
+          for (int i = 0; i < n; ++i) {
+            auto& w = result.cell_weights[static_cast<std::size_t>(blk.cols[static_cast<std::size_t>(i)])];
+            w.assign(static_cast<std::size_t>(K), 0.0);
+            for (int k = 0; k < K; ++k) w[static_cast<std::size_t>(k)] = Theta[static_cast<std::size_t>(i) * K + k];
+          }
+          auto& amb = result.type_ambient_profile[static_cast<std::size_t>(T)];
+          amb.assign(static_cast<std::size_t>(G), 0.0);
+          if (lam_a > 0.0) {
+            for (int g = 0; g < G; ++g) amb[static_cast<std::size_t>(g)] = a_prof[static_cast<std::size_t>(g)];
+          }
+        }
       }
     }
     own_frac = std::move(own_frac_new);

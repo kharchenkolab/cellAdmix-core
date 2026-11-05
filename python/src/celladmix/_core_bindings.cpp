@@ -828,6 +828,11 @@ PYBIND11_MODULE(_core, m) {
         out["pair_rho"] = res.pair_rho;
         out["pair_induced"] = res.pair_induced;
         out["ambient_scale"] = res.ambient_scale;
+        out["type_programs"] = res.type_programs;
+        out["cell_weights"] = res.cell_weights;
+        out["pair_profile"] = res.pair_profile;
+        out["pair_induced_profile"] = res.pair_induced_profile;
+        out["type_ambient_profile"] = res.type_ambient_profile;
         out["factor_alignment"] = res.factor_alignment;
         out["whole_cell_profiles"] = res.whole_cell_profiles;
         py::list induced;

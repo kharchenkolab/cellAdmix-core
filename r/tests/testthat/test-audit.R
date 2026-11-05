@@ -264,6 +264,20 @@ test_that("the generative correction removes planted admixture", {
   model <- audit$fit_generative(num_threads = 2L)
   comp <- model$composition(source = "A", target = "B")
   expect_gt(max(comp$contamination), 0)
+  # the fitted expectation adds up to the cells' molecules, and the planted
+  # A molecules in B cells are admixture on the admixed expectation, not a
+  # response on the contact term
+  E <- model$expectation("B")
+  expect_equal(dim(E$own), c(length(E$cells), nrow(before)))
+  total <- E$own + E$ambient + E$floor + Reduce(`+`, E$admixed)
+  for (I in E$induced) total <- total + I
+  expect_lt(abs(sum(total) - sum(E$totals)) / sum(E$totals), 0.2)
+  expect_error(model$expectation("no such type"), "no fitted pairs")
+  det <- model$detect_responses(source = "A", target = "B", verbose = FALSE)
+  expect_equal(nrow(det), nrow(before))
+  a_rows <- det[det$gene %in% genes_a, ]
+  expect_gt(sum(a_rows$admixed_fit), 0)
+  expect_false(any(a_rows$called))
   c2 <- model$correct()
   expect_equal(sum(abs(c2$counts() - after)), 0, tolerance = 1e-6)
   removed_default <- sum(before) - sum(after)

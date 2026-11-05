@@ -164,6 +164,49 @@ class GenerativeCorrectionTests(unittest.TestCase):
         self.assertAlmostEqual(
             float(y0[y0.cell_type == "all"].removed_share.iloc[0]), 0.0)
 
+    def test_expectation_and_contact_detection(self):
+        model = self.audit.fit_generative(num_threads=2)
+        before, genes, cells = self.fit.counts()
+        E = model.expectation("B")
+        self.assertEqual(E["own"].shape, (len(E["cells"]), len(genes)))
+        self.assertIn("A", E["admixed"])
+        # the components add up to the cells' molecules, as the fit's
+        # expectation of each cell's total
+        total = E["own"] + E["ambient"] + E["floor"] + sum(E["admixed"].values())
+        for I in E["induced"].values():
+            total = total + I
+        self.assertLess(abs(total.sum() - E["totals"].sum()) / E["totals"].sum(), 0.2)
+        with self.assertRaises(ValueError):
+            model.expectation("no such type")
+        det = model.detect_responses(source="A", target="B")
+        self.assertEqual(len(det), len(genes))
+        self.assertTrue({"z", "response_share", "called", "screen_flagged"} <= set(det.columns))
+        # the planted A molecules in B cells are admixture carried by the
+        # admixed expectation, not a response on the contact term
+        a = det[det.gene.str.startswith("a")]
+        self.assertGreater(float(a.admixed_fit.sum()), 0.0)
+        self.assertFalse(bool(a.called.any()))
+
+    def test_realized_molecule_correction_follows_the_count_level_removal(self):
+        model = self.audit.fit_generative(num_threads=2)
+        expected, genes, cells = model.correct().counts()
+        before, _, _ = self.fit.counts()
+        realized = model.realize(self.fit, name="generative_molecules", seed=3)
+        self.assertIn("realization", realized.manifest)
+        got, g2, c2 = realized.counts()
+        self.assertEqual(list(g2), list(genes))
+        gi = pd.Index(c2).get_indexer(cells)
+        self.assertTrue((gi >= 0).all())
+        got = got[:, gi]
+        # per cell and gene the realized removal is the expected one up to
+        # the rounding of a fraction, and the totals agree within it
+        diff = np.abs((before - got).toarray() - (before - expected).toarray())
+        self.assertLessEqual(diff.max(), 1.0 + 1e-9)
+        removed_expected = float((before - expected).sum())
+        removed_got = float((before - got).sum())
+        self.assertLess(abs(removed_got - removed_expected), 0.1 * removed_expected + 5)
+        self.assertEqual(realized.manifest["n_removed"], int(round(removed_got)))
+
     def test_neighbor_profiles_split_the_fraction_over_the_source_neighbors(self):
         before, genes, cells = self.fit.counts()
         b_cells = np.array([self.audit._ctypes.get(c) == "B" for c in cells])

@@ -299,6 +299,34 @@ package excludes induced genes from admixture estimation (see
 genes and their measured disproportionality are reported by
 `markers()`.
 
+The screen decides the induced term's support inside the fit; the fitted
+model also offers a detection instrument that reads a response from the
+counts against the fit's own expectation, `model.detect_responses()`
+(`model$detect_responses()` in R). For each pair and gene, the target
+cells' counts are regressed, as a Poisson model with non-negative
+scales, on the cell's own expectation (its programs), the source's
+admixed expectation (the pair's profile times the fitted fraction) and
+the number of source cells among the cell's nearest neighbors, with the
+other sources' admixed and induced expectations, the ambient
+expectation and the floor held fixed; a gene responds when the term on
+the neighbor count reaches a z of 6. Transfer enters through the
+admixed expectation, whose amount follows the dose prior per exposure
+stratum; a response is a free rate per source cell. On three simulated
+pancreas sections with planted responses the instrument calls no gene
+falsely among 2,200 clean source-owned genes per section, where the
+screen flags 5 to 20, and calls 11 of the 20 planted genes whose
+induced molecules make at least 0.3 of their content, where the screen
+flags one. The misses are genes the source profile itself carries
+(the free per-gene scale of the admixed expectation absorbs a
+contact-proportional response there), genes the target's own programs
+already carry in the exposed cells' state, and plants of a few thousand
+molecules from thin sources. With `copy_scale="fixed"` the admixed
+expectation enters as fitted and the calls rise to 16 of 20, but a
+profile error on a gene then reads as a response (one false call among
+the planted pairs' clean genes per section), so the free scale is the
+default and the fixed one the sensitive reading. The run costs about a
+minute per pair on a section of 150,000 cells.
+
 ## The interface-activation finding
 
 Figure 3b's three genes exemplify a general finding: what looks like
@@ -576,7 +604,17 @@ without refitting: `model$correct()` keeps the induced expression,
 `model$correct(retain_induced = FALSE)` removes the fitted induced
 share along with the contamination — the direct demonstration of what
 retention protects. `correct_generative()` remains as the one-call
-convenience. The dose prior's estimation is set by three options —
+convenience. In Python the fitted model also writes a molecule-level
+correction, `model.realize(nmf_fit)`: a corrected molecule store in the
+layout of the factor-based cleanup, with the removal in every cell and
+gene drawn at random over the cell's molecules of that gene. Within one
+gene in one cell nothing tells a transferred molecule from an own one
+where source cells lie above or below the target, and position adds
+under a point of precision where they lie beside it, so the draw is
+random; on a simulated pancreas section with a known origin per
+molecule it recalls 0.80 of the admixed molecules at a precision of
+0.85 and removes no own-marker molecule, where the ten-member molecule
+vote of the factor-based cleanup recalls 0.79 at 0.82 and removes 3.3%. The dose prior's estimation is set by three options —
 `dose_mode` (`"joint"`, or `"marginal"` for one source at a time),
 `dose_ladder` (the rungs stratifying unexposed cells; empty for a single
 unexposed stratum) and `dose_min_z` (the significance a dose–response

@@ -336,6 +336,10 @@ model.composition("Exocrine epithelial", "Ductal/tumor epithelial")
 correction = model.correct()       # corrected counts, induced expression kept
 model.correct(retain_induced=False)  # ... or removed along with contamination
 audit.evaluate(correction)         # verified like any other correction
+model.realize(nmf_fit)             # a molecule-level corrected store: the
+                                   # removal drawn at random per cell and gene
+model.expectation("Ductal/tumor epithelial")  # the fitted components per cell and gene
+model.detect_responses()           # responses on a contact term, per pair and gene
 ```
 
 The `init` argument selects the expression-program initialization: an

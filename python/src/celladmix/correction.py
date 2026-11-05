@@ -271,8 +271,71 @@ def cap_correction(fit, correction, cap, *, votes=None, seed=0, scale=1.0):
     restore = rank >= cap_count[inverse]
     keep_new = ~removed
     keep_new[rows[restore]] = True
-    # the corrected store: molecules in the writer's tile order, the cells table
-    # and the per-cell summary recomputed from the kept molecules
+    cap_info = dict(amount_molecules=float(amount.sum()), cap_molecules=int(cap_count.sum()),
+                    restored=int(restore.sum()), seed=int(seed), scale=float(scale))
+    return _rewrite_store(fit, correction, parent, keep_new, {"cap": cap_info})
+
+
+def realize_correction(fit, model, *, name="generative", seed=0, retain_induced=True):
+    """A molecule-level correction from a fitted generative model: in every
+    cell and gene the number of molecules the model removes (its fractional
+    amount, rounded stochastically with ``seed``) is drawn at random from
+    the cell's molecules of that gene, since within one gene in one cell
+    nothing tells a transferred molecule from an own one on stacked pairs
+    and position adds under a point of precision on lateral ones. The
+    corrected store is written under the run as ``corrected/<name>``, in
+    the layout of the factor-based cleanup, and returned as a correction.
+    With ``retain_induced=False`` the induced share is removed as well.
+    """
+    import pyarrow.parquet as pq
+    from scipy import sparse
+
+    # a complete store to rewrite: the native writer with a rule that
+    # matches no cell type removes nothing
+    rules = pd.DataFrame(dict(factor=[1], target_cell_type=["(no cell type)"]))
+    correction = fit.correct(rules, name=name)
+    correction.rules = None
+    run = Path(fit.run_path)
+    parent = pq.read_table(run / "molecules.parquet")
+    n = parent.num_rows
+    obs = parent.column("obs_id").to_numpy()
+    if not np.array_equal(obs, np.arange(n)):
+        raise ValueError("the parent store's molecule identifiers are not its row indices")
+    removed_vec = model._removed if retain_induced else model._removed_strict
+    amounts = _cap_amounts((sparse.csc_matrix(
+        (np.asarray(removed_vec, dtype=float), model._matrix.indices, model._matrix.indptr),
+        shape=model._matrix.shape), model._genes, model._cells), fit)
+    n_genes = amounts.shape[1]
+    gene_idx = parent.column("gene_idx").to_numpy()
+    cell_idx = parent.column("cell_idx").to_numpy()
+    key = cell_idx.astype(np.int64) * n_genes + gene_idx
+    uniq, inverse = np.unique(key, return_inverse=True)
+    amount = np.asarray(amounts[uniq // n_genes, uniq % n_genes]).ravel()
+    rng = np.random.default_rng(seed)
+    count = np.floor(amount).astype(np.int64) + (rng.random(len(uniq)) < amount - np.floor(amount))
+    order = np.lexsort((rng.random(n), inverse))                  # by key, random within
+    rank = np.empty(n, dtype=np.int64)
+    starts = np.r_[0, np.flatnonzero(np.diff(inverse[order])) + 1]
+    rank[order] = np.arange(n) - np.repeat(starts, np.diff(np.r_[starts, n]))
+    keep_new = rank >= count[inverse]
+    info = dict(amount_molecules=float(amount.sum()), removed=int((~keep_new).sum()),
+                seed=int(seed), retained_induced=bool(retain_induced))
+    return _rewrite_store(fit, correction, parent, keep_new, {"realization": info})
+
+
+def _rewrite_store(fit, correction, parent, keep_new, manifest_update):
+    """Rewrite a corrected store from a keep mask over the parent run's
+    molecules: the molecules in the writer's tile order, the cells table and
+    the per-cell summary recomputed from the kept molecules, the manifest
+    updated with ``manifest_update``; returns the correction with its
+    manifest updated."""
+    import json
+
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    out = Path(correction.run_path)
+    n = parent.num_rows
     kept_table = parent.filter(pa.array(keep_new)).sort_by(
         [("crop_idx", "ascending"), ("tile_x", "ascending"), ("tile_y", "ascending"), ("obs_id", "ascending")])
     row_group = int(fit.manifest.get("storage_options", {}).get("parquet_row_group_size", 65536))
@@ -317,10 +380,10 @@ def cap_correction(fit, correction, cap, *, votes=None, seed=0, scale=1.0):
     manifest_path = out / "run.json"
     manifest = json.loads(manifest_path.read_text())
     manifest["n_transcripts"] = int(keep_new.sum())
-    manifest["cap"] = dict(amount_molecules=float(amount.sum()), cap_molecules=int(cap_count.sum()),
-                           restored=int(restore.sum()), seed=int(seed), scale=float(scale))
+    manifest["n_removed"] = int(n - keep_new.sum())
+    manifest.update(manifest_update)
     manifest_path.write_text(json.dumps(manifest, indent=1))
     correction.manifest["n_transcripts"] = int(keep_new.sum())
     correction.manifest["n_removed"] = int(n - keep_new.sum())
-    correction.manifest["cap"] = manifest["cap"]
+    correction.manifest.update(manifest_update)
     return correction

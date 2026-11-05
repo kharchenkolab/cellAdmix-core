@@ -603,13 +603,42 @@ CellAdmixAudit <- R6::R6Class(
         cross_attributed_molecules = res$pairs$cross_attributed_molecules,
         stringsAsFactors = FALSE)
 
+      # the fitted components, for the model's expectation per cell and gene
+      n_genes <- nrow(counts)
+      programs <- list(); weights <- list(); cells_of <- list(); ambient_profile <- list()
+      for (ti in seq_along(types)) {
+        progs <- res$type_programs[[ti]]
+        if (!length(progs)) next
+        t <- types[[ti]]
+        programs[[t]] <- matrix(progs, ncol = n_genes, byrow = TRUE)
+        cols <- which(codes == ti - 1L)
+        cells_of[[t]] <- cols
+        weights[[t]] <- do.call(rbind, lapply(res$cell_weights[cols], as.numeric))
+        ambient_profile[[t]] <- as.numeric(res$type_ambient_profile[[ti]])
+      }
+      pair_profile <- list(); pair_induced_profile <- list(); pair_st <- list()
+      for (j in seq_along(pair_specs)) {
+        if (!length(res$pair_profile[[j]])) next
+        key <- paste(pair_source[[j]], pair_target[[j]], sep = " -> ")
+        pair_profile[[key]] <- as.numeric(res$pair_profile[[j]])
+        pair_induced_profile[[key]] <- as.numeric(res$pair_induced_profile[[j]])
+        pair_st[[key]] <- c(pair_source[[j]], pair_target[[j]])
+      }
+      components <- list(programs = programs, weights = weights, cells_of = cells_of,
+        ambient_profile = ambient_profile, ambient_scale = as.numeric(res$ambient_scale),
+        pair_profile = pair_profile, pair_induced_profile = pair_induced_profile,
+        pair_st = pair_st, floor_total = options$floor_total %||% 0.002,
+        neighbor_k = as.integer(options$neighbor_k), cell_table = cell_tbl,
+        annotation = private$.cell_types)
+
       CellAdmixGenerativeModel$new(
         counts = counts, removed = res$removed,
         removed_without_retention = res$removed_without_retention,
         pairs = pairs_summary, induced = induced, composition = composition,
         n_programs = stats::setNames(res$n_programs_used, types),
         whole_cell_profiles = isTRUE(res$whole_cell_profiles),
-        init = init_label, cell_types = private$.cell_types)
+        init = init_label, cell_types = private$.cell_types,
+        components = components)
     },
 
     correct_generative = function(name = "generative", ...) {
@@ -1098,7 +1127,9 @@ scales_comma <- function(x) format(x, big.mark = ",", scientific = FALSE)
 #' cell's counts into own expression, per-source contamination, ambient
 #' background, and induced expression. Exposes the per-cell decomposition
 #' (`composition()`), the retained induced genes (`induced`), per-pair
-#' summaries (`pairs`), and derives corrections without refitting
+#' summaries (`pairs`), the fitted expectation per cell and gene
+#' (`expectation()`), a contact-term detection of responses
+#' (`detect_responses()`), and derives corrections without refitting
 #' (`correct()`). Created by `audit$fit_generative()`.
 #' @export
 CellAdmixGenerativeModel <- R6::R6Class(
@@ -1112,7 +1143,8 @@ CellAdmixGenerativeModel <- R6::R6Class(
 
     initialize = function(counts, removed, removed_without_retention,
                           pairs, induced, composition, n_programs,
-                          whole_cell_profiles, init, cell_types = NULL) {
+                          whole_cell_profiles, init, cell_types = NULL,
+                          components = NULL) {
       self$pairs <- pairs
       self$induced <- induced
       self$n_programs <- n_programs
@@ -1123,6 +1155,124 @@ CellAdmixGenerativeModel <- R6::R6Class(
       private$.removed_strict <- removed_without_retention
       private$.composition <- composition
       private$.cell_types <- cell_types
+      private$.components <- components
+      private$.expectations <- list()
+    },
+
+    expectation = function(target) {
+      # The model's expectation per cell and gene for the cells of one
+      # target type, in molecules, as dense matrices (cells x genes): own
+      # (the cell's expression programs), admixed (a list by source type),
+      # ambient, induced (a list by source type, only sources with induced
+      # genes) and floor (the uniform floor), with cells the column
+      # indices of the cells and totals their molecule counts.
+      if (!is.null(private$.expectations[[target]])) {
+        return(private$.expectations[[target]])
+      }
+      comp <- private$.components
+      if (is.null(comp) || is.null(comp$programs[[target]])) {
+        stop("no fitted pairs into ", target)
+      }
+      n_genes <- nrow(private$.counts)
+      cols <- comp$cells_of[[target]]
+      totals <- as.numeric(Matrix::colSums(private$.counts[, cols, drop = FALSE]))
+      cell_ids <- colnames(private$.counts)[cols]
+      own <- (comp$weights[[target]] %*% comp$programs[[target]]) * totals
+      admixed <- list(); induced <- list()
+      for (key in names(comp$pair_profile)) {
+        st <- comp$pair_st[[key]]
+        if (st[[2]] != target) next
+        d <- private$.composition[private$.composition$source == st[[1]] &
+          private$.composition$target == target, , drop = FALSE]
+        idx <- match(cell_ids, as.character(d$cell_id))
+        alpha <- d$contamination[idx]; alpha[is.na(alpha)] <- 0
+        admixed[[st[[1]]]] <- outer(alpha * totals, comp$pair_profile[[key]])
+        mi <- comp$pair_induced_profile[[key]]
+        if (sum(mi) > 0) {
+          ind <- d$induced[idx]; ind[is.na(ind)] <- 0
+          induced[[st[[1]]]] <- outer(ind * totals, mi)
+        }
+      }
+      amb <- comp$ambient_profile[[target]]
+      if (is.null(amb)) amb <- rep(0, n_genes)
+      ambient <- outer(comp$ambient_scale[cols] * totals, amb)
+      floor <- matrix(comp$floor_total / n_genes, nrow = length(cols), ncol = n_genes) * totals
+      out <- list(cells = cols, totals = totals, own = own, admixed = admixed,
+        ambient = ambient, induced = induced, floor = floor)
+      private$.expectations[[target]] <- out
+      out
+    },
+
+    detect_responses = function(source = NULL, target = NULL, z_min = 6,
+                                min_share = 0, n_iter = 200L,
+                                copy_scale = c("free", "fixed"), verbose = TRUE) {
+      # Detect neighborhood-induced responses with a contact term on the
+      # fitted expectation: for each pair (or those selected by source and
+      # target) and gene, the target cells' counts regressed, as a Poisson
+      # model with non-negative scales, on the cell's own expectation, the
+      # source's admixed expectation and the number of source cells among
+      # the cell's nearest neighbors (the exposure count), the other
+      # sources' admixed and induced expectations, the ambient expectation
+      # and the floor held fixed; a gene responds when the contact term's z
+      # reaches z_min and the molecules it explains make at least min_share
+      # of the gene's content. The induced term the fit carries for the
+      # pair is left out, so the test reads the response from the counts;
+      # screen_flagged says what the screen made of the gene. With
+      # copy_scale "free" the admixed expectation enters with a free
+      # per-gene scale, which absorbs a contact-proportional response on
+      # genes the source profile carries; with "fixed" it enters as fitted,
+      # so such a response loads on the contact term and a profile error
+      # does too. One row per pair and gene.
+      copy_scale <- match.arg(copy_scale)
+      comp <- private$.components
+      if (is.null(comp)) stop("the model carries no fitted components")
+      expo <- .celladmix_source_exposure_counts(comp$cell_table, comp$annotation,
+        comp$neighbor_k)
+      pos <- match(colnames(private$.counts), as.character(comp$cell_table$cell_id))
+      genes <- rownames(private$.counts)
+      flagged <- if (nrow(self$induced)) paste(self$induced$source, self$induced$target,
+        self$induced$gene) else character()
+      rows <- list()
+      for (key in names(comp$pair_profile)) {
+        st <- comp$pair_st[[key]]
+        s <- st[[1]]; t <- st[[2]]
+        if ((!is.null(source) && s != source) || (!is.null(target) && t != target)) next
+        E <- self$expectation(t)
+        t0 <- Sys.time()
+        Y <- as.matrix(Matrix::t(private$.counts[, E$cells, drop = FALSE]))
+        contact <- as.numeric(expo$counts[pos[E$cells], s])
+        fixed <- E$ambient + E$floor
+        for (s2 in names(E$admixed)) if (s2 != s) fixed <- fixed + E$admixed[[s2]]
+        for (s2 in names(E$induced)) if (s2 != s) fixed <- fixed + E$induced[[s2]]
+        if (copy_scale == "fixed") {
+          fit <- .celladmix_poisson_scales(Y, fixed + E$admixed[[s]], E$own,
+            0 * E$own, contact, n_iter)
+          a <- fit$scales[1, ]; gamma <- rep(1, length(genes)); b <- fit$scales[3, ]
+        } else {
+          fit <- .celladmix_poisson_scales(Y, fixed, E$own, E$admixed[[s]], contact, n_iter)
+          a <- fit$scales[1, ]; gamma <- fit$scales[2, ]; b <- fit$scales[3, ]
+        }
+        se_b <- fit$se[3, ]
+        z <- ifelse(se_b > 0, b / se_b, NA_real_)
+        observed <- colSums(Y)
+        response <- b * sum(contact)
+        share <- response / pmax(observed, 1e-9)
+        if (verbose) {
+          message(sprintf("[detect_responses] %s -> %s: %d cells, %.0fs", s, t,
+            length(E$cells), as.numeric(difftime(Sys.time(), t0, units = "secs"))))
+        }
+        rows[[length(rows) + 1]] <- data.frame(source = s, target = t, gene = genes,
+          observed = observed, own_fit = a * colSums(E$own),
+          admixed_fit = gamma * colSums(E$admixed[[s]]), contact_rate = b,
+          contact_se = se_b, z = z, response_molecules = response,
+          response_share = share,
+          screen_flagged = paste(s, t, genes) %in% flagged,
+          called = !is.na(z) & z >= z_min & share >= min_share,
+          stringsAsFactors = FALSE)
+      }
+      out <- do.call(rbind, rows)
+      rownames(out) <- NULL
+      out
     },
 
     composition = function(source = NULL, target = NULL) {
@@ -1159,8 +1309,49 @@ CellAdmixGenerativeModel <- R6::R6Class(
     }
   ),
   private = list(.counts = NULL, .removed = NULL, .removed_strict = NULL,
-    .composition = NULL, .cell_types = NULL)
+    .composition = NULL, .cell_types = NULL, .components = NULL,
+    .expectations = NULL)
 )
+
+# Non-negative Poisson regression of every gene at once,
+# E[y] = fixed + a * own + gamma * copy + b * contact, by multiplicative
+# updates; the scales (3 x genes) and their standard errors from the Fisher
+# information.
+.celladmix_poisson_scales <- function(Y, fixed, own, copy, contact, n_iter = 200L,
+                                      tol = 1e-6) {
+  G <- ncol(Y)
+  a <- rep(0.1, G); gamma <- rep(0.1, G); b <- rep(0.1, G)
+  col_own <- colSums(own); col_copy <- colSums(copy); col_contact <- sum(contact)
+  predict <- function() {
+    fixed + sweep(own, 2, a, "*") + sweep(copy, 2, gamma, "*") + outer(contact, b)
+  }
+  for (it in seq_len(n_iter)) {
+    ratio <- Y / pmax(predict(), 1e-12)
+    a_new <- ifelse(col_own > 0, a * colSums(own * ratio) / pmax(col_own, 1e-12), 0)
+    g_new <- ifelse(col_copy > 0, gamma * colSums(copy * ratio) / pmax(col_copy, 1e-12), 0)
+    b_new <- if (col_contact > 0) b * as.numeric(crossprod(contact, ratio)) / col_contact else rep(0, G)
+    change <- max(abs(a_new - a) / pmax(a, 1e-8), abs(g_new - gamma) / pmax(gamma, 1e-8),
+      abs(b_new - b) / pmax(b, 1e-8))
+    a <- a_new; gamma <- g_new; b <- b_new
+    if (change < tol) break
+  }
+  w <- 1 / pmax(predict(), 1e-12)
+  I_aa <- colSums(own * own * w); I_ag <- colSums(own * copy * w)
+  I_ab <- colSums(own * contact * w); I_gg <- colSums(copy * copy * w)
+  I_gb <- colSums(copy * contact * w); I_bb <- colSums(contact^2 * w)
+  pinv <- function(m) {
+    sv <- svd(m)
+    d <- ifelse(sv$d > 1e-12 * max(sv$d, 1e-300), 1 / sv$d, 0)
+    sv$v %*% (d * t(sv$u))
+  }
+  se <- matrix(NA_real_, 3, G)
+  for (g in seq_len(G)) {
+    info <- matrix(c(I_aa[g], I_ag[g], I_ab[g], I_ag[g], I_gg[g], I_gb[g],
+      I_ab[g], I_gb[g], I_bb[g]), 3, 3)
+    se[, g] <- sqrt(pmax(diag(pinv(info)), 0))
+  }
+  list(scales = rbind(a, gamma, b), se = se)
+}
 
 #' Generative Admixture Correction
 #'
