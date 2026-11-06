@@ -115,19 +115,6 @@ DenseMatrix cell_type_counts_within(
     double r_in,
     double r_out);
 
-// The k nearest neighbor cells of every cell (2D centroids, the cell itself
-// excluded) in order of distance: index and distance as row-major cells x k
-// arrays, -1 and infinity where fewer than k other cells exist.
-struct CellNeighbors {
-  int k = 0;
-  std::vector<int> index;
-  std::vector<double> distance;
-};
-CellNeighbors cell_nearest_neighbors(
-    const std::vector<double>& x,
-    const std::vector<double>& y,
-    int k);
-
 // Distance from every cell to the nearest cell of each type, excluding the
 // cell itself. Returns a dense cells x n_types matrix; infinity for types
 // with no cells.

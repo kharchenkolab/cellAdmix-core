@@ -121,25 +121,6 @@ come from:
   all genes, keeping the division of each count well-defined where every
   structured component is near zero.
 
-The admixed term can instead be built from the source cells that
-actually neighbor each target cell (`neighbor_profiles`): the profile
-becomes the cytoplasmic counts of the source cells among the cell's 15
-nearest neighbors, each shrunk toward the pair's interface-local profile
-by 100 pseudo-molecules, and the cell's fraction $\alpha_{cs}$ is split
-over those neighbors under a Dirichlet prior whose shape follows the
-centroid distance and which the counts attributed to each neighbor's
-profile update. This is off by default because it changes nothing that
-can be measured: on four simulated sections with known transfer the
-recall of admixed molecules and the own-molecule loss stay within a
-point of the pair-profile model, and on the pancreas section the removed
-mass, the own-marker removal, the share of source-owned genes among the
-genes rising with a source and the excess yardstick are unchanged. The
-per-cell fraction already absorbs the cell-to-cell variation of
-transfer, and the interface-local profile already carries the border
-state of the source. Taking the neighbors' own counts without the
-shrinkage costs nine points of recall, since a cell's few hundred
-cytoplasmic molecules cover too few genes to serve as a profile.
-
 Figure 2 shows the fitted model on one pair: admixture from malignant
 cells into fibroblasts on the CosMx NSCLC section (fine labels). The
 content of malignant-specific genes in fibroblasts, read as a fraction
@@ -327,28 +308,29 @@ expectation and the floor held fixed; a gene responds when the term on
 the neighbor count reaches a z of 6. Transfer enters through the
 admixed expectation, whose amount follows the dose prior per exposure
 stratum; a response is a free rate per source cell. On three simulated
-pancreas sections with planted responses the instrument calls no gene
-falsely among 2,200 clean source-owned genes per section, where the
-screen flags 5 to 20, and calls 12 of the 20 planted genes whose
-induced molecules make at least 0.3 of their content, where the screen
-flags one. The misses are genes the source profile itself carries
-(the free per-gene scale of the admixed expectation absorbs a
-contact-proportional response there), genes the target's own programs
-already carry in the exposed cells' state, and plants of a few thousand
-molecules from thin sources. With `copy_scale="fixed"` the admixed
-expectation enters as fitted and the calls rise to 15 of 20, but a
-profile error on a gene then reads as a response (21 false calls among
-2,200 clean genes over one section's 40 pairs, on a handful of genes
-whose interface profile errs), so the free scale is the default and the
-fixed one the sensitive reading. The run costs about a
+pancreas sections with planted responses the instrument calls 12 of the
+20 planted genes whose induced molecules make at least 0.3 of their
+content, where the screen flags one, and calls none of the 2,200 genes
+per section that the pair's source owns and that carry no response,
+where the screen flags 5 to 20. The misses are genes the source profile
+itself carries (the admixed expectation enters with a free per-gene
+scale, so that a profile error on a gene does not read as a response,
+and that scale also absorbs a contact-proportional response there),
+genes the target's own programs already carry in the exposed cells'
+state, and plants of a few thousand molecules from thin sources. It
+also calls 54 to 68 genes per section that carry no planted response:
+most are the target's own genes, whose own expression the fitted
+programs miss where it follows the neighbor count (retaining their
+removal is harmless), and 4 to 10 are genes of a third type whose
+admixture the model under-removes and whose remainder follows the
+source's neighbor count (1,000 to 3,600 response molecules per section,
+which retention would wrongly keep). The run costs about a
 minute per pair on a section of 150,000 cells. On the pancreas section
-the free scale calls CFTR, PROX1, FXYD2 and PPP1R1B in ductal cells
+the instrument calls CFTR, PROX1, FXYD2 and PPP1R1B in ductal cells
 next to acini at a third to a half of their content (the screen flags CFTR
 and PROX1), does not call the activation genes on the exocrine side
 (admixture from the bordering ductal cells, as Figure 3b shows), and
-leaves the T-cell genes in fibroblasts at the threshold, where the
-fixed scale reads the interface profile's mismatch with the actual
-T-cell neighbors as a response. On real tissue a target-owned gene's
+leaves the T-cell genes in fibroblasts at the threshold. On real tissue a target-owned gene's
 exposure-linked change can be a cell-state gradient as well as a
 response to contact, and the instrument reads both: its share is what
 tracks the neighbor count beyond the fitted expectation, whatever the
@@ -368,21 +350,23 @@ source's density between 20 and 60 micrometers of the cell, so that the
 mode of a response is read where it can be: on a simulated section with
 responses planted in both modes, the density-driven genes load on the
 range term (range share 0.82 to 0.98) and the level-driven gene on the
-contact term (0.01). Over all pairs of three simulated sections the two
-terms call no gene falsely among 2,200 clean source-owned genes per
-section, and retention of both lowers the share of the planted induced
-molecules removed further, to 0.29 and 0.60 on the two sections above;
-splitting the evidence over two terms can also leave a contact response
-just under the threshold (z 5.9 for one plant). The simulations carry
-no regional expression that follows tissue composition and no material
-from cells above or below the section, and on the pancreas section the
-range term carries 211,000 of the 305,000 response molecules and calls
-the same gene in one type against several unrelated sources (EPCAM in
-ductal cells against endothelial, immune and fibroblast neighbors;
-CD3E in fibroblasts against endothelial neighbors), which reads such
-regional structure rather than a response. On real tissue the range
-term's calls are candidates to be checked, and retention of them is a
-choice the analyst makes on that evidence.
+contact term (0.01). Retention of both terms lowers the share of the
+planted induced molecules removed further, to 0.29 and 0.60 on the two
+sections above, but the range term also reads the remainder of
+admixture the model under-removes: over all pairs of three simulated
+sections it raises the calls on genes of a third type from 4–10 to
+21–27 per section (12,000 to 20,000 response molecules, 80% to 90% of
+whose content in the target is admixture), calling the same gene in one
+type against several sources that share its region (an exocrine gene
+in ductal cells against endothelial and immune neighbors). The
+pancreas section shows the same pattern at a larger scale: the range
+term carries 211,000 of the 305,000 response molecules and calls EPCAM
+in ductal cells against endothelial, immune and fibroblast neighbors
+and CD3E in fibroblasts against endothelial neighbors. Splitting the
+evidence over two terms can also leave a contact response just under
+the threshold (z 5.9 for one plant). The range term's calls are
+therefore candidates to be checked rather than responses to retain as
+they stand.
 
 ## The interface-activation finding
 

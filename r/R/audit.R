@@ -1207,7 +1207,6 @@ CellAdmixGenerativeModel <- R6::R6Class(
 
     detect_responses = function(source = NULL, target = NULL, z_min = 6,
                                 min_share = 0, n_iter = 200L,
-                                copy_scale = c("free", "fixed"),
                                 kernels = c("contact", "both"),
                                 range_um = c(20, 60), verbose = TRUE) {
       # Detect neighborhood-induced responses with a contact term on the
@@ -1221,18 +1220,16 @@ CellAdmixGenerativeModel <- R6::R6Class(
       # reaches z_min and the molecules it explains make at least min_share
       # of the gene's content. The induced term the fit carries for the
       # pair is left out, so the test reads the response from the counts;
-      # screen_flagged says what the screen made of the gene. With
-      # copy_scale "free" the admixed expectation enters with a free
-      # per-gene scale, which absorbs a contact-proportional response on
-      # genes the source profile carries; with "fixed" it enters as fitted,
-      # so such a response loads on the contact term and a profile error
-      # does too. With kernels "both" a second term, the source cells
+      # screen_flagged says what the screen made of the gene. The admixed
+      # expectation enters with a free per-gene scale, so that an error of
+      # the source profile on a gene is not read as a response; the scale
+      # also absorbs a contact-proportional response on genes the source
+      # profile carries. With kernels "both" a second term, the source cells
       # between range_um[1] and range_um[2] micrometers of the cell per 1000
       # square micrometers, is fitted beside the contact term, so that a
       # response driven by the source's density at range loads on it; the
       # table then carries range_rate, range_se, range_z and range_share,
       # and a gene is called on either term's z. One row per pair and gene.
-      copy_scale <- match.arg(copy_scale)
       kernels <- match.arg(kernels)
       comp <- private$.components
       if (is.null(comp)) stop("the model carries no fitted components")
@@ -1257,14 +1254,8 @@ CellAdmixGenerativeModel <- R6::R6Class(
         fixed <- E$ambient + E$floor
         for (s2 in names(E$admixed)) if (s2 != s) fixed <- fixed + E$admixed[[s2]]
         for (s2 in names(E$induced)) if (s2 != s) fixed <- fixed + E$induced[[s2]]
-        if (copy_scale == "fixed") {
-          fit <- .celladmix_poisson_scales(Y, fixed + E$admixed[[s]], E$own,
-            0 * E$own, covariates, n_iter)
-          gamma <- rep(1, length(genes))
-        } else {
-          fit <- .celladmix_poisson_scales(Y, fixed, E$own, E$admixed[[s]], covariates, n_iter)
-          gamma <- fit$scales[2, ]
-        }
+        fit <- .celladmix_poisson_scales(Y, fixed, E$own, E$admixed[[s]], covariates, n_iter)
+        gamma <- fit$scales[2, ]
         a <- fit$scales[1, ]; b <- fit$scales[3, ]; se_b <- fit$se[3, ]
         z <- ifelse(se_b > 0, b / se_b, NA_real_)
         observed <- colSums(Y)

@@ -149,28 +149,6 @@ TEST_CASE("Cell type counts within an annulus exclude the cell and the inner dis
   REQUIRE(threw);
 }
 
-TEST_CASE("Cell nearest neighbors are ordered by distance and exclude the cell") {
-  const std::vector<double> x = {0.0, 1.0, 3.0, 6.0};
-  const std::vector<double> y = {0.0, 0.0, 0.0, 0.0};
-  const auto nb = cell_nearest_neighbors(x, y, 2);
-  REQUIRE_EQ(nb.k, 2);
-  REQUIRE_EQ(nb.index.size(), 8U);
-  // cell 0: cell 1 at 1, then cell 2 at 3
-  REQUIRE_EQ(nb.index[0], 1);
-  REQUIRE_EQ(nb.index[1], 2);
-  REQUIRE(std::abs(nb.distance[0] - 1.0) < 1e-12);
-  REQUIRE(std::abs(nb.distance[1] - 3.0) < 1e-12);
-  // cell 3: cell 2 at 3, then cell 1 at 5
-  REQUIRE_EQ(nb.index[6], 2);
-  REQUIRE_EQ(nb.index[7], 1);
-  REQUIRE(std::abs(nb.distance[7] - 5.0) < 1e-12);
-  // more neighbors requested than other cells exist: the rest are empty
-  const auto wide = cell_nearest_neighbors(x, y, 5);
-  REQUIRE_EQ(wide.index[0 * 5 + 2], 3);
-  REQUIRE_EQ(wide.index[0 * 5 + 3], -1);
-  REQUIRE(std::isinf(wide.distance[0 * 5 + 3]));
-}
-
 TEST_CASE("Cell neighbor type counts respect k and skip unlabeled neighbors") {
   // Four labeled cells on a line plus one unlabeled cell in the middle.
   const std::vector<double> x = {0.0, 1.0, 2.0, 3.0, 1.5};

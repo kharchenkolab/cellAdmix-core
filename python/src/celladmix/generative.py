@@ -130,7 +130,7 @@ class GenerativeModel:
         return out
 
     def detect_responses(self, source=None, target=None, z_min=6.0,
-                         min_share=0.0, n_iter=200, copy_scale="free",
+                         min_share=0.0, n_iter=200,
                          kernels="contact", range_um=(20.0, 60.0),
                          verbose=True):
         """Detect neighborhood-induced responses with a contact term on the
@@ -146,11 +146,11 @@ class GenerativeModel:
         content. The induced term the fit itself carries for the pair is
         left out, so that the test reads the response from the counts
         rather than from the screen; ``screen_flagged`` says what the
-        screen made of the gene. With ``copy_scale="free"`` the admixed
-        expectation enters with a free per-gene scale, which absorbs a
-        contact-proportional response on genes the source profile carries;
-        with ``"fixed"`` it enters as fitted, so such a response loads on
-        the contact term and a profile error does too. With
+        screen made of the gene. The admixed expectation enters with a
+        free per-gene scale, so that an error of the source profile on a
+        gene is not read as a response; the scale also absorbs a
+        contact-proportional response on genes the source profile carries.
+        With
         ``kernels="both"`` a second term, the source cells between
         ``range_um[0]`` and ``range_um[1]`` micrometers of the cell per
         1000 square micrometers, is fitted beside the contact term, so
@@ -186,13 +186,8 @@ class GenerativeModel:
                     fixed = fixed + I
             t0 = time.time()
             covariates = np.column_stack([contact] + ([density[pos[cols], types.index(s)]] if both else []))
-            if copy_scale == "fixed":
-                scales, se = _poisson_scales(Y, fixed + E["admixed"][s], E["own"],
-                                             np.zeros_like(E["own"]), covariates, n_iter)
-                gamma = np.ones(len(genes))
-            else:
-                scales, se = _poisson_scales(Y, fixed, E["own"], E["admixed"][s], covariates, n_iter)
-                gamma = scales[1]
+            scales, se = _poisson_scales(Y, fixed, E["own"], E["admixed"][s], covariates, n_iter)
+            gamma = scales[1]
             a, b = scales[0], scales[2]
             if verbose:
                 print(f"[detect_responses] {s} -> {t}: {len(cols)} cells, "
