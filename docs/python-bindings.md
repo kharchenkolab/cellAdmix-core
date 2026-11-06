@@ -340,7 +340,7 @@ audit.evaluate(correction)         # verified like any other correction
 model.realize(nmf_fit)             # a molecule-level corrected store: the
                                    # removal drawn at random per cell and gene
 model.expectation("Ductal/tumor epithelial")  # the fitted components per cell and gene
-model.detect_responses()           # responses on a contact term, per pair and gene
+model.detect_responses()           # neighbor-type associations, per type and gene
 model.retain_responses(responses)  # ... kept in the correction
 ```
 

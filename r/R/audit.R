@@ -1129,8 +1129,8 @@ scales_comma <- function(x) format(x, big.mark = ",", scientific = FALSE)
 #' background, and induced expression. Exposes the per-cell decomposition
 #' (`composition()`), the retained induced genes (`induced`), per-pair
 #' summaries (`pairs`), the fitted expectation per cell and gene
-#' (`expectation()`), a contact-term detection of responses
-#' (`detect_responses()`), and derives corrections without refitting
+#' (`expectation()`), a detection of associations between neighboring
+#' cell types and expression (`detect_responses()`), and derives corrections without refitting
 #' (`correct()`). Created by `audit$fit_generative()`.
 #' @export
 CellAdmixGenerativeModel <- R6::R6Class(
@@ -1209,86 +1209,168 @@ CellAdmixGenerativeModel <- R6::R6Class(
                                 min_share = 0, n_iter = 200L,
                                 kernels = c("contact", "both"),
                                 range_um = c(20, 60), verbose = TRUE) {
-      # Detect neighborhood-induced responses with a contact term on the
-      # fitted expectation: for each pair (or those selected by source and
-      # target) and gene, the target cells' counts regressed, as a Poisson
-      # model with non-negative scales, on the cell's own expectation, the
-      # source's admixed expectation and the number of source cells among
-      # the cell's nearest neighbors (the exposure count), the other
-      # sources' admixed and induced expectations, the ambient expectation
-      # and the floor held fixed; a gene responds when the contact term's z
-      # reaches z_min and the molecules it explains make at least min_share
-      # of the gene's content. The induced term the fit carries for the
-      # pair is left out, so the test reads the response from the counts;
-      # screen_flagged says what the screen made of the gene. The admixed
-      # expectation enters with a free per-gene scale, so that an error of
-      # the source profile on a gene is not read as a response; the scale
-      # also absorbs a contact-proportional response on genes the source
-      # profile carries. With kernels "both" a second term, the source cells
-      # between range_um[1] and range_um[2] micrometers of the cell per 1000
-      # square micrometers, is fitted beside the contact term, so that a
-      # response driven by the source's density at range loads on it; the
-      # table then carries range_rate, range_se, range_z and range_share,
-      # and a gene is called on either term's z. One row per pair and gene.
+      # Detect associations between the presence of neighboring cell types
+      # and the expression of a target type, on the fitted expectation: for
+      # each target type (or target) and gene, the target cells' counts
+      # regressed, as a Poisson model with non-negative scales, on the
+      # cell's own expectation, the admixed expectation of every source the
+      # fit carries for the type, each with its own free per-gene scale,
+      # and, for every other labeled type, the number of its cells among
+      # the cell's nearest neighbors (the exposure count); the ambient
+      # expectation and the floor are held fixed and the fit's induced
+      # terms are left out, so the test reads the response from the counts
+      # (screen_flagged says what the screen made of the gene). The free
+      # admixed scales absorb an error of a source profile and a remainder
+      # of admixture the fit left in the cells, which follows that source's
+      # neighbors; with every type's neighbors in one regression, such a
+      # remainder is not credited to another type that happens to sit near
+      # the source. The fit's admixed profiles are zeroed on the target's
+      # own genes; here each source's admixed expectation is extended to
+      # the target-owned genes the source expresses on its own (at least a
+      # tenth of the target's rate, measured in cells away from each
+      # other), so that admixture on genes both types express is not read
+      # as a response. The free scale also absorbs a response proportional
+      # to a source's dose on genes that source carries. Each row is a
+      # neighboring type (source), target and gene: the type's rate per
+      # neighbor and its z, called when the z reaches z_min and the
+      # molecules the type's terms explain make at least min_share of the
+      # gene's content. joint_z tests all neighboring types together (a
+      # Wald test over every neighbor term except those of the gene's
+      # owner, the type with the highest rate, whose association with its
+      # own gene cannot be told from admixture), as a z of equal tail
+      # probability; joint_called marks a gene associated with the
+      # neighborhood, including where types that co-occur share the
+      # association and none reaches z_min alone. With kernels "both" each
+      # type also enters with its cells between range_um[1] and
+      # range_um[2] micrometers of the cell per 1000 square micrometers,
+      # so that a response to cells beyond the nearest neighbors loads on
+      # it; the table then carries range_rate, range_se, range_z and
+      # range_share (the range term's share of the type's response), and a
+      # gene is called for a type on either term's z.
       kernels <- match.arg(kernels)
       comp <- private$.components
       if (is.null(comp)) stop("the model carries no fitted components")
       expo <- private$.exposure()
       both <- kernels == "both"
       if (both) dens <- private$.range(range_um)
-      pos <- match(colnames(private$.counts), as.character(comp$cell_table$cell_id))
-      genes <- rownames(private$.counts)
+      counts <- private$.counts
+      pos <- match(colnames(counts), as.character(comp$cell_table$cell_id))
+      genes <- rownames(counts)
       flagged <- if (nrow(self$induced)) paste(self$induced$source, self$induced$target,
         self$induced$gene) else character()
-      rows <- list()
+      col_type <- as.character(private$.cell_types[colnames(counts)])
+      types <- expo$types
+      labeled <- types[vapply(types, function(x) any(col_type == x, na.rm = TRUE), logical(1))]
+      sums <- vapply(labeled, function(x) Matrix::rowSums(counts[, which(col_type == x), drop = FALSE]),
+        numeric(length(genes)))
+      sums <- matrix(sums, ncol = length(labeled))
+      owner <- labeled[max.col(sweep(sums, 2, pmax(colSums(sums), 1), "/"), ties.method = "first")]
+      rate <- function(cols) {
+        x <- Matrix::rowSums(counts[, cols, drop = FALSE])
+        x / max(sum(x), 1)
+      }
+      sources_of <- list()
       for (key in names(comp$pair_profile)) {
         st <- comp$pair_st[[key]]
-        s <- st[[1]]; t <- st[[2]]
-        if ((!is.null(source) && s != source) || (!is.null(target) && t != target)) next
+        sources_of[[st[[2]]]] <- c(sources_of[[st[[2]]]], st[[1]])
+      }
+      rows <- list()
+      for (t in names(comp$cells_of)) {
+        if (!is.null(target) && t != target) next
         E <- self$expectation(t)
+        cols <- E$cells
+        p <- pos[cols]
+        Y <- as.matrix(Matrix::t(counts[, cols, drop = FALSE]))
+        srcs <- intersect(sources_of[[t]], names(E$admixed))
+        terms <- list(E$own)
+        for (s in srcs) {
+          psi <- comp$pair_profile[[paste(s, t, sep = " -> ")]]
+          admixed <- E$admixed[[s]]
+          s_cols <- which(col_type == s)
+          s_far <- s_cols[expo$counts[pos[s_cols], t] == 0]
+          t_far <- cols[expo$counts[p, s] == 0]
+          if (length(s_far) >= 50 && length(t_far) >= 50 && sum(psi) > 0) {
+            r_s <- rate(s_far); r_t <- rate(t_far)
+            shared <- owner == t & psi <= 0 & r_s > 0 & r_s >= .celladmix_shared_min * r_t
+            if (any(shared)) {
+              full <- psi
+              full[shared] <- r_s[shared]
+              admixed <- outer(rowSums(admixed) / sum(psi), full)
+            }
+          }
+          terms[[length(terms) + 1]] <- admixed
+        }
+        names_x <- character(); names_k <- character(); C <- list()
+        for (x in setdiff(types, t)) {
+          vals <- list(contact = as.numeric(expo$counts[p, x]))
+          if (both) vals$range <- as.numeric(dens$counts[p, x])
+          for (kind in names(vals)) {
+            if (sum(vals[[kind]]) > 0) {
+              names_x <- c(names_x, x); names_k <- c(names_k, kind)
+              C[[length(C) + 1]] <- vals[[kind]]
+            }
+          }
+        }
+        if (!length(C)) next
+        C <- do.call(cbind, C)
         t0 <- Sys.time()
-        Y <- as.matrix(Matrix::t(private$.counts[, E$cells, drop = FALSE]))
-        contact <- as.numeric(expo$counts[pos[E$cells], s])
-        covariates <- if (both) cbind(contact, as.numeric(dens$counts[pos[E$cells], s])) else
-          matrix(contact, ncol = 1)
-        fixed <- E$ambient + E$floor
-        for (s2 in names(E$admixed)) if (s2 != s) fixed <- fixed + E$admixed[[s2]]
-        for (s2 in names(E$induced)) if (s2 != s) fixed <- fixed + E$induced[[s2]]
-        fit <- .celladmix_poisson_scales(Y, fixed, E$own, E$admixed[[s]], covariates, n_iter)
-        gamma <- fit$scales[2, ]
-        a <- fit$scales[1, ]; b <- fit$scales[3, ]; se_b <- fit$se[3, ]
-        z <- ifelse(se_b > 0, b / se_b, NA_real_)
-        observed <- colSums(Y)
-        response <- b * sum(contact)
-        significant <- !is.na(z) & z >= z_min
-        if (both) {
-          b_r <- fit$scales[4, ]; se_r <- fit$se[4, ]
-          z_r <- ifelse(se_r > 0, b_r / se_r, NA_real_)
-          response_r <- b_r * sum(covariates[, 2])
-          response_all <- response + response_r
-          significant <- significant | (!is.na(z_r) & z_r >= z_min)
-        } else {
-          response_all <- response
-        }
-        share <- response_all / pmax(observed, 1e-9)
+        fit <- .celladmix_poisson_terms(Y, E$ambient + E$floor, terms, C, n_iter)
+        K <- length(terms)
         if (verbose) {
-          message(sprintf("[detect_responses] %s -> %s: %d cells, %.0fs", s, t,
-            length(E$cells), as.numeric(difftime(Sys.time(), t0, units = "secs"))))
+          message(sprintf("[detect_responses] %s: %d cells, %d admixed terms, %d neighbor terms, %.0fs",
+            t, length(cols), length(srcs), ncol(C), as.numeric(difftime(Sys.time(), t0, units = "secs"))))
         }
-        row <- data.frame(source = s, target = t, gene = genes,
-          observed = observed, own_fit = a * colSums(E$own),
-          admixed_fit = gamma * colSums(E$admixed[[s]]), contact_rate = b,
-          contact_se = se_b, z = z, response_molecules = response_all,
-          response_share = share,
-          screen_flagged = paste(s, t, genes) %in% flagged,
-          stringsAsFactors = FALSE)
-        if (both) {
-          row$range_rate <- b_r; row$range_se <- se_r; row$range_z <- z_r
-          row$range_share <- response_r / pmax(response_all, 1e-9)
-          row$range_in_um <- range_um[[1]]; row$range_out_um <- range_um[[2]]
+        b <- fit$coef[K + seq_len(ncol(C)), , drop = FALSE]
+        b_se <- fit$se[K + seq_len(ncol(C)), , drop = FALSE]
+        z <- ifelse(b_se > 0, b / b_se, NA_real_)
+        response <- b * colSums(C)
+        observed <- colSums(Y)
+        joint_stat <- numeric(length(genes)); joint_df <- integer(length(genes))
+        joint_response <- numeric(length(genes))
+        for (g in seq_along(genes)) {
+          sel <- which(names_x != owner[[g]])
+          if (!length(sel)) next
+          S <- fit$cov[K + sel, K + sel, g]
+          joint_stat[[g]] <- as.numeric(t(b[sel, g]) %*% .celladmix_pinv(S) %*% b[sel, g])
+          joint_df[[g]] <- length(sel)
+          joint_response[[g]] <- sum(response[sel, g])
         }
-        row$called <- significant & share >= min_share
-        rows[[length(rows) + 1]] <- row
+        p_joint <- ifelse(joint_df > 0, stats::pchisq(joint_stat, pmax(joint_df, 1), lower.tail = FALSE), 1)
+        joint_z <- stats::qnorm(pmin(pmax(p_joint, 1e-300), 1), lower.tail = FALSE)
+        joint_called <- joint_df > 0 & joint_z >= z_min & joint_response / pmax(observed, 1e-9) >= min_share
+        for (x in unique(names_x)) {
+          if (!is.null(source) && x != source) next
+          ic <- which(names_x == x & names_k == "contact")
+          ir <- which(names_x == x & names_k == "range")
+          k_adm <- match(x, srcs)
+          r_c <- if (length(ic)) response[ic, ] else rep(0, length(genes))
+          r_r <- if (length(ir)) response[ir, ] else rep(0, length(genes))
+          total <- r_c + r_r
+          share <- total / pmax(observed, 1e-9)
+          z_c <- if (length(ic)) z[ic, ] else rep(NA_real_, length(genes))
+          row <- data.frame(source = x, target = t, gene = genes, observed = observed,
+            own_fit = fit$coef[1, ] * colSums(E$own),
+            admixed_fit = if (is.na(k_adm)) 0 else fit$coef[1 + k_adm, ] * colSums(terms[[1 + k_adm]]),
+            contact_rate = if (length(ic)) b[ic, ] else 0,
+            contact_se = if (length(ic)) b_se[ic, ] else NA_real_, z = z_c,
+            response_molecules = total, response_share = share,
+            screen_flagged = paste(x, t, genes) %in% flagged, stringsAsFactors = FALSE)
+          significant <- !is.na(z_c) & z_c >= z_min
+          if (both) {
+            z_r <- if (length(ir)) z[ir, ] else rep(NA_real_, length(genes))
+            row$range_rate <- if (length(ir)) b[ir, ] else 0
+            row$range_se <- if (length(ir)) b_se[ir, ] else NA_real_
+            row$range_z <- z_r
+            row$range_share <- r_r / pmax(total, 1e-9)
+            row$range_in_um <- range_um[[1]]; row$range_out_um <- range_um[[2]]
+            significant <- significant | (!is.na(z_r) & z_r >= z_min)
+          }
+          row$called <- significant & share >= min_share
+          row$owner <- owner
+          row$joint_z <- joint_z
+          row$joint_called <- joint_called
+          rows[[length(rows) + 1]] <- row
+        }
       }
       out <- do.call(rbind, rows)
       rownames(out) <- NULL
@@ -1296,11 +1378,11 @@ CellAdmixGenerativeModel <- R6::R6Class(
     },
 
     retain_responses = function(responses) {
-      # Keep the responses the contact term called: for each called pair
+      # Keep the called responses: for each called neighboring type, target
       # and gene in responses (a table from detect_responses), the response
-      # molecules in every target cell - the fitted rate per source cell
-      # times the cell's source-neighbor count (and the range term's share
-      # with two kernels) - are taken out of the cell's removal of that
+      # molecules in every target cell - the fitted rate per neighbor times
+      # the cell's count of that type among its nearest neighbors (and the
+      # range term likewise) - are taken out of the cell's removal of that
       # gene, and nothing else changes. Returns a new model whose
       # corrections carry the retained responses; the removal without
       # retention is unchanged.
@@ -1449,52 +1531,63 @@ CellAdmixGenerativeModel <- R6::R6Class(
     amounts = as.numeric(m@x[ok]))
 }
 
+# Target-owned genes enter a source's admixed expectation in detection when
+# the source expresses them at least at this fraction of the target's rate.
+.celladmix_shared_min <- 0.1
+
+.celladmix_pinv <- function(mat) {
+  sv <- svd(mat)
+  d <- ifelse(sv$d > 1e-12 * max(sv$d, 1e-300), 1 / sv$d, 0)
+  sv$v %*% (d * t(sv$u))
+}
+
 # Non-negative Poisson regression of every gene at once,
-# E[y] = fixed + a * own + gamma * copy + b * contact, by multiplicative
-# updates; the scales (3 x genes) and their standard errors from the Fisher
-# information.
-.celladmix_poisson_scales <- function(Y, fixed, own, copy, covariates, n_iter = 200L,
-                                      tol = 1e-6) {
+# E[y] = fixed + sum_k c_k * terms[[k]] + sum_j b_j * covariates[, j], by
+# multiplicative updates; terms are cells x genes expectations, each with its
+# own scale per gene, covariates per-cell terms shared by all genes. The
+# scales ((k + m) x genes), their standard errors and their covariance per
+# gene ((k + m) x (k + m) x genes) from the Fisher information.
+.celladmix_poisson_terms <- function(Y, fixed, terms, covariates, n_iter = 200L,
+                                     tol = 1e-6) {
   C <- as.matrix(covariates)
-  m <- ncol(C)
-  G <- ncol(Y)
-  a <- rep(0.1, G); gamma <- rep(0.1, G); b <- matrix(0.1, m, G)
-  col_own <- colSums(own); col_copy <- colSums(copy); col_c <- colSums(C)
-  predict <- function() {
-    mu <- fixed + sweep(own, 2, a, "*") + sweep(copy, 2, gamma, "*")
-    for (j in seq_len(m)) mu <- mu + outer(C[, j], b[j, ])
+  K <- length(terms); m <- ncol(C); G <- ncol(Y)
+  coef <- matrix(0.1, K + m, G)
+  col_t <- lapply(terms, colSums); col_c <- colSums(C)
+  predict <- function(coef) {
+    mu <- fixed + C %*% coef[K + seq_len(m), , drop = FALSE]
+    for (k in seq_len(K)) mu <- mu + sweep(terms[[k]], 2, coef[k, ], "*")
     mu
   }
   for (it in seq_len(n_iter)) {
-    ratio <- Y / pmax(predict(), 1e-12)
-    a_new <- ifelse(col_own > 0, a * colSums(own * ratio) / pmax(col_own, 1e-12), 0)
-    g_new <- ifelse(col_copy > 0, gamma * colSums(copy * ratio) / pmax(col_copy, 1e-12), 0)
-    b_new <- b
-    for (j in seq_len(m)) {
-      b_new[j, ] <- if (col_c[[j]] > 0) b[j, ] * as.numeric(crossprod(C[, j], ratio)) / col_c[[j]] else 0
+    ratio <- Y / pmax(predict(coef), 1e-12)
+    new <- coef
+    for (k in seq_len(K)) {
+      new[k, ] <- ifelse(col_t[[k]] > 0, coef[k, ] * colSums(terms[[k]] * ratio) /
+        pmax(col_t[[k]], 1e-12), 0)
     }
-    change <- max(abs(a_new - a) / pmax(a, 1e-8), abs(g_new - gamma) / pmax(gamma, 1e-8),
-      abs(b_new - b) / pmax(b, 1e-8))
-    a <- a_new; gamma <- g_new; b <- b_new
+    num <- crossprod(C, ratio)
+    for (j in seq_len(m)) {
+      new[K + j, ] <- if (col_c[[j]] > 0) coef[K + j, ] * num[j, ] / col_c[[j]] else 0
+    }
+    change <- max(abs(new - coef) / pmax(coef, 1e-8))
+    coef <- new
     if (change < tol) break
   }
-  w <- 1 / pmax(predict(), 1e-12)
-  design <- c(list(own, copy), lapply(seq_len(m), function(j) C[, j]))
-  k <- 2 + m
-  cross <- matrix(list(), k, k)
-  info_entries <- array(0, c(k, k, G))
-  for (p in seq_len(k)) for (q in p:k) {
-    v <- colSums(design[[p]] * design[[q]] * w)
-    info_entries[p, q, ] <- v; info_entries[q, p, ] <- v
+  w <- 1 / pmax(predict(coef), 1e-12)
+  k <- K + m
+  info <- array(0, c(k, k, G))
+  for (a in seq_len(k)) for (b in a:k) {
+    v <- if (b <= K) colSums(terms[[a]] * terms[[b]] * w) else if (a <= K)
+      colSums(terms[[a]] * (C[, b - K] * w)) else as.numeric(crossprod(C[, a - K] * C[, b - K], w))
+    info[a, b, ] <- v; info[b, a, ] <- v
   }
-  pinv <- function(mat) {
-    sv <- svd(mat)
-    d <- ifelse(sv$d > 1e-12 * max(sv$d, 1e-300), 1 / sv$d, 0)
-    sv$v %*% (d * t(sv$u))
-  }
+  cov <- array(0, c(k, k, G))
   se <- matrix(NA_real_, k, G)
-  for (g in seq_len(G)) se[, g] <- sqrt(pmax(diag(pinv(info_entries[, , g])), 0))
-  list(scales = rbind(a, gamma, b), se = se)
+  for (g in seq_len(G)) {
+    cov[, , g] <- .celladmix_pinv(info[, , g])
+    se[, g] <- sqrt(pmax(diag(cov[, , g]), 0))
+  }
+  list(coef = coef, se = se, cov = cov)
 }
 
 #' Generative Admixture Correction

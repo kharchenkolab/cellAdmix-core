@@ -11,12 +11,17 @@ import numpy as np
 import pandas as pd
 
 
-def make_split_bundle(root: Path, seed: int = 11, patchy: bool = False):
+def make_split_bundle(root: Path, seed: int = 11, patchy: bool = False,
+                      shared: bool = False, response: bool = False):
     """A split grid: type A on the left, type B on the right, with A-marker
     molecules planted into B cells in proportion to boundary proximity.
     With ``patchy`` the planted amount varies from cell to cell around the
     same mean (none in half the cells, twice the amount in the other
-    half)."""
+    half). With ``shared`` both types express s0 (half of A's molecules and
+    a little more of B's) and twice the A material is planted, carrying s0
+    at A's rate; with ``response`` the
+    B cells of the two columns next to A express r0, which neither type
+    expresses otherwise (8 and 4 molecules)."""
     rng = np.random.default_rng(seed)
     genes_a = [f"a{i}" for i in range(3)]
     genes_b = [f"b{i}" for i in range(3)]
@@ -31,12 +36,21 @@ def make_split_bundle(root: Path, seed: int = 11, patchy: bool = False):
             cx, cy = gx * 30.0 + 15.0, gy * 30.0 + 15.0
             cells.append((cell_id, cx, cy, 0.0, cell_type))
             own = genes_a if cell_type == "A" else genes_b
-            pool = list(rng.choice(own, 60)) + ["h1"] * 10
+            if shared:
+                own_p = [0.5 / 3] * 3 + [0.5] if cell_type == "A" else [0.15] * 3 + [0.55]
+                pool = list(rng.choice(own + ["s0"], 60, p=own_p)) + ["h1"] * 10
+            else:
+                pool = list(rng.choice(own, 60)) + ["h1"] * 10
             if cell_type == "B":
                 n_adm = max(0, 12 - 6 * (gx - side // 2))
                 if patchy:
                     n_adm = 2 * n_adm if rng.random() < 0.5 else 0
-                pool += list(rng.choice(genes_a, n_adm))
+                if shared:
+                    pool += list(rng.choice(genes_a + ["s0"], 2 * n_adm, p=[0.5 / 3] * 3 + [0.5]))
+                else:
+                    pool += list(rng.choice(genes_a, n_adm))
+                if response:
+                    pool += ["r0"] * max(0, 8 - 4 * (gx - side // 2))
             for gene in pool:
                 molecules.append((
                     f"t{len(molecules)}", cell_id, gene,
@@ -185,12 +199,16 @@ class GenerativeCorrectionTests(unittest.TestCase):
             model.expectation("no such type")
         det = model.detect_responses(source="A", target="B")
         self.assertEqual(len(det), len(genes))
-        self.assertTrue({"z", "response_share", "called", "screen_flagged"} <= set(det.columns))
+        self.assertTrue({"z", "response_share", "called", "screen_flagged", "owner",
+                         "joint_z", "joint_called"} <= set(det.columns))
         # the planted A molecules in B cells are admixture carried by the
         # admixed expectation, not a response on the contact term
         a = det[det.gene.str.startswith("a")]
         self.assertGreater(float(a.admixed_fit.sum()), 0.0)
         self.assertFalse(bool(a.called.any()))
+        # the joint test leaves out the owner's terms: A's genes are not tested against A
+        self.assertTrue((a.owner == "A").all())
+        self.assertFalse(bool(a.joint_called.any()))
         # two kernels: the range term's columns are reported and a declared
         # response on both terms is retained through both
         det2 = model.detect_responses(source="A", target="B", kernels="both",
@@ -328,6 +346,64 @@ class GenerativeCorrectionTests(unittest.TestCase):
         pairs = report.pairs()
         row = pairs[(pairs["source"] == "A") & (pairs["target"] == "B")]
         self.assertGreater(float(row["sensitivity"].iloc[0]), 0.5)
+
+
+class ResponseDetectionTests(unittest.TestCase):
+    """Detection on a split grid where both types express s0 (B more) and B
+    cells next to A express r0 in response to A."""
+
+    @classmethod
+    def setUpClass(cls):
+        from celladmix import CellAdmix
+
+        cls.tmp = tempfile.TemporaryDirectory()
+        root = Path(cls.tmp.name)
+        annotation, _ = make_split_bundle(root / "bundle", shared=True, response=True)
+        ds = CellAdmix(str(root / "bundle"), output_dir=str(root / "out"),
+                       annotation=annotation.set_index("cell_id")["cell_type"], num_threads=2)
+        fit = ds.fit(rank=2, ncv_k=6, graph_k=4, nmf_iterations=20, nmf_n_runs=1,
+                     nmf_train_max_rows=200, seed=11, verbose=False)
+        audit = fit.audit_admixture(neighbor_k=6, min_target_cells=50,
+                                    min_reference_cells=20, min_excess=50)
+        cls.model = audit.fit_generative(num_threads=2)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def test_a_response_is_called_and_admixture_on_a_shared_gene_is_not(self):
+        det = self.model.detect_responses(target="B", verbose=False).set_index(["source", "gene"])
+        r0 = det.loc[("A", "r0")]
+        self.assertTrue(bool(r0.called))
+        self.assertTrue(bool(r0.joint_called))
+        self.assertGreater(float(r0.response_share), 0.5)
+        # s0 is B's gene, carried into B cells by A's material: the admixed
+        # term extended to genes both types express takes it, so it is no response
+        s0 = det.loc[("A", "s0")]
+        self.assertEqual(s0.owner, "B")
+        self.assertGreater(float(s0.admixed_fit), 0.0)
+        self.assertFalse(bool(s0.called))
+        self.assertFalse(bool(s0.joint_called))
+
+    def test_the_joint_test_finds_an_association_shared_by_co_occurring_terms(self):
+        from celladmix.generative import _poisson_terms
+        from scipy import stats
+
+        rng = np.random.default_rng(3)
+        n = 4000
+        region = rng.uniform(0, 1, n)
+        # two neighbor counts that rise together, a response to their sum
+        c1 = rng.poisson(3 * region)
+        c2 = rng.poisson(3 * region)
+        own = np.full((n, 1), 2.0)
+        y = rng.poisson(own[:, 0] + 0.15 * (c1 + c2))[:, None].astype(float)
+        coef, cov = _poisson_terms(y, np.zeros((n, 1)), [own], np.column_stack([c1, c2]).astype(float))
+        b = coef[1:, 0]
+        S = cov[0][1:, 1:]
+        z = b / np.sqrt(np.diag(S))
+        joint = float(b @ np.linalg.inv(S) @ b)
+        self.assertGreater(stats.norm.isf(stats.chi2.sf(joint, 2)), z.max() + 1.0)
+        self.assertAlmostEqual(float(b.sum()), 0.3, delta=0.08)
 
 
 class DatasetLevelAuditTests(unittest.TestCase):

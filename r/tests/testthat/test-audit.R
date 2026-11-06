@@ -182,7 +182,12 @@ test_that("the interface profile reflects the bordering source cells", {
   expect_lt(prof2[["g1"]], 0.01)
 })
 
-make_audit_fit <- function(seed = 11L) {
+# A split grid, A left and B right, with A material planted into B cells
+# near the boundary. With shared both types express s0 (half of A's
+# molecules, a little more of B's) and twice the A material is planted,
+# carrying s0 at A's rate; with response the B cells of the two columns next
+# to A express r0, which neither type expresses otherwise.
+make_audit_fit <- function(seed = 11L, shared = FALSE, response = FALSE) {
   set.seed(seed)
   n_side <- 18; spacing <- 30
   cells <- expand.grid(ix = seq_len(n_side), iy = seq_len(n_side))
@@ -194,10 +199,20 @@ make_audit_fit <- function(seed = 11L) {
   for (i in seq_len(nrow(cells))) {
     ci <- cells[i, ]
     own <- if (ci$cell_type == "A") genes_a else genes_b
-    g <- c(sample(own, 60L, replace = TRUE), rep("h1", 10L))
+    if (shared) {
+      own_p <- if (ci$cell_type == "A") c(rep(0.5 / 3, 3), 0.5) else c(rep(0.15, 3), 0.55)
+      g <- c(sample(c(own, "s0"), 60L, replace = TRUE, prob = own_p), rep("h1", 10L))
+    } else {
+      g <- c(sample(own, 60L, replace = TRUE), rep("h1", 10L))
+    }
     if (ci$cell_type == "B") {
-      n_adm <- max(0L, 12L - 6L * (as.integer(ci$ix - n_side / 2) - 1L))
-      if (n_adm > 0) g <- c(g, sample(genes_a, n_adm, replace = TRUE))
+      d <- as.integer(ci$ix - n_side / 2) - 1L
+      n_adm <- max(0L, 12L - 6L * d)
+      if (n_adm > 0) {
+        g <- c(g, if (shared) sample(c(genes_a, "s0"), 2L * n_adm, replace = TRUE,
+          prob = c(rep(0.5 / 3, 3), 0.5)) else sample(genes_a, n_adm, replace = TRUE))
+      }
+      if (response) g <- c(g, rep("r0", max(0L, 8L - 4L * d)))
     }
     tx[[i]] <- data.frame(gene = g,
       x = ci$x + stats::runif(length(g), -10, 10),
@@ -275,9 +290,13 @@ test_that("the generative correction removes planted admixture", {
   expect_error(model$expectation("no such type"), "no fitted pairs")
   det <- model$detect_responses(source = "A", target = "B", verbose = FALSE)
   expect_equal(nrow(det), nrow(before))
+  expect_true(all(c("owner", "joint_z", "joint_called") %in% names(det)))
   a_rows <- det[det$gene %in% genes_a, ]
   expect_gt(sum(a_rows$admixed_fit), 0)
   expect_false(any(a_rows$called))
+  # the joint test leaves out the owner's terms: A's genes are not tested against A
+  expect_true(all(a_rows$owner == "A"))
+  expect_false(any(a_rows$joint_called))
   det2 <- model$detect_responses(source = "A", target = "B", kernels = "both",
     range_um = c(20, 60), verbose = FALSE)
   expect_true(all(c("range_rate", "range_z", "range_share") %in% names(det2)))
@@ -324,6 +343,41 @@ test_that("the generative correction removes planted admixture", {
   y0 <- audit$evaluate(identity_correction, warn_uncovered = FALSE,
     yardstick_min_molecules = 50)$yardstick()
   expect_equal(y0$removed_share[y0$cell_type == "all"], 0, tolerance = 1e-9)
+})
+
+test_that("detection calls a response and not admixture on a gene both types express", {
+  fit <- make_audit_fit(shared = TRUE, response = TRUE)
+  audit <- fit$audit_admixture(neighbor_k = 6L, min_target_cells = 50L,
+    min_reference_cells = 20L, min_excess = 50)
+  model <- audit$fit_generative(num_threads = 2L)
+  det <- model$detect_responses(target = "B", verbose = FALSE)
+  r0 <- det[det$source == "A" & det$gene == "r0", ]
+  expect_true(r0$called)
+  expect_true(r0$joint_called)
+  expect_gt(r0$response_share, 0.5)
+  # s0 is B's gene, carried into B cells by A's material: the admixed term
+  # extended to genes both types express takes it, so it is no response
+  s0 <- det[det$source == "A" & det$gene == "s0", ]
+  expect_equal(s0$owner, "B")
+  expect_gt(s0$admixed_fit, 0)
+  expect_false(s0$called)
+  expect_false(s0$joint_called)
+})
+
+test_that("the joint test finds an association shared by co-occurring terms", {
+  set.seed(3)
+  n <- 4000
+  region <- stats::runif(n)
+  c1 <- stats::rpois(n, 3 * region); c2 <- stats::rpois(n, 3 * region)
+  own <- matrix(2, n, 1)
+  y <- matrix(as.numeric(stats::rpois(n, 2 + 0.15 * (c1 + c2))), n, 1)
+  fit <- .celladmix_poisson_terms(y, matrix(0, n, 1), list(own), cbind(c1, c2))
+  b <- fit$coef[2:3, 1]
+  S <- fit$cov[2:3, 2:3, 1]
+  z <- b / sqrt(diag(S))
+  joint <- as.numeric(t(b) %*% solve(S) %*% b)
+  expect_gt(stats::qnorm(stats::pchisq(joint, 2, lower.tail = FALSE), lower.tail = FALSE), max(z) + 1)
+  expect_equal(sum(b), 0.3, tolerance = 0.08 / 0.3)
 })
 
 test_that("the generative fit reports progress only when verbose", {

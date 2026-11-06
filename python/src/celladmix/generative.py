@@ -133,96 +133,171 @@ class GenerativeModel:
                          min_share=0.0, n_iter=200,
                          kernels="contact", range_um=(20.0, 60.0),
                          verbose=True):
-        """Detect neighborhood-induced responses with a contact term on the
-        fitted expectation. For each pair (or the pairs selected by
-        ``source`` and ``target``) and each gene, the counts of the target
-        cells are regressed, as a Poisson model with non-negative scales,
-        on the cell's own expectation, the source's admixed expectation and
-        the number of source cells among the cell's nearest neighbors (the
-        exposure count), with the other sources' admixed and induced
-        expectations, the ambient expectation and the floor held fixed; a
-        gene responds when the contact term's z reaches ``z_min`` and the
-        molecules it explains make at least ``min_share`` of the gene's
-        content. The induced term the fit itself carries for the pair is
-        left out, so that the test reads the response from the counts
-        rather than from the screen; ``screen_flagged`` says what the
-        screen made of the gene. The admixed expectation enters with a
-        free per-gene scale, so that an error of the source profile on a
-        gene is not read as a response; the scale also absorbs a
-        contact-proportional response on genes the source profile carries.
-        With
-        ``kernels="both"`` a second term, the source cells between
-        ``range_um[0]`` and ``range_um[1]`` micrometers of the cell per
-        1000 square micrometers, is fitted beside the contact term, so
-        that a response driven by the source's density at range loads on
-        it; the table then carries ``range_rate``, ``range_se``,
-        ``range_z`` and ``range_share`` (the range term's share of the
-        response), and a gene is called on either term's z. Returns one
-        row per pair and gene."""
+        """Detect associations between the presence of neighboring cell
+        types and the expression of a target type, on the fitted
+        expectation. For each target type (or ``target``) and each gene,
+        the counts of the target cells are regressed, as a Poisson model
+        with non-negative scales, on the cell's own expectation, the
+        admixed expectation of every source the fit carries for the type,
+        each with its own free per-gene scale, and, for every other
+        labeled type, the number of its cells among the cell's nearest
+        neighbors (the exposure count); the ambient expectation and the
+        floor are held fixed, and the fit's induced terms are left out, so
+        that the test reads the response from the counts rather than from
+        the screen (``screen_flagged`` says what the screen made of the
+        gene).
+
+        The free admixed scales absorb an error of a source profile and a
+        remainder of admixture the fit left in the cells, which follows
+        that source's neighbors; with every type's neighbors in one
+        regression, such a remainder is not credited to another type that
+        happens to sit near the source. The fit's admixed profiles are
+        zeroed on the target's own genes; here each source's admixed
+        expectation is extended to the target-owned genes the source
+        expresses on its own (at least a tenth of the target's rate,
+        measured in cells away from each other), so that admixture on
+        genes both types express is not read as a response. The free
+        scale also absorbs a response proportional to a source's dose on
+        genes that source carries.
+
+        Each row is a neighboring type (``source``), target and gene: the
+        type's rate per neighbor and its z, and the gene is called for
+        that type when the z reaches ``z_min`` and the molecules the
+        type's terms explain make at least ``min_share`` of the gene's
+        content. ``joint_z`` tests all neighboring types together (a Wald
+        test over every neighbor term except those of the gene's
+        ``owner``, the type with the highest rate, whose association with
+        its own gene cannot be told from admixture), as a z of equal tail
+        probability; ``joint_called`` marks a gene associated with the
+        neighborhood, including where types that co-occur share the
+        association and none reaches ``z_min`` alone.
+
+        With ``kernels="both"`` each type also enters with its cells
+        between ``range_um[0]`` and ``range_um[1]`` micrometers of the
+        cell per 1000 square micrometers, so that a response to cells
+        beyond the nearest neighbors loads on it; the table then carries
+        ``range_rate``, ``range_se``, ``range_z`` and ``range_share`` (the
+        range term's share of the type's response), and a gene is called
+        for a type on either term's z."""
         import time
+        from scipy import stats
+
         exposure, types, pos = self._exposure()
         both = kernels == "both"
         if both:
             density, _, _ = self._range(tuple(range_um))
         elif kernels != "contact":
             raise ValueError("kernels must be \"contact\" or \"both\"")
-        genes = np.asarray(self._genes)
+        comp = self._components
+        genes = np.asarray(self._genes).astype(str)
         flagged = {(r.source, r.target, r.gene) for r in self.induced.itertuples()} \
             if len(self.induced.columns) else set()
+        matrix = self._matrix.tocsc()
+        col_type = self._cell_types.reindex(pd.Index(np.asarray(self._cells).astype(str))) \
+            .astype(object).to_numpy()
+        labeled = [x for x in types if (col_type == x).any()]
+        sums = np.column_stack([np.asarray(matrix[:, col_type == x].sum(axis=1)).ravel() for x in labeled])
+        owner = np.array(labeled)[np.argmax(sums / np.maximum(sums.sum(axis=0), 1.0), axis=1)]
+        sources_of = {}
+        for (s, t) in comp["pair_profile"]:
+            sources_of.setdefault(t, []).append(s)
+
+        def rate(cols):
+            x = np.asarray(matrix[:, cols].sum(axis=1)).ravel()
+            return x / max(float(x.sum()), 1.0)
+
         rows = []
-        for (s, t) in self._components["pair_profile"]:
-            if (source is not None and s != source) or (target is not None and t != target):
+        for t in comp["cells_of"]:
+            if target is not None and t != target:
                 continue
             E = self.expectation(t)
             cols = E["cells"]
-            Y = np.asarray(self._matrix[:, cols].todense()).T.astype(float)
-            contact = exposure[pos[cols], types.index(s)].astype(float)
-            fixed = E["ambient"] + E["floor"]
-            for s2, A in E["admixed"].items():
-                if s2 != s:
-                    fixed = fixed + A
-            for s2, I in E["induced"].items():
-                if s2 != s:
-                    fixed = fixed + I
+            p = pos[cols]
+            Y = np.asarray(matrix[:, cols].todense()).T.astype(float)
+            srcs = [s for s in sources_of.get(t, []) if s in E["admixed"]]
+            terms = [E["own"]]
+            for s in srcs:
+                psi = comp["pair_profile"][(s, t)]
+                admixed = E["admixed"][s]
+                s_cols = np.flatnonzero(col_type == s)
+                s_far = s_cols[exposure[pos[s_cols], types.index(t)] == 0]
+                t_far = cols[exposure[p, types.index(s)] == 0]
+                if len(s_far) >= 50 and len(t_far) >= 50 and psi.sum() > 0:
+                    r_s, r_t = rate(s_far), rate(t_far)
+                    shared = (owner == t) & (psi <= 0) & (r_s > 0) & (r_s >= _SHARED_MIN * r_t)
+                    if shared.any():
+                        full = psi.copy()
+                        full[shared] = r_s[shared]
+                        admixed = np.outer(admixed.sum(axis=1) / psi.sum(), full)
+                terms.append(admixed)
+            names, C = [], []
+            for x in types:
+                if x == t:
+                    continue
+                for kind, values in [("contact", exposure[p, types.index(x)].astype(float))] + \
+                        ([("range", density[p, types.index(x)])] if both else []):
+                    if values.sum() > 0:
+                        names.append((x, kind))
+                        C.append(values)
+            if not C:
+                continue
+            C = np.column_stack(C)
             t0 = time.time()
-            covariates = np.column_stack([contact] + ([density[pos[cols], types.index(s)]] if both else []))
-            scales, se = _poisson_scales(Y, fixed, E["own"], E["admixed"][s], covariates, n_iter)
-            gamma = scales[1]
-            a, b = scales[0], scales[2]
+            coef, cov = _poisson_terms(Y, E["ambient"] + E["floor"], terms, C, n_iter)
+            K = len(terms)
             if verbose:
-                print(f"[detect_responses] {s} -> {t}: {len(cols)} cells, "
-                      f"{time.time() - t0:.0f}s", flush=True)
-
-            def z_of(rate, err):
-                return np.where(err > 0, rate / np.where(err > 0, err, 1.0), np.nan)
-
-            z = z_of(b, se[2])
+                print(f"[detect_responses] {t}: {len(cols)} cells, {len(srcs)} admixed terms, "
+                      f"{C.shape[1]} neighbor terms, {time.time() - t0:.0f}s", flush=True)
+            se = np.sqrt(np.maximum(np.stack([cov[:, k, k] for k in range(K + C.shape[1])]), 0.0))
+            b, b_se = coef[K:], se[K:]
+            z = np.where(b_se > 0, b / np.where(b_se > 0, b_se, 1.0), np.nan)
+            response = b * C.sum(axis=0)[:, None]
             observed = Y.sum(axis=0)
-            response = b * contact.sum()
-            if both:
-                b_r = scales[3]
-                z_r = z_of(b_r, se[3])
-                response_r = b_r * covariates[:, 1].sum()
-                response_all = response + response_r
-            else:
-                response_all = response
-            share = response_all / np.maximum(observed, 1e-9)
+            of_type = np.array([x for x, _ in names])
+            joint_stat = np.zeros(len(genes))
+            joint_df = np.zeros(len(genes), dtype=int)
+            joint_response = np.zeros(len(genes))
             for g in range(len(genes)):
-                row = dict(
-                    source=s, target=t, gene=str(genes[g]), observed=float(observed[g]),
-                    own_fit=float(a[g] * E["own"][:, g].sum()),
-                    admixed_fit=float(gamma[g] * E["admixed"][s][:, g].sum()),
-                    contact_rate=float(b[g]), contact_se=float(se[2][g]), z=float(z[g]),
-                    response_molecules=float(response_all[g]), response_share=float(share[g]),
-                    screen_flagged=(s, t, str(genes[g])) in flagged)
-                significant = bool(np.isfinite(z[g]) and z[g] >= z_min)
-                if both:
-                    row.update(range_rate=float(b_r[g]), range_se=float(se[3][g]), range_z=float(z_r[g]),
-                               range_share=float(response_r[g] / max(response_all[g], 1e-9)),
-                               range_in_um=float(range_um[0]), range_out_um=float(range_um[1]))
-                    significant = significant or bool(np.isfinite(z_r[g]) and z_r[g] >= z_min)
-                row["called"] = significant and share[g] >= min_share
-                rows.append(row)
+                sel = np.flatnonzero(of_type != owner[g])
+                if len(sel):
+                    joint_stat[g] = float(b[sel, g] @ np.linalg.pinv(cov[g][np.ix_(K + sel, K + sel)]) @ b[sel, g])
+                    joint_df[g] = len(sel)
+                    joint_response[g] = response[sel, g].sum()
+            p_joint = np.where(joint_df > 0, stats.chi2.sf(joint_stat, np.maximum(joint_df, 1)), 1.0)
+            joint_z = stats.norm.isf(np.clip(p_joint, 1e-300, 1.0))
+            joint_called = (joint_df > 0) & (joint_z >= z_min) & \
+                (joint_response / np.maximum(observed, 1e-9) >= min_share)
+            for x in dict.fromkeys(of_type):
+                if source is not None and x != source:
+                    continue
+                ic = names.index((x, "contact")) if (x, "contact") in names else None
+                ir = names.index((x, "range")) if (x, "range") in names else None
+                k_adm = 1 + srcs.index(x) if x in srcs else None
+                for g in range(len(genes)):
+                    r_c = response[ic, g] if ic is not None else 0.0
+                    r_r = response[ir, g] if ir is not None else 0.0
+                    total = r_c + r_r
+                    share = total / max(observed[g], 1e-9)
+                    z_c = z[ic, g] if ic is not None else np.nan
+                    row = dict(
+                        source=x, target=t, gene=genes[g], observed=float(observed[g]),
+                        own_fit=float(coef[0, g] * E["own"][:, g].sum()),
+                        admixed_fit=float(coef[k_adm, g] * terms[k_adm][:, g].sum()) if k_adm else 0.0,
+                        contact_rate=float(b[ic, g]) if ic is not None else 0.0,
+                        contact_se=float(b_se[ic, g]) if ic is not None else np.nan, z=float(z_c),
+                        response_molecules=float(total), response_share=float(share),
+                        screen_flagged=(x, t, genes[g]) in flagged)
+                    significant = bool(np.isfinite(z_c) and z_c >= z_min)
+                    if both:
+                        z_r = z[ir, g] if ir is not None else np.nan
+                        row.update(range_rate=float(b[ir, g]) if ir is not None else 0.0,
+                                   range_se=float(b_se[ir, g]) if ir is not None else np.nan,
+                                   range_z=float(z_r), range_share=float(r_r / max(total, 1e-9)),
+                                   range_in_um=float(range_um[0]), range_out_um=float(range_um[1]))
+                        significant = significant or bool(np.isfinite(z_r) and z_r >= z_min)
+                    row.update(called=significant and share >= min_share, owner=str(owner[g]),
+                               joint_z=float(joint_z[g]), joint_called=bool(joint_called[g]))
+                    rows.append(row)
         return pd.DataFrame(rows)
 
     def composition(self, source=None, target=None):
@@ -259,11 +334,13 @@ class GenerativeModel:
                                     cell_types=self._cell_types)
 
     def retain_responses(self, responses):
-        """Keep the responses the contact term called: for each called pair
-        and gene in ``responses`` (a table from :meth:`detect_responses`),
-        the response molecules in every target cell, the fitted rate per
-        source cell times the cell's source-neighbor count, are taken out
-        of the cell's removal of that gene, and nothing else changes.
+        """Keep the called responses: for each called neighboring type,
+        target and gene in ``responses`` (a table from
+        :meth:`detect_responses`), the response molecules in every target
+        cell, the fitted rate per neighbor times the cell's count of that
+        type among its nearest neighbors (and the range term likewise),
+        are taken out of the cell's removal of that gene, and nothing else
+        changes.
         Returns a new model whose corrections carry the retained
         responses; the removal without retention is unchanged."""
         from scipy import sparse
@@ -359,56 +436,57 @@ class GenerativeModel:
                 f"removed_expected={removed:,.0f}, init={self.init!r})")
 
 
-def _poisson_scales(Y, fixed, own, copy, covariates, n_iter=200, tol=1e-6):
+# Target-owned genes enter a source's admixed expectation in detection when
+# the source expresses them at least at this fraction of the target's rate.
+_SHARED_MIN = 0.1
+
+
+def _poisson_terms(Y, fixed, terms, covariates, n_iter=200, tol=1e-6):
     """Non-negative Poisson regression of every gene at once:
-    E[y] = fixed + a * own + gamma * copy + sum_j b_j * covariate_j, by
-    multiplicative updates; ``covariates`` is a cells x m matrix of per-cell
-    terms shared by all genes. Returns the scales ((2 + m) x genes) and
-    their standard errors from the Fisher information."""
+    E[y] = fixed + sum_k c_k * terms[k] + sum_j b_j * covariate_j, by
+    multiplicative updates; ``terms`` are cells x genes expectations, each
+    with its own scale per gene, and ``covariates`` a cells x m matrix of
+    per-cell terms shared by all genes. Returns the scales ((k + m) x
+    genes) and their covariance per gene (genes x (k + m) x (k + m)) from
+    the Fisher information."""
     n_genes = Y.shape[1]
     C = np.asarray(covariates, dtype=float)
     if C.ndim == 1:
         C = C[:, None]
-    m = C.shape[1]
-    a = np.full(n_genes, 0.1)
-    gamma = np.full(n_genes, 0.1)
-    b = np.full((m, n_genes), 0.1)
-    col_own = own.sum(axis=0)
-    col_copy = copy.sum(axis=0)
+    K, m = len(terms), C.shape[1]
+    coef = np.full((K + m, n_genes), 0.1)
+    col_t = [T.sum(axis=0) for T in terms]
     col_c = C.sum(axis=0)
 
-    def predict(a, gamma, b):
-        mu = fixed + own * a + copy * gamma
-        for j in range(m):
-            mu = mu + C[:, j:j + 1] * b[j]
+    def predict(coef):
+        mu = fixed + C @ coef[K:]
+        for k, T in enumerate(terms):
+            mu = mu + T * coef[k]
         return mu
 
     for _ in range(n_iter):
-        ratio = Y / np.maximum(predict(a, gamma, b), 1e-12)
-        a_new = np.where(col_own > 0, a * (own * ratio).sum(axis=0) / np.maximum(col_own, 1e-12), 0.0)
-        g_new = np.where(col_copy > 0, gamma * (copy * ratio).sum(axis=0) / np.maximum(col_copy, 1e-12), 0.0)
-        b_new = np.zeros_like(b)
-        for j in range(m):
-            if col_c[j] > 0:
-                b_new[j] = b[j] * (C[:, j] @ ratio) / col_c[j]
-        change = max(np.max(np.abs(a_new - a) / np.maximum(a, 1e-8)),
-                     np.max(np.abs(g_new - gamma) / np.maximum(gamma, 1e-8)),
-                     np.max(np.abs(b_new - b) / np.maximum(b, 1e-8)))
-        a, gamma, b = a_new, g_new, b_new
+        ratio = Y / np.maximum(predict(coef), 1e-12)
+        new = np.zeros_like(coef)
+        for k, T in enumerate(terms):
+            new[k] = np.where(col_t[k] > 0, coef[k] * (T * ratio).sum(axis=0) / np.maximum(col_t[k], 1e-12), 0.0)
+        new[K:] = np.where(col_c[:, None] > 0, coef[K:] * (C.T @ ratio) / np.maximum(col_c[:, None], 1e-12), 0.0)
+        change = np.max(np.abs(new - coef) / np.maximum(coef, 1e-8))
+        coef = new
         if change < tol:
             break
-    w = 1.0 / np.maximum(predict(a, gamma, b), 1e-12)
-    # the design per gene: own and copy (cells x genes) and the covariates
-    design = [own, copy] + [C[:, j:j + 1] for j in range(m)]
-    k = 2 + m
+    w = 1.0 / np.maximum(predict(coef), 1e-12)
+    k = K + m
     info = np.zeros((n_genes, k, k))
-    for p_ in range(k):
-        for q in range(p_, k):
-            v = (design[p_] * design[q] * w).sum(axis=0)
-            info[:, p_, q] = info[:, q, p_] = v
-    cov = np.linalg.pinv(info)
-    se = np.sqrt(np.maximum(np.stack([cov[:, i, i] for i in range(k)]), 0.0))
-    return np.vstack([a[None, :], gamma[None, :], b]), se
+    for a in range(k):
+        for b in range(a, k):
+            if b < K:
+                v = (terms[a] * terms[b] * w).sum(axis=0)
+            elif a < K:
+                v = (terms[a] * (C[:, b - K:b - K + 1] * w)).sum(axis=0)
+            else:
+                v = (C[:, a - K] * C[:, b - K]) @ w
+            info[:, a, b] = info[:, b, a] = v
+    return coef, np.linalg.pinv(info)
 
 
 def fit_generative(audit, *, init=None, n_programs=4, num_threads=None,
