@@ -147,9 +147,10 @@ test_that("panel screening excludes disproportionate induced genes", {
   }
   # Induced gene: large exposure-linked excess despite a tiny profile share.
   counts["induced1", ] <- rpois(n_T, 40 * expo + 1)
-  # Dominant transfer channel deviating ~15% from proportionality: within
-  # profile uncertainty, although its counting-noise significance is large.
-  counts["bigch", ] <- rpois(n_T, 0.02 * 5000 * expo * 1.15 + 5)
+  # Dominant transfer channel deviating ~30% from the other genes' proportion:
+  # within profile uncertainty once it carries the regression, although its
+  # counting-noise significance is large.
+  counts["bigch", ] <- rpois(n_T, 0.02 * 5000 * expo * 1.3 + 5)
   totals <- Matrix::colSums(counts) + 500
   screen <- function(...) cellAdmixCore:::.celladmix_audit_screen_panel(
     counts, candidates = c("bigch", "induced1", smk),
@@ -165,6 +166,30 @@ test_that("panel screening excludes disproportionate induced genes", {
   # Without the profile-uncertainty term the large channel's small relative
   # deviation becomes formally significant; the term is what prevents that.
   expect_true("bigch" %in% screen(profile_cv = 0)$induced)
+})
+
+test_that("genes below the proportion do not pull the screen's slope down", {
+  # Three large channels and many small genes the profile overstates five-fold:
+  # a fit weighted by the observed counts would take the small genes' level as
+  # the proportion and call the large channels induced.
+  set.seed(3)
+  n_small <- 100L
+  genes <- c(paste0("big", 1:3), paste0("small", seq_len(n_small)))
+  psi <- setNames(c(rep(0.2, 3), rep(0.004, n_small)), genes)
+  n_cells <- 2000L
+  cells <- paste0("c", seq_len(n_cells))
+  expo <- setNames(as.numeric(seq_len(n_cells) <= n_cells / 2), cells)
+  scale <- 2 * 50000 / n_cells
+  rows <- lapply(seq_along(genes), function(g) {
+    rpois(n_cells, scale * psi[[g]] * expo * (if (g <= 3) 1 else 0.1) + 0.01)
+  })
+  counts <- Matrix::Matrix(do.call(rbind, rows), sparse = TRUE,
+    dimnames = list(genes, cells))
+  totals <- Matrix::colSums(counts) + 100
+  screened <- cellAdmixCore:::.celladmix_audit_screen_panel(
+    counts, candidates = genes, T_cells = cells, expo = expo,
+    totals = setNames(totals, cells), source_profile = psi, n_pool = 20L)
+  expect_length(intersect(screened$induced, paste0("big", 1:3)), 0)
 })
 
 test_that("the interface profile reflects the bordering source cells", {

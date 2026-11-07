@@ -182,8 +182,10 @@
 # target cells is disproportionate to the interface-local source profile is
 # more likely induced by proximity than transferred, and is excluded from
 # the panel (the panel is then filled from the remaining candidates in rank
-# order). The proportional expectation is a weighted regression of per-gene
-# excess on the profile, and the residual is standardized by counting noise
+# order). The proportional expectation is a regression of per-gene excess on
+# the profile, each gene weighted by the variance of its count expected under
+# the regression (a weight from the observed count would favor the genes that
+# fall below the proportion), and the residual is standardized by counting noise
 # plus a multiplicative profile-uncertainty term - without the latter, a
 # small relative deviation on a large transfer channel reaches an arbitrary
 # significance simply because the channel is large.
@@ -207,8 +209,13 @@
   excess <- as.numeric(m_exp - m_un / t_un * t_exp)
   var_count <- as.numeric(m_exp + (t_exp / t_un)^2 * m_un + 1)
   psi <- pmax(source_profile[genes], 0)
-  w <- 1 / var_count
-  slope <- max(sum(w * excess * psi) / max(sum(w * psi^2), 1e-12), 0)
+  ratio <- t_exp / t_un
+  reference <- as.numeric((ratio + ratio^2) * m_un + 1)
+  slope <- max(sum(excess) / max(sum(psi), 1e-12), 0)
+  for (i in seq_len(10L)) {
+    w <- 1 / (reference + slope * psi)
+    slope <- max(sum(w * excess * psi) / max(sum(w * psi^2), 1e-12), 0)
+  }
   expected <- slope * psi
   z <- (excess - expected) / sqrt(var_count + (profile_cv * expected)^2)
   sel <- z > z_min & excess > excess_min

@@ -59,13 +59,13 @@ class ScreenPanelTests(unittest.TestCase):
         expo = np.tile([0, 1, 2, 3], n_cells // 4)
         # Genes 0..9: transferred material proportional to the source
         # profile; gene 10: induced (large excess, tiny profile share);
-        # gene 11: dominant transfer channel deviating ~15% from
-        # proportionality - within profile uncertainty, although its
-        # counting-noise significance is large.
+        # gene 11: dominant transfer channel deviating ~30% from the other
+        # genes' proportion - within profile uncertainty once it carries the
+        # regression, although its counting-noise significance is large.
         psi = np.array(list(range(600, 100, -50)) + [30.0, 5000.0])
         rows = [rng.poisson(0.02 * psi[g] * expo + 1) for g in range(10)]
         rows.append(rng.poisson(40 * expo + 1))
-        rows.append(rng.poisson(0.02 * 5000 * expo * 1.15 + 5))
+        rows.append(rng.poisson(0.02 * 5000 * expo * 1.3 + 5))
         # Background expression independent of exposure, as carried by the
         # rest of the transcriptome in real cells.
         rows.append(rng.poisson(np.full(n_cells, 500.0)))
@@ -89,6 +89,26 @@ class ScreenPanelTests(unittest.TestCase):
         # relative deviation becomes formally significant.
         _, induced, _ = self._screen_case(profile_cv=0.0)
         self.assertIn(11, induced.tolist())
+
+    def test_genes_below_the_proportion_do_not_pull_the_slope_down(self):
+        from celladmix.audit import _screen_panel
+
+        # Three large channels and many small genes the profile overstates
+        # five-fold: a fit weighted by the observed counts would take the small
+        # genes' level as the proportion and call the large channels induced.
+        rng = np.random.default_rng(3)
+        n_small = 100
+        psi = np.r_[np.full(3, 0.2), np.full(n_small, 0.004)]
+        n_cells = 2000
+        exposed = np.arange(n_cells) < n_cells // 2
+        scale = 2 * 50000.0 / n_cells
+        rows = [rng.poisson(scale * psi[g] * exposed * (1.0 if g < 3 else 0.1) + 0.01)
+                for g in range(len(psi))]
+        rows.append(rng.poisson(np.full(n_cells, 100.0)))
+        matrix = sparse.csc_matrix(np.vstack(rows).astype(float))
+        _, induced, _ = _screen_panel(matrix, list(range(len(psi))),
+            np.flatnonzero(exposed), np.flatnonzero(~exposed), psi, n_pool=20)
+        self.assertEqual(sorted(set(induced.tolist()) & {0, 1, 2}), [])
 
     def test_interface_profile_uses_bordering_cells(self):
         from celladmix.audit import _interface_profile

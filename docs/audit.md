@@ -269,7 +269,7 @@ ambient reference and induced-gene screening described above (the
 evaluation harness in `analysis/cleanup_benchmark/` uses the $\hat\rho_0$ floor for its
 sweeps). On pancreas the reference deepens for 36 of 39 pairs (median
 correction 1.21x, total estimate 1.57M molecules) and the screening
-excludes 23 genes as likely induced, led by CFTR at 3.9-fold its
+excludes 21 genes as likely induced, led by CFTR at 3.3-fold its
 transfer expectation; on breast 5K all 29 pairs deepen and the estimate
 roughly doubles to 18.4M molecules (~22% of the dataset); on NSCLC, the
 27 detected pairs carry an estimated 4.4M molecules. The flagged genes,

@@ -1445,9 +1445,9 @@ GenerativeResult fit_generative(
             dose_tot += blk.totals[static_cast<std::size_t>(i)] * ps.lam_cell[static_cast<std::size_t>(i)];
           }
           dose_tot = std::max(dose_tot, 1.0);
-          // weighted proportional fit over source-owned genes
-          double num = 0.0;
-          double den = 0.0;
+          // proportional fit over source-owned genes, each gene weighted by the
+          // variance of its count expected under the fit, so that a gene's
+          // weight does not rise because its count fell below the proportion
           std::vector<int> gset;
           std::vector<double> excess(static_cast<std::size_t>(G), 0.0);
           std::vector<double> var(static_cast<std::size_t>(G), 0.0);
@@ -1461,11 +1461,27 @@ GenerativeResult fit_generative(
                     c_un[static_cast<std::size_t>(g)] + 1.0;
             excess[static_cast<std::size_t>(g)] = ex;
             var[static_cast<std::size_t>(g)] = vr;
-            const double p = ps.psi[static_cast<std::size_t>(g)];
-            num += ex * p / vr;
-            den += p * p / vr;
           }
-          const double slope = std::max(num / std::max(den, 1e-12), 0.0);
+          const double ratio = t_exp / std::max(t_un, 1.0);
+          double sum_excess = 0.0;
+          double sum_psi = 0.0;
+          for (const int g : gset) {
+            sum_excess += excess[static_cast<std::size_t>(g)];
+            sum_psi += ps.psi[static_cast<std::size_t>(g)];
+          }
+          double slope = std::max(sum_excess / std::max(sum_psi, 1e-12), 0.0);
+          for (int iter = 0; iter < 10; ++iter) {
+            double num = 0.0;
+            double den = 0.0;
+            for (const int g : gset) {
+              const double p = ps.psi[static_cast<std::size_t>(g)];
+              const double reference = c_un[static_cast<std::size_t>(g)];
+              const double vr = ratio * reference + ratio * ratio * reference + slope * p + 1.0;
+              num += excess[static_cast<std::size_t>(g)] * p / vr;
+              den += p * p / vr;
+            }
+            slope = std::max(num / std::max(den, 1e-12), 0.0);
+          }
           for (const int g : gset) {
             const double expected = slope * ps.psi[static_cast<std::size_t>(g)];
             const double z = (excess[static_cast<std::size_t>(g)] - expected) /

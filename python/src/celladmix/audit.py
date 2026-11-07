@@ -184,8 +184,11 @@ def _screen_panel(matrix, candidates, cols_exposed, cols_unexposed,
     disproportionate to the interface-local source profile is more likely
     induced by proximity than transferred; it is excluded and the panel is
     filled from the remaining candidates in rank order. The proportional
-    expectation is a weighted regression of per-gene excess on the
-    profile, and the residual is standardized by counting noise plus a
+    expectation is a regression of per-gene excess on the profile, each
+    gene weighted by the variance of its count expected under the
+    regression (a weight from the observed count would favor the genes
+    that fall below the proportion), and the residual is standardized by
+    counting noise plus a
     multiplicative profile-uncertainty term - without the latter, a small
     relative deviation on a large transfer channel reaches an arbitrary
     significance simply because the channel is large.
@@ -203,9 +206,13 @@ def _screen_panel(matrix, candidates, cols_exposed, cols_unexposed,
     excess = m_exp - m_un / t_un * t_exp
     var_count = m_exp + (t_exp / t_un) ** 2 * m_un + 1
     psi = np.maximum(source_profile[gset], 0.0)
-    w = 1.0 / var_count
-    slope = max(float((w * excess * psi).sum())
-                / max(float((w * psi * psi).sum()), 1e-12), 0.0)
+    ratio = t_exp / t_un
+    reference = (ratio + ratio ** 2) * m_un + 1
+    slope = max(float(excess.sum()) / max(float(psi.sum()), 1e-12), 0.0)
+    for _ in range(10):
+        w = 1.0 / (reference + slope * psi)
+        slope = max(float((w * excess * psi).sum())
+                    / max(float((w * psi * psi).sum()), 1e-12), 0.0)
     expected = slope * psi
     z = (excess - expected) / np.sqrt(var_count + (profile_cv * expected) ** 2)
     sel = (z > z_min) & (excess > excess_min)
