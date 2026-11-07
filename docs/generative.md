@@ -135,7 +135,7 @@ three outcomes the model distinguishes. KRT19, a malignant marker that
 fibroblasts do not express, is removed at every stratum: the
 exposure-linked part by the admixture term, the baseline of 2.8 per
 10,000 by the background term. MMP7 is also a malignant gene, but
-fibroblasts near malignant cells carry 3.4 times the excess that
+fibroblasts near malignant cells carry 3.1 times the excess that
 admixture from the bordering malignant cells can deliver; the screen
 flags it, and the fibroblasts keep 34 of their 42 molecules per 10,000
 at four or more neighbors. DCN, a fibroblast gene, falls from 78 to 37
@@ -168,13 +168,16 @@ The induced term's gene support is chosen by a proportionality test.
 Admixed material samples the source transcriptome, so a gene's
 exposure-linked excess in target cells should be proportional to its
 share of the (interface-local) source profile. For each pair, the
-per-gene excess is regressed on the profile, and the residual is
-standardized by counting noise plus a multiplicative profile-uncertainty
-term of 15%. The second term is the sparsity mechanism: a pure
+per-gene excess is regressed on the profile, each gene weighted by the
+variance of its count expected under the regression, and the residual
+is standardized by counting noise plus a multiplicative
+profile-uncertainty term of 15%. A weight from the observed count would
+favor the genes that happen to fall below the proportion and pull the
+fit toward them, so that the admixed genes above it read as induced. The second term is the sparsity mechanism: a pure
 counting-noise test flags large admixture channels for deviations of a
 few percent — on pancreas it flagged AMY2A at 1.08-fold its expectation,
 plain profile noise reaching formal significance only because the
-channel is huge — while the real induced genes deviate 2.3- to 22-fold.
+channel is huge — while the real induced genes deviate 2.7- to 22-fold.
 Genes past the threshold receive the induced term; their disproportionate
 excess is retained where it occurs (the per-cell
 strength $\rho_{cs}$ concentrates it in the responding cells) while their proportional share
@@ -295,94 +298,136 @@ package excludes induced genes from admixture estimation (see
 genes and their measured disproportionality are reported by
 `markers()`.
 
-The screen decides the induced term's support inside the fit; the fitted
-model also offers a detection instrument that reads associations between
-the presence of neighboring cell types and a target type's expression
-from the counts, against the fit's own expectation,
-`model.detect_responses()` (`model$detect_responses()` in R). For each
-target type and gene, the target cells' counts are regressed, as a
-Poisson model with non-negative scales, on the cell's own expectation
-(its programs), the admixed expectation of every source the fit carries
-for the type (the pair's profile times the fitted fraction), each with
-its own free per-gene scale, and, for every other labeled type, the
-number of its cells among the cell's nearest neighbors; the ambient
-expectation and the floor are held fixed, and the fit's induced terms
-are left out. Each neighboring type's term gets a z, and a gene is
-called for that type when the z reaches 6; a joint test over all
-neighboring types' terms (a Wald test, reported as the z of equal tail
-probability) calls a gene associated with the neighborhood as a whole,
-which covers an association that several co-occurring types share and
-none carries alone. The joint test leaves out the terms of the gene's
-owner (the type with the highest rate), whose association with its own
-gene cannot be told from admixture.
+## Testing associations with neighboring cell types
 
-Three parts of this design keep the remainder of admixture from reading
-as a response. The free admixed scales absorb an error of a source
-profile and the admixture the fit leaves in the cells, which on the
-simulated sections is a uniform under-scaling of one source (exocrine
-material in ductal cells is removed at 0.63 to 0.87 of its true amount
-at every neighbor count). Every type's neighbor counts sit in the same
-regression, so a remainder that follows one type's neighbors is not
-credited to another type that happens to sit nearby. And because the
-fit's admixed profiles are zeroed on the target's own genes (the model
-never removes admixture there), the admixed expectation used for
-detection is extended to the target-owned genes the source expresses on
-its own, at least a tenth of the target's rate measured in cells away
-from each other: exocrine cells carry ductal genes such as CAV1 and
-CAPN8 into ductal cells at up to a quarter of a molecule per cell, more
-than the cells' own expression at high exposure, and without the
-extension these genes read as responses to the exocrine neighbors.
+The test described here is a separate step that follows the fit
+(`model.detect_responses()`, `model$detect_responses()` in R). The fit
+divides each cell's molecules among the origins of Figure 1 and decides what
+the correction removes, and its induced term is chosen by the screen above.
+The test asks a different question of the fitted model: for a target type and
+a gene, are the counts associated with the presence of neighboring cell types,
+beyond what the fit's own, admixed and background components explain? It takes
+those components as inputs and does not change them; the fitted model and its
+correction stay as they are unless the called associations are explicitly kept
+(`retain_responses`, below). An association is a statistical statement made
+under the assumption of short-range interactions: whether it reflects a
+response to neighbors or a regional state that rises with them, the test does
+not say.
 
-On five simulated pancreas sections with planted responses (contact,
-gene-level, density at 20 to 60 and 60 to 120 micrometers, decay with
-distance, and a regional state that rises with the share of stromal
-cells within 100 micrometers), the instrument calls 33 of the 62
-planted pairs on their true source, no unplanted gene of the target,
-one gene of a third type over all five sections (160 response
-molecules) and at most one of the source's own genes per section.
-Regressing one pair at a time with the other sources' admixture held
-fixed, as the alternative, calls 50 to 62 unplanted target-owned genes
-per section on the contact term, and with the range term added 21 to 27
-genes of a third type (12,000 to 23,000 response molecules, 80% to 93%
-of whose content in the target is admixture); on the section with
-responses at range it credits a planted gene to a wrong source 60 to 74
-times. The misses are genes the source profile carries (where the free
-scale also absorbs a response proportional to the source's dose), genes
-the target's own programs already carry in the exposed cells' state,
-and plants of a few thousand molecules from thin sources. The regional plants are called by the joint test (4 of 4
-genes) but on one source only for 3 of the 16 gene-source pairs: the
-four stromal types rise together across a region, and an association
-they share has no single source; whether such an association is a
-response to contact or a regional state the detection cannot tell, as
-both rise with the neighbors. On the pancreas section, with the range term
-described below, the instrument calls CFTR, PROX1, FXYD2 and PPP1R1B in ductal
-cells next to acini at a third to a half of their content, makes 64
-calls over all types (91 genes by the joint test, against 222 calls
-when each pair is regressed alone), and the run takes about 17 minutes
+![Figure 4](figures/generative_fig4.png)
+
+**Figure 4. The regression of the test, which follows the fit.** The colors are
+those of Figure 1. Hats mark values taken from the fit and not re-estimated;
+$a_g$, $b_{sg}$, $\gamma_{xg}$ and $\delta_{xg}$ are estimated here, per gene and
+constrained to be non-negative, separately for each target type $T$. The tested
+coefficients are $\gamma_{xg}$ and $\delta_{xg}$; the fit's induced term is left
+out, so that an association has to appear in them.
+
+The terms of the regression are the following.
+
+- **Own programs.** The cell's own expression as fitted, with one free scale
+  $a_g$ per gene.
+- **Admixed from sources.** The fitted admixed fraction $\hat\alpha_{cs}$ of
+  every source the fit carries for the target type, with one free scale
+  $b_{sg}$ per source and gene. The profile $\tilde P_{sg}$ equals the
+  fit's $P_{sg}$, extended to genes the fit zeroes, as described below.
+- **Background and floor.** Held at the fitted values.
+- **Association with neighboring types.** For every labeled type $x$ other than
+  the target, whether or not the fit carries it as a source: $N_{cx}$, the
+  number of cells of type $x$ among the cell's nearest neighbors, with
+  coefficient $\gamma_{xg}$ (molecules per neighbor). With `kernels="both"` the
+  regression also includes $D_{cx}$, the number of cells of type $x$ between 20
+  and 60 µm of the cell per 1000 µm², with coefficient $\delta_{xg}$, so that an
+  association with cells beyond the nearest neighbors can load on it.
+
+The regression is fitted by maximum likelihood, and the covariance of the
+coefficients comes from the inverse Fisher information at the estimate. Two
+tests follow, at a threshold of z = 6.
+
+- **Per neighboring type.** $z = \hat\gamma_{xg}/\mathrm{SE}(\hat\gamma_{xg})$, and
+  likewise for $\delta_{xg}$; a gene is called for type $x$ when either z reaches
+  the threshold.
+- **Over the neighborhood.** A Wald test that all neighbor coefficients of the
+  gene are zero, $W = \hat\beta^\top \hat\Sigma^{-1} \hat\beta$, compared with a
+  $\chi^2$ distribution with as many degrees of freedom as there are coefficients
+  and reported as the normal z of equal one-sided tail probability
+  (`joint_z`, `joint_called`). It finds an association that several
+  co-occurring types share and none carries alone. It leaves out the
+  coefficients of the gene's owner (the type with the highest rate of the gene,
+  `owner`), because an association of a gene with neighbors of the type that
+  mainly expresses it cannot be told from admixture.
+
+Three parts of this design keep the remainder of admixture from reading as an
+association. The free scales $b_{sg}$ absorb an error in the shape of a source's
+profile. On the simulated sections described below, the removal itself is
+accurate where a source's material is concentrated: in ductal cells with
+exocrine neighbors, and no planted response on those genes, the molecules removed
+from exocrine-owned genes are 1.00 to 1.02 of the true admixed and background
+molecules there, at every neighbor count. But the profile puts 85% of its mass on
+those genes where the truly admixed material has 81%, so that on genes owned by
+other types the fit's expectation of exocrine material is 68% of the truth. Those
+molecules are mostly still removed, under the terms of other sources (total
+removal on such genes is 0.94 to 1.01 of the truth), but the fit does not
+attribute them to exocrine cells, and they would otherwise read as an association
+with exocrine neighbors. Second, every type's neighbor counts sit in the same
+regression, so that a remainder following one type's neighbors is not credited
+to another type that happens to sit nearby. Third, the profile is extended to
+genes both types express. The fit zeroes $P_{sg}$ on the target's own genes and
+never removes admixture there, but a source can carry such a gene in quantity:
+exocrine cells carry the ductal genes CAV1 and CAPN8 into ductal cells at up to a
+quarter of a molecule per cell, more than the cells' own expression at high
+exposure. $\tilde P_{sg}$ therefore takes the source's own rate of the gene,
+wherever it is at least a tenth of the target's rate, both measured in cells with
+no neighbor of the other type.
+
+The free scale also limits what the test can find: on a gene the source profile
+carries, a response proportional to the source's dose is absorbed by $b_{sg}$ and
+is not called.
+
+On five simulated pancreas sections with responses planted in known genes (on
+contact, by gene level, by density at 20 to 60 and 60 to 120 µm, decaying with
+distance, and following a regional share of stromal cells within 100 µm), the
+test calls 33 of the 62 planted gene and neighboring-type pairs on the correct
+type, and the test over the neighborhood finds 33 of the 50 planted genes. Among
+genes without a planted response it calls none owned by the target, one owned by
+a type that is neither the target nor the one it was called against (over all
+five sections, 159 molecules) and at most one owned by the neighboring type per
+section. As a comparison, regressing one source at a time, with the other
+sources' admixture held fixed and no other type's neighbors in the regression,
+calls 50 to 62 target-owned genes per section with $N$ alone, and 21 to 27 genes
+of such other types with $N$ and $D$ (12,000 to 23,000 molecules attributed, 80%
+to 93% of whose content in the target is admixture); on the section with responses
+at several distances it credits a planted gene to the wrong type 60 to 74 times,
+against 4 here. The misses are genes the source profile carries (the limit above),
+genes the target's own programs already carry in the exposed cells' state, and
+responses of a few thousand molecules from sparse types. The regional responses
+are found by the test over the neighborhood (4 of 4 genes) and on one type only
+for 3 of the 16 gene and type pairs: the four stromal types rise together across
+a region, and an association they share has no single type.
+
+On the same section with responses at several distances, the share of a planted
+response's attributed molecules that falls on $D$ rather than $N$ is 0.00 for
+responses on contact, 0.97 to 1.00 for responses at 20 to 60 µm, and 0.84 to 0.98
+for responses at 60 to 120 µm or decaying over 30 or 80 µm: the two terms tell
+contact from distance, not one distance from another. A response whose distance
+profile neither term matches can be credited in part to a type that sits at that
+distance (4 such calls on that section).
+
+On the real pancreas section, with both terms, the test calls CFTR, PROX1, FXYD2
+and PPP1R1B in ductal cells next to acini at a third to a half of their content,
+and makes 63 calls over all types (90 genes by the test over the neighborhood,
+against 222 calls when each source is regressed alone). It takes about 15 minutes
 on three threads for a section of 150,000 cells.
 
-With `kernels="both"` each type also enters with its density between 20
-and 60 micrometers of the cell, so that a response to cells beyond the
-nearest neighbors loads on it. On the simulated section with responses
-at several distances, the contact plants load on the contact term
-(range share 0.00), the plants at 20 to 60 micrometers on the range term
-(0.97 to 1.00), and the plants at 60 to 120 micrometers and those
-decaying over 30 or 80 micrometers mostly on it (0.84 to 0.98): the two
-terms tell contact from range, not one range from another. A response
-whose distance profile no term matches can be credited in part to a
-type that sits at that distance (4 such calls on that section).
-
-What the instrument calls can be kept: `model.retain_responses(responses)`
-takes, for each called type, target and gene, the response molecules in
-every target cell (the fitted rate per neighbor times the cell's
-neighbor count, and the range term likewise) out of the cell's removal
-of that gene and changes nothing else. On the simulated sections this
-lowers the share of the planted induced molecules removed from 0.48 to
-0.38 and from 0.86 to 0.71 at a cost of 0.006 to 0.024 in the recall of
-admixed molecules, where the screen's own retention keeps almost none
-of them; it is partial because the rate the regression attributes to a
-neighbor is the part of the response the admixed expectation does not
-already absorb.
+What the test calls can be kept: `model.retain_responses(responses)` takes, for
+each called type, target and gene, the attributed molecules in every target cell
+($\hat\gamma_{xg} N_{cx} + \hat\delta_{xg} D_{cx}$) out of the cell's removal of
+that gene and changes nothing else. On the simulated sections this lowers the
+share of the planted induced molecules removed from 0.48 to 0.38 and from 0.86 to
+0.71, at a cost of 0.006 to 0.024 in the recall of admixed molecules, where the
+screen's own retention keeps almost none of them. It is partial because the rate
+the regression attributes to a neighbor is the part of the response the free
+admixed scale does not already absorb.
 
 ## The interface-activation finding
 
@@ -395,7 +440,7 @@ ductal-average share of CXCL6, CFB and PPP1R1B — they are, plausibly,
 the inflamed tumor edge — and that elevation, compounded across the
 admixed material, accounts for the neighbors' excess. The genes the
 screen does flag as induced behave differently: their excess tracks
-exposure but not the source-side composition shift, at 2.3- to 22-fold
+exposure but not the source-side composition shift, at 2.7- to 22-fold
 their admixture expectation (on pancreas, led by CFTR — the canonical
 duct gene, peaking in duct cells at acinar interfaces — with interface
 programs of fibroblasts, immune and endothelial/mural cells behind it).
@@ -437,7 +482,7 @@ exposure-linked excess removed on the held-out half, weighted across the
   planted induction. The planted induction itself is retained or removed
   depending on how far it exceeds the admixture expectation of its genes —
   the full sweep over gene ranks and planted amounts is shown in
-  Figure 4 and discussed under the identifiability limit below.
+  Figure 5 and discussed under the identifiability limit below.
 - **Replication**: on the CosMx NSCLC dataset (98,002 cells, 960-gene
   panel, 27 detected pairs) the same configuration reaches 0.942 on
   held-out genes, removes 11.6% of the molecules, keeps own-marker
@@ -491,7 +536,7 @@ disproportionate to the local source profile; induction proportionate
 to a source's own top markers is indistinguishable from admixture at
 count level and will be removed.
 
-Figure 4 shows this boundary measured directly. Synthetic induced
+Figure 5 shows this boundary measured directly. Synthetic induced
 expression was planted across a range of gene ranks and amounts, and
 its retained fraction charted against the gene's total exposure-linked
 excess relative to the admixture expectation: retention turns on where
@@ -501,11 +546,11 @@ admixture. The real flagged genes, plotted at their measured
 disproportionality and their realized retained fractions, fall on the
 same curve — the model treats real and planted induction alike, and
 its largest real retention decision (CFTR, flagged in Figure 3a) sits well inside
-the recoverable regime at 3.9-fold.
+the recoverable regime at 3.8-fold.
 
-![Figure 4](figures/generative_fig4.png)
+![Figure 5](figures/generative_fig5.png)
 
-**Figure 4. The separation boundary.** Fraction of planted induced
+**Figure 5. The separation boundary.** Fraction of planted induced
 expression retained, as a function of the gene's exposure-linked excess
 relative to the admixture expectation (blue: spike-in sweep over planted
 gene ranks and amounts, pancreas); red squares: the real flagged genes
@@ -538,9 +583,9 @@ changes, including half on the target's own genes) are pure expression
 changes, while the remainder are entangled with the admixture split and
 inherit its uncertainty — CFTR is in this second tier by construction,
 since a sixth of its content in ductal cells is removed as admixture,
-and its retention rests on the separation measured in Figure 4.
+and its retention rests on the separation measured in Figure 5.
 
-The pancreas results (Figure 5) extend the interface picture in both
+The pancreas results (Figure 6) extend the interface picture in both
 directions. Ductal cells near exocrine tissue not only gain the induced
 program (PPP1R1B, CFB, CXCL2 among the unambiguous tier) but lose part
 of their identity program — GPRC5A, MALL, FHL2, GPX2 and TMC5 fall
@@ -556,9 +601,9 @@ target class reads as expression change — the immune rows near tumor
 (macrophage markers rising, T-cell markers falling) are most naturally
 composition, not per-cell state.
 
-![Figure 5](figures/generative_fig5.png)
+![Figure 6](figures/generative_fig6.png)
 
-**Figure 5. Neighborhood-associated expression changes on the corrected
+**Figure 6. Neighborhood-associated expression changes on the corrected
 counts.** Each point is one gene of the target type: fold change per
 source neighbor (horizontal, log scale) against the significance of the
 association (vertical). Filled points are the unambiguous tier —

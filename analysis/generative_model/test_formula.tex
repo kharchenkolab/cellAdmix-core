@@ -1,0 +1,40 @@
+% The regression of the neighbor-association test, which follows the model's
+% fit, with its components colored as in the model's formula (Figure 1), tagged
+% beneath, and the named quantities pointed out above. Hats mark values taken
+% from the fit. Notation: c cell, g gene, k expression program, s source cell
+% type, x neighboring cell type, T target type. Built by 16_test_figure.py (two
+% pdflatex passes for the overlay).
+\documentclass[border={6pt 6pt 30pt 6pt}]{standalone}
+\usepackage[T1]{fontenc}
+\usepackage{helvet}\renewcommand{\familydefault}{\sfdefault}
+\usepackage{amsmath}
+\usepackage{sansmath}\sansmath
+\usepackage{xcolor}
+\usepackage{tikz}
+\definecolor{own}{HTML}{2E86C1}\definecolor{adm}{HTML}{C0392B}\definecolor{bg}{HTML}{7F8C8D}\definecolor{ind}{HTML}{27AE60}
+% a symbol as a named node, so that a label can point at it
+\newcommand{\sym}[3]{\tikz[remember picture,baseline=(#1.base)]{\node[inner sep=0.5pt,outer sep=1pt,text=#2] (#1) {$#3$};}}
+\begin{document}
+\begin{minipage}{21cm}
+\vspace*{1.6cm}\centering
+\large
+$\displaystyle
+y_{cg} \sim \mathrm{Poisson}\Big(\;
+{\color{own}\underbrace{\sym{a}{own}{a_g}\; t_c \textstyle\sum_k \hat\theta_{ck}\,\hat F_{kg}}_{\substack{\text{own}\\\text{programs}}}} \;+\;
+{\color{adm}\underbrace{\textstyle\sum_s \sym{b}{adm}{b_{sg}}\; t_c\, \hat\alpha_{cs}\,\sym{P}{adm}{\tilde P_{sg}}}_{\substack{\text{admixed}\\\text{from sources}}}} \;+\;
+{\color{bg}\underbrace{t_c \big(\hat\beta_c\,\hat A_g + \hat\varepsilon_g\big)}_{\substack{\text{background and floor}\\\text{(held fixed)}}}} \;+\;
+{\color{ind}\underbrace{\textstyle\sum_{x \neq T} \big( \sym{g}{ind}{\gamma_{xg}}\,\sym{N}{ind}{N_{cx}} \;+\; \sym{d}{ind}{\delta_{xg}}\,\sym{D}{ind}{D_{cx}} \big)}_{\substack{\text{association with}\\\text{neighboring types (tested)}}}}
+\;\Big)$
+\end{minipage}
+\begin{tikzpicture}[remember picture,overlay,font=\small,every node/.style={inner sep=1pt}]
+\node[own] (ta) at ([yshift=0.95cm,xshift=-0.2cm]a.north) {scale per gene};
+\node[adm] (tb) at ([yshift=0.95cm,xshift=-0.5cm]b.north) {scale per gene};
+\node[adm] (tP) at ([yshift=0.95cm,xshift=0.7cm]P.north) {source profile};
+\node[ind] (tg) at ([yshift=0.95cm,xshift=-1.1cm]g.north) {rate per neighbor};
+\node[ind] (tN) at ([yshift=1.55cm,xshift=-0.3cm]N.north) {neighbor count};
+\node[ind] (td) at ([yshift=0.95cm,xshift=0.25cm]d.north) {rate per density};
+\node[ind] (tD) at ([yshift=1.55cm,xshift=1.1cm]D.north) {density at 20--60\,$\mu$m};
+\foreach \t/\s/\c in {ta/a/own, tb/b/adm, tP/P/adm, tg/g/ind, tN/N/ind, td/d/ind, tD/D/ind}
+  \draw[\c, line width=0.5pt, shorten >=1.5pt, shorten <=1.5pt] (\t.south) -- (\s.north);
+\end{tikzpicture}
+\end{document}

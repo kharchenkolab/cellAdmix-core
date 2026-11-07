@@ -348,7 +348,7 @@ ax.legend(frameon=False, fontsize=8, loc="lower right")
 ax.annotate("indistinguishable\nfrom transfer", (1.1, 0.32), fontsize=8,
             color="grey", ha="left")
 fig3.tight_layout()
-fig3.savefig(os.path.join(OUT, "generative_fig4.png"), dpi=150,
+fig3.savefig(os.path.join(OUT, "generative_fig5.png"), dpi=150,
              bbox_inches="tight")
 print("fig3 done")
 
@@ -387,6 +387,6 @@ for ax, (src, tgt), title in [
     ax.set_title(title, fontsize=10)
     ax.legend(frameon=False, fontsize=7.5, loc="upper left")
 fig4.tight_layout()
-fig4.savefig(os.path.join(OUT, "generative_fig5.png"), dpi=150,
+fig4.savefig(os.path.join(OUT, "generative_fig6.png"), dpi=150,
              bbox_inches="tight")
 print("fig4 done")
