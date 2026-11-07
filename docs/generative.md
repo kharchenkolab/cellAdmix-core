@@ -331,6 +331,11 @@ The terms of the regression are the following.
   every source the fit carries for the target type, with one free scale
   $b_{sg}$ per source and gene. The profile $\tilde P_{sg}$ equals the
   fit's $P_{sg}$, extended to genes the fit zeroes, as described below.
+  For one gene the profile is a constant, so the fit's profiles reach the
+  test only through the per-cell fractions $\hat\alpha_{cs}$, which the fit
+  estimated from all genes together, and through which genes they leave at
+  zero; how many molecules of a gene the source's markers predict is not
+  imposed. The reason is given below.
 - **Background and floor.** Held at the fitted values.
 - **Association with neighboring types.** For every labeled type $x$ other than
   the target, whether or not the fit carries it as a source: $N_{cx}$, the
@@ -382,7 +387,31 @@ no neighbor of the other type.
 
 The free scale also limits what the test can find: on a gene the source profile
 carries, a response proportional to the source's dose is absorbed by $b_{sg}$ and
-is not called.
+is not called. Imposing the profile's amount instead was measured on the
+simulated sections described below, on a sixth section whose genes shed with the
+per-gene transfer propensities measured on the real pancreas section (0.3 to
+3 times the proportional amount), and on the two real sections. With the
+admixed term held at the fit's amount, or given one scale per source that all
+its genes share, the test recovers one to three more planted responses per
+section but calls 16 to 36 genes per section that have no planted response,
+carrying 28,000 to 72,000 molecules; on the section with transfer propensities
+it calls 18 to 20 of the genes whose propensity exceeds 1.5; and on the real
+pancreas section it calls the T-cell genes in fibroblasts at 0.15 to 0.28 of
+their content, where those genes rise in proportion to the neighbors' own
+content, the mark of admixture. Pulling each gene's scale toward its source's,
+by a spread estimated from the source's genes, recovers nothing more and adds 3
+to 7 such calls per section. Estimating a per-gene factor of the source from
+its other target types, so that an excess specific to one target reads as a
+response and one shared by all targets as a property of the source gene, calls
+none of the propensity genes and recovers the planted responses on genes the
+source sheds, but calls the genes a source expresses only at its interface
+with that target, its own induced genes carried into the target, and again
+the T-cell genes in fibroblasts: the profile of what a source sheds is
+specific to the pair. Using the fit's dose prior $\lambda_{cs}$ in place of
+the fitted fraction $\hat\alpha_{cs}$ is worse on every count, because the
+fitted fraction carries each cell's actual admixed content, which is what
+separates the neighbor count from admixture. The free scale is therefore the
+price of a test whose calls are not the profile's errors.
 
 On five simulated pancreas sections with responses planted in known genes (on
 contact, by gene level, by density at 20 to 60 and 60 to 120 µm, decaying with
