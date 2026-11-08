@@ -13,7 +13,10 @@ describes a generative model that decomposes each cell's counts into
 origin components so that induced expression can be told apart from
 admixed molecules and retained, the evidence for where that
 separation is possible and where it is not, and the practical correction
-that resulted. The complete experimental record lives in
+that resulted. The page first defines the model, then describes how it is
+fitted, the screen that selects induced genes, and the test of
+associations with neighboring cell types that follows the fit; the later
+sections give the findings, the validation and the limits. The complete experimental record lives in
 `analysis/generative_model/` (model, evaluation scripts, findings) and
 `analysis/audit_guided/` (the shared evaluation harness); the audit
 vocabulary used throughout — exposure, marker pools, the ambient
@@ -459,8 +462,8 @@ Second, the fitted model is simultaneous over every detected source: a
 target cell carries one contamination term per source, each anchored to
 that source's own neighbor count, so molecules arriving from a second
 source load onto that source's term — the induced term only receives
-what no modeled source can explain. Third, what remains is the honest
-residual risk: material from a source with no detected pair — an
+what no modeled source can explain. Third, a residual risk
+remains: material from a source with no detected pair — an
 unannotated or rare cell type — has no term to load onto, and its genes
 could be misread as induced if their arrival correlates with a modeled
 source's exposure. The screen's reports (`markers()` in the audit, the
@@ -546,8 +549,8 @@ at z = 7.6 with 4,900 molecules attributed to the neighbors. A planted
 response on STC2, which exocrine cells do not shed, is called either way
 (z = 16 with the scale free, 37 with the amount fixed, the difference being
 the part of the response that the extension of the profile to shared genes,
-described below, lets $b_{sg}$ absorb). The cost of the free scales is the
-other side of the same coin: on a gene the source sheds, a response whose
+described below, lets $b_{sg}$ absorb). The cost of the free scales follows
+from the same fact: on a gene the source sheds, a response whose
 pattern across cells is that of the material received, or close to it, is
 absorbed by $b_{sg}$ and not called. The planted CD68 response is missed
 either way, because the profile over-predicts the gene and the response hides
@@ -640,7 +643,7 @@ carrying 28,000 to 72,000 molecules; on the section with transfer propensities
 it calls 18 to 20 of the genes whose propensity exceeds 1.5; and on the real
 pancreas section it calls the T-cell genes in fibroblasts at 0.15 to 0.28 of
 their content, where those genes rise in proportion to the neighbors' own
-content, the mark of admixture. Pulling each gene's scale toward its source's,
+content, as admixed molecules do. Pulling each gene's scale toward its source's,
 by a spread estimated from the source's genes, recovers nothing more and adds 3
 to 7 such calls per section. Estimating a per-gene factor of the source from
 its other target types, so that an excess specific to one target reads as a
@@ -801,8 +804,8 @@ ratios stay under an order of magnitude, against prior odds — of
 order a thousand to one — that a strict-tier molecule in an exposed
 cell is contamination. And cell-level concentration of induction can
 sharpen a gene already flagged but cannot flag one hidden below the
-disproportionality floor. The honest claim for this model and any
-successor is therefore: induced expression is preserved when it is
+disproportionality floor. What this model, and any model of this
+family, can claim is therefore: induced expression is preserved when it is
 disproportionate to the local source profile; induction proportionate
 to a source's own top markers is indistinguishable from admixture at
 count level and will be removed.
@@ -896,7 +899,7 @@ their rates for a shared gene are close. Recomputing ownership on the
 corrected counts changes the owner of 8 of the panel's 377 genes — all
 near-ties with margins of a few percent, none among the genes any
 result here rests on. The loop is real but confined to genes whose
-ownership was a coin flip either way.
+ownership was undecided either way.
 
 *Source profiles.* The admixture profile of each source is measured from
 its bordering cells, which are themselves the most contaminated members
@@ -938,8 +941,8 @@ molecules add false positives, and inflated totals hide true changes.
 
 The model's two portable mechanisms — the screen, with its
 bordering-cell profiles and its allowance for profile error, and the
-per-gene retention of the disproportionate excess share — graft
-directly onto the much simpler exposure-regression corrector: measure the removal dose on unflagged genes only, and cap
+per-gene retention of the disproportionate excess share — carry over
+directly to the much simpler exposure-regression corrector: measure the removal dose on unflagged genes only, and cap
 each flagged gene's removable content at its proportional (admixed)
 share, leaving the induced share with the cell. Under the same harness
 this composite removes admixed content at the regression corrector's
