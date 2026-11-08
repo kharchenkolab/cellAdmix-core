@@ -339,26 +339,45 @@ in the gene's counts that the best admixture-only description of that gene
 does not: a test of the neighbor count, not of the profile. The statistics and
 the threshold are given after Figure 4.
 
-What separates the two hypotheses is the difference between material and
-presence. Admixed material follows each cell's fitted fraction
-$\hat\alpha_{cs}$, which varies between cells with the same number of
-neighbors, because some received more of the source's material than others,
-and the per-gene scales $b_{sg}$ let the null model follow that dependence as
-closely as the gene's counts allow. An association with neighbors follows
-their number whether or not material arrived. A gene that rises with the
-number of $x$ cells in proportion to the material they delivered is explained
-by the null model; a gene that rises with their number beyond that is not. On
-a gene the source does not shed there is no admixed term, and any dependence
-on the neighbor count beyond the cell's own expression and background is an
-association. On a gene the source sheds, a response exactly proportional to
-the material received cannot be told from a larger share of that gene in the
-shed material, and the test does not try to.
+The test's evidence is a pattern across cells, not an amount. For one gene,
+the own term and each admixed term are fixed patterns across the cells of the
+type: the cell's fitted own expression of the gene, and the amount of each
+source's material the cell received. The per-gene scales $a_g$ and $b_{sg}$
+can raise or lower the gene's counts by any factor along those patterns, so
+the test does not use how many molecules of the gene the fit predicts: a gene
+with twice the admixed molecules the profile predicts, in the same cells, is
+explained by the null model. What the scales cannot do is produce a pattern
+they do not have: counts that rise with the number of neighboring $x$ cells in
+cells that received little of their material. That pattern is the evidence for
+an association, and the fitted per-cell fractions make it readable, because
+cells with the same number of neighbors differ in how much material they
+received (across the ductal cells of the simulated pancreas section, fitted
+exocrine material and exocrine neighbor count are correlated at 0.78, not 1).
+On a gene the source does not shed there is no admixed term, and any
+dependence on the neighbor count beyond the cell's own expression and
+background is an association.
 
-The per-gene scales are what make this a test of the neighbor count rather
-than of the profile. With the admixed term held at the profile's amount, every
-gene whose amount the profile gets wrong would rise or fall with the fitted
-fraction, which itself rises with the neighbor count, and the error would be
-read as an association. The measurements that show this are given below.
+The scales are free because the alternative is worse. With the admixed term
+held at the profile's amount, the null model is wrong for every gene whose
+share of the shed material the profile misjudges, and the error has the
+pattern of the material, which rises with the neighbor count. On the simulated
+section, CD19 carries 36% more admixed molecules in ductal cells than the
+exocrine profile predicts and has no planted response. With its scale free,
+the mean difference between observed and expected counts per cell stays
+within 0.02 molecules at every neighbor count and the gene is not called; with
+the amount fixed, that difference grows from 0.02 molecules in cells without
+exocrine neighbors to 0.99 in cells with six or more, and the gene is called
+at z = 7.6 with 4,900 molecules attributed to the neighbors. A planted
+response on STC2, which exocrine cells do not shed, is called either way
+(z = 16 with the scale free, 37 with the amount fixed, the difference being
+the part of the response that the extension of the profile to shared genes,
+described below, lets $b_{sg}$ absorb). The cost of the free scales is the
+other side of the same coin: on a gene the source sheds, a response whose
+pattern across cells is that of the material received, or close to it, is
+absorbed by $b_{sg}$ and not called. The planted CD68 response is missed
+either way, because the profile over-predicts the gene and the response hides
+inside the over-prediction. The measurements over all variants of the scale
+are given below.
 
 The test takes the fit's components as inputs and does not change them; the
 fitted model and its correction stay as they are unless the called
