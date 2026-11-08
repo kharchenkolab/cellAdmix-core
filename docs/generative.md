@@ -314,24 +314,49 @@ malignant cells, retained unchanged. Script:
 
 ## The induced-expression screen
 
-The induced term's gene support is chosen by a proportionality test.
-Admixed material samples the source transcriptome, so a gene's
-exposure-linked excess in target cells should be proportional to its
-share of the (interface-local) source profile. For each pair, the
-per-gene excess is regressed on the profile, each gene weighted by the
-variance of its count expected under the regression, and the residual
-is standardized by counting noise plus a multiplicative
-profile-uncertainty term of 15%. A weight from the observed count would
-favor the genes that happen to fall below the proportion and pull the
-fit toward them, so that the admixed genes above it read as induced. The second term is the sparsity mechanism: a pure
-counting-noise test flags large admixture channels for deviations of a
-few percent — on pancreas it flagged AMY2A at 1.08-fold its expectation,
-plain profile noise reaching formal significance only because the
-channel is huge — while the real induced genes deviate 2.7- to 22-fold.
-Genes past the threshold receive the induced term; their disproportionate
-excess is retained where it occurs (the per-cell
-strength $\rho_{cs}$ concentrates it in the responding cells) while their proportional share
-is still removed as admixture.
+The screen decides, for each pair, on which genes the induced term may be
+nonzero. It compares, gene by gene, the excess of the gene in exposed
+target cells with the excess that admixture of the source's material would
+produce, and selects the genes whose excess is too large to be admixture.
+The procedure, for a pair with source $s$ and target type $T$:
+
+1. The target cells are split into exposed cells (at least one $s$ cell
+   among the 15 nearest neighbors) and unexposed cells (none). Both groups
+   must hold at least 50 cells.
+2. For each gene $g$, the excess is the number of molecules of $g$ in the
+   exposed cells beyond what the unexposed cells' rate predicts for the
+   exposed cells' total molecule count:
+   $\text{excess}_g = c^{\text{exp}}_g - c^{\text{un}}_g \, t^{\text{exp}} / t^{\text{un}}$.
+3. Admixed material should add molecules of each gene in proportion to the
+   gene's share $\psi_g$ of the source profile $P_s$. Over the genes the
+   source owns, the excess is regressed on $\psi_g$ through the origin by
+   weighted least squares; each gene is weighted by the inverse of the
+   variance its excess would have if the proportional relation held (the
+   counting variance of the unexposed reference plus the proportional
+   expectation itself), and the slope and the weights are iterated ten
+   times. The slope is the amount of admixed material per unit of profile
+   share. Weights taken from the observed counts instead would favor the
+   genes that happen to fall below the proportion and pull the slope toward
+   them, so that admixed genes above it would read as induced.
+4. The residual of each gene is standardized,
+   $z_g = (\text{excess}_g - \text{slope} \cdot \psi_g) / \sqrt{V_g + (0.15 \cdot \text{slope} \cdot \psi_g)^2}$,
+   where $V_g$ is the counting variance of the excess and the second term
+   allows a 15% error in the profile's share of the gene. Without that
+   term, a gene carried in very large amounts would be selected for a
+   deviation of a few percent: on the pancreas section AMY2A, at 1.08 times
+   its expectation, reached formal significance on counting noise alone,
+   while the genes that are induced deviate 2.7- to 22-fold.
+5. A gene is selected when $z_g > 8$ and its excess exceeds 50 molecules.
+   Its induced profile value $M_{sg}$ starts as the part of its excess above
+   the proportional expectation, per unit of dose, and is refined in the
+   iterations on the selected genes only.
+
+The selected genes keep their disproportionate excess in the corrected
+counts (the per-cell strength $\rho_{cs}$ concentrates it in the cells
+that respond), while their proportional share is still removed as
+admixture. Because the second term of the denominator grows with the
+expectation, a shortfall below the proportion can never be selected; the
+screen acts on excess only.
 
 To be explicit about the reference of the comparison: each gene is
 tested individually against the proportional fit to the *source-cell
