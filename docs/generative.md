@@ -54,72 +54,222 @@ come from:
 - **Admixed molecules** ($\alpha_{cs}$, $P_{sg}$): one term per detected
   source type, the contamination the correction removes. The profile
   $P_s$ is the cytoplasmic expression profile of the source cells that
-  actually border the target type (within 30 µm, widening when sparse)
-  — cell states are not uniform across a tissue, and molecules admixed
-  from activated interface cells carry their elevated activation-gene
-  share; against a global
-  profile those genes would be misread as induced. The profile is zeroed
-  on target-owned genes (a gene is *owned* by the cell type in which it
-  makes up the largest share of the transcriptome, counting over all the
-  type's cells together), where contamination is indistinguishable from own
-  expression: it is deliberately left in place, which makes removal
-  of the target's own markers structurally impossible. The per-cell
-  fraction $\alpha_{cs}$ has a prior mean $\lambda_{cs}$, the cell's
-  exposure to the source, given by the pair's
-  dose–response: the source's marker content in the target cells, fitted
-  monotonically along an ordered exposure axis. Exposed cells sit on that
-  axis by their number of source neighbors; unexposed cells by how many
-  nearest neighbors must be inspected before a source cell appears (the
-  rungs of the audit's reference ladder), so a cell near but not
-  adjacent to source tissue receives the contamination the audit
-  measures in such cells, and the prior is zero at the deepest,
-  source-free stratum (whose level is never taken above the pooled rate
-  of all unexposed cells, the rule the audit applies to its own
-  reference). The
-  dose–responses of all of a target
-  type's sources are fitted jointly, each pair keeping only its own
-  component, so material a co-located source delivered is not credited
-  to the pair (the content its other components explain is reported per
-  pair); and a response enters the prior only when the exposed cells'
-  content rises significantly above the unexposed cells' against the
-  cell-to-cell variation, since a monotone fit of a covariate carrying
-  no signal drifts upward. The
-  posterior update weighs a cell's own counts against the prior by
-  pseudo-molecules: a cell with t molecules gives its counts the weight
-  t / (t + s). The strength s is estimated per pair from the spread of
-  the cells' fractions around the prior, net of counting noise, as the
-  pseudo-count of a beta distribution with that spread: a first pass at
-  s = 10 gives the fractions, the estimate (bounded to 5–1000) replaces
-  it, and a second pass refits. It is reported per pair
-  (`prior_strength` in the model's pair table); a positive
-  `alpha_prior_strength` fixes it instead. On simulated pancreas
-  sections the spread is wide on every pair and the estimates come out
-  at 5 to 15; against a fixed s = 300 the recall of admixed molecules
-  rises by 2 to 3 points at equal or lower own-molecule loss, and on the
-  pancreas section the model removes 22% of molecules instead of 20.5%,
-  more of the T-cell genes in fibroblasts and also more of the myeloid
-  genes the interface profile over-predicts. The
-  posterior update is also bounded — at most
-  five-fold the prior, exactly zero where the prior is zero — so removal
-  stays tied to the demonstrated spatial signal (with an unbounded
-  update, the model keeps finding the true contamination even after the
-  spatial covariates are scrambled, and the permutation control fails).
+  border the target type, measured before the fit (how, and how it is
+  corrected for those cells' own admixture, is described in the next
+  section): cell states are not uniform across a tissue, and molecules
+  admixed from activated interface cells carry their elevated
+  activation-gene share; against a global profile those genes would be
+  misread as induced. The profile is zeroed on target-owned genes (a gene
+  is *owned* by the cell type in which it makes up the largest share of
+  the transcriptome, counting over all the type's cells together), where
+  contamination is indistinguishable from own expression: it is
+  deliberately left in place, which makes removal of the target's own
+  markers structurally impossible. The per-cell fraction $\alpha_{cs}$ is
+  estimated for every cell around a prior mean $\lambda_{cs}$, the cell's
+  exposure to the source: the pair's dose–response, the content of the
+  source's marker genes in target cells as a function of their number of
+  source neighbors. The prior, the strength with which it holds the
+  estimate, and the bounds on the estimate are given in the next section.
 - **Background** ($\beta_c$, $A_g$): ambient molecules, restricted to the strict
   genes (essentially absent from the target natively), with profile and
   level measured on target cells far from any source cell, and a bounded
   per-cell scale. This is the component that removes the
   exposure-independent baseline of strict genes.
 - **Induced by neighbors** ($\lambda_{cs}$, $\rho_{cs}$, $M_{sg}$): a
-  sparse term whose induction profile $M_s$ is active only on genes
-  selected by the proportionality screen (next section). The response
-  scales with the cell's exposure $\lambda_{cs}$, the same dose prior
-  that sets the admixed share, and the per-cell strength $\rho_{cs}$
-  concentrates the induced content in the cells that actually respond.
+  sparse term whose induction profile $M_s$ is nonzero only on genes
+  selected by the induced-expression screen (its own section below). The
+  response scales with the cell's exposure $\lambda_{cs}$, the same dose
+  that is the prior of the admixed share, and the per-cell strength
+  $\rho_{cs}$ concentrates the induced content in the cells that respond.
   This content is retained; the genes' proportional (admixed) share is
   still removed.
 - **Uniform floor** ($\varepsilon_g$): 0.2% of cell content spread over
   all genes, keeping the division of each count well-defined where every
   structured component is near zero.
+
+## How the model is fitted
+
+The model is fitted one target cell type at a time. All cells of the type
+are fitted together, in one model that contains every source type the
+audit detected for it, the type's own expression programs, the background
+term and the induced term. Types are fitted independently of one another,
+and the whole procedure is run twice (two outer rounds), the second time
+with source profiles corrected by the first round's result. Within a type,
+the fit has three stages: quantities measured from the data before any
+fitting, the exposure prior and the screen, and the iterations that
+estimate the per-cell quantities.
+
+### Quantities measured before fitting
+
+- **Exposure.** For every cell and every type $x$, the number of $x$ cells
+  among the cell's 15 nearest neighbors, $N_{cx}$. For a cell with none, the
+  number of nearest neighbors that must be inspected before an $x$ cell
+  appears, recorded against the rungs 30, 60, 120 and 240.
+- **Pairs and their genes.** The source–target pairs come from the audit,
+  each with its marker pool (the source's genes most specific against the
+  target) and its strict genes (genes essentially absent from the target).
+  Gene ownership is computed from the per-type expression profiles.
+- **Source profile $P_s$ for a pair.** The share of each gene among the
+  cytoplasmic molecules of the source cells that lie within 30 µm of the
+  nearest target cell; the radius widens to 100 µm, then to all source
+  cells, when those cells hold fewer than 30,000 molecules. The shares of
+  genes the target type owns are set to zero and the profile renormalized.
+  In the second round each share is first multiplied by the source type's
+  own fraction for that gene (below) and the profile renormalized.
+- **Own programs $F_k$.** From the NMF fit, the gene shares of the
+  molecules labeled with the factors aligned to the type (the alternatives
+  are described at the end of this page). Strict genes are set to zero in
+  the programs when the background term is in use.
+- **Background profile $A_g$ and level.** The gene shares, over the strict
+  genes, of the molecules of target cells farther than 250 µm from any
+  source cell, and their share of those cells' content; when such cells hold
+  fewer than 20,000 molecules, the level falls back to half the strict-gene
+  rate of all unexposed cells.
+- **Floor $\varepsilon_g$.** 0.2% of the cell's content, spread evenly over
+  all genes.
+
+### The exposure prior $\lambda_{cs}$
+
+For each pair the target cells are placed on an axis: exposed cells by
+their number of source neighbors (1, 2, 3, …), unexposed cells by the rung
+at which the first source cell appears, deepest first, so that admixed
+content should not decrease along the axis. The content of the pair's
+marker genes in each cell, as a fraction of the cell's molecules, is then
+fitted as a non-decreasing function of the position on this axis (an
+isotonic regression, each cell weighted by its molecule count). All sources
+of the target type are fitted at once, additively, so that content a
+co-located source explains is not credited to the pair. The reference level
+is the fitted value at the deepest unexposed stratum that holds at least
+20,000 molecules, and never above the pooled rate of all unexposed cells.
+The prior is
+
+$\lambda_{cs} = \min\{(\text{fitted}_{cs} - \text{reference}_s) / \text{share}_s,\ 0.6\}$,
+
+where share$_s$ is the share of the marker genes in $P_s$, so that the
+marker content is converted into a fraction of the whole profile. The prior
+is zero at the reference stratum and below it. If the exposed cells'
+marker content does not exceed the unexposed cells' by three standard
+errors, the pair's prior is zero everywhere: a monotone fit of a covariate
+that carries no signal drifts upward, and the guard keeps such a pair from
+removing anything.
+
+### The screen
+
+Before the iterations, the induced-expression screen (next section) runs
+on each pair and selects the genes on which the induced profile $M_s$ may
+be nonzero, from the excess of those genes in exposed cells relative to the
+proportion the source profile predicts. The screen uses only the counts,
+the profile and the prior; it does not use a fitted model.
+
+### The iterations
+
+The per-cell quantities are estimated by expectation–maximization for the
+Poisson model, in the form of multiplicative updates. Starting values:
+$\alpha_{cs} = \lambda_{cs}$, $\beta_c$ at the background level,
+$\rho_{cs} = 1$, and $\theta_{ck}$ set to the cell's remaining share
+$\max(1 - \sum_s \lambda_{cs} - \text{background level}, 0.2)$ spread
+over the programs by their share of the type's pooled expression.
+
+In each iteration, for each cell $c$ and each of its nonzero counts, the
+expected rate per molecule is
+$r_{cg} = \sum_k \theta_{ck} F_{kg} + \sum_s \alpha_{cs} P_{sg} + \beta_c A_g + \sum_s \lambda_{cs} \rho_{cs} M_{sg} + \varepsilon_g$
+and the ratio $w_{cg} = y_{cg} / (t_c r_{cg})$ of observed to expected
+count divides the count among the components in proportion to their
+contributions. The updates are:
+
+- **Program weights**, no prior:
+  $\theta_{ck} \leftarrow \theta_{ck} \sum_g F_{kg} w_{cg}$.
+- **Admixed fractions**, pulled toward the prior with a strength $s_s$
+  measured in molecules: with $e_{cs} = t_c \alpha_{cs} \sum_g P_{sg} w_{cg} / \sum_g P_{sg}$
+  the number of the cell's molecules the current fit attributes to the
+  source,
+  $\alpha_{cs} \leftarrow \min\{(e_{cs} + s_s \lambda_{cs}) / (t_c + s_s),\ 5\lambda_{cs}\}$.
+  A cell with many molecules is governed by its counts, a cell with few by
+  the prior; the estimate cannot exceed five times the prior and is zero
+  where the prior is zero, which ties the removal to the measured
+  dose–response and makes the permutation control below meaningful.
+- **Background scale**, likewise toward its level with strength 300,
+  capped at five times the level.
+- **Induced strength**, with a gamma prior of shape 2 and a cap of 30:
+  $\rho_{cs} \leftarrow \min\{(2 + z_{cs}) / (2 + t_c \lambda_{cs} \sum_g M_{sg}),\ 30\}$,
+  where $z_{cs}$ is the number of molecules attributed to the pair's
+  induced term.
+- **Programs** $F_{kg}$, updated from all cells of the type with each cell
+  weighted by $1 / (1 + 20 \sum_s \lambda_{cs})$, so that lightly exposed
+  cells determine them, then renormalized; without this weighting a program
+  shared between source and target absorbs the admixed molecules as a cell
+  state and the pair's removal collapses.
+- **Induced profile** $M_{sg}$, updated on the screened genes only.
+
+The source profiles, the background profile, the prior $\lambda_{cs}$ and
+the set of screened genes stay fixed throughout.
+
+Forty iterations are run (fewer if the log-likelihood has converged). The
+prior strength $s_s$ is then estimated per pair from the spread of the
+cells' attributed fractions $e_{cs}/t_c$ around the prior, net of the
+binomial counting variance, as the pseudo-count of a beta distribution with
+that spread, bounded to 5–1000, and the forty iterations are run again
+with it. (The first pass uses $s_s = 10$; on simulated pancreas sections
+the estimates come out at 5 to 15, and against a fixed value of 300 the
+recall of admixed molecules rises by 2 to 3 points at equal own-molecule
+loss.) Finally, up to three refinement passes: the removal implied by the
+current fit is applied, the dose–response of the marker genes not selected
+by the screen is measured again on the remaining counts, and any exposure
+gradient still present is added to the prior (capped at 0.6), followed by
+fifteen iterations with the programs held fixed; the passes stop when the
+addition falls below 0.01% of the type's molecules.
+
+### The output of a round, and the second round
+
+For every count, the share kept is the own, induced and floor part of the
+rate, $(\sum_k \theta_{ck} F_{kg} + \sum_s \lambda_{cs} \rho_{cs} M_{sg} + \varepsilon_g) / r_{cg}$,
+and the rest is removed; without retention of induced expression the
+induced part is removed too. For every gene, the type's own fraction is
+the share of its molecules of that gene, over all its cells, that the fit
+attributes to the own programs. The second round repeats everything for
+every type with each source profile corrected by that source type's own
+fractions: the profile of what a source sheds is measured on its interface
+cells, which are themselves contaminated, and the correction removes from
+it the genes that are present in those cells only through admixture. Two
+rounds are run, not more; the correction averages over all cells of the
+source type, while the profile is measured on its interface cells, so it is
+likely too weak where it is applied, and on the source's own genes nothing
+can be attributed to admixture, so those shares are not corrected at all.
+
+In outline:
+
+```
+for round in 1, 2:
+    for each target type T with detected sources:
+        P_s  <- interface profile of each source s (round 2: each gene times s's own fraction),
+                zero on genes T owns
+        F    <- T's expression programs from the NMF factors
+        A    <- background profile of T from cells far from any source
+        for each source s of T:
+            lambda_cs <- dose-response of s's marker genes along the exposure axis,
+                         fitted jointly over all sources of T; zero without a significant rise
+            M_s       <- screen: genes whose excess in exposed cells exceeds
+                         the proportion P_s predicts
+        alpha <- lambda; beta <- background level; rho <- 1; theta <- the cell's remaining share
+        repeat 40 times:
+            divide each count among the components in proportion to their expected contributions
+            update theta_c, alpha_cs (toward lambda_cs), beta_c, rho_cs for every cell
+            update F (cells weighted toward lightly exposed ones) and M (screened genes only)
+        estimate the prior strength s_s per source from the spread of alpha around lambda
+        repeat the 40 iterations with it
+        up to 3 times:
+            re-measure the dose-response on the counts left after removal
+            add any remaining exposure gradient to lambda; 15 iterations with F fixed
+        removed_cg <- y_cg x (admixed + background share of r_cg)
+        own fraction of T per gene <- for the next round's profiles
+```
+
+| Estimated in the iterations | Fixed during the iterations |
+|---|---|
+| Per cell: $\theta_{ck}$, $\alpha_{cs}$, $\beta_c$, $\rho_{cs}$ | Source profiles $P_s$, background profile $A_g$ |
+| Per gene, shared by the type's cells: programs $F_{kg}$; induced profile $M_{sg}$ on the screened genes | Exposure prior $\lambda_{cs}$ (refined only between passes); the screened gene set |
+
+## The fitted model on one pair
 
 Figure 2 shows the fitted model on one pair: admixture from malignant
 cells into fibroblasts on the CosMx NSCLC section (fine labels). The
