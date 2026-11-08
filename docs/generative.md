@@ -301,18 +301,71 @@ genes and their measured disproportionality are reported by
 ## Testing associations with neighboring cell types
 
 The test described here is a separate step that follows the fit
-(`model.detect_responses()`, `model$detect_responses()` in R). The fit
-divides each cell's molecules among the origins of Figure 1 and decides what
-the correction removes, and its induced term is chosen by the screen above.
-The test asks a different question of the fitted model: for a target type and
-a gene, are the counts associated with the presence of neighboring cell types,
-beyond what the fit's own, admixed and background components explain? It takes
-those components as inputs and does not change them; the fitted model and its
-correction stay as they are unless the called associations are explicitly kept
-(`retain_responses`, below). An association is a statistical statement made
-under the assumption of short-range interactions: whether it reflects a
-response to neighbors or a regional state that rises with them, the test does
-not say.
+(`model.detect_responses()`, `model$detect_responses()` in R). It has a
+different form from the fit because it estimates different unknowns.
+
+The fit estimates per-cell quantities: for every cell, the fraction of its
+molecules admixed from each source ($\alpha_{cs}$), the weights of its own
+expression programs, and its background level. These can be estimated only
+because the gene profiles ($P_s$, $F_k$, $A_g$) are held in common across all
+cells: a cell's admixed fraction is read from all of its genes at once, as the
+amount of the source's whole profile that its counts contain. The profiles
+have to be rigid for this to work. A profile free to change gene by gene
+would make the admixed fraction of a cell indistinguishable from its own
+expression, and the division of each count into origins, which is what the
+correction removes, would no longer be determined.
+
+The test estimates per-gene quantities: for every gene of a target type,
+whether its counts across the type's cells depend on the numbers of
+neighboring cells of each type beyond the dependence that admixture
+produces. Here the fit's per-cell quantities enter as known covariates: each
+cell's fitted own expression, its fitted admixed amount from each source, its
+background. No per-cell quantity is re-estimated, which is what keeps the
+test from re-dividing the molecules the fit has already divided. For one gene
+a profile is a single number, so the fit's profiles enter the test only
+through the fitted per-cell fractions, which were estimated from all genes
+together, and through which genes they leave at zero.
+
+The hypothesis tested, for a target type $T$, a gene $g$ and a neighboring type
+$x$, is the following. Under the null hypothesis the expected count of $g$ in a
+cell $c$ of type $T$ is described by the fit's components, each rescaled by a
+non-negative factor for this gene:
+$E[y_{cg}] = a_g\,\widehat{\mathrm{own}}_{cg} + \sum_s b_{sg}\,\widehat{\mathrm{admixed}}_{csg} + \widehat{\mathrm{background}}_{cg}$.
+Under the alternative, terms proportional to the numbers of neighboring $x$
+cells are added, $\gamma_{xg} N_{cx} + \delta_{xg} D_{cx}$ with
+$\gamma_{xg}, \delta_{xg} \ge 0$. The null model is contained in the
+alternative, and the test asks whether the neighbor counts explain variation
+in the gene's counts that the best admixture-only description of that gene
+does not: a test of the neighbor count, not of the profile. The statistics and
+the threshold are given after Figure 4.
+
+What separates the two hypotheses is the difference between material and
+presence. Admixed material follows each cell's fitted fraction
+$\hat\alpha_{cs}$, which varies between cells with the same number of
+neighbors, because some received more of the source's material than others,
+and the per-gene scales $b_{sg}$ let the null model follow that dependence as
+closely as the gene's counts allow. An association with neighbors follows
+their number whether or not material arrived. A gene that rises with the
+number of $x$ cells in proportion to the material they delivered is explained
+by the null model; a gene that rises with their number beyond that is not. On
+a gene the source does not shed there is no admixed term, and any dependence
+on the neighbor count beyond the cell's own expression and background is an
+association. On a gene the source sheds, a response exactly proportional to
+the material received cannot be told from a larger share of that gene in the
+shed material, and the test does not try to.
+
+The per-gene scales are what make this a test of the neighbor count rather
+than of the profile. With the admixed term held at the profile's amount, every
+gene whose amount the profile gets wrong would rise or fall with the fitted
+fraction, which itself rises with the neighbor count, and the error would be
+read as an association. The measurements that show this are given below.
+
+The test takes the fit's components as inputs and does not change them; the
+fitted model and its correction stay as they are unless the called
+associations are explicitly kept (`retain_responses`, below). An association
+is a statistical statement made under the assumption of short-range
+interactions: whether it reflects a response to neighbors or a regional state
+that rises with them, the test does not say.
 
 ![Figure 4](figures/generative_fig4.png)
 
@@ -331,11 +384,6 @@ The terms of the regression are the following.
   every source the fit carries for the target type, with one free scale
   $b_{sg}$ per source and gene. The profile $\tilde P_{sg}$ equals the
   fit's $P_{sg}$, extended to genes the fit zeroes, as described below.
-  For one gene the profile is a constant, so the fit's profiles reach the
-  test only through the per-cell fractions $\hat\alpha_{cs}$, which the fit
-  estimated from all genes together, and through which genes they leave at
-  zero; how many molecules of a gene the source's markers predict is not
-  imposed. The reason is given below.
 - **Background and floor.** Held at the fitted values.
 - **Association with neighboring types.** For every labeled type $x$ other than
   the target, whether or not the fit carries it as a source: $N_{cx}$, the
