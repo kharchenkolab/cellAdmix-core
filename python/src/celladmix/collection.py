@@ -59,13 +59,13 @@ class CellAdmixCollection:
             self.fits[name] = dataset.fit(**kwargs)
         return self
 
-    def fit_consensus(self, *, match_min: float = 0.3, min_restarts: int = 2, min_recurrence: float = 0.5,
+    def fit_consensus(self, *, match_min: float = 0.3, min_restarts: int = 2, min_stability: float = 0.0,
                       name: str = "consensus", num_threads: Optional[int] = None, **fit_kwargs):
         """Cluster the pooled restart factors of all samples into shared
         profiles and project every sample onto them."""
         state = self._prepare_profiles(**fit_kwargs)
         min_restarts = max(1, int(min_restarts))
-        min_recurrence = min(1.0, max(0.0, float(min_recurrence)))
+        min_stability = min(1.0, max(0.0, float(min_stability)))
         # Every restart of every sample enters the pool; each sample's primary
         # restart is marked so the matching table can describe its own factors.
         pools = {s: [h[state["genes"]] for h in _fit_member_profiles(state["fits"][s])]
@@ -73,10 +73,10 @@ class CellAdmixCollection:
         selected = {s: int(state["fits"][s].manifest["nmf_diagnostics"]["selected_run"])
                     for s in state["samples"]}
         consensus = _consensus_profiles(pools, state["weights"], selected, match_min=match_min,
-                                        min_restarts=min_restarts, min_recurrence=min_recurrence)
+                                        min_restarts=min_restarts, min_stability=min_stability)
         if consensus["profiles"].empty:
             raise ValueError(f"no factor recurs across restarts at match_min = {match_min}; "
-                             "lower match_min, min_restarts, or min_recurrence")
+                             "lower match_min, min_restarts, or min_stability")
         # The matching table describes each sample's primary factors: the
         # consensus factor whose cluster they joined, their ownership correlation
         # with that consensus profile, their within-cluster agreement, and their
@@ -109,7 +109,7 @@ class CellAdmixCollection:
             state["fits"], consensus["profiles"], matching, consensus["factors"],
             consensus["components"], consensus["unreproduced"],
             self._loss_table(state, consensus["profiles"]),
-            params={"match_min": match_min, "min_restarts": min_restarts, "min_recurrence": min_recurrence,
+            params={"match_min": match_min, "min_restarts": min_restarts, "min_stability": min_stability,
                     "weights": state["weights"], "restarts_total": consensus["restarts_total"],
                     "name": name, "run_id": run_id, "source": "consensus"})
 
@@ -157,8 +157,8 @@ class CellAdmixCollection:
             "consensus_factor": range(1, len(profiles) + 1),
             "cluster": pd.NA,
             "samples": [int(counts.get(k, 0)) for k in range(1, len(profiles) + 1)]})
-        factors["coverage"] = factors["samples"] / len(state["samples"])
-        for column in ("restarts", "components", "max_recurrence", "agreement"):
+        factors["recurrence"] = factors["samples"] / len(state["samples"])
+        for column in ("restarts", "components", "stability", "agreement"):
             factors[column] = pd.NA
         components = pd.DataFrame({
             "sample": matching["sample"], "restart": pd.NA, "factor": matching["sample_factor"],
@@ -251,11 +251,11 @@ class CellAdmixConsensusFit:
     def samples(self) -> list:
         return list(self.fits)
 
-    def recurrence(self) -> pd.DataFrame:
+    def factor_stability(self) -> pd.DataFrame:
         """Per consensus factor and sample: the number of that sample's restarts
-        with a component in the factor's cluster, and that number as a fraction
-        of the sample's restarts. Zero rows mark samples that do not carry the
-        factor at all."""
+        with a component in the factor's cluster, and that number as a share of
+        the sample's restarts (the program's stability within the sample). Zero
+        rows mark samples that do not carry the factor at all."""
         comp = self.components[self.components["consensus_factor"].notna()]
         totals = self.params.get("restarts_total") or {}
         rows = []
@@ -266,7 +266,7 @@ class CellAdmixConsensusFit:
                 total = totals.get(s)
                 rows.append({"consensus_factor": k, "sample": s, "restarts": restarts,
                              "restarts_total": total if total is not None else pd.NA,
-                             "recurrence": restarts / total if total else np.nan})
+                             "stability": restarts / total if total else np.nan})
         return pd.DataFrame(rows)
 
     def loadings(self) -> pd.DataFrame:
@@ -623,8 +623,8 @@ class CellAdmixCollectionScore:
         consensus = self.consensus
         if consensus.params.get("source") != "consensus":
             return None
-        recurrence = consensus.recurrence()
-        return {s: set(recurrence[(recurrence["sample"] == s) & (recurrence["restarts"] > 0)]
+        stability = consensus.factor_stability()
+        return {s: set(stability[(stability["sample"] == s) & (stability["restarts"] > 0)]
                        ["consensus_factor"].astype(int)) for s in consensus.fits}
 
     def _member_summary(self, sample: str, member: int) -> pd.DataFrame:
@@ -829,7 +829,7 @@ class CellAdmixCollectionCorrection:
             rules = rules[rules["keep"].fillna(True).astype(bool)]
         consensus = self.score.consensus
         fits = consensus.fits
-        recurrence = consensus.recurrence() if consensus.params.get("source") == "consensus" else None
+        stability = consensus.factor_stability() if consensus.params.get("source") == "consensus" else None
         where_present = self.params.get("apply_rules") == "where_present"
         rows = []
         for s, correction in self.corrections.items():
@@ -847,8 +847,8 @@ class CellAdmixCollectionCorrection:
 
             absent = None
             applied = rules
-            if recurrence is not None:
-                carried = set(recurrence[(recurrence["sample"] == s) & (recurrence["restarts"] > 0)]["consensus_factor"].astype(int))
+            if stability is not None:
+                carried = set(stability[(stability["sample"] == s) & (stability["restarts"] > 0)]["consensus_factor"].astype(int))
                 on_carried = rules["factor"].astype(int).isin(carried).to_numpy(dtype=bool)
                 absent = rules[~on_carried]
                 if where_present:
@@ -1179,7 +1179,7 @@ def _profile_correlation(profiles: pd.DataFrame, reference: pd.DataFrame) -> np.
 
 
 def _consensus_profiles(pools: dict, weights: dict, selected: dict, *, match_min: float,
-                        min_restarts: int, min_recurrence: float = 0.0) -> dict:
+                        min_restarts: int, min_stability: float = 0.0) -> dict:
     """Shared profiles by pooled clustering of every restart of every sample.
 
     ``pools`` maps each sample to the list of its restart profile frames (raw
@@ -1187,7 +1187,7 @@ def _consensus_profiles(pools: dict, weights: dict, selected: dict, *, match_min
     primary restart (1-based). The pooled components are clustered by average
     linkage on gene-ownership correlation, cut at ``match_min``; a cluster
     whose components come from at least ``min_restarts`` distinct restarts, of
-    any samples, and from at least a fraction ``min_recurrence`` of the
+    any samples, and from at least a share ``min_stability`` of the
     restarts of some sample, becomes a consensus factor, and the remaining
     components are reported as unreproduced. The consensus profile of a cluster is the
     weighted per-gene median of its unit-sum component profiles (every
@@ -1220,12 +1220,12 @@ def _consensus_profiles(pools: dict, weights: dict, selected: dict, *, match_min
         per_sample = components.iloc[idx].groupby("sample")["group"].nunique()
         rows.append({"cluster": int(k), "samples": int(components["sample"].iloc[idx].nunique()),
                      "restarts": int(components["group"].iloc[idx].nunique()), "components": int(len(idx)),
-                     "max_recurrence": float(max(per_sample[s] / restarts_total[s] for s in per_sample.index)),
+                     "stability": float(max(per_sample[s] / restarts_total[s] for s in per_sample.index)),
                      "agreement": float(np.nanmean(components["agreement"].iloc[idx])) if len(idx) > 1 else np.nan,
                      "mass": float(row_sums[idx].mean())})
     summary = pd.DataFrame(rows).sort_values(["samples", "restarts", "mass"], ascending=False, kind="stable")
     reproduced = summary[(summary["restarts"] >= min_restarts)
-                         & (summary["max_recurrence"] >= min_recurrence)].reset_index(drop=True)
+                         & (summary["stability"] >= min_stability)].reset_index(drop=True)
     sums = stacked.sum(axis=1, keepdims=True)
     sums[sums <= 0] = 1.0
     normalized = stacked / sums
@@ -1242,10 +1242,10 @@ def _consensus_profiles(pools: dict, weights: dict, selected: dict, *, match_min
         "consensus_factor": range(1, len(reproduced) + 1),
         "cluster": reproduced["cluster"].astype(int),
         "samples": reproduced["samples"].astype(int),
-        "coverage": reproduced["samples"] / len(pools),
+        "recurrence": reproduced["samples"] / len(pools),
         "restarts": reproduced["restarts"].astype(int),
         "components": reproduced["components"].astype(int),
-        "max_recurrence": reproduced["max_recurrence"],
+        "stability": reproduced["stability"],
         "agreement": reproduced["agreement"]})
     unreproduced = components[components["consensus_factor"].isna()].reset_index(drop=True)
     frame = pd.DataFrame(consensus, index=[f"F{i + 1}" for i in range(len(reproduced))], columns=genes)

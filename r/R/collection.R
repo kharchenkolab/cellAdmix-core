@@ -83,11 +83,11 @@ CellAdmixCollection <- R6::R6Class(
       invisible(self)
     },
 
-    fit_consensus = function(..., match_min = 0.3, min_restarts = 2L, min_recurrence = 0.5,
+    fit_consensus = function(..., match_min = 0.3, min_restarts = 2L, min_stability = 0,
                              name = "consensus", num_threads = NULL) {
       state <- private$prepare_profiles(...)
       min_restarts <- max(1L, as.integer(min_restarts))
-      min_recurrence <- min(1, max(0, as.numeric(min_recurrence)))
+      min_stability <- min(1, max(0, as.numeric(min_stability)))
       # Every restart of every sample enters the pool; each sample's primary
       # restart is marked so the matching table can describe the sample's own
       # factors.
@@ -100,10 +100,10 @@ CellAdmixCollection <- R6::R6Class(
         as.integer(fit$run$nmf_diagnostics$selected_run)
       }, integer(1))
       consensus <- .celladmix_consensus_profiles(pools, state$weights, selected,
-        match_min = match_min, min_restarts = min_restarts, min_recurrence = min_recurrence)
+        match_min = match_min, min_restarts = min_restarts, min_stability = min_stability)
       if (!nrow(consensus$profiles)) {
         stop("no factor recurs across restarts at match_min = ", match_min,
-          "; lower match_min, min_restarts, or min_recurrence")
+          "; lower match_min, min_restarts, or min_stability")
       }
       # The matching table describes each sample's primary factors: the
       # consensus factor whose cluster they joined, their ownership correlation
@@ -149,7 +149,7 @@ CellAdmixCollection <- R6::R6Class(
         unreproduced = consensus$unreproduced,
         loss = private$loss_table(state, consensus$profiles),
         params = list(match_min = match_min, min_restarts = min_restarts,
-          min_recurrence = min_recurrence,
+          min_stability = min_stability,
           weights = state$weights, restarts_total = consensus$restarts_total,
           name = name, run_id = run_id, source = "consensus")
       )
@@ -200,8 +200,8 @@ CellAdmixCollection <- R6::R6Class(
       matched <- matching[matching$matched, , drop = FALSE]
       samples_per_factor <- tabulate(matched$consensus_factor, nbins = nrow(profiles))
       factors <- data.frame(consensus_factor = seq_len(nrow(profiles)), cluster = NA_integer_,
-        samples = samples_per_factor, coverage = samples_per_factor / length(state$samples),
-        restarts = NA_integer_, components = NA_integer_, max_recurrence = NA_real_,
+        samples = samples_per_factor, recurrence = samples_per_factor / length(state$samples),
+        restarts = NA_integer_, components = NA_integer_, stability = NA_real_,
         agreement = NA_real_, stringsAsFactors = FALSE)
       components <- data.frame(sample = matching$sample, restart = NA_integer_,
         factor = matching$sample_factor, group = NA_integer_, selected = TRUE,
@@ -332,8 +332,8 @@ CellAdmixConsensusFit <- R6::R6Class(
       cat("  factors:", nrow(self$profiles),
         if (single) paste0("(", single, " from one sample only)") else "", "\n")
       if (identical(self$params$source, "consensus")) {
-        cat("  sample coverage per factor: median",
-          round(stats::median(self$factors$coverage), 2),
+        cat("  recurrence across samples per factor: median",
+          round(stats::median(self$factors$recurrence), 2),
           "; unreproduced components:", nrow(self$unreproduced), "\n")
       }
       if (nrow(self$matching)) {
@@ -348,11 +348,11 @@ CellAdmixConsensusFit <- R6::R6Class(
     samples = function() names(self$fits),
     loadings = function() self$profiles,
 
-    recurrence = function() {
+    factor_stability = function() {
       # Per consensus factor and sample: the number of that sample's restarts
-      # with a component in the factor's cluster, and that number as a
-      # fraction of the sample's restarts. Zero rows mark samples that do not
-      # carry the factor at all.
+      # with a component in the factor's cluster, and that number as a share
+      # of the sample's restarts (the program's stability within the sample).
+      # Zero rows mark samples that do not carry the factor at all.
       comp <- self$components[!is.na(self$components$consensus_factor), , drop = FALSE]
       totals <- self$params$restarts_total
       grid <- expand.grid(consensus_factor = seq_len(nrow(self$profiles)),
@@ -362,7 +362,7 @@ CellAdmixConsensusFit <- R6::R6Class(
         length(unique(comp$restart[rows]))
       }, integer(1))
       grid$restarts_total <- if (is.null(totals)) NA_integer_ else as.integer(totals[grid$sample])
-      grid$recurrence <- grid$restarts / grid$restarts_total
+      grid$stability <- grid$restarts / grid$restarts_total
       grid[order(grid$consensus_factor, grid$sample), , drop = FALSE]
     },
 
@@ -799,9 +799,9 @@ CellAdmixCollectionScore <- R6::R6Class(
       if (!identical(consensus$params$source, "consensus")) {
         return(NULL)
       }
-      recurrence <- consensus$recurrence()
+      stability <- consensus$factor_stability()
       lapply(stats::setNames(nm = names(consensus$fits)), function(sample) {
-        as.integer(recurrence$consensus_factor[recurrence$sample == sample & recurrence$restarts > 0])
+        as.integer(stability$consensus_factor[stability$sample == sample & stability$restarts > 0])
       })
     },
 
@@ -1000,7 +1000,7 @@ CellAdmixCollectionCorrection <- R6::R6Class(
       }
       consensus <- self$score$consensus
       fits <- consensus$fits
-      recurrence <- if (identical(consensus$params$source, "consensus")) consensus$recurrence() else NULL
+      stability <- if (identical(consensus$params$source, "consensus")) consensus$factor_stability() else NULL
       where_present <- identical(self$params$apply_rules, "where_present")
       out <- do.call(rbind, lapply(names(self$corrections), function(sample) {
         removed <- .celladmix_removed_by_type_factor(fits[[sample]], self$corrections[[sample]])
@@ -1019,8 +1019,8 @@ CellAdmixCollectionCorrection <- R6::R6Class(
         }
         absent <- NULL
         applied <- rules
-        if (!is.null(recurrence)) {
-          carried <- recurrence$consensus_factor[recurrence$sample == sample & recurrence$restarts > 0]
+        if (!is.null(stability)) {
+          carried <- stability$consensus_factor[stability$sample == sample & stability$restarts > 0]
           on_carried <- as.integer(rules$factor) %in% carried
           absent <- rules[!on_carried, , drop = FALSE]
           if (where_present) {
@@ -1380,7 +1380,7 @@ CellAdmixCollectionCleanupReport <- R6::R6Class(
 # restart (1-based). The pooled components are clustered by average linkage
 # on gene-ownership correlation, cut at `match_min`; a cluster whose
 # components come from at least `min_restarts` distinct restarts, of any
-# samples, and from at least a fraction `min_recurrence` of the restarts of
+# samples, and from at least a share `min_stability` of the restarts of
 # some sample, becomes a consensus factor, and the remaining components are
 # reported as unreproduced. The consensus profile of a cluster is the
 # weighted per-gene median of its unit-sum component profiles (every
@@ -1391,7 +1391,7 @@ CellAdmixCollectionCleanupReport <- R6::R6Class(
 # of a loosely agreeing cluster from blurring. Factors are ordered by the number
 # of samples covered, then restarts, then profile mass.
 .celladmix_consensus_profiles <- function(pools, weights, selected, match_min, min_restarts,
-                                          min_recurrence = 0) {
+                                          min_stability = 0) {
   genes <- colnames(pools[[1]][[1]])
   blocks <- list()
   meta <- list()
@@ -1421,13 +1421,13 @@ CellAdmixCollectionCleanupReport <- R6::R6Class(
       samples = length(unique(components$sample[idx])),
       restarts = length(unique(components$group[idx])),
       components = length(idx),
-      max_recurrence = max(as.numeric(per_sample) / as.numeric(restarts_total[names(per_sample)])),
+      stability = max(as.numeric(per_sample) / as.numeric(restarts_total[names(per_sample)])),
       agreement = if (length(idx) > 1L) mean(components$agreement[idx], na.rm = TRUE) else NA_real_,
       mass = mean(row_sums[idx]),
       stringsAsFactors = FALSE)
   }))
   summary <- summary[order(-summary$samples, -summary$restarts, -summary$mass), , drop = FALSE]
-  reproduced <- summary[summary$restarts >= min_restarts & summary$max_recurrence >= min_recurrence, , drop = FALSE]
+  reproduced <- summary[summary$restarts >= min_restarts & summary$stability >= min_stability, , drop = FALSE]
   consensus <- matrix(0, nrow(reproduced), length(genes),
     dimnames = list(if (nrow(reproduced)) paste0("F", seq_len(nrow(reproduced))) else NULL, genes))
   normalized <- .celladmix_normalize_profiles(stacked)
@@ -1441,9 +1441,9 @@ CellAdmixCollectionCleanupReport <- R6::R6Class(
   lookup <- stats::setNames(seq_len(nrow(reproduced)), reproduced$cluster)
   components$consensus_factor <- unname(lookup[as.character(components$cluster)])
   factors <- data.frame(consensus_factor = seq_len(nrow(reproduced)), cluster = reproduced$cluster,
-    samples = reproduced$samples, coverage = reproduced$samples / length(pools),
+    samples = reproduced$samples, recurrence = reproduced$samples / length(pools),
     restarts = reproduced$restarts, components = reproduced$components,
-    max_recurrence = reproduced$max_recurrence, agreement = reproduced$agreement,
+    stability = reproduced$stability, agreement = reproduced$agreement,
     stringsAsFactors = FALSE)
   rownames(factors) <- NULL
   unreproduced <- components[is.na(components$consensus_factor), , drop = FALSE]

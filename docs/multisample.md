@@ -40,15 +40,20 @@ built from every restart of every sample.
    different ranks pose no difficulty.
 3. **Consensus profiles.** A cluster becomes a shared factor when its
    members come from at least `min_restarts` distinct restarts (default
-   2), of any samples, and from at least a fraction `min_recurrence`
-   (default 0.5) of the restarts of some sample: a program found by a
-   single random start is not reproducible, and one found by a minority
-   of every sample's restarts is an alternative decomposition rather than
-   the solution any sample settles on. With the default, the shared
-   factors are the programs that are the majority solution of at least
-   one sample, which keeps the shared space close to the per-sample rank;
-   `min_recurrence = 0` admits every program that recurs at all. The
-   excluded components are reported rather than used. The shared profile is
+   2), of any samples: a program found by a single random start is not
+   reproducible, and one that two restarts agree on is, whether the two
+   belong to one sample or to different ones. Every reproduced program
+   enters, including the alternative decompositions that different
+   restarts make of the same signal, which then sit side by side as
+   near-duplicate factors; the ensemble correction averages over the
+   restarts' splits, and keeping the decompositions distinct preserves
+   what the samples' restarts found. `min_stability` (default 0)
+   optionally requires in addition that some one sample finds the program
+   in at least that share of its restarts; at 0.5 only the programs that
+   are the majority solution of some sample enter, which keeps the shared
+   space near the per-sample rank at the price of the subtler programs
+   that several samples find at low restart share. The excluded components
+   are reported rather than used. The shared profile is
    the per-gene median of the cluster's components after each is
    normalized to unit sum, every component weighted by its sample's weight
    (molecule count, or equal, by `sample_allocation`), so that a program
@@ -164,15 +169,19 @@ sample:
   objectives. A consensus within that spread fits the sample as well as
   one of its own restarts would.
 - **Factors** (`factors`): one row per shared factor with the number and
-  fraction of samples contributing to its cluster (`samples`, `coverage`),
-  the number of restarts carrying it (`restarts`, equal to the number of
-  components since each restart contributes at most one), the largest
-  fraction of any one sample's restarts carrying it (`max_recurrence`),
-  and the mean within-cluster ownership correlation (`agreement`). A factor whose
-  coverage is one sample's share is carried by that sample alone.
-- **Recurrence** (`recurrence()`): per factor and sample, the number of
-  that sample's restarts containing the program and the fraction of its
-  restarts; zero marks a sample that does not carry the factor.
+  fraction of samples contributing to its cluster (`samples`,
+  `recurrence`), the number of restarts carrying it (`restarts`, equal to
+  the number of components since each restart contributes at most one),
+  the largest share of any one sample's restarts carrying it
+  (`stability`), and the mean within-cluster ownership correlation
+  (`agreement`). A factor whose recurrence is one sample's share is
+  carried by that sample alone; a factor with low stability is one that
+  no sample's restarts settle on, such as one of several ways the restarts
+  split a signal.
+- **Stability per sample** (`factor_stability()`): per factor and sample,
+  the number of that sample's restarts containing the program and the
+  share of its restarts; zero marks a sample that does not carry the
+  factor.
 - **Unreproduced components** (`unreproduced`): the pooled components whose
   cluster did not reach `min_restarts`, with their sample, restart, factor
   index, and whether they belong to the sample's primary restart.
@@ -210,7 +219,7 @@ flags that report rather than gate:
   from the sample itself (the sample is absent from the rule's
   `samples_significant`) and the fraction of the sample's removed
   molecules attributable to those rules; and the number of rules whose
-  program none of the sample's own restarts carries (zero recurrence in
+  program none of the sample's own restarts carries (zero stability in
   that sample), applied there under `apply_rules = "everywhere"` and
   skipped under `"where_present"`, with the fraction of the sample's
   removed molecules attributable to those. A removed molecule is
@@ -231,14 +240,16 @@ A sample that trips the shared-factor flag has many primary factors that
 no other restart reproduces, which happens when its own restarts disagree
 among themselves (low within-sample stability); the shared space then
 holds fewer programs than the sample's own fit, and admixture programs
-among the lost ones are not cleaned. Lowering `min_recurrence` admits the
-less reproducible programs and recovers sensitivity, at the price of a
-larger shared space and more own-marker removal; on an unstable variant
-neither threshold matches the balance of a stable one, and the better
-remedy is a more stable NMF variant or more restarts for the per-sample
-fits. On the breast replicates, `ls_nmf` with bridge scoring under the
-default consensus cleaned better on every audit measure than
-`invsqrt_kl` with membrane scoring under any threshold. Projecting every
+among the lost ones are not cleaned. The unreproduced table names them,
+and more restarts give each of them more chances to be found twice. An
+unstable fit also fills the shared space with the alternative
+decompositions its restarts make; the audit's own-marker false removal
+per sample shows what they cost, and raising `min_stability` prunes the
+shared space to the programs some sample's restarts agree on, at the
+price of sensitivity to the programs they do not. On the breast
+replicates, `ls_nmf` with bridge scoring cleaned better on every audit
+measure than `invsqrt_kl` with membrane scoring under any threshold.
+Projecting every
 sample onto one coherent decomposition through `fit_profiles()`, or a
 joint factorization, are the remaining options.
 
@@ -265,8 +276,8 @@ datasets <- list(
 collection <- cellAdmixCollection(datasets)          # sample_allocation = "proportional"
 consensus <- collection$fit_consensus()              # per-sample fits, matching, projection
 consensus$loss                                       # loss gap per sample
-consensus$factors                                    # coverage and recurrence per shared factor
-consensus$recurrence()                               # per factor and sample
+consensus$factors                                    # recurrence across samples and stability per shared factor
+consensus$factor_stability()                         # share of each sample's restarts per factor
 consensus$matching                                   # each sample's primary factors in the shared space
 score <- consensus$score_bridge()                    # per-sample scores, pooled summary
 rules <- score$rules()                               # pooled rules with sample_support
@@ -293,8 +304,8 @@ Python:
 collection = ca.CellAdmixCollection({"rep1": ds1, "rep2": ds2})  # sample_allocation="proportional"
 consensus = collection.fit_consensus()              # per-sample fits, matching, projection
 consensus.loss                                      # loss gap per sample
-consensus.factors                                   # coverage and recurrence per shared factor
-consensus.recurrence()                              # per factor and sample
+consensus.factors                                   # recurrence across samples and stability per shared factor
+consensus.factor_stability()                        # share of each sample's restarts per factor
 consensus.matching                                  # each sample's primary factors in the shared space
 score = consensus.score_bridge()                    # per-sample scores, pooled summary
 rules = score.rules()                               # pooled rules with sample_support

@@ -56,9 +56,9 @@ collection$fit(nmf_variant = nmf_variant, nmf_n_runs = 10L)
 log_line("per-sample fits ready in", round(as.numeric(difftime(Sys.time(), t0, units = "mins")), 1), "min")
 
 t0 <- Sys.time()
-min_recurrence <- as.numeric(Sys.getenv("CELLADMIX_MIN_RECURRENCE", "0"))
+min_stability <- as.numeric(Sys.getenv("CELLADMIX_MIN_STABILITY", "0"))
 cfit <- if (identical(mode, "consensus")) {
-  collection$fit_consensus(min_recurrence = min_recurrence, num_threads = threads)
+  collection$fit_consensus(min_stability = min_stability, num_threads = threads)
 } else if (identical(mode, "reference")) {
   own <- collection$fits[[mode_arg]]
   collection$fit_profiles(
@@ -80,7 +80,7 @@ write.csv(cfit$matching, file.path(out_dir, "matching.csv"), row.names = FALSE)
 write.csv(cfit$loss, file.path(out_dir, "loss.csv"), row.names = FALSE)
 write.csv(cfit$stability(), file.path(out_dir, "stability.csv"), row.names = FALSE)
 write.csv(cfit$factors, file.path(out_dir, "factors.csv"), row.names = FALSE)
-write.csv(cfit$recurrence(), file.path(out_dir, "recurrence.csv"), row.names = FALSE)
+write.csv(cfit$factor_stability(), file.path(out_dir, "factor_stability.csv"), row.names = FALSE)
 write.csv(cfit$unreproduced, file.path(out_dir, "unreproduced.csv"), row.names = FALSE)
 write.csv(cfit$sample_usage(), file.path(out_dir, "sample_usage.csv"), row.names = FALSE)
 write.csv(cfit$usage_divergence(), file.path(out_dir, "usage_divergence.csv"), row.names = FALSE)

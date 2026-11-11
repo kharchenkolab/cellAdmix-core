@@ -129,9 +129,10 @@ plot_grid(plotlist = lapply(names(collection$fits), function(sample) {
 ## Consensus factorization
 
 The consensus pools the factors of every restart of every sample,
-clusters them into recurring programs, keeps the programs that recur in
-at least half of some sample's restarts (`min_recurrence = 0.5`, the
-majority rule), takes the per-gene median of each program's members as
+clusters them into programs, keeps every program that at least two
+restarts agree on (`min_restarts = 2`; `min_stability`, default 0, can
+further require that some sample finds the program in a share of its
+restarts), takes the per-gene median of each program's members as
 its shared profile, and then labels every sample's molecules against the
 shared profiles. The result is one factor index that means the same
 thing in every sample. The fixed-profile labeling of each sample is
@@ -150,8 +151,8 @@ one rank means the two samples found largely the same programs; a much
 larger one means many programs were specific to one sample; a much
 smaller one means few programs recurred. **From one sample only** counts
 the shared factors whose cluster contains restarts of a single sample.
-**Sample coverage per factor** is the fraction of samples contributing
-to a factor's cluster, so a median of 1 says the typical shared program
+**Recurrence across samples per factor** is the fraction of samples
+contributing to a factor's cluster, so a median of 1 says the typical shared program
 was found in every sample. **Unreproduced components** are pooled
 factors that no second restart reproduced; they are listed, not used.
 **Primary factors in the shared space** counts, over all samples, the
@@ -163,16 +164,16 @@ their gene ownership with the shared profile they joined.
 
 One row per shared factor:
 
-- `samples` and `coverage`: the number and fraction of samples whose
+- `samples` and `recurrence`: the number and fraction of samples whose
   restarts contributed to the cluster.
 - `restarts`: how many restarts, over all samples, carried the program
   (each restart contributes at most one factor to a cluster);
   `components` counts the contributed factors before that restriction,
   so a value above `restarts` means some restart split the program in
   two.
-- `max_recurrence`: the largest fraction of any one sample's restarts
-  carrying the program; the majority rule kept the factors with a value
-  of at least 0.5.
+- `stability`: the largest share of any one sample's restarts carrying
+  the program; a low value marks a program that no sample's restarts
+  settle on, such as one of several ways the restarts split a signal.
 - `agreement`: the mean ownership correlation within the cluster, so
   how alike the contributing factors were.
 
@@ -180,18 +181,18 @@ One row per shared factor:
 show(consensus$factors)
 ```
 
-### Recurrence per sample
+### Stability per sample
 
-The recurrence table gives, per shared factor and sample, the number of
-that sample's restarts that carried the program and the fraction of its
-restarts (`recurrence`). A zero marks a program the sample never found
+The stability table gives, per shared factor and sample, the number of
+that sample's restarts that carried the program and the share of its
+restarts (`stability`). A zero marks a program the sample never found
 on its own; molecules labeled with that factor in the sample are then
 nearest-profile assignments rather than evidence of the program, which
 matters for the rule application discussed below.
 
-```{r recurrence, fig.width=9.0, fig.height=2.4}
-recurrence <- consensus$recurrence()
-ggplot(recurrence, aes(x = factor(consensus_factor), y = sample, fill = recurrence)) +
+```{r factor-stability, fig.width=9.0, fig.height=2.4}
+stability <- consensus$factor_stability()
+ggplot(stability, aes(x = factor(consensus_factor), y = sample, fill = stability)) +
   geom_tile(color = "white") +
   scale_fill_gradient(low = "grey95", high = "steelblue4", limits = c(0, 1)) +
   labs(x = "shared factor", y = NULL, fill = "share of\nrestarts") +
@@ -280,9 +281,8 @@ flags report; nothing is gated on them.
   when the sample's own restarts disagree among themselves (low
   `within_sample_stability`): the shared space then holds fewer programs
   than the sample's own fit, and admixture programs among the lost ones
-  are not cleaned. The first remedy is a more stable NMF variant or more
-  restarts; lowering `min_recurrence` admits the less reproducible
-  programs at the price of more own-marker removal.
+  are not cleaned. The unreproduced table names the lost programs, and
+  more restarts give each of them more chances to be found twice.
 - `max_usage_divergence` and `divergent_cell_type` name the cell type
   whose factor usage differs most between this sample and the pool.
 
@@ -637,7 +637,7 @@ data. A report back should include:
    the loss gap against the restart spread, the shared fraction of
    primary factors, both flags, and the most divergent cell type with its
    divergence.
-3. `consensus$factors` with the recurrence heatmap, and the stability
+3. `consensus$factors` with the stability heatmap, and the stability
    plots of the per-sample fits.
 4. The rule counts: candidates, kept, the native-check table, the
    `sample_support` distribution of the kept rules, and the pooled

@@ -164,16 +164,16 @@ class CollectionTests(unittest.TestCase):
         self.assertTrue(np.isfinite(consensus.matching["own_stability"]).all())
         factors = consensus.factors
         self.assertEqual(len(factors), len(profiles))
-        self.assertTrue({"consensus_factor", "samples", "coverage", "restarts", "components",
-                         "max_recurrence", "agreement"} <= set(factors.columns))
-        self.assertTrue(((factors["max_recurrence"] > 0) & (factors["max_recurrence"] <= 1)).all())
+        self.assertTrue({"consensus_factor", "samples", "recurrence", "restarts", "components",
+                         "stability", "agreement"} <= set(factors.columns))
+        self.assertTrue(((factors["stability"] > 0) & (factors["stability"] <= 1)).all())
         # one factorization contributes at most one component to a shared factor
         self.assertTrue((factors["components"] == factors["restarts"]).all())
         self.assertTrue((factors["restarts"] >= 2).all())
-        self.assertTrue(((factors["coverage"] > 0) & (factors["coverage"] <= 1)).all())
-        recurrence = consensus.recurrence()
-        self.assertEqual(len(recurrence), len(profiles) * 2)
-        self.assertTrue(((recurrence["recurrence"] >= 0) & (recurrence["recurrence"] <= 1)).all())
+        self.assertTrue(((factors["recurrence"] > 0) & (factors["recurrence"] <= 1)).all())
+        stability = consensus.factor_stability()
+        self.assertEqual(len(stability), len(profiles) * 2)
+        self.assertTrue(((stability["stability"] >= 0) & (stability["stability"] <= 1)).all())
         self.assertTrue({"sample", "restart", "factor", "cluster"} <= set(consensus.unreproduced.columns))
         # every pooled component is either in a shared factor or unreproduced
         self.assertEqual(int(consensus.components["consensus_factor"].notna().sum()) + len(consensus.unreproduced),
@@ -225,10 +225,10 @@ class CollectionTests(unittest.TestCase):
         # identical where every program is present, skipped elsewhere.
         present = score.correct(rules=rules, vote=0.3, apply_rules="where_present", name="present")
         self.assertEqual(present.params["apply_rules"], "where_present")
-        recurrence = consensus.recurrence()
+        stability = consensus.factor_stability()
         present_diagnostics = present.diagnostics().set_index("sample")
         for s in ("a", "b"):
-            carried = set(recurrence[(recurrence["sample"] == s) & (recurrence["restarts"] > 0)]
+            carried = set(stability[(stability["sample"] == s) & (stability["restarts"] > 0)]
                           ["consensus_factor"].astype(int))
             applied = int(rules["factor"].astype(int).isin(carried).sum())
             self.assertEqual(int(present_diagnostics.loc[s, "rules_applied"]), applied)

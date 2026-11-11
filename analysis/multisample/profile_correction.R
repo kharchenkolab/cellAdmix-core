@@ -24,7 +24,7 @@ datasets <- lapply(specs, function(s) cellAdmix(s$bundle, output_dir = s$dir,
 names(datasets) <- vapply(specs, `[[`, character(1), "sample")
 collection <- cellAdmixCollection(datasets)
 timed("fits", collection$fit(nmf_variant = "ls_nmf", nmf_n_runs = 10L))
-cfit <- timed("consensus", collection$fit_consensus(min_recurrence = 0.5, num_threads = budget))
+cfit <- timed("consensus", collection$fit_consensus(min_stability = 0.5, num_threads = budget))
 score <- timed("scoring", cfit$score_bridge())
 rules <- timed("rules", score$rules())
 kept <- rules[is.na(rules$keep) | rules$keep, , drop = FALSE]

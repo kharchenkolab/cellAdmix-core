@@ -130,10 +130,11 @@ plot_grid(plotlist = lapply(names(collection$fits), function(sample) {
 ## Consensus factorization
 
 The consensus pools the factors of every restart of every sample,
-clusters them into recurring programs, keeps the programs that recur in
-at least half of some sample’s restarts (`min_recurrence = 0.5`, the
-majority rule), takes the per-gene median of each program’s members as
-its shared profile, and then labels every sample’s molecules against the
+clusters them into programs, keeps every program that at least two
+restarts agree on (`min_restarts = 2`; `min_stability`, default 0, can
+further require that some sample finds the program in a share of its
+restarts), takes the per-gene median of each program’s members as its
+shared profile, and then labels every sample’s molecules against the
 shared profiles. The result is one factor index that means the same
 thing in every sample. The fixed-profile labeling of each sample is
 cached in that sample’s output directory under a run id derived from the
@@ -142,20 +143,14 @@ change.
 
 ``` r
 consensus <- collection$fit_consensus()
-```
-
-    ## Reusing cached run consensus_0e364129 (parameters match)
-    ## Reusing cached run consensus_0e364129 (parameters match)
-
-``` r
 consensus
 ```
 
     ## cellAdmix consensus fit
     ##   samples: rep1, rep2 
-    ##   factors: 26 (2 from one sample only) 
-    ##   sample coverage per factor: median 1 ; unreproduced components: 37 
-    ##   primary factors in the shared space: 44 of 46 ; ownership correlation median 0.932
+    ##   factors: 37 (10 from one sample only) 
+    ##   recurrence across samples per factor: median 1 ; unreproduced components: 4 
+    ##   primary factors in the shared space: 46 of 46 ; ownership correlation median 0.911
 
 The summary lines read as follows. **Factors** is the size of the shared
 space, to be compared with the per-sample rank: a shared space of about
@@ -163,29 +158,29 @@ one rank means the two samples found largely the same programs; a much
 larger one means many programs were specific to one sample; a much
 smaller one means few programs recurred. **From one sample only** counts
 the shared factors whose cluster contains restarts of a single sample.
-**Sample coverage per factor** is the fraction of samples contributing
-to a factor’s cluster, so a median of 1 says the typical shared program
-was found in every sample. **Unreproduced components** are pooled
-factors that no second restart reproduced; they are listed, not used.
-**Primary factors in the shared space** counts, over all samples, the
-factors of the selected restart (the restart that serves as the sample’s
-own fit) that joined a shared factor, with the median correlation of
-their gene ownership with the shared profile they joined.
+**Recurrence across samples per factor** is the fraction of samples
+contributing to a factor’s cluster, so a median of 1 says the typical
+shared program was found in every sample. **Unreproduced components**
+are pooled factors that no second restart reproduced; they are listed,
+not used. **Primary factors in the shared space** counts, over all
+samples, the factors of the selected restart (the restart that serves as
+the sample’s own fit) that joined a shared factor, with the median
+correlation of their gene ownership with the shared profile they joined.
 
 ### Factors
 
 One row per shared factor:
 
-  - `samples` and `coverage`: the number and fraction of samples whose
+  - `samples` and `recurrence`: the number and fraction of samples whose
     restarts contributed to the cluster.
   - `restarts`: how many restarts, over all samples, carried the program
     (each restart contributes at most one factor to a cluster);
     `components` counts the contributed factors before that restriction,
     so a value above `restarts` means some restart split the program in
     two.
-  - `max_recurrence`: the largest fraction of any one sample’s restarts
-    carrying the program; the majority rule kept the factors with a
-    value of at least 0.5.
+  - `stability`: the largest share of any one sample’s restarts carrying
+    the program; a low value marks a program that no sample’s restarts
+    settle on, such as one of several ways the restarts split a signal.
   - `agreement`: the mean ownership correlation within the cluster, so
     how alike the contributing factors were.
 
@@ -195,47 +190,58 @@ One row per shared factor:
 show(consensus$factors)
 ```
 
-| consensus\_factor | cluster | samples | coverage | restarts | components | max\_recurrence | agreement |
-| ----------------: | ------: | ------: | -------: | -------: | ---------: | --------------: | --------: |
-|                 1 |       2 |       2 |      1.0 |       20 |         20 |             1.0 |     0.896 |
-|                 2 |      11 |       2 |      1.0 |       20 |         20 |             1.0 |     0.745 |
-|                 3 |       7 |       2 |      1.0 |       20 |         20 |             1.0 |     0.839 |
-|                 4 |      13 |       2 |      1.0 |       20 |         20 |             1.0 |     0.938 |
-|                 5 |       6 |       2 |      1.0 |       20 |         20 |             1.0 |     0.846 |
-|                 6 |      10 |       2 |      1.0 |       20 |         20 |             1.0 |     0.949 |
-|                 7 |      12 |       2 |      1.0 |       20 |         20 |             1.0 |     0.809 |
-|                 8 |      18 |       2 |      1.0 |       20 |         20 |             1.0 |     0.946 |
-|                 9 |      21 |       2 |      1.0 |       20 |         20 |             1.0 |     0.918 |
-|                10 |      23 |       2 |      1.0 |       20 |         20 |             1.0 |     0.832 |
-|                11 |      19 |       2 |      1.0 |       20 |         20 |             1.0 |     0.848 |
-|                12 |       1 |       2 |      1.0 |       19 |         19 |             1.0 |     0.842 |
-|                13 |       3 |       2 |      1.0 |       19 |         19 |             1.0 |     0.861 |
-|                14 |       5 |       2 |      1.0 |       18 |         18 |             0.9 |     0.852 |
-|                15 |       9 |       2 |      1.0 |       18 |         18 |             0.9 |     0.883 |
-|                16 |       8 |       2 |      1.0 |       17 |         17 |             0.9 |     0.814 |
-|                17 |      16 |       2 |      1.0 |       17 |         17 |             1.0 |     0.947 |
-|                18 |      26 |       2 |      1.0 |       16 |         16 |             1.0 |     0.783 |
-|                19 |      17 |       2 |      1.0 |       15 |         15 |             0.8 |     0.767 |
-|                20 |      14 |       2 |      1.0 |       13 |         13 |             0.8 |     0.778 |
-|                21 |       4 |       2 |      1.0 |       12 |         12 |             0.7 |     0.776 |
-|                22 |      15 |       2 |      1.0 |       10 |         10 |             0.6 |     0.619 |
-|                23 |      27 |       2 |      1.0 |        8 |          8 |             0.5 |     0.778 |
-|                24 |      22 |       2 |      1.0 |        8 |          8 |             0.7 |     0.927 |
-|                25 |      33 |       1 |      0.5 |        7 |          7 |             0.7 |     0.682 |
-|                26 |      20 |       1 |      0.5 |        6 |          6 |             0.6 |     0.983 |
+| consensus\_factor | cluster | samples | recurrence | restarts | components | stability | agreement |
+| ----------------: | ------: | ------: | ---------: | -------: | ---------: | --------: | --------: |
+|                 1 |       2 |       2 |        1.0 |       20 |         20 |       1.0 |     0.896 |
+|                 2 |      11 |       2 |        1.0 |       20 |         20 |       1.0 |     0.745 |
+|                 3 |       7 |       2 |        1.0 |       20 |         20 |       1.0 |     0.839 |
+|                 4 |      13 |       2 |        1.0 |       20 |         20 |       1.0 |     0.938 |
+|                 5 |       6 |       2 |        1.0 |       20 |         20 |       1.0 |     0.846 |
+|                 6 |      10 |       2 |        1.0 |       20 |         20 |       1.0 |     0.949 |
+|                 7 |      12 |       2 |        1.0 |       20 |         20 |       1.0 |     0.809 |
+|                 8 |      18 |       2 |        1.0 |       20 |         20 |       1.0 |     0.946 |
+|                 9 |      21 |       2 |        1.0 |       20 |         20 |       1.0 |     0.918 |
+|                10 |      23 |       2 |        1.0 |       20 |         20 |       1.0 |     0.832 |
+|                11 |      19 |       2 |        1.0 |       20 |         20 |       1.0 |     0.848 |
+|                12 |       1 |       2 |        1.0 |       19 |         19 |       1.0 |     0.842 |
+|                13 |       3 |       2 |        1.0 |       19 |         19 |       1.0 |     0.861 |
+|                14 |       5 |       2 |        1.0 |       18 |         18 |       0.9 |     0.852 |
+|                15 |       9 |       2 |        1.0 |       18 |         18 |       0.9 |     0.883 |
+|                16 |       8 |       2 |        1.0 |       17 |         17 |       0.9 |     0.814 |
+|                17 |      16 |       2 |        1.0 |       17 |         17 |       1.0 |     0.947 |
+|                18 |      26 |       2 |        1.0 |       16 |         16 |       1.0 |     0.783 |
+|                19 |      17 |       2 |        1.0 |       15 |         15 |       0.8 |     0.767 |
+|                20 |      14 |       2 |        1.0 |       13 |         13 |       0.8 |     0.778 |
+|                21 |       4 |       2 |        1.0 |       12 |         12 |       0.7 |     0.776 |
+|                22 |      15 |       2 |        1.0 |       10 |         10 |       0.6 |     0.619 |
+|                23 |      27 |       2 |        1.0 |        8 |          8 |       0.5 |     0.778 |
+|                24 |      22 |       2 |        1.0 |        8 |          8 |       0.7 |     0.927 |
+|                25 |      24 |       2 |        1.0 |        5 |          5 |       0.3 |     0.828 |
+|                26 |      30 |       2 |        1.0 |        4 |          4 |       0.2 |     0.643 |
+|                27 |      29 |       2 |        1.0 |        3 |          3 |       0.2 |     0.746 |
+|                28 |      33 |       1 |        0.5 |        7 |          7 |       0.7 |     0.682 |
+|                29 |      20 |       1 |        0.5 |        6 |          6 |       0.6 |     0.983 |
+|                30 |      39 |       1 |        0.5 |        4 |          4 |       0.4 |     0.992 |
+|                31 |      37 |       1 |        0.5 |        4 |          4 |       0.4 |     0.949 |
+|                32 |      25 |       1 |        0.5 |        3 |          3 |       0.3 |     0.454 |
+|                33 |      28 |       1 |        0.5 |        2 |          2 |       0.2 |     0.729 |
+|                34 |      35 |       1 |        0.5 |        2 |          2 |       0.2 |     0.960 |
+|                35 |      32 |       1 |        0.5 |        2 |          2 |       0.2 |     0.982 |
+|                36 |      36 |       1 |        0.5 |        2 |          2 |       0.2 |     0.977 |
+|                37 |      38 |       1 |        0.5 |        2 |          2 |       0.2 |     0.982 |
 
-### Recurrence per sample
+### Stability per sample
 
-The recurrence table gives, per shared factor and sample, the number of
-that sample’s restarts that carried the program and the fraction of its
-restarts (`recurrence`). A zero marks a program the sample never found
-on its own; molecules labeled with that factor in the sample are then
+The stability table gives, per shared factor and sample, the number of
+that sample’s restarts that carried the program and the share of its
+restarts (`stability`). A zero marks a program the sample never found on
+its own; molecules labeled with that factor in the sample are then
 nearest-profile assignments rather than evidence of the program, which
 matters for the rule application discussed below.
 
 ``` r
-recurrence <- consensus$recurrence()
-ggplot(recurrence, aes(x = factor(consensus_factor), y = sample, fill = recurrence)) +
+stability <- consensus$factor_stability()
+ggplot(stability, aes(x = factor(consensus_factor), y = sample, fill = stability)) +
   geom_tile(color = "white") +
   scale_fill_gradient(low = "grey95", high = "steelblue4", limits = c(0, 1)) +
   labs(x = "shared factor", y = NULL, fill = "share of\nrestarts") +
@@ -243,7 +249,7 @@ ggplot(recurrence, aes(x = factor(consensus_factor), y = sample, fill = recurren
   theme(panel.grid = element_blank())
 ```
 
-<img src="breast_replicates_multisample_files/figure-gfm/recurrence-1.png" alt="" width="864" style="display: block; margin: auto;" />
+<img src="breast_replicates_multisample_files/figure-gfm/factor-stability-1.png" alt="" width="864" style="display: block; margin: auto;" />
 
 ### Matching of each sample’s own factors
 
@@ -268,19 +274,19 @@ show(matching[!matching$matched | matching$correlation < 0.8, ])
 
 | sample | sample\_factor | consensus\_factor | correlation | matched | agreement | own\_stability |
 | :----- | -------------: | ----------------: | ----------: | :------ | --------: | -------------: |
-| rep1   |             15 |                20 |       0.769 | TRUE    |     0.679 |          0.494 |
-| rep1   |             20 |                NA |          NA | FALSE   |     0.982 |          0.115 |
-| rep2   |              1 |                21 |       0.781 | TRUE    |     0.713 |          0.799 |
-| rep2   |             12 |                19 |       0.747 | TRUE    |     0.779 |          0.647 |
-| rep2   |             18 |                NA |          NA | FALSE   |     0.756 |          0.044 |
-| rep2   |             22 |                10 |       0.714 | TRUE    |     0.840 |          0.984 |
+| rep1   |             15 |                20 |       0.722 | TRUE    |     0.679 |          0.494 |
+| rep2   |              1 |                21 |       0.778 | TRUE    |     0.713 |          0.799 |
+| rep2   |             12 |                19 |       0.767 | TRUE    |     0.779 |          0.647 |
+| rep2   |             15 |                 7 |       0.791 | TRUE    |     0.813 |          0.886 |
+| rep2   |             18 |                25 |       0.755 | TRUE    |     0.756 |          0.044 |
+| rep2   |             22 |                10 |       0.797 | TRUE    |     0.840 |          0.984 |
 
 ``` r
 unreproduced <- consensus$unreproduced
 cat(nrow(unreproduced), "unreproduced components; from a primary restart:\n")
 ```
 
-    ## 37 unreproduced components; from a primary restart:
+    ## 4 unreproduced components; from a primary restart:
 
 ``` r
 show(unreproduced[unreproduced$selected, ])
@@ -288,8 +294,6 @@ show(unreproduced[unreproduced$selected, ])
 
 | sample | restart | factor | group | selected | cluster | agreement | consensus\_factor |
 | :----- | ------: | -----: | ----: | :------- | ------: | --------: | ----------------: |
-| rep1   |      10 |     20 |    10 | TRUE     |      32 |     0.982 |                NA |
-| rep2   |       5 |     18 |    15 | TRUE     |      24 |     0.756 |                NA |
 
 ### Representation of each sample
 
@@ -308,8 +312,8 @@ show(consensus$loss, digits = 4)
 
 | sample | own\_loss | consensus\_loss | loss\_gap | restart\_spread |
 | :----- | --------: | --------------: | --------: | --------------: |
-| rep1   |  341.5532 |        338.7613 |  \-0.0082 |          0.0055 |
-| rep2   |  344.1052 |        342.6633 |  \-0.0042 |          0.0048 |
+| rep1   |  341.5532 |        327.0308 |  \-0.0425 |          0.0055 |
+| rep2   |  344.1052 |        330.0449 |  \-0.0409 |          0.0048 |
 
 The stability table places each sample’s within-sample restart stability
 next to the agreement of its restarts, aligned to the shared factors,
@@ -323,8 +327,8 @@ show(consensus$stability())
 
 | sample | within\_sample\_stability | consensus\_agreement | members |
 | :----- | ------------------------: | -------------------: | ------: |
-| rep1   |                     0.845 |                0.907 |      21 |
-| rep2   |                     0.811 |                0.907 |      21 |
+| rep1   |                     0.845 |                0.942 |      21 |
+| rep2   |                     0.811 |                0.942 |      21 |
 
 Factor usage compares how the samples use the shared factors. For every
 cell type, `sample_usage()` gives the share of the type’s molecules
@@ -341,16 +345,16 @@ samples, which points to a sample effect in the factorization.
 show(head(consensus$usage_divergence(), 8))
 ```
 
-| cell\_type                  | divergence | molecules |
-| :-------------------------- | ---------: | --------: |
-| Perivascular-Like           |      0.039 |    174886 |
-| Mast\_Cells                 |      0.038 |     51367 |
-| Stromal                     |      0.036 |  20375495 |
-| IRF7+\_DCs                  |      0.031 |    145267 |
-| Macrophages\_2              |      0.030 |    632248 |
-| DCIS\_2                     |      0.027 |   6821572 |
-| DCIS\_1                     |      0.023 |   6796373 |
-| Stromal\_&\_T\_Cell\_Hybrid |      0.023 |    134214 |
+| cell\_type                | divergence | molecules |
+| :------------------------ | ---------: | --------: |
+| Mast\_Cells               |      0.058 |     51367 |
+| DCIS\_1                   |      0.058 |   6796373 |
+| Perivascular-Like         |      0.046 |    174886 |
+| DCIS\_2                   |      0.045 |   6821572 |
+| T\_Cell\_&\_Tumor\_Hybrid |      0.033 |    141971 |
+| Stromal                   |      0.032 |  20375495 |
+| IRF7+\_DCs                |      0.032 |    145267 |
+| Macrophages\_2            |      0.028 |    632248 |
 
 ### Per-sample summary and flags
 
@@ -369,9 +373,9 @@ report; nothing is gated on them.
     fires when the sample’s own restarts disagree among themselves (low
     `within_sample_stability`): the shared space then holds fewer
     programs than the sample’s own fit, and admixture programs among the
-    lost ones are not cleaned. The first remedy is a more stable NMF
-    variant or more restarts; lowering `min_recurrence` admits the less
-    reproducible programs at the price of more own-marker removal.
+    lost ones are not cleaned. The unreproduced table names the lost
+    programs, and more restarts give each of them more chances to be
+    found twice.
   - `max_usage_divergence` and `divergent_cell_type` name the cell type
     whose factor usage differs most between this sample and the pool.
 
@@ -383,8 +387,8 @@ show(consensus$diagnostics(), digits = 4)
 
 | sample | loss\_gap | restart\_spread | representation\_flag | primary\_factors | primary\_factors\_shared | shared\_fraction | shared\_factors\_flag | within\_sample\_stability | consensus\_agreement | max\_usage\_divergence | divergent\_cell\_type |
 | :----- | --------: | --------------: | :------------------- | ---------------: | -----------------------: | ---------------: | :-------------------- | ------------------------: | -------------------: | ---------------------: | :-------------------- |
-| rep1   |  \-0.0082 |          0.0055 | FALSE                |               23 |                       22 |           0.9565 | FALSE                 |                    0.8453 |               0.9073 |                 0.0376 | Mast\_Cells           |
-| rep2   |  \-0.0042 |          0.0048 | FALSE                |               23 |                       22 |           0.9565 | FALSE                 |                    0.8110 |               0.9073 |                 0.0389 | Perivascular-Like     |
+| rep1   |  \-0.0425 |          0.0055 | FALSE                |               23 |                       23 |                1 | FALSE                 |                    0.8453 |               0.9424 |                 0.0581 | Mast\_Cells           |
+| rep2   |  \-0.0409 |          0.0048 | FALSE                |               23 |                       23 |                1 | FALSE                 |                    0.8110 |               0.9424 |                 0.0575 | DCIS\_1               |
 
 ## Pooled scoring and rules
 
@@ -407,14 +411,14 @@ show(head(pooled[order(pooled$p_value, -pooled$mean_score), ], 8))
 
 | target\_cell\_type | source\_cell\_type | factor | n\_pairs | mean\_score | mean\_null\_score | p\_value | neg\_log10\_p | n\_samples |
 | :----------------- | :----------------- | -----: | -------: | ----------: | ----------------: | -------: | ------------: | ---------: |
-| CD4+\_T\_Cells     | Endothelial        |      5 |      542 |       0.326 |             0.077 |        0 |           300 |          2 |
-| CD4+\_T\_Cells     | B\_Cells           |      6 |      304 |       0.308 |             0.082 |        0 |           300 |          2 |
-| Perivascular-Like  | Endothelial        |      5 |      355 |       0.290 |             0.066 |        0 |           300 |          2 |
-| CD8+\_T\_Cells     | Endothelial        |      5 |      507 |       0.273 |             0.059 |        0 |           300 |          2 |
-| CD4+\_T\_Cells     | Macrophages\_2     |      4 |      309 |       0.271 |             0.074 |        0 |           300 |          2 |
-| CD8+\_T\_Cells     | B\_Cells           |      6 |      477 |       0.267 |             0.061 |        0 |           300 |          2 |
-| Macrophages\_1     | B\_Cells           |      6 |      521 |       0.264 |             0.056 |        0 |           300 |          2 |
-| Stromal            | B\_Cells           |      6 |      800 |       0.247 |             0.055 |        0 |           300 |          2 |
+| CD4+\_T\_Cells     | B\_Cells           |      6 |      299 |       0.308 |             0.085 |        0 |           300 |          2 |
+| CD4+\_T\_Cells     | Endothelial        |      5 |      451 |       0.297 |             0.062 |        0 |           300 |          2 |
+| CD4+\_T\_Cells     | Macrophages\_2     |      4 |      310 |       0.276 |             0.081 |        0 |           300 |          2 |
+| Macrophages\_1     | B\_Cells           |      6 |      500 |       0.271 |             0.055 |        0 |           300 |          2 |
+| CD8+\_T\_Cells     | B\_Cells           |      6 |      469 |       0.267 |             0.066 |        0 |           300 |          2 |
+| Stromal            | B\_Cells           |      6 |      800 |       0.246 |             0.052 |        0 |           300 |          2 |
+| Myoepi\_ACTA2+     | Stromal            |     12 |      800 |       0.245 |             0.065 |        0 |           300 |          2 |
+| CD8+\_T\_Cells     | Endothelial        |      5 |      407 |       0.240 |             0.053 |        0 |           300 |          2 |
 
 In the pooled summary, `n_pairs` is the number of target-source cell
 pairs the evidence rests on, `mean_score` and `mean_null_score` the
@@ -441,7 +445,7 @@ rules <- score$rules()
 cat(nrow(rules), "candidate rules;", sum(rules$keep), "kept\n")
 ```
 
-    ## 322 candidate rules; 272 kept
+    ## 393 candidate rules; 326 kept
 
 ``` r
 table(native_check = rules$native_check, keep = rules$keep)
@@ -449,19 +453,19 @@ table(native_check = rules$native_check, keep = rules$keep)
 
     ##                   keep
     ## native_check       FALSE TRUE
-    ##   native_median       18    0
-    ##   native_outlier      15    0
+    ##   native_median       20    0
+    ##   native_outlier      21    0
     ##   no_exposed_cells     1    0
-    ##   no_gradient         16    0
-    ##   pass                 0  272
+    ##   no_gradient         25    0
+    ##   pass                 0  326
 
 ``` r
 table(sample_support = rules$sample_support[rules$keep])
 ```
 
     ## sample_support
-    ## 0.5   1 
-    ##  39 233
+    ##   0 0.5   1 
+    ##   1  53 272
 
 The verdicts of the native-factor check: `native_median` when target
 cells with no source cell among their neighbors still carry the factor
@@ -505,7 +509,7 @@ run concurrently within a thread budget, here 32 threads.
 correction <- score$correct(rules = rules, num_threads = 32)
 ```
 
-    ## Pooled ensemble correction over 10 members shared by 2 samples: molecules removed by >= 3 members (vote >= 0.30) are dropped (rep1: 9,170,383, rep2: 7,129,175).
+    ## Pooled ensemble correction over 10 members shared by 2 samples: molecules removed by >= 3 members (vote >= 0.30) are dropped (rep1: 9,159,867, rep2: 7,155,523).
 
 ``` r
 correction
@@ -513,7 +517,7 @@ correction
 
     ## cellAdmix collection correction
     ##   samples: rep1, rep2 
-    ##   molecules removed: 9,170,383, 7,129,175
+    ##   molecules removed: 9,159,867, 7,155,523
 
 The rules carried by the correction gain two columns: `support`, the
 fraction of ensemble members whose own rules contain the rule’s source
@@ -528,7 +532,7 @@ summary(applied$support)
 ```
 
     ##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-    ##   0.200   0.900   1.000   0.911   1.000   1.000
+    ##  0.2000  0.9000  1.0000  0.9071  1.0000  1.0000
 
 ``` r
 table(samples_without_program = applied$samples_without_program)
@@ -536,7 +540,7 @@ table(samples_without_program = applied$samples_without_program)
 
     ## samples_without_program
     ##      rep1 rep2 
-    ##  269    2    1
+    ##  276   29   21
 
 The correction summary reports, per sample and cell type, the number of
 cells, how many were modified, molecule counts before and after, the
@@ -553,8 +557,8 @@ show(removal[removal$cell_type == "all", ])
 
 | sample | cell\_type | n\_cells | n\_modified\_cells | fraction\_cells\_modified | molecules\_before | molecules\_after | molecules\_removed | fraction\_molecules\_removed | median\_removed\_per\_modified\_cell | median\_fraction\_removed\_per\_modified\_cell |
 | :----- | :--------- | -------: | -----------------: | ------------------------: | ----------------: | ---------------: | -----------------: | ---------------------------: | -----------------------------------: | ---------------------------------------------: |
-| rep1   | all        |   166534 |             157723 |                     0.947 |          39668814 |         30498431 |            9170383 |                        0.231 |                                   30 |                                          0.182 |
-| rep2   | all        |   118710 |             114693 |                     0.966 |          29089452 |         21960277 |            7129175 |                        0.245 |                                   38 |                                          0.220 |
+| rep1   | all        |   166534 |             157007 |                     0.943 |          39668814 |         30508947 |            9159867 |                        0.231 |                                   31 |                                          0.188 |
+| rep2   | all        |   118710 |             114386 |                     0.964 |          29089452 |         21933929 |            7155523 |                        0.246 |                                   39 |                                          0.227 |
 
 For replicates the per-type removal fractions should track each other,
 which is the direct reading of whether the sections were cleaned alike.
@@ -649,19 +653,11 @@ report <- audit$evaluate(correction)
 
     ## Warning: Correction removed only 3% of the estimated ~84,515 admixed molecules from DCIS_1 into DCIS_2
 
-    ## Warning: Correction removed only 17% of the estimated ~27,746 admixed molecules from DCIS_1 into
-    ## Myoepi_ACTA2+
-
-    ## Warning: Correction removed only 18% of the estimated ~62,415 admixed molecules from DCIS_1 into
-    ## Myoepi_KRT15+
-
-    ## Warning: Correction removed only 8% of the estimated ~41,934 admixed molecules from DCIS_2 into
+    ## Warning: Correction removed only 14% of the estimated ~41,934 admixed molecules from DCIS_2 into
     ## Invasive_Tumor
 
-    ## Warning: Correction removed only 4% of the estimated ~393,234 admixed molecules from DCIS_2 into
+    ## Warning: Correction removed only 7% of the estimated ~393,234 admixed molecules from DCIS_2 into
     ## Myoepi_ACTA2+
-
-    ## Warning: Correction removed only 4% of the estimated ~94,659 admixed molecules from DCIS_2 into Myoepi_KRT15+
 
     ## Warning: Correction removed only 0% of the estimated ~158,738 admixed molecules from Invasive_Tumor into
     ## DCIS_1
@@ -669,31 +665,31 @@ report <- audit$evaluate(correction)
     ## Warning: Correction removed only 0% of the estimated ~423,609 admixed molecules from Invasive_Tumor into
     ## DCIS_2
 
-    ## Warning: Correction removed only 4% of the estimated ~16,642 admixed molecules from IRF7+_DCs into
+    ## Warning: Correction removed only 3% of the estimated ~16,642 admixed molecules from IRF7+_DCs into
     ## CD4+_T_Cells
 
-    ## Warning: Correction removed only 0% of the estimated ~24,788 admixed molecules from IRF7+_DCs into
+    ## Warning: Correction removed only 5% of the estimated ~24,788 admixed molecules from IRF7+_DCs into
     ## CD8+_T_Cells
 
-    ## Warning: Correction removed only 7% of the estimated ~14,430 admixed molecules from LAMP3+_DCs into
+    ## Warning: Correction removed only 0% of the estimated ~14,430 admixed molecules from LAMP3+_DCs into
     ## CD4+_T_Cells
 
-    ## Warning: Correction removed only 0% of the estimated ~11,087 admixed molecules from LAMP3+_DCs into
+    ## Warning: Correction removed only 11% of the estimated ~11,087 admixed molecules from LAMP3+_DCs into
     ## CD8+_T_Cells
 
-    ## Warning: Correction removed only 10% of the estimated ~29,210 admixed molecules from Macrophages_1 into
+    ## Warning: Correction removed only 6% of the estimated ~29,210 admixed molecules from Macrophages_1 into
     ## Macrophages_2
 
-    ## Warning: Correction removed only 0% of the estimated ~83,102 admixed molecules from Myoepi_ACTA2+ into
+    ## Warning: Correction removed only 12% of the estimated ~83,102 admixed molecules from Myoepi_ACTA2+ into
     ## Myoepi_KRT15+
 
-    ## Warning: Correction removed only 9% of the estimated ~105,699 admixed molecules from Myoepi_KRT15+ into
+    ## Warning: Correction removed only 0% of the estimated ~105,699 admixed molecules from Myoepi_KRT15+ into
     ## Myoepi_ACTA2+
 
     ## Warning: Correction removed only 0% of the estimated ~41,752 admixed molecules from Perivascular-Like into
     ## Endothelial
 
-    ## Warning: Correction removed only 0% of the estimated ~10,734 admixed molecules from Perivascular-Like into
+    ## Warning: Correction removed only 5% of the estimated ~10,734 admixed molecules from Perivascular-Like into
     ## Myoepi_ACTA2+
 
     ## Warning: Correction removed only 0% of the estimated ~65,391 admixed molecules from Prolif_Invasive_Tumor
@@ -702,10 +698,7 @@ report <- audit$evaluate(correction)
     ## Warning: Correction removed only 0% of the estimated ~1,524,852 admixed molecules from Prolif_Invasive_Tumor
     ## into Invasive_Tumor
 
-    ## Warning: Correction removed only 20% of the estimated ~24,477 admixed molecules from Prolif_Invasive_Tumor
-    ## into Myoepi_ACTA2+
-
-    ## Warning: Correction removed only 3% of the estimated ~6,306 admixed molecules from Prolif_Invasive_Tumor into
+    ## Warning: Correction removed only 0% of the estimated ~6,306 admixed molecules from Prolif_Invasive_Tumor into
     ## T_Cell_&_Tumor_Hybrid
 
     ## Warning: Correction removed only 0% of the estimated ~145,545 admixed molecules from CD4+_T_Cells into
@@ -719,15 +712,7 @@ report <- audit$evaluate(correction)
     ## Warning: Correction removed only 0% of the estimated ~354,017 admixed molecules from DCIS_1 into
     ## Myoepi_ACTA2+
 
-    ## Warning: Correction removed only 4% of the estimated ~68,806 admixed molecules from DCIS_1 into Myoepi_KRT15+
-
     ## Warning: Correction removed only 0% of the estimated ~76,588 admixed molecules from DCIS_2 into DCIS_1
-
-    ## Warning: Correction removed only 11% of the estimated ~35,353 admixed molecules from DCIS_2 into
-    ## Myoepi_ACTA2+
-
-    ## Warning: Correction removed only 18% of the estimated ~61,478 admixed molecules from DCIS_2 into
-    ## Myoepi_KRT15+
 
     ## Warning: Correction removed only 0% of the estimated ~119,268 admixed molecules from Invasive_Tumor into
     ## DCIS_1
@@ -735,32 +720,20 @@ report <- audit$evaluate(correction)
     ## Warning: Correction removed only 12% of the estimated ~43,420 admixed molecules from Invasive_Tumor into
     ## DCIS_2
 
-    ## Warning: Correction removed only 12% of the estimated ~55,871 admixed molecules from Invasive_Tumor into
-    ## Myoepi_ACTA2+
-
-    ## Warning: Correction removed only 8% of the estimated ~16,438 admixed molecules from IRF7+_DCs into
+    ## Warning: Correction removed only 6% of the estimated ~16,438 admixed molecules from IRF7+_DCs into
     ## CD4+_T_Cells
 
-    ## Warning: Correction removed only 9% of the estimated ~22,796 admixed molecules from IRF7+_DCs into
+    ## Warning: Correction removed only 18% of the estimated ~22,796 admixed molecules from IRF7+_DCs into
     ## CD8+_T_Cells
 
-    ## Warning: Correction removed only 9% of the estimated ~12,739 admixed molecules from LAMP3+_DCs into
+    ## Warning: Correction removed only 2% of the estimated ~12,739 admixed molecules from LAMP3+_DCs into
     ## CD4+_T_Cells
 
-    ## Warning: Correction removed only 0% of the estimated ~7,541 admixed molecules from LAMP3+_DCs into
-    ## CD8+_T_Cells
-
-    ## Warning: Correction removed only 0% of the estimated ~85,072 admixed molecules from Myoepi_ACTA2+ into
-    ## Myoepi_KRT15+
-
-    ## Warning: Correction removed only 10% of the estimated ~136,553 admixed molecules from Myoepi_KRT15+ into
+    ## Warning: Correction removed only 3% of the estimated ~136,553 admixed molecules from Myoepi_KRT15+ into
     ## Myoepi_ACTA2+
 
     ## Warning: Correction removed only 0% of the estimated ~25,169 admixed molecules from Perivascular-Like into
     ## Endothelial
-
-    ## Warning: Correction removed only 11% of the estimated ~3,764 admixed molecules from Perivascular-Like into
-    ## Myoepi_ACTA2+
 
     ## Warning: Correction removed only 0% of the estimated ~25,915 admixed molecules from Prolif_Invasive_Tumor
     ## into DCIS_1
@@ -774,8 +747,8 @@ show(report$summary())
 
 | sample | detected\_pairs | estimated\_admixed\_molecules | leakage\_removed\_overall | median\_pair\_sensitivity | own\_marker\_false\_removal | worst\_false\_removal       |
 | :----- | --------------: | ----------------------------: | ------------------------: | ------------------------: | --------------------------: | :-------------------------- |
-| rep1   |             172 |                      12086775 |                     0.618 |                     0.884 |                       0.011 | Stromal\_&\_T\_Cell\_Hybrid |
-| rep2   |             149 |                      10251316 |                     0.684 |                     0.882 |                       0.017 | Stromal\_&\_T\_Cell\_Hybrid |
+| rep1   |             172 |                      12086775 |                     0.627 |                     0.839 |                       0.014 | Stromal\_&\_T\_Cell\_Hybrid |
+| rep2   |             149 |                      10251316 |                     0.697 |                     0.860 |                       0.020 | Stromal\_&\_T\_Cell\_Hybrid |
 
 The warnings list the detected pairs of which the correction removed
 less than a fifth. On these sections they are of one kind: pairs of cell
@@ -819,16 +792,16 @@ report_pairs <- report_pairs[order(report_pairs$sensitivity), ]
 show(head(report_pairs[, c("sample", "source", "target", "admixed_molecules", "sensitivity")], 8))
 ```
 
-| sample | source            | target                    | admixed\_molecules | sensitivity |
-| :----- | :---------------- | :------------------------ | -----------------: | ----------: |
-| rep2   | Perivascular-Like | Endothelial               |              25169 |     \-0.315 |
-| rep1   | Perivascular-Like | Endothelial               |              41752 |     \-0.299 |
-| rep1   | LAMP3+\_DCs       | CD8+\_T\_Cells            |              11087 |     \-0.100 |
-| rep1   | CD4+\_T\_Cells    | CD8+\_T\_Cells            |             173203 |     \-0.073 |
-| rep2   | LAMP3+\_DCs       | CD8+\_T\_Cells            |               7541 |     \-0.068 |
-| rep1   | Myoepi\_ACTA2+    | Myoepi\_KRT15+            |              83102 |     \-0.062 |
-| rep1   | CD4+\_T\_Cells    | T\_Cell\_&\_Tumor\_Hybrid |               2629 |     \-0.052 |
-| rep2   | CD4+\_T\_Cells    | CD8+\_T\_Cells            |             145545 |     \-0.044 |
+| sample | source                  | target                    | admixed\_molecules | sensitivity |
+| :----- | :---------------------- | :------------------------ | -----------------: | ----------: |
+| rep1   | Myoepi\_KRT15+          | Stromal                   |                883 |     \-1.481 |
+| rep2   | Perivascular-Like       | Endothelial               |              25169 |     \-0.167 |
+| rep1   | Perivascular-Like       | Endothelial               |              41752 |     \-0.119 |
+| rep1   | CD4+\_T\_Cells          | T\_Cell\_&\_Tumor\_Hybrid |               2629 |     \-0.072 |
+| rep1   | Prolif\_Invasive\_Tumor | Invasive\_Tumor           |            1524852 |     \-0.055 |
+| rep1   | CD4+\_T\_Cells          | CD8+\_T\_Cells            |             173203 |     \-0.051 |
+| rep2   | Prolif\_Invasive\_Tumor | Invasive\_Tumor           |             613924 |     \-0.043 |
+| rep1   | LAMP3+\_DCs             | CD4+\_T\_Cells            |              14430 |     \-0.037 |
 
 Two further views complete the verification and read the same with any
 number of samples. The first is the estimated admixture of each sample’s
@@ -884,8 +857,8 @@ show(correction$diagnostics(report), digits = 4)
 
 | sample | rules\_applied | rules\_without\_local\_evidence | removed\_without\_local\_evidence | rules\_on\_absent\_programs | removed\_via\_absent\_programs | molecules\_removed | leakage\_removed\_overall | median\_pair\_sensitivity | own\_marker\_false\_removal | false\_removal\_flag |
 | :----- | -------------: | ------------------------------: | --------------------------------: | --------------------------: | -----------------------------: | -----------------: | ------------------------: | ------------------------: | --------------------------: | :------------------- |
-| rep1   |            272 |                               6 |                            0.0017 |                           2 |                         0.0003 |            9170383 |                    0.6181 |                    0.8845 |                      0.0114 | FALSE                |
-| rep2   |            272 |                              33 |                            0.0035 |                           1 |                         0.0000 |            7129175 |                    0.6845 |                    0.8821 |                      0.0166 | FALSE                |
+| rep1   |            326 |                              24 |                            0.0031 |                          29 |                         0.0172 |            9159867 |                    0.6273 |                    0.8392 |                      0.0137 | FALSE                |
+| rep2   |            326 |                              31 |                            0.0026 |                          21 |                         0.0195 |            7155523 |                    0.6965 |                    0.8596 |                      0.0196 | FALSE                |
 
 ## Replicate agreement
 
@@ -925,24 +898,24 @@ show(agreement)
 | cell\_type                  | uncorrected | corrected |
 | :-------------------------- | ----------: | --------: |
 | B\_Cells                    |       0.992 |     0.988 |
-| CD4+\_T\_Cells              |       0.995 |     0.990 |
-| CD8+\_T\_Cells              |       0.993 |     0.990 |
-| DCIS\_1                     |       0.964 |     0.980 |
+| CD4+\_T\_Cells              |       0.995 |     0.991 |
+| CD8+\_T\_Cells              |       0.993 |     0.989 |
+| DCIS\_1                     |       0.964 |     0.981 |
 | DCIS\_2                     |       0.967 |     0.980 |
-| Endothelial                 |       0.991 |     0.991 |
-| Invasive\_Tumor             |       0.996 |     0.996 |
-| IRF7+\_DCs                  |       0.974 |     0.970 |
-| LAMP3+\_DCs                 |       0.950 |     0.964 |
-| Macrophages\_1              |       0.993 |     0.992 |
-| Macrophages\_2              |       0.973 |     0.969 |
-| Mast\_Cells                 |       0.949 |     0.952 |
+| Endothelial                 |       0.991 |     0.990 |
+| Invasive\_Tumor             |       0.996 |     0.997 |
+| IRF7+\_DCs                  |       0.974 |     0.967 |
+| LAMP3+\_DCs                 |       0.950 |     0.960 |
+| Macrophages\_1              |       0.993 |     0.991 |
+| Macrophages\_2              |       0.973 |     0.970 |
+| Mast\_Cells                 |       0.949 |     0.945 |
 | Myoepi\_ACTA2+              |       0.993 |     0.992 |
-| Myoepi\_KRT15+              |       0.991 |     0.989 |
-| Perivascular-Like           |       0.971 |     0.973 |
+| Myoepi\_KRT15+              |       0.991 |     0.988 |
+| Perivascular-Like           |       0.971 |     0.969 |
 | Prolif\_Invasive\_Tumor     |       0.995 |     0.992 |
 | Stromal                     |       0.990 |     0.995 |
-| Stromal\_&\_T\_Cell\_Hybrid |       0.972 |     0.975 |
-| T\_Cell\_&\_Tumor\_Hybrid   |       0.976 |     0.974 |
+| Stromal\_&\_T\_Cell\_Hybrid |       0.972 |     0.974 |
+| T\_Cell\_&\_Tumor\_Hybrid   |       0.976 |     0.972 |
 
 ``` r
 ggplot(agreement, aes(x = uncorrected, y = corrected, label = cell_type)) +
@@ -1008,7 +981,7 @@ data. A report back should include:
     factors, the loss gap against the restart spread, the shared
     fraction of primary factors, both flags, and the most divergent cell
     type with its divergence.
-3.  `consensus$factors` with the recurrence heatmap, and the stability
+3.  `consensus$factors` with the stability heatmap, and the stability
     plots of the per-sample fits.
 4.  The rule counts: candidates, kept, the native-check table, the
     `sample_support` distribution of the kept rules, and the pooled

@@ -118,16 +118,16 @@ test_that("a consensus factorization pools two samples end to end", {
   expect_true(all(is.finite(consensus$matching$own_stability)))
   factors <- consensus$factors
   expect_equal(nrow(factors), nrow(profiles))
-  expect_true(all(c("consensus_factor", "samples", "coverage", "restarts", "components",
-    "max_recurrence", "agreement") %in% names(factors)))
-  expect_true(all(factors$max_recurrence > 0 & factors$max_recurrence <= 1))
+  expect_true(all(c("consensus_factor", "samples", "recurrence", "restarts", "components",
+    "stability", "agreement") %in% names(factors)))
+  expect_true(all(factors$stability > 0 & factors$stability <= 1))
   # one factorization contributes at most one component to a shared factor
   expect_true(all(factors$components == factors$restarts))
   expect_true(all(factors$restarts >= 2L))
-  expect_true(all(factors$coverage > 0 & factors$coverage <= 1))
-  recurrence <- consensus$recurrence()
-  expect_equal(nrow(recurrence), nrow(profiles) * 2L)
-  expect_true(all(recurrence$recurrence >= 0 & recurrence$recurrence <= 1))
+  expect_true(all(factors$recurrence > 0 & factors$recurrence <= 1))
+  stability <- consensus$factor_stability()
+  expect_equal(nrow(stability), nrow(profiles) * 2L)
+  expect_true(all(stability$stability >= 0 & stability$stability <= 1))
   expect_true(all(c("sample", "restart", "factor", "cluster") %in% names(consensus$unreproduced)))
   # every pooled component is either in a shared factor or unreproduced
   expect_equal(sum(!is.na(consensus$components$consensus_factor)) + nrow(consensus$unreproduced),
@@ -188,10 +188,10 @@ test_that("a consensus factorization pools two samples end to end", {
   # identical where every program is present, skipped elsewhere.
   present <- score$correct(rules = rules, vote = 0.3, apply_rules = "where_present", name = "present")
   expect_equal(present$params$apply_rules, "where_present")
-  recurrence <- consensus$recurrence()
+  stability <- consensus$factor_stability()
   present_diagnostics <- present$diagnostics()
   for (sample in c("a", "b")) {
-    carried <- recurrence$consensus_factor[recurrence$sample == sample & recurrence$restarts > 0]
+    carried <- stability$consensus_factor[stability$sample == sample & stability$restarts > 0]
     applied <- sum(as.integer(rules$factor) %in% carried)
     expect_equal(present_diagnostics$rules_applied[present_diagnostics$sample == sample], applied)
     expect_equal(present_diagnostics$rules_on_absent_programs[present_diagnostics$sample == sample],

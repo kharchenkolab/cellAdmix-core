@@ -80,7 +80,7 @@ cat(sprintf("%d samples; restart spreads %s\n", length(samples), paste(sprintf("
 rows <- list()
 st <- star(); rows[[1]] <- describe("star (pairwise)", st$profiles, st$coverage)
 cons <- cellAdmixCore:::.celladmix_consensus_profiles(pools, weights, selected, match_min = 0.3, min_restarts = 2L)
-rows[[2]] <- describe("pooled clustering", cons$profiles, cons$factors$coverage)
+rows[[2]] <- describe("pooled clustering", cons$profiles, cons$factors$recurrence)
 write.csv(do.call(rbind, rows), file.path(out_dir, "factor_space.csv"), row.names = FALSE)
 write.csv(cons$factors, file.path(out_dir, "pooled_factors.csv"), row.names = FALSE)
 gaps <- data.frame(sample = samples, restart_spread = spread,
