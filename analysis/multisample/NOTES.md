@@ -1261,3 +1261,108 @@ fired shared-factor flag. The example pages are re-rendered under the
 new default (37 shared factors on the replicates). Open: a KL fit without
 the gene weighting to test the cause of the noise tail; across-sample
 recurrence as an optional admission gate.
+
+## Loop 16 (2026-11-11): the KL noise tail is a sparse-row effect, not the gene weighting
+
+Trigger. The user asked for the KL fit without the inverse-square-root
+gene weighting and for the comparison with `ls_nmf`; the weighting had
+been chosen from examples, to avoid factors dominated by single genes,
+not by a robust evaluation. The core already has `kl` (raw neighborhood
+counts) and `sqrt_kl` (square-root counts) next to `invsqrt_kl`.
+
+Observed, rank ladder (`rank_ladder.R`, 10 restarts, 150 iterations,
+20-molecule neighborhoods, 10,000 training rows;
+`results/variant_ladder.csv`; mean one-to-one stability / share of the
+molecules in factors more than 30% unrepresentable in other restarts):
+
+| data | rank | `ls_nmf` | `kl` | `sqrt_kl` | `invsqrt_kl` |
+|---|---|---|---|---|---|
+| breast rep1 | 5 | | 0.77 / 0% | 0.73 / 17% | 0.53 / 4% |
+| breast rep1 | 8 | 0.94 / 0% | 0.69 / 10% | 0.66 / 15% | 0.47 / 14% |
+| breast rep1 | 12 | 0.80 / 1% | 0.55 / 42% | 0.53 / 24% | 0.42 / 10% |
+| breast rep1 | 16 | 0.80 / 0% | 0.53 / 52% | 0.49 / 59% | 0.36 / 18% |
+| breast rep1 | 23 | 0.82 / 1% | 0.43 / 56% | 0.40 / 47% | 0.31 / 24% |
+| breast rep2 | 23 | 0.79 / 1% | 0.44 / 43% | 0.41 / 73% | 0.31 / 27% |
+| pancreas left | 9 | 0.85 / 0% | 0.69 / 30% | 0.56 / 32% | 0.41 / 10% |
+| pancreas right | 9 | 0.78 / 5% | 0.58 / 12% | 0.48 / 18% | 0.30 / 6% |
+| pancreas left | 14 | 0.80 / 2% | 0.56 / 20% | 0.50 / 24% | 0.31 / 9% |
+| pancreas right | 14 | 0.85 / 0% | 0.47 / 33% | 0.39 / 28% | 0.25 / 9% |
+
+Observed, factor character of the selected restart (`factor_character.R`;
+`results/variant_factor_character.csv`, per factor in
+`results/variant_factors.csv`): single-gene factors are factors with more
+than half of their unit-sum loading on one gene; a cell type has a home
+factor when one factor holds at least half of its molecules.
+
+| fit | single-gene factors (molecule share) | median effective genes | mass-weighted purity | cell types with a home factor |
+|---|---|---|---|---|
+| breast rep1 `ls_nmf` 23 | 0 | 36 | 0.53 | 13 of 19 |
+| breast rep1 `invsqrt_kl` 23 | 0 | 17 | 0.48 | 5 of 19 |
+| breast rep1 `sqrt_kl` 23 | 0 | 11 | 0.45 | 1 of 19 |
+| breast rep1 `kl` 23 | 2 (9%) | 10 | 0.45 | 0 of 19 |
+| pancreas right `ls_nmf` 9 | 0 | 50 | 0.73 | 5 of 7 |
+| pancreas right `invsqrt_kl` 9 | 0 | 41 | 0.65 | 4 of 7 |
+| pancreas right `kl` 9 | 3 (58%) | 26 | 0.65 | 4 of 7 |
+
+On the pancreas right half the raw-count fit puts AMY2A (97% of its
+factor's loading), GATM (76%) and CFTR (58%) into single-gene factors
+holding 58% of the molecules, the acinar program in pieces; `ls_nmf` does
+the same for AMY2A (79%) and INS (61%) at rank 14. On the breast the
+raw-count fit splits the tumor program into GATA3, CCND1, TACSTD2,
+ERBB2 (79%) and ANKRD30A pieces with 2 to 13 effective genes, where
+`invsqrt_kl` keeps one tumor factor of 28 effective genes and `ls_nmf`
+one of 34.
+
+Observed, gene counts of the noise factors (`gene_weight_check.R`):
+`invsqrt_kl` noise factors load on genes with mean log10 total 4.8
+against 5.2 for its program factors (3 to 4 times the loading on the
+bottom-quartile genes); `kl` noise factors load on high-count genes (5.3
+against 5.35). The weighting moves which genes the spare factors fit; it
+does not create them.
+
+Observed, mechanism tests on `invsqrt_kl` at rank 23 on the breast
+replicates (rep1 / rep2):
+
+| change | stability | stable factors | unrepresentable mass | noise mass |
+|---|---|---|---|---|
+| default (20 molecules per row, 10,000 rows) | 0.31 / 0.31 | 6 / 6 | 24% / 23% | 24% / 27% |
+| 600 iterations | 0.32 | 7 | 25% | 29% |
+| 50,000 training rows | 0.33 / 0.33 | 5 / 5 | 25% / 20% | 28% / 23% |
+| 50 molecules per row | 0.45 / 0.42 | 10 / 7 | 10% / 10% | 6% / 7% |
+| 100 molecules per row | 0.51 / 0.54 | 11 / 13 | 6% / 5% | 7% / 4% |
+| `ls_nmf`, 50 molecules per row | 0.83 / 0.80 | 22 / 20 | 4% / 2% | 2% / 1% |
+| `ls_nmf`, 50,000 rows | 0.83 / 0.81 | 22 / 20 | 7% / 5% | 1% / 7% |
+
+With 50-molecule rows the rank-23 `invsqrt_kl` fit recovers 13 programs
+of 28 to 45 effective genes (tumor, two stromal, macrophages, T cells,
+myoepithelial, endothelial, DCIS, B cells, dendritic cells,
+proliferation, CD8 T cells, a second tumor program) and 7 to 9 of 19 cell
+types get a home factor; the remaining noise factors hold 6% of the
+molecules. On the pancreas halves 50-molecule rows cut the `invsqrt_kl`
+noise mass from 10% / 6% to 3% / 4% at rank 9 and raise stability from
+0.41 / 0.30 to 0.55 / 0.38; the rest of its instability there is the
+re-partitioning of Loop 15.
+
+Interpretation. (1) Removing the gene weighting does not remove the
+noise tail; raw counts make it larger at every rank and bring back the
+single-gene factors the weighting was introduced against. (2) The tail
+is the KL objective fitting the sampling noise of sparse neighborhood
+rows (20 molecules over 321 genes) with the spare rank: denser rows
+remove most of it, more rows and more iterations do nothing, and every
+count transform shows it. The least-squares variant with
+inverse-frequency gene weights does not reward fitting the noise of
+single rows and is unaffected by row density, row count and rank. (3)
+`ls_nmf` is the most stable and representable variant on both datasets at
+every rank, with the broadest programs and the most cell types resolved;
+`invsqrt_kl` with 50- to 100-molecule rows comes close in noise mass but
+not in one-to-one stability. The automatic neighborhood size
+(20 × sqrt(genes / 400), capped at half the median cell size, never below
+20) trades locality for counts and was set for the least-squares variant.
+
+Decided. No default changes: the variant and neighborhood defaults stay,
+because a larger neighborhood costs sub-cellular locality and only the
+cleanup benchmark (docs/audit.md) can price that. The multi-sample page
+names the lever for an unstable KL fit (a larger `ncv_k`), next to more
+restarts. Open: the cleanup benchmark of `invsqrt_kl` at `ncv_k = 50`
+against `ls_nmf`; the colleague's six-zone case, where `rank_ladder.R`
+on one zone separates noise factors from re-partitioning.

@@ -241,7 +241,10 @@ no other restart reproduces, which happens when its own restarts disagree
 among themselves (low within-sample stability); the shared space then
 holds fewer programs than the sample's own fit, and admixture programs
 among the lost ones are not cleaned. The unreproduced table names them,
-and more restarts give each of them more chances to be found twice. An
+and more restarts give each of them more chances to be found twice. With
+a KL variant much of the disagreement is the sampling noise of the sparse
+neighborhood rows fitted by the spare rank, and a larger neighborhood
+(`ncv_k`) removes most of it; `ls_nmf` is unaffected. An
 unstable fit also fills the shared space with the alternative
 decompositions its restarts make; the audit's own-marker false removal
 per sample shows what they cost, and raising `min_stability` prunes the

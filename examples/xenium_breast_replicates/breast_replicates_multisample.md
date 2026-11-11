@@ -375,7 +375,9 @@ report; nothing is gated on them.
     programs than the sample’s own fit, and admixture programs among the
     lost ones are not cleaned. The unreproduced table names the lost
     programs, and more restarts give each of them more chances to be
-    found twice.
+    found twice; with a KL variant a larger neighborhood (`ncv_k`)
+    removes most of the disagreement, which is the sampling noise of
+    the sparse neighborhood rows fitted by the spare rank.
   - `max_usage_divergence` and `divergent_cell_type` name the cell type
     whose factor usage differs most between this sample and the pool.
 

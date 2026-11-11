@@ -1,0 +1,35 @@
+dataset,sample,variant,rank,single_gene_factors,single_gene_mass,median_top_gene_share,median_effective_genes,mass_weighted_effective_genes,median_purity,mass_weighted_purity,cell_types_with_home,cell_types,median_home_share,noise_factors,noise_mass
+breast,rep1,ls_nmf,8,0,0,0.08,58.7,55.4,0.51,0.52,15,19,0.6,0,0
+breast,rep1,ls_nmf,23,0,0,0.14,35.8,35.4,0.47,0.53,13,19,0.55,3,0.013
+breast,rep1,invsqrt_kl,8,0,0,0.05,57.2,58.8,0.37,0.49,12,19,0.52,4,0.143
+breast,rep1,invsqrt_kl,23,0,0,0.14,16.9,23.4,0.37,0.48,5,19,0.35,15,0.235
+breast,rep2,ls_nmf,8,0,0,0.08,59.6,54.9,0.5,0.51,17,19,0.6,1,0.021
+breast,rep2,ls_nmf,23,0,0,0.15,37.1,35.9,0.51,0.5,12,19,0.52,4,0.011
+breast,rep2,invsqrt_kl,8,0,0,0.05,61.7,59.9,0.39,0.48,12,19,0.54,2,0.048
+breast,rep2,invsqrt_kl,23,0,0,0.15,15.1,25.3,0.38,0.47,5,19,0.42,17,0.27
+breast,rep1,kl,8,0,0,0.1,45.9,41.9,0.37,0.48,12,19,0.55,2,0.1
+breast,rep2,kl,8,0,0,0.11,45.2,40.1,0.37,0.47,14,19,0.56,3,0.143
+breast,rep1,sqrt_kl,8,0,0,0.08,41.2,42.7,0.37,0.48,10,19,0.53,3,0.149
+breast,rep2,sqrt_kl,8,0,0,0.09,45.3,42.3,0.37,0.47,15,19,0.59,2,0.082
+breast,rep1,kl,23,2,0.086,0.27,10.4,12,0.36,0.45,0,19,0.25,14,0.564
+breast,rep2,kl,23,1,0.041,0.28,10,14.3,0.4,0.44,1,19,0.36,16,0.433
+breast,rep1,sqrt_kl,23,0,0,0.23,10.8,13.1,0.37,0.45,1,19,0.33,16,0.468
+breast,rep2,sqrt_kl,23,1,0.029,0.26,9.1,12.8,0.35,0.44,0,19,0.33,19,0.725
+breast,rep1,invsqrt_kl_k50,23,0,0,0.11,32.6,38.5,0.39,0.51,7,19,0.46,10,0.064
+breast,rep2,invsqrt_kl_k50,23,0,0,0.1,30.7,41.3,0.4,0.5,9,19,0.46,9,0.065
+pancreas halves,left,ls_nmf,9,0,0,0.15,48,57.8,0.77,0.84,7,7,0.75,1,0.003
+pancreas halves,left,ls_nmf,14,0,0,0.14,45.9,45.4,0.74,0.83,6,7,0.71,2,0.018
+pancreas halves,right,ls_nmf,9,0,0,0.12,49.7,20.8,0.64,0.73,5,7,0.64,2,0.048
+pancreas halves,right,ls_nmf,14,2,0.372,0.2,34.2,17.6,0.64,0.72,4,7,0.57,1,0.002
+pancreas halves,left,kl,9,0,0,0.14,35.2,35.6,0.62,0.75,6,7,0.6,4,0.294
+pancreas halves,left,kl,14,0,0,0.19,19.3,22.9,0.65,0.72,3,7,0.4,5,0.198
+pancreas halves,right,kl,9,3,0.576,0.23,25.8,20.4,0.54,0.65,4,7,0.54,2,0.124
+pancreas halves,right,kl,14,3,0.524,0.23,12.9,13.1,0.59,0.65,2,7,0.42,8,0.326
+pancreas halves,left,sqrt_kl,9,0,0,0.09,34.8,40.8,0.66,0.75,4,7,0.61,5,0.32
+pancreas halves,left,sqrt_kl,14,0,0,0.13,22.9,24.9,0.62,0.71,3,7,0.38,6,0.238
+pancreas halves,right,sqrt_kl,9,0,0,0.18,20.8,21.2,0.53,0.65,5,7,0.57,4,0.179
+pancreas halves,right,sqrt_kl,14,0,0,0.25,12.3,14.3,0.53,0.64,3,7,0.45,8,0.277
+pancreas halves,left,invsqrt_kl,9,0,0,0.06,50.5,54,0.51,0.73,6,7,0.71,4,0.101
+pancreas halves,left,invsqrt_kl,14,0,0,0.09,31,37.4,0.55,0.74,4,7,0.53,6,0.093
+pancreas halves,right,invsqrt_kl,9,0,0,0.08,41.1,30,0.47,0.65,4,7,0.56,3,0.058
+pancreas halves,right,invsqrt_kl,14,0,0,0.1,24,21,0.5,0.66,4,7,0.53,7,0.09

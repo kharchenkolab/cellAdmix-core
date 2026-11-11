@@ -5,10 +5,19 @@
 # another restart's factor cone cannot represent (nonnegative least squares
 # on unit-sum profiles, median over the other restarts), and the factors
 # more than 30% unrepresentable ("noise factors") with their molecule share.
-# CELLADMIX_NMF_ITERATIONS overrides the NMF iteration count under its own run id.
+# CELLADMIX_NMF_ITERATIONS, CELLADMIX_NCV_K and CELLADMIX_TRAIN_ROWS override
+# the iteration count, the neighborhood size and the training-row cap, each
+# under its own run id.
 args <- commandArgs(TRUE)
 variant <- args[[1]]; ranks <- as.integer(strsplit(args[[2]], ",")[[1]]); out_csv <- args[[3]]; specs <- args[-(1:3)]
+`%||%` <- function(a, b) if (is.null(a)) b else a
+overrides <- list(); tag <- ""
 iterations <- as.integer(Sys.getenv("CELLADMIX_NMF_ITERATIONS", NA))
+if (!is.na(iterations)) { overrides$nmf_iterations <- iterations; tag <- paste0(tag, "_iter", iterations) }
+ncv_k <- as.integer(Sys.getenv("CELLADMIX_NCV_K", NA))
+if (!is.na(ncv_k)) { overrides$ncv_k <- ncv_k; tag <- paste0(tag, "_k", ncv_k) }
+train_rows <- as.integer(Sys.getenv("CELLADMIX_TRAIN_ROWS", NA))
+if (!is.na(train_rows)) { overrides$nmf_train_max_rows <- train_rows; tag <- paste0(tag, "_rows", train_rows) }
 suppressPackageStartupMessages(library(cellAdmixCore))
 ns <- asNamespace("cellAdmixCore")
 read_labels <- function(path) {
@@ -50,14 +59,16 @@ for (spec in specs) {
   p <- strsplit(spec, "=", fixed = TRUE)[[1]]
   ds <- cellAdmix(p[[2]], output_dir = p[[4]], annotation = read_labels(p[[3]]), num_threads = 6)
   for (k in ranks) {
-    fit <- if (is.na(iterations)) {
-      ds$fit(nmf_variant = variant, rank = k)
+    fit <- if (nzchar(tag)) {
+      do.call(ds$fit, c(list(nmf_variant = variant, rank = k,
+        run_id = sprintf("fit_manual_rank%d_%s%s", k, variant, tag)), overrides))
     } else {
-      ds$fit(nmf_variant = variant, rank = k, nmf_iterations = iterations,
-        run_id = sprintf("fit_manual_rank%d_%s_iter%d", k, variant, iterations))
+      ds$fit(nmf_variant = variant, rank = k)
     }
     rows[[length(rows) + 1]] <- cbind(sample = p[[1]], variant = variant,
-      iterations = if (is.na(iterations)) as.integer(fit$run$pipeline_options$nmf_iterations) else iterations,
+      iterations = as.integer(fit$run$pipeline_options$nmf_iterations),
+      ncv_k = as.integer(fit$run$pipeline_options$ncv_k),
+      training_rows = as.integer(fit$run$n_training_rows %||% NA),
       describe(fit))
   }
 }
