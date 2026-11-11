@@ -1366,3 +1366,132 @@ names the lever for an unstable KL fit (a larger `ncv_k`), next to more
 restarts. Open: the cleanup benchmark of `invsqrt_kl` at `ncv_k = 50`
 against `ls_nmf`; the colleague's six-zone case, where `rank_ladder.R`
 on one zone separates noise factors from re-partitioning.
+
+## Loop 17 (2026-11-11): choosing the neighborhood size
+
+Trigger. The user asked for strategies to pick the neighborhood size
+`ncv_k`: it has to stay below the cell size to capture sub-cellular
+admixture patterns, and it depends on the cell size, the panel size and
+more.
+
+Observed, the automatic rule and what it gives (`neighborhood_reach.py`;
+k = 20 × sqrt(genes / 400), capped at half the median cell's molecules,
+never below 20; reach is the median distance to the k-th within-cell
+neighbor as a share of the cell's equivalent radius, 2D from the molecule
+spread, over 1,500 cells of 30 or more molecules):
+
+| dataset | genes | molecules per cell (p25 / p50 / p75) | automatic k | k as share of the median cell | reach at k (share of the radius) |
+|---|---|---|---|---|---|
+| breast rep1 | 321 | 121 / 206 / 323 | 20 | 9% | 0.29 |
+| pancreas left | 377 | 15 / 30 / 52 | 20 | 38% (cap active) | 0.66 |
+| breast 5k crop | 5,101 | 73 / 143 / 325 | 71 | 33% | about 0.62 |
+
+Reach at 10 / 20 / 50 / 100 molecules: 0.20 / 0.29 / 0.48 / 0.71 on the
+breast replicate, 0.42 / 0.66 / 1.06 / 1.26 on the pancreas half, 0.23 /
+0.34 / 0.56 / 0.69 on the 5k crop.
+
+Observed, the spatial structure of admixture (`marker_patch_scale.py`;
+breast rep1; the molecules of genes whose share in the target type is 30
+times below the source type's, inside target cells within 20 µm of a
+source cell, five pairs): they sit at the periphery (median radial position
+0.72 to 0.84 of the radius against 0.63 to 0.66 for all molecules), on the
+half of the cell facing the source (16 to 22 points more than the cell's
+molecules), and are weakly clustered: among a foreign molecule's k nearest
+within-cell neighbors the foreign share is 2 to 3 times the cell's share at
+k = 10, 2 times at k = 20, 1.1 to 1.7 times at k = 50. Admixture is a
+source-facing rim whose foreign molecules are mixed with native ones at the
+10- to 20-molecule scale. The molecules the shared correction removes show
+the same decay (1.5 times at k = 5 to 10, none at k = 100), but that set is
+shaped by the 20-molecule neighborhoods and the label smoothing.
+
+Observed, the information side (`information_floor.R`; Bhattacharyya
+distance per molecule between the fitted programs, molecules for an error
+bound of exp(-3)): 2 to 3 molecules separate the median pair of programs on
+the 321- and 377-gene panels and 4 to 8 on the 5,101-gene panel (hardest
+tenth of pairs). Labeling against known programs needs far fewer molecules
+than a row holds; the counts matter for finding the programs, and only
+under the KL objective.
+
+Observed, fit structure against k (`results/variant_ladder.csv`; stability
+mean / noise mass):
+
+| data | k | `ls_nmf` | `invsqrt_kl` |
+|---|---|---|---|
+| breast rep1, rank 23 | 10 | 0.78 / 1% | 0.23 / 53% |
+| | 20 | 0.82 / 1% | 0.31 / 24% |
+| | 50 | 0.83 / 2% | 0.45 / 6% |
+| | 100 | | 0.51 / 7% |
+| breast 5k crop, rank 8 | 20 | 0.60 / 2% | 0.09 / 23% |
+| | 35 | 0.78 / 0% | 0.18 / 8% |
+| | 71 (automatic) | 0.84 / 1% | 0.32 / 4% |
+| | 140 | 0.72 / 0% | 0.39 / 1% |
+| breast 5k crop, rank 16 | 20 | 0.67 / 0% | 0.05 / 45% |
+| | 71 | 0.75 / 2% | 0.20 / 7% |
+| | 140 | 0.68 / 2% | 0.25 / 3% |
+
+Observed, cleanup against k (`cleanup_vs_k.R`;
+`results/breast_rep1_cleanup_vs_ncv_k.csv`; `ls_nmf` rank 23, bridge
+scoring, the 10-member vote at 0.3, audited over 172 detected pairs):
+
+| k | stability | rules kept | leakage removed overall | median pair sensitivity | pairs below 0.2 | own-marker false removal |
+|---|---|---|---|---|---|---|
+| 10 | 0.78 | 207 | 0.61 | 0.89 | 30 | 0.9% |
+| 20 | 0.82 | 213 | 0.63 | 0.86 | 22 | 1.6% |
+| 50 | 0.83 | 248 | 0.64 | 0.84 | 24 | 2.5% |
+| 100 | 0.79 | 250 | 0.61 | 0.79 | 23 | 2.8% |
+
+The pairs move in both directions: DCIS_2 → Myoepi_ACTA2+ (393,000 admixed
+molecules, the largest pair) is cleaned at 50 and 100 (0.82, 0.86) and not
+at 10 and 20 (0.05, 0.28); DCIS_1 → Myoepi_ACTA2+ (28,000) the reverse
+(0.86 at 20, 0.25 at 100); from 20 to 100, 29 pairs lose more than 0.1 and
+7 gain.
+
+Interpretation. (1) Two bounds. Locality bounds k from above: the
+admixture is a facing rim mixed at the 10- to 20-molecule scale, so the
+neighborhood belongs near a tenth of the cell's molecules (0.3 of its
+radius); the breast cleanup agrees, with false removal falling
+monotonically as k shrinks and the median pair sensitivity rising, while
+overall leakage removal stays within three points from 10 to 100 and the
+thin cell types lose their pairs at 100. Counts bound k from below, and the
+bound belongs to the fit, not to the labeling: 2 to 8 molecules separate
+the programs once they exist, but the KL objective needs 50 to 140 per row
+to find them without a noise tail (a third to all of the cell on the 5k
+panel and all of it on the pancreas), where the least-squares objective
+finds them at 10 to 20 on every panel tested. (2) The current rule serves
+the KL variant's count need (k grows with the square root of the panel)
+and meets the locality bound only through the cap at half the median
+cell: a third of the median cell on the 5k panel, two thirds on the
+pancreas. (3) No single k serves every pair: the largest breast pair needs
+50 or more, the thin-cell pairs 20 or less, and 10 leaves more pairs
+without a rule.
+
+Strategies, in order of preference:
+
+1. Locality rule with a variant floor: k = f × median molecules per cell,
+   f about 0.1, clamped to a floor that is the fit's count need (10 for
+   `ls_nmf`; for the KL variants 50 at 300 genes and 70 to 140 at 5,000)
+   and reported when the floor exceeds the locality bound instead of
+   silently capping. On the datasets here this gives 20 (breast), 14 (5k
+   crop) and 3 (pancreas, floored to 10) for `ls_nmf`.
+2. Multi-scale ensemble: pool the molecule vote over members labeled at
+   two or three neighborhood sizes (10, 20, 50) the way it pools over
+   restarts, so the pairs that need different scales are both covered and
+   the vote threshold keeps the specificity; the pair table shows both
+   directions of movement, so this is the one that can beat every single
+   k. The cost is one labeling pass per extra scale.
+3. Decoupled training and labeling neighborhoods for the KL variants: fit
+   the programs on dense rows (50 or more molecules, or whole-cell rows)
+   and label molecules with small rows projected onto the fixed profiles;
+   the fixed-profile path makes this testable without new code (a fit at
+   50, then a fixed-profile run at 20), and a `ncv_k_train` option would
+   make it a setting.
+4. Per-cell neighborhoods, k_cell = max(floor, f × N_cell), so that the
+   pancreas's 30-molecule cells and the breast's 200-molecule cells get
+   the same relative reach; the within-cell search supports it directly.
+5. A physical radius instead of a count equalizes the scale in µm across
+   cell sizes but ties the counts to the local density, which reintroduces
+   the count floor as a density floor; less attractive than 4.
+
+Decided. Nothing changed in the code or the defaults. Open: the cleanup
+ladder on the 5k crop, where the rule picks 71; strategies 2 and 3 cost one
+audited cleanup run each on the breast replicate (about 1.5 hours per arm).

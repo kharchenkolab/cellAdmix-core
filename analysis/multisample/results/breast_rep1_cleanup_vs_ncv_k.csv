@@ -1,0 +1,5 @@
+"ncv_k","stability_mean","rules_kept","rules_candidate","molecules_removed","detected_pairs","estimated_admixed","leakage_removed_overall","median_pair_sensitivity","pairs_below_0.2","own_marker_false_removal","worst_false_removal"
+10,0.778,207,259,8939522,172,12086775,0.6089,0.887,30,0.0092,"Stromal_&_T_Cell_Hybrid"
+20,0.816,213,273,8923378,172,12086775,0.6259,0.8608,22,0.0157,"Stromal_&_T_Cell_Hybrid"
+50,0.827,248,308,9080505,172,12086775,0.6369,0.843,24,0.0253,"Stromal_&_T_Cell_Hybrid"
+100,0.785,250,301,8672721,172,12086775,0.6126,0.789,23,0.0282,"Stromal_&_T_Cell_Hybrid"
