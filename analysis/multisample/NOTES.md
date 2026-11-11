@@ -1495,3 +1495,53 @@ Strategies, in order of preference:
 Decided. Nothing changed in the code or the defaults. Open: the cleanup
 ladder on the 5k crop, where the rule picks 71; strategies 2 and 3 cost one
 audited cleanup run each on the breast replicate (about 1.5 hours per arm).
+
+## Loop 18 (2026-11-11): the neighborhood ladder for the KL variant
+
+Trigger. Loop 17 ran the cleanup ladder for `ls_nmf` only; the user pointed
+out that the instability is the KL variant's. Same protocol
+(`cleanup_vs_k.R`, now taking the variant; breast rep1, rank 23, bridge
+scoring, the 10-member vote at 0.3, audited over 172 detected pairs), plus
+the decoupled arms of `decoupled_kl.R`: the programs of the 50- or
+100-molecule fit (its selected restart as the fixed profiles, all its
+restarts as the member pool) with every molecule labeled from 20-molecule
+rows.
+
+Observed (`results/breast_rep1_cleanup_vs_ncv_k.csv`; strict-tier
+sensitivity is 0.92 to 1.0 in every arm, so the arms separate on
+specificity):
+
+| fit | stability | rules kept | molecules removed (share of all) | leakage removed overall | median pair sensitivity | pairs below 0.2 | own-marker false removal |
+|---|---|---|---|---|---|---|---|
+| `ls_nmf`, 10 | 0.78 | 207 | 8.9M (23%) | 0.61 | 0.89 | 30 | 0.9% |
+| `ls_nmf`, 20 | 0.82 | 213 | 8.9M (22%) | 0.63 | 0.86 | 22 | 1.6% |
+| `ls_nmf`, 50 | 0.83 | 248 | 9.1M (23%) | 0.64 | 0.84 | 24 | 2.5% |
+| `ls_nmf`, 100 | 0.79 | 250 | 8.7M (22%) | 0.61 | 0.79 | 23 | 2.8% |
+| `invsqrt_kl`, 10 | 0.23 | 301 | 19.0M (48%) | 0.77 | 1.00 | 8 | 11.6% |
+| `invsqrt_kl`, 20 | 0.31 | 271 | 14.4M (36%) | 0.70 | 1.00 | 16 | 7.1% |
+| `invsqrt_kl`, 50 | 0.45 | 242 | 10.8M (27%) | 0.64 | 0.95 | 24 | 3.2% |
+| `invsqrt_kl`, 100 | 0.51 | 253 | 10.3M (26%) | 0.65 | 0.88 | 25 | 3.4% |
+| `invsqrt_kl`, programs at 50, labels at 20 | 0.45 | 242 | 10.7M (27%) | 0.64 | 0.95 | 27 | 2.6% |
+| `invsqrt_kl`, programs at 100, labels at 20 | 0.51 | 253 | 10.2M (26%) | 0.65 | 0.89 | 25 | 3.3% |
+
+Interpretation. (1) For the KL variant the ladder is the fit's noise, not
+locality: the noise factors of the sparse-row fits carry removal rules, and
+the 10- and 20-molecule fits remove half and a third of all molecules at
+12% and 7% own-marker false removal; denser training rows bring the
+removal to the least-squares level (26 to 27% of molecules) with false
+removal of about 3%. (2) The labeling neighborhood hardly matters: the
+decoupled arms reproduce their training fit's cleanup almost exactly, with
+false removal 0.6 points lower at 50 and the same at 100. The neighborhood
+size acts through the programs, so for the KL variant the training rows
+can be dense while the labels stay local, and strategy 3 of Loop 17 costs
+nothing in sensitivity. (3) Even so, the best KL arm (programs at 50, 2.6%)
+removes own markers at 1.6 times the rate of `ls_nmf` at 20 (1.6%) and
+three times `ls_nmf` at 10 (0.9%), for the same overall leakage removal
+(0.64 against 0.63); the least-squares fit remains the better default on
+this dataset, and its own ladder is governed by locality alone.
+
+Decided. Nothing changed in the code or defaults. For a KL fit, the
+recommendation is the decoupled form: 50 or more molecules per training
+row (70 to 140 on a 5,000-gene panel), labels at the locality rule's size.
+Open: the same two ladders on the 5k crop and on the pancreas halves, where
+the count floor and the cell size collide.

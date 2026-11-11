@@ -1,5 +1,11 @@
-"ncv_k","stability_mean","rules_kept","rules_candidate","molecules_removed","detected_pairs","estimated_admixed","leakage_removed_overall","median_pair_sensitivity","pairs_below_0.2","own_marker_false_removal","worst_false_removal"
-10,0.778,207,259,8939522,172,12086775,0.6089,0.887,30,0.0092,"Stromal_&_T_Cell_Hybrid"
-20,0.816,213,273,8923378,172,12086775,0.6259,0.8608,22,0.0157,"Stromal_&_T_Cell_Hybrid"
-50,0.827,248,308,9080505,172,12086775,0.6369,0.843,24,0.0253,"Stromal_&_T_Cell_Hybrid"
-100,0.785,250,301,8672721,172,12086775,0.6126,0.789,23,0.0282,"Stromal_&_T_Cell_Hybrid"
+variant,ncv_k,stability_mean,rules_kept,rules_candidate,molecules_removed,detected_pairs,estimated_admixed,leakage_removed_overall,median_pair_sensitivity,pairs_below_0.2,own_marker_false_removal,worst_false_removal
+ls_nmf,10,0.778,207,259,8939522,172,12086775,0.6089,0.887,30,0.0092,Stromal_&_T_Cell_Hybrid
+ls_nmf,20,0.816,213,273,8923378,172,12086775,0.6259,0.8608,22,0.0157,Stromal_&_T_Cell_Hybrid
+ls_nmf,50,0.827,248,308,9080505,172,12086775,0.6369,0.843,24,0.0253,Stromal_&_T_Cell_Hybrid
+ls_nmf,100,0.785,250,301,8672721,172,12086775,0.6126,0.789,23,0.0282,Stromal_&_T_Cell_Hybrid
+invsqrt_kl,10,0.225,301,406,18977617,172,12086775,0.7677,1,8,0.1157,Stromal_&_T_Cell_Hybrid
+invsqrt_kl,20,0.311,271,389,14363066,172,12086775,0.6981,0.9982,16,0.0712,Stromal_&_T_Cell_Hybrid
+invsqrt_kl,50,0.446,242,335,10802839,172,12086775,0.638,0.95,24,0.032,Stromal_&_T_Cell_Hybrid
+invsqrt_kl,100,0.509,253,315,10311192,172,12086775,0.651,0.8785,25,0.0338,Stromal_&_T_Cell_Hybrid
+"invsqrt_kl, programs at 50, labels at 20",20,0.446,242,335,10671507,172,12086775,0.6391,0.9461,27,0.0256,Stromal_&_T_Cell_Hybrid
+"invsqrt_kl, programs at 100, labels at 20",20,0.509,253,315,10249341,172,12086775,0.6502,0.8894,25,0.0331,Stromal_&_T_Cell_Hybrid
