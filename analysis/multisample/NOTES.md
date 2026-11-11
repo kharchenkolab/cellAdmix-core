@@ -1146,3 +1146,118 @@ for shared programs was not pursued; (2) the per-sample steps of the
 correction run concurrently (Loop 13); (3) the candidate budget already
 scales with the sample count, one single-sample budget per sample scaled
 by relative size (Loop 13). The pull request to `dev` waits for the user.
+
+## Loop 15 (2026-11-11): the stability gate, and what restart instability is
+
+Trigger. A colleague's six-zone run produced two shared factors; the
+zones' own fits had few stable factors after a coarser annotation (under
+investigation on their side, rank fixed to the fine annotation's value).
+The user set the terms: recurrence is across samples, stability is across
+restarts within a sample; the consensus code had used "recurrence" for the
+restart share and "coverage" for the sample share.
+
+Observed, what the majority rule (restart share 0.5) drops, from the
+pooled clustering at threshold 0 (`pooled_factors.csv` of Loop 11 and the
+replicates' pools):
+
+| data | factors at 0 | dropped at 0.5 | of those in 2+ samples | in 3+ | in 4 to 6 |
+|---|---|---|---|---|---|
+| breast replicates | 37 | 11 | 3 | | |
+| eight tiles | 61 | 24 | 20 | 12 | 6 |
+
+One dropped program occurs in 6 of 8 tiles (10 restarts in all, at most
+2 per tile); the rule keeps 2 single-tile programs. The dropped programs
+have lower within-cluster agreement (median 0.58 against 0.76). The
+cleanup differences between the thresholds on stable fits (Loop 10) were
+within run-to-run variation; the sensitivity cost showed on the pancreas
+halves (0.60 / 0.55 → 0.48 / 0.40) and the unstable breast fits (Loop
+12). More restarts do not raise a restart share; they only help the
+two-restart minimum.
+
+Observed, fixed-rank weighted NMF of the pooled unit-sum restart profiles
+(rows weighted by sample weight over the sample's restarts; fitted on the
+odd restarts, even restarts projected by nonnegative least squares):
+
+| variant | construction | profiles | held-out unexplained |
+|---|---|---|---|
+| `ls_nmf` | pooled NMF rank 23 / 37 | 23 / 37 | 0.17 / 0.07 |
+| `ls_nmf` | cluster medians, 0.5 / 0 | 26 / 37 | 0.13 / 0.07 |
+| `invsqrt_kl` | pooled NMF rank 23 / 45 | 23 / 45 | 0.59 / 0.45 |
+| `invsqrt_kl` | cluster medians, 0.5 / 0 | 12 / 71 | 0.72 / 0.36 |
+
+On the stable variant the factorization rediscovers the cluster programs
+(each profile matches one at ownership r 0.81 to 0.97; primaries load on
+one profile, median share 0.91) and reconstructs held-out restarts as the
+medians do at equal size; the held-out curve has no elbow at any rank. On
+the unstable variant no common low-rank cone exists, and the fixed-rank
+profiles are mixtures (matches 0.25 to 0.91, half the primaries spread
+over several profiles), the blurring of the pooled mean (Loop 9).
+
+Observed, restart structure (`restart_structure.R`: for each pair of
+restarts, the share of a factor's unit-sum profile that nonnegative least
+squares on the other restart's factors cannot represent; "noise factors"
+are primary factors above 0.3 in the median over the other restarts):
+
+| fit | objective spread | one-to-one stability | unrepresentable, mass-weighted | noise factors (mass) |
+|---|---|---|---|---|
+| breast `ls_nmf` rank 23 | 0.5% / 0.5% | 0.82 / 0.79 | 2% / 2% | 3 / 4 of 23 (1% / 1%) |
+| breast `invsqrt_kl` rank 23 | 1.7% / 1.1% | 0.31 / 0.31 | 24% / 23% | 15 / 17 of 23 (24% / 27%) |
+| breast `invsqrt_kl` rank 23, 600 iterations | 2.0% | 0.32 | 25% | 16 of 23 (29%) |
+| breast `invsqrt_kl` rank 8 | 1.6% / 2.1% | 0.47 / 0.52 | 8% / 6% | 4 / 2 of 8 (14% / 5%) |
+| pancreas halves `invsqrt_kl` rank 9 | 1.5% / 1.4% | 0.41 / 0.29 | 8% / 9% | 4 / 3 of 9 (10% / 6%) |
+
+On the pancreas right half 8 of 9 primary factors have stability below
+0.5 while 92% of the molecules sit in factors representable in every
+other restart at under 10% residual (INS/GCG at 1%): re-partitionings of
+the same programs. The noise factors are small (0.5 to 3% of molecules
+each), nearly orthogonal across restarts (85 to 95% unrepresentable), and
+their top genes are not programs (THAP2/EIF4EBP1/LPL/DMKN,
+MAP3K8/FSTL3/EDNRB/RAPGEF3, LARS/JUP/CLDN4/KLF5).
+
+Observed, rank ladder (`rank_ladder.R`; `results/breast_rank_ladder.csv`;
+10 restarts, 150 iterations):
+
+| variant | rank | stability mean (rep1 / rep2) | stable factors | unrepresentable, mass-weighted | noise mass |
+|---|---|---|---|---|---|
+| `ls_nmf` | 8 | 0.94 / 0.89 | 8 / 7 | 0% / 2% | 0% / 2% |
+| `ls_nmf` | 12 | 0.80 / 0.85 | 11 / 11 | 2% / 2% | 1% / 2% |
+| `ls_nmf` | 16 | 0.80 / 0.80 | 15 / 14 | 3% / 6% | 0% / 8% |
+| `ls_nmf` | 23 | 0.82 / 0.79 | 21 / 20 | 2% / 2% | 1% / 1% |
+| `invsqrt_kl` | 5 | 0.53 / 0.58 | 2 / 3 | 4% / 4% | 4% / 0% |
+| `invsqrt_kl` | 8 | 0.47 / 0.52 | 4 / 5 | 8% / 6% | 14% / 5% |
+| `invsqrt_kl` | 12 | 0.42 / 0.40 | 5 / 4 | 11% / 11% | 10% / 9% |
+| `invsqrt_kl` | 16 | 0.36 / 0.34 | 6 / 4 | 16% / 17% | 18% / 16% |
+| `invsqrt_kl` | 23 | 0.31 / 0.31 | 6 / 6 | 24% / 23% | 24% / 27% |
+
+Interpretation. (1) The majority rule was a stability gate, against the
+standing decision that stability is report-only, and it discards programs
+that recur across samples while keeping single-sample ones. (2) A
+fixed-rank factorization of the pooled factor space is not a robustness
+step: it reproduces the clustering where the fits are stable and blurs
+where they are not, and no held-out criterion picks its rank. (3) Two
+things hide under low stability. Re-partitioning of real programs across
+restarts (the same cone, a different basis) happens on the pancreas
+halves and is what the one-to-one metric under-reports. Noise factors,
+small, nearly orthogonal across restarts, with gene-soup profiles, are the
+other, and `invsqrt_kl` produces them in proportion to the rank: it
+resolves 4 to 7 programs on the breast replicates at any rank and fills
+the rest of the rank with interchangeable fits of the residual (objective
+spread 1 to 2%, unchanged by four times the iterations), which is why its
+stability falls monotonically with the rank while `ls_nmf` keeps the
+unrepresentable mass at 2% up to rank 23. The ensemble vote tolerates the
+noise factors because their labels differ from member to member and
+cancel in the vote. The likely cause is the inverse-square-root gene
+weighting handing the objective to the low-count genes, whose Poisson
+noise the extra factors fit; untested.
+
+Decided. `min_stability = 0` is the default in both bindings: every
+program that two restarts agree on enters, with recurrence (share of
+samples) and stability (largest restart share in any sample) reported per
+factor and ordered by recurrence; the terms are renamed throughout
+(`fit_consensus(min_stability)`, `factors$recurrence`,
+`factors$stability`, `factor_stability()`), and the docs no longer
+prescribe a more stable variant or more restarts as the remedy for a
+fired shared-factor flag. The example pages are re-rendered under the
+new default (37 shared factors on the replicates). Open: a KL fit without
+the gene weighting to test the cause of the noise tail; across-sample
+recurrence as an optional admission gate.
